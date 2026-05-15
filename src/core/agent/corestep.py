@@ -7,13 +7,13 @@ from src.core.skills.registry import SkillRegistry
 from src.governance.tool_selection import select_tool
 from src.execution.engine import execute_tool
 from src.core.types.result import CoreResult
-
+from src.core.agent.outcome import classify_step, StepOutcome
 
 def core_step(
     state: ConversationState,
     transport: LLMTransport,
     config: AgentConfig,
-) -> Tuple[CoreResult, ConversationState]:
+) -> Tuple[CoreResult, ConversationState, StepOutcome]:
 
     # 1. Build prompt from state
     prompt = state.as_prompt()
@@ -33,7 +33,7 @@ def core_step(
         result = CoreResult.from_text(llm_resp.text or "")
         state.append_llm(result.text)
         state.last_result = result
-        return result, state
+        return result, state, classify_step(result)
 
     # 5. Governance
     spec = select_tool(
@@ -46,6 +46,7 @@ def core_step(
 
     # 6. Execute tool
     result = execute_tool(spec, llm_resp.tool_args or {})
+
     state.last_result = result
 
     if result.is_error:
@@ -53,4 +54,6 @@ def core_step(
     else:
         state.append_tool(spec.name, result.tool_output)
 
-    return result, state
+    outcome = classify_step(result)
+
+    return result, state, outcome
