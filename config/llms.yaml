@@ -1,9 +1,9 @@
 # /config/llms.yaml
 
-default: deepseek-mini
+default: deepseek-chat
 
 llms:
-  deepseek-mini:
+  deepseek-chat:
     model: "deepseek-chat"
     temperature: 0.0
     max_tokens: 4096

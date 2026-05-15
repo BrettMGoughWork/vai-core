@@ -8,11 +8,11 @@ A minimal, layered agent runtime built around deterministic boundaries, canonica
 # Install dependencies
 uv sync
 
-# Run end-to-end test
+# Run the runtime entrypoint
 uv run --with openai --with python-dotenv python main.py
 
 # Run test suite
-uv run --with pytest --with python-dotenv pytest -v
+uv run --with pytest --with python-dotenv pytest -q
 ```
 
 ## Directory Structure
@@ -20,6 +20,7 @@ uv run --with pytest --with python-dotenv pytest -v
 ```
 src/
 ├── core/              # Core execution loop and utilities
+│   ├── agent/         # Agent config, state, step, and runtime
 │   ├── loop.py        # CoreLoop: one LLM call → one action
 │   ├── config/        # Config loading (JSON + env overrides)
 │   ├── skills/        # Skill introspection and validation
@@ -47,9 +48,12 @@ config/
 └── agents.yaml        # Agent definitions
 
 tests/
-├── test_e2e.py        # End-to-end core loop tests
-├── test_core_*.py     # Layer-specific unit tests
-└── test_core_llm_transport.py  # Transport layer tests
+├── test_agent_e2e.py              # End-to-end runtime flow with fake LLM
+├── test_core_agent_runtime.py     # AgentRuntime behavior
+├── test_core_agent_corestep.py    # Single-step stateful execution
+├── test_core_agent_state.py       # ConversationState prompt/history logic
+├── test_core_llm_transport.py     # Transport layer tests
+└── test_core_*.py                 # Other layer-specific unit tests
 
 main.py               # Entry point: initializes runtime + transport
 ```
@@ -136,4 +140,6 @@ All layers have focused unit tests:
 - `test_core_llm_transport.py` — LLM transport
 - `test_e2e.py` — full stack integration
 
-Run all: `uv run --with pytest --with python-dotenv pytest -v`
+`pytest.ini` scopes discovery to `tests/`.
+
+Run all: `uv run --with pytest --with python-dotenv pytest -q`
