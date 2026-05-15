@@ -31,6 +31,12 @@ class ToolSpec:
     # Optional: whether this tool is allowed by default
     enabled: bool = True
 
+    # Optional: whether to hide this tool from the LLM (for internal use only)
+    hidden: bool = False
+
+    # Optional: whether this tool is only for development/testing and should not be used in production
+    dev_only: bool = False
+
     def run(self, **kwargs) -> Any:
         """
         Execute the tool with validated arguments.

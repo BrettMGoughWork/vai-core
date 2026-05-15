@@ -9,86 +9,80 @@ from src.core.skills.registry import SkillRegistry
 from .config import AgentConfig
 
 
-class _SkillRegistryAdapter:
-    @staticmethod
-    def get_spec(name: str):
-        try:
-            return SkillRegistry.get(name)
-        except KeyError:
-            return None
-
-
 class AgentRuntime:
     def __init__(self, transport: LLMTransport, config: AgentConfig):
         self.transport = transport
         self.config = config
 
+    # ---------------------------------------------------------
+    # Single-step agent
+    # ---------------------------------------------------------
     def step(self, prompt: str) -> CoreResult:
-        """
-        Single-step agent:
-        - call LLM
-        - maybe call one tool
-        - return CoreResult
-        """
+        # Tightened tool exposure
+        tools = SkillRegistry.all_specs_for_agent(self.config)
+
         llm_resp: CoreLLMResponse = self.transport.call(
             prompt=prompt,
-            tools=SkillRegistry.all(),
+            tools=tools,
             model=self.config.model,
         )
 
-        # No tool requested → plain text
+        # LLM returned plain text
         if not llm_resp.tool_name:
             return CoreResult.from_text(llm_resp.text or "")
 
-        # Tool requested → governance + execution
+        # Governance: ensure tool is allowed
         spec = select_tool(
             tool_name=llm_resp.tool_name,
             allowed_tools=self.config.allowed_tools,
             allowed_categories=self.config.allowed_categories,
             allowed_side_effects=self.config.allowed_side_effects,
-            registry=_SkillRegistryAdapter,
+            registry=SkillRegistry,
         )
 
+        # Execute the tool
         return execute_tool(spec, llm_resp.tool_args or {})
 
+    # ---------------------------------------------------------
+    # Multi-step agent
+    # ---------------------------------------------------------
     def run(self, prompt: str) -> CoreResult:
-        """
-        Multi-step agent:
-        - loop up to max_steps
-        - feed tool results back into LLM
-        - stop on text or error
-        """
-        context: str = prompt
+        context = prompt
         last_result: Optional[CoreResult] = None
 
         for _ in range(self.config.max_steps):
+            tools = SkillRegistry.all_specs_for_agent(self.config)
+
             llm_resp: CoreLLMResponse = self.transport.call(
                 prompt=context,
-                tools=SkillRegistry.all(),
+                tools=tools,
                 model=self.config.model,
             )
 
+            # LLM returned final text
             if not llm_resp.tool_name:
                 return CoreResult.from_text(llm_resp.text or "")
 
+            # Governance
             spec = select_tool(
                 tool_name=llm_resp.tool_name,
                 allowed_tools=self.config.allowed_tools,
                 allowed_categories=self.config.allowed_categories,
                 allowed_side_effects=self.config.allowed_side_effects,
-                registry=_SkillRegistryAdapter,
+                registry=SkillRegistry,
             )
 
+            # Execute tool
             result = execute_tool(spec, llm_resp.tool_args or {})
             last_result = result
 
             if result.is_error:
                 return result
 
-            # naive: append tool output back into context
+            # Feed tool output back into LLM
             context += f"\n\nTool {result.tool_name} returned: {result.tool_output}"
 
-        # max steps reached
+        # Max steps reached
         if last_result is not None:
             return last_result
 

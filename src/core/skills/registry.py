@@ -3,7 +3,6 @@ from typing import Dict, List, Optional
 
 from .toolspec import ToolSpec
 
-
 class SkillRegistry:
     """
     Global registry for all skills in the system.
@@ -37,8 +36,36 @@ class SkillRegistry:
         return cls._skills[name]
 
     @classmethod
+    def get_spec(cls, name: str) -> Optional[ToolSpec]:
+        return cls._skills.get(name)
+
+    @classmethod
     def all(cls) -> List[ToolSpec]:
         return list(cls._skills.values())
+
+    @classmethod
+    def all_specs(cls) -> List[ToolSpec]:
+        """
+        Return only globally valid skills:
+        - enabled
+        - not hidden
+        - not dev-only
+        """
+        return [
+            spec
+            for spec in cls._skills.values()
+            if spec.enabled and not spec.hidden and not spec.dev_only
+        ]
+    
+    @classmethod
+    def all_specs_for_agent(cls, config):
+        return [
+            spec
+            for spec in cls.all_specs()
+            if spec.name in config.allowed_tools
+            and spec.category in config.allowed_categories
+            and spec.side_effects in config.allowed_side_effects
+        ]
 
     # ---------------------------------------------------------
     # Filtering (used by agent policies)
