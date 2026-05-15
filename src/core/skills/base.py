@@ -8,6 +8,7 @@ from .side_effects import SideEffect
 from .schema import generate_schema_from_handler
 from .validator import validate_structural, ValidationError
 from .semantic import validate_semantic, SemanticValidationError
+from .canonical import canonicalize_args
 
 @dataclass
 class BaseSkill:
@@ -63,13 +64,16 @@ class BaseSkill:
         Validate arguments and execute the handler.
         """
 
+        # canonicalisation
+        clean = canonicalize_args(self.spec.schema, kwargs)
+
         # structural validation
-        validate_structural(self.spec.schema, kwargs)
+        validate_structural(self.spec.schema, clean)
 
         # semantic validation
-        validate_semantic(self.spec.schema, kwargs)
+        validate_semantic(self.spec.schema, clean)
         
-        return self.spec.run(**kwargs)
+        return self.spec.run(**clean)
 
     # ---------------------------------------------------------
     # What the LLM sees

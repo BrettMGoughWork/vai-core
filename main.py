@@ -7,7 +7,7 @@ from src.transport.llm import DeepSeekLLM
 from src.observability.logger import StructuredLogger
 from src.telemetry.telemetry import Telemetry
 from src.policy.policy import Policy
-from config.loader import Config
+from src.core.config.loader import Config
 from src.tools.schema import ToolSchemaGenerator
 from src.tools.prompt_builder import ToolPromptBuilder
 from src.tools.validator import ToolValidator
@@ -55,7 +55,7 @@ def create_runtime():
 
 if __name__ == "__main__":
     runtime = create_runtime()
-    print(runtime.run("add 5 and 7"))
+    print(runtime.run("add 1 and 2"))
     if runtime.telemetry:
         print("\nTelemetry snapshot:")
         print(runtime.telemetry.snapshot())
