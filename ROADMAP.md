@@ -11,7 +11,7 @@ X. Implement canonicalisation layer — trim, normalise, lower.
 X. Implement LLM transport wrapper — single entrypoint.  
 X. Implement tool selection governance — allowed tools, categories.  
 X. Implement tool execution engine — call handler, wrap errors.  
-12. Define CoreResult type — success, error, metadata.
+X. Define CoreResult type — success, error, metadata.
 
 ---
 

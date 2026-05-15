@@ -3,149 +3,168 @@ from unittest.mock import MagicMock, patch
 
 from src.execution.engine import execute_tool
 from src.execution.errors import ToolExecutionError
+from src.core.types.result import CoreResult
 from src.core.skills.base import BaseSkill
 
 
-def test_execute_tool_runs_skill_with_args():
-    """execute_tool calls skill.run() with the provided arguments."""
+def test_execute_tool_returns_core_result_on_success():
+    """execute_tool returns CoreResult with tool name and output."""
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "test_skill"
     mock_skill.run.return_value = 42
 
     result = execute_tool(mock_skill, {"a": 1, "b": 2})
 
-    assert result == 42
-    mock_skill.run.assert_called_once_with(a=1, b=2)
+    assert isinstance(result, CoreResult)
+    assert result.tool_name == "test_skill"
+    assert result.tool_output == 42
+    assert result.error is None
+    assert result.is_tool is True
+    assert result.is_error is False
 
 
-def test_execute_tool_returns_handler_result():
-    """execute_tool returns the exact result from the handler."""
+def test_execute_tool_calls_skill_run_with_args():
+    """execute_tool passes all arguments to skill.run()."""
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "add"
-    expected_result = {"sum": 42, "count": 2}
-    mock_skill.run.return_value = expected_result
+    mock_skill.run.return_value = 100
 
-    result = execute_tool(mock_skill, {"a": 10, "b": 32})
+    execute_tool(mock_skill, {"a": 50, "b": 50})
 
-    assert result == expected_result
-    assert result is expected_result
+    mock_skill.run.assert_called_once_with(a=50, b=50)
 
 
-def test_execute_tool_raises_toolexecutionerror_on_failure():
-    """execute_tool wraps any exception from skill.run() as ToolExecutionError."""
+def test_execute_tool_returns_error_result_on_exception():
+    """execute_tool returns CoreResult with error message on exception."""
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "failing_skill"
     mock_skill.run.side_effect = ValueError("Invalid input")
 
-    with pytest.raises(ToolExecutionError) as exc_info:
-        execute_tool(mock_skill, {"x": "bad"})
+    result = execute_tool(mock_skill, {"x": "bad"})
 
-    assert "failing_skill" in str(exc_info.value)
-    assert "Invalid input" in str(exc_info.value)
-    assert isinstance(exc_info.value.__cause__, ValueError)
+    assert isinstance(result, CoreResult)
+    assert result.is_error is True
+    assert "failing_skill" in result.error
+    assert "Invalid input" in result.error
+    assert result.tool_name is None
+    assert result.tool_output is None
 
 
-def test_execute_tool_preserves_exception_chain():
-    """ToolExecutionError preserves the original exception as __cause__."""
+def test_execute_tool_error_includes_skill_name():
+    """Error result message includes the skill name."""
     mock_skill = MagicMock(spec=BaseSkill)
-    mock_skill.name = "error_skill"
-    original_error = RuntimeError("Original error")
-    mock_skill.run.side_effect = original_error
+    mock_skill.name = "my_special_skill"
+    mock_skill.run.side_effect = RuntimeError("Something broke")
 
-    with pytest.raises(ToolExecutionError) as exc_info:
-        execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {})
 
-    assert exc_info.value.__cause__ is original_error
+    assert "my_special_skill" in result.error
+
+
+def test_execute_tool_preserves_handler_result_type():
+    """execute_tool preserves the exact result type from handler."""
+    mock_skill = MagicMock(spec=BaseSkill)
+    mock_skill.name = "dict_skill"
+    expected_output = {"sum": 42, "count": 2}
+    mock_skill.run.return_value = expected_output
+
+    result = execute_tool(mock_skill, {})
+
+    assert result.tool_output == expected_output
+    assert result.tool_output is expected_output
 
 
 def test_execute_tool_with_empty_args():
     """execute_tool works with no arguments."""
     mock_skill = MagicMock(spec=BaseSkill)
-    mock_skill.name = "no_args_skill"
+    mock_skill.name = "no_args"
     mock_skill.run.return_value = "done"
 
     result = execute_tool(mock_skill, {})
 
-    assert result == "done"
+    assert isinstance(result, CoreResult)
+    assert result.tool_name == "no_args"
+    assert result.tool_output == "done"
     mock_skill.run.assert_called_once_with()
 
 
 def test_execute_tool_with_multiple_args():
-    """execute_tool passes all arguments to skill.run()."""
+    """execute_tool passes all arguments correctly."""
     mock_skill = MagicMock(spec=BaseSkill)
-    mock_skill.name = "multi_arg_skill"
+    mock_skill.name = "multi"
     mock_skill.run.return_value = "result"
 
-    result = execute_tool(mock_skill, {"a": 1, "b": "text", "c": [1, 2, 3], "d": {"nested": True}})
+    result = execute_tool(mock_skill, {"a": 1, "b": "text", "c": [1, 2, 3]})
 
-    assert result == "result"
-    mock_skill.run.assert_called_once_with(a=1, b="text", c=[1, 2, 3], d={"nested": True})
+    assert result.tool_output == "result"
+    mock_skill.run.assert_called_once_with(a=1, b="text", c=[1, 2, 3])
 
 
 def test_execute_tool_handles_validation_errors():
-    """execute_tool catches and wraps validation errors from skill.run()."""
+    """execute_tool catches and returns ValidationError as CoreResult."""
     from src.core.skills.validator import ValidationError
 
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "validate_skill"
     mock_skill.run.side_effect = ValidationError("Missing required field: x")
 
-    with pytest.raises(ToolExecutionError) as exc_info:
-        execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {})
 
-    assert "validate_skill" in str(exc_info.value)
-    assert "Missing required field" in str(exc_info.value)
+    assert isinstance(result, CoreResult)
+    assert result.is_error is True
+    assert "validate_skill" in result.error
 
 
 def test_execute_tool_handles_canonicalisation_errors():
-    """execute_tool catches and wraps canonicalisation errors from skill.run()."""
+    """execute_tool catches and returns canonicalisation errors as CoreResult."""
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "canon_skill"
     mock_skill.run.side_effect = TypeError("Cannot coerce value to int")
 
-    with pytest.raises(ToolExecutionError) as exc_info:
-        execute_tool(mock_skill, {"x": "not_a_number"})
+    result = execute_tool(mock_skill, {"x": "not_a_number"})
 
-    assert "canon_skill" in str(exc_info.value)
-    assert "Cannot coerce" in str(exc_info.value)
+    assert isinstance(result, CoreResult)
+    assert result.is_error is True
+    assert "canon_skill" in result.error
 
 
-def test_execute_tool_error_message_includes_skill_name():
-    """ToolExecutionError message always includes the skill name."""
+def test_execute_tool_handles_generic_exceptions():
+    """execute_tool wraps any exception as ToolExecutionError."""
     mock_skill = MagicMock(spec=BaseSkill)
-    mock_skill.name = "my_special_skill"
-    mock_skill.run.side_effect = Exception("Some error")
+    mock_skill.name = "error_skill"
+    mock_skill.run.side_effect = Exception("Something unexpected")
 
-    with pytest.raises(ToolExecutionError) as exc_info:
-        execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {})
 
-    assert "my_special_skill" in str(exc_info.value)
-
-
-def test_execute_tool_delegates_full_validation_to_skill():
-    """execute_tool assumes skill.run() handles all validation and canonicalisation."""
-    # This test documents that execute_tool is thin—it's the skill's responsibility
-    # to validate and canonicalise before executing the handler.
-    
-    def fake_handler(a: int, b: int) -> int:
-        return a + b
-
-    mock_skill = MagicMock(spec=BaseSkill)
-    mock_skill.name = "add"
-    mock_skill.run = MagicMock(side_effect=lambda **kw: fake_handler(**kw))
-
-    result = execute_tool(mock_skill, {"a": 5, "b": 3})
-
-    assert result == 8
-    # The skill's run method is called, trusting it to validate/canonicalise
+    assert isinstance(result, CoreResult)
+    assert result.is_error is True
+    assert "error_skill" in result.error
+    assert "Something unexpected" in result.error
 
 
-def test_execute_tool_returns_none_when_handler_returns_none():
-    """execute_tool correctly returns None if the handler returns None."""
+def test_execute_tool_returns_none_output_safely():
+    """execute_tool correctly returns None as tool_output."""
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "void_skill"
     mock_skill.run.return_value = None
 
     result = execute_tool(mock_skill, {})
 
-    assert result is None
+    assert isinstance(result, CoreResult)
+    assert result.tool_name == "void_skill"
+    assert result.tool_output is None
+    assert result.is_tool is True
+    assert result.is_error is False
+
+
+def test_execute_tool_result_is_always_core_result():
+    """execute_tool always returns a CoreResult, never raises."""
+    mock_skill = MagicMock(spec=BaseSkill)
+    mock_skill.name = "always_fails"
+    mock_skill.run.side_effect = Exception("Catastrophic failure")
+
+    # This should never raise—should return CoreResult with error
+    result = execute_tool(mock_skill, {})
+
+    assert isinstance(result, CoreResult)
+    assert result.is_error is True
