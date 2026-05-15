@@ -17,7 +17,7 @@ X. Define CoreResult type — success, error, metadata.
 
 # PHASE 2 — State Machine & Loop Semantics
 
-13. Define ConversationState — input, history, last tool call, metadata.  
+X. Define ConversationState — input, history, last tool call, metadata.  
 14. Implement corestep(state) — one LLM → tool → result transition.  
 15. Classify step outcomes — success, recoverable, fatal, noop.  
 16. Define isdone(state) — goal reached, limits hit.  

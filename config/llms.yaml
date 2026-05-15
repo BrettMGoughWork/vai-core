@@ -1,6 +1,6 @@
 # /config/llms.yaml
 
-default: deepseek-chat
+default: deepseek-mini
 
 llms:
   deepseek-mini:
