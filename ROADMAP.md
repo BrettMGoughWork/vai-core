@@ -10,7 +10,7 @@ X. Implement semantic validator hook — domain‑specific checks.
 X. Implement canonicalisation layer — trim, normalise, lower.  
 X. Implement LLM transport wrapper — single entrypoint.  
 X. Implement tool selection governance — allowed tools, categories.  
-11. Implement tool execution engine — call handler, wrap errors.  
+X. Implement tool execution engine — call handler, wrap errors.  
 12. Define CoreResult type — success, error, metadata.
 
 ---
