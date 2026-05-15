@@ -1,7 +1,7 @@
 import os
 import json
+from dotenv import load_dotenv
 from openai import OpenAI
-from src.util.helpers import load_env_file
 
 SYSTEM_PROMPT = """
 You are a deterministic tool-calling model.
@@ -36,7 +36,7 @@ Return ONLY a JSON object. No prose.
 class DeepSeekLLM:
     def __init__(self, model="deepseek-chat", schema_prompt=None):
         # Ensure local .env values are loaded in development/dev VM runs.
-        load_env_file()
+        load_dotenv(override=False)
 
         api_key = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
         base_url = (os.environ.get("DEEPSEEK_BASE_URL") or "https://api.deepseek.com/v1").strip()
