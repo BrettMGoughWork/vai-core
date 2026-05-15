@@ -5,6 +5,7 @@ from .toolspec import ToolSpec
 from .registry import SkillRegistry
 from .categories import SkillCategory
 from .side_effects import SideEffect
+from .schema import generate_schema_from_handler
 
 @dataclass
 class BaseSkill:
@@ -48,14 +49,9 @@ class BaseSkill:
     # ---------------------------------------------------------
     def _infer_schema_from_handler(self) -> Dict[str, Any]:
         """
-        Very minimal schema inference. Later steps will replace this
-        with full signature introspection.
+        Infer a JSON schema from the handler's type hints.
         """
-        return {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        return generate_schema_from_handler(self.handler)
 
     # ---------------------------------------------------------
     # Execution wrapper
