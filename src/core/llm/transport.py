@@ -12,21 +12,23 @@ class LLMTransport:
     """
 
     def __init__(self, client):
-        self.client = client # e.g. OpenAI, Anthropic, DeepSeek
+        self.client = client  # e.g. OpenAI, Anthropic, DeepSeek
 
-    async def call(
+    def call(
         self,
         prompt: str,
         tools: List[ToolSpec],
         model: str,
         temperature: float = 0.2,
     ) -> CoreLLMResponse:
-
+        """
+        Call the LLM with tools and parse the response.
+        """
         # Convert ToolSpecs → provider schema
         tool_defs = [self._convert_tool_spec(t) for t in tools]
 
         # Call the provider
-        raw = await self.client.chat.completions.create(
+        raw = self.client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             tools=tool_defs,
