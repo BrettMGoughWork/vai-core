@@ -7,6 +7,7 @@ from .categories import SkillCategory
 from .side_effects import SideEffect
 from .schema import generate_schema_from_handler
 from .validator import validate_structural, ValidationError
+from .semantic import validate_semantic, SemanticValidationError
 
 @dataclass
 class BaseSkill:
@@ -61,7 +62,13 @@ class BaseSkill:
         """
         Validate arguments and execute the handler.
         """
+
+        # structural validation
         validate_structural(self.spec.schema, kwargs)
+
+        # semantic validation
+        validate_semantic(self.spec.schema, kwargs)
+        
         return self.spec.run(**kwargs)
 
     # ---------------------------------------------------------
