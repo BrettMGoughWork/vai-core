@@ -55,7 +55,7 @@ def create_runtime():
 
 if __name__ == "__main__":
     runtime = create_runtime()
-    print(runtime.run(a=" 1 ", b="2"))
+    print(runtime.run("add 1 and 2"))
     if runtime.telemetry:
         print("\nTelemetry snapshot:")
         print(runtime.telemetry.snapshot())
