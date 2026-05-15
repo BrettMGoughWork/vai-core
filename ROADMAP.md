@@ -7,9 +7,9 @@ X. Define skill categories + side‑effect flags — io, network, fs, dangerous.
 X. Implement schema generator — from handler signature → JSON schema.  
 X. Implement structural validator — types, required fields.  
 X. Implement semantic validator hook — domain‑specific checks.  
-8. Implement canonicalisation layer — trim, normalise, lower.  
-9. Implement LLM transport wrapper — single entrypoint.  
-10. Implement tool selection governance — allowed tools, categories.  
+X. Implement canonicalisation layer — trim, normalise, lower.  
+X. Implement LLM transport wrapper — single entrypoint.  
+X. Implement tool selection governance — allowed tools, categories.  
 11. Implement tool execution engine — call handler, wrap errors.  
 12. Define CoreResult type — success, error, metadata.
 
