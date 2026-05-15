@@ -1,10 +1,10 @@
-from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Callable
 
 from .toolspec import ToolSpec
 from .registry import SkillRegistry
-
+from .categories import SkillCategory
+from .side_effects import SideEffect
 
 @dataclass
 class BaseSkill:
@@ -20,8 +20,8 @@ class BaseSkill:
     description: str
     handler: Callable[..., Any]
     schema: Optional[Dict[str, Any]] = None
-    category: str = "general"
-    side_effects: bool = False
+    category: SkillCategory = SkillCategory.GENERAL
+    side_effects: SideEffect = SideEffect.NONE
     enabled: bool = True
 
     def __post_init__(self):

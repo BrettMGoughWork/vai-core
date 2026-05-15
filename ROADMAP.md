@@ -1,8 +1,8 @@
 # PHASE 1 — Core Runtime Foundation (with BaseSkill + ToolSpec)
 
-1. Define core config model — LLM, timeouts, limits, skill paths.  
-2. Define ToolSpec class — name, description, schema, side‑effects, category.  
-3. Define BaseSkill class — handler, schema generation, validation, execution.  
+X. Define core config model — LLM, timeouts, limits, skill paths.  
+X. Define ToolSpec class — name, description, schema, side‑effects, category.  
+X. Define BaseSkill class — handler, schema generation, validation, execution.  
 4. Define skill categories + side‑effect flags — io, network, fs, dangerous.  
 5. Implement schema generator — from handler signature → JSON schema.  
 6. Implement structural validator — types, required fields.  

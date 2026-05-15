@@ -1,8 +1,9 @@
-from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict
 
-
+from .categories import SkillCategory
+from .side_effects import SideEffect
+    
 @dataclass
 class ToolSpec:
     """
@@ -22,10 +23,10 @@ class ToolSpec:
     handler: Callable[..., Any]
 
     # Optional: category for governance (fs, http, math, text, dangerous, etc.)
-    category: str = "general"
+    category: SkillCategory = SkillCategory.GENERAL
 
     # Optional: whether this tool has side effects (write, network, etc.)
-    side_effects: bool = False
+    side_effects: SideEffect = SideEffect.NONE
 
     # Optional: whether this tool is allowed by default
     enabled: bool = True
