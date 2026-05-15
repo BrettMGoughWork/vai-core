@@ -1,89 +1,36 @@
 from typing import Optional
 
+from src.core.agent.state import ConversationState
+from src.core.agent.corestep import core_step
+from src.core.agent.outcome import StepOutcome
+from src.core.agent.config import AgentConfig
 from src.core.llm.transport import LLMTransport
-from src.core.llm.types import CoreLLMResponse
-from src.governance.tool_selection import select_tool
-from src.execution.engine import execute_tool
 from src.core.types.result import CoreResult
-from src.core.skills.registry import SkillRegistry
-from .config import AgentConfig
-
 
 class AgentRuntime:
     def __init__(self, transport: LLMTransport, config: AgentConfig):
         self.transport = transport
         self.config = config
 
-    # ---------------------------------------------------------
-    # Single-step agent
-    # ---------------------------------------------------------
     def step(self, prompt: str) -> CoreResult:
-        # Tightened tool exposure
-        tools = SkillRegistry.all_specs_for_agent(self.config)
+        state = ConversationState(input=prompt)
+        result, _, _ = core_step(state, self.transport, self.config)
+        return result
 
-        llm_resp: CoreLLMResponse = self.transport.call(
-            prompt=prompt,
-            tools=tools,
-            model=self.config.model,
-        )
-
-        # LLM returned plain text
-        if not llm_resp.tool_name:
-            return CoreResult.from_text(llm_resp.text or "")
-
-        # Governance: ensure tool is allowed
-        spec = select_tool(
-            tool_name=llm_resp.tool_name,
-            allowed_tools=self.config.allowed_tools,
-            allowed_categories=self.config.allowed_categories,
-            allowed_side_effects=self.config.allowed_side_effects,
-            registry=SkillRegistry,
-        )
-
-        # Execute the tool
-        return execute_tool(spec, llm_resp.tool_args or {})
-
-    # ---------------------------------------------------------
-    # Multi-step agent
-    # ---------------------------------------------------------
     def run(self, prompt: str) -> CoreResult:
-        context = prompt
-        last_result: Optional[CoreResult] = None
+        state = ConversationState(input=prompt)
+        last: Optional[CoreResult] = None
 
         for _ in range(self.config.max_steps):
-            tools = SkillRegistry.all_specs_for_agent(self.config)
+            result, state, outcome = core_step(state, self.transport, self.config)
+            last = result
 
-            llm_resp: CoreLLMResponse = self.transport.call(
-                prompt=context,
-                tools=tools,
-                model=self.config.model,
-            )
-
-            # LLM returned final text
-            if not llm_resp.tool_name:
-                return CoreResult.from_text(llm_resp.text or "")
-
-            # Governance
-            spec = select_tool(
-                tool_name=llm_resp.tool_name,
-                allowed_tools=self.config.allowed_tools,
-                allowed_categories=self.config.allowed_categories,
-                allowed_side_effects=self.config.allowed_side_effects,
-                registry=SkillRegistry,
-            )
-
-            # Execute tool
-            result = execute_tool(spec, llm_resp.tool_args or {})
-            last_result = result
-
-            if result.is_error:
+            if outcome in (StepOutcome.SUCCESS, StepOutcome.FATAL):
                 return result
 
-            # Feed tool output back into LLM
-            context += f"\n\nTool {result.tool_name} returned: {result.tool_output}"
+            # RECOVERABLE -> continue
+            # NOOP -> continue (Step 16 will refine this)
 
-        # Max steps reached
-        if last_result is not None:
-            return last_result
-
-        return CoreResult.from_error(RuntimeError("Agent reached max_steps without result"))
+        return last or CoreResult.from_error(
+            RuntimeError("Agent reached max_steps without result")
+        )
