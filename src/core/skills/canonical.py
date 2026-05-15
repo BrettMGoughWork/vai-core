@@ -21,6 +21,13 @@ def canonicalise_args(schema: Dict[str, Any], args: Dict[str, Any]) -> Dict[str,
     return out
 
 
+def canonicalize_args(schema: Dict[str, Any], args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    American-spelling alias used by BaseSkill.
+    """
+    return canonicalise_args(schema, args)
+
+
 def _canonicalise_value(value: Any, expected_schema: Dict[str, Any]) -> Any:
     t = expected_schema.get("type")
 
