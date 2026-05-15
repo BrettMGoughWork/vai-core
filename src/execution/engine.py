@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from src.core.skills.base import BaseSkill
 from src.execution.errors import ToolExecutionError
-
+from src.core.types.result import CoreResult
 
 def execute_tool(skill: BaseSkill, args: Dict[str, Any]) -> Any:
     """
@@ -17,7 +17,10 @@ def execute_tool(skill: BaseSkill, args: Dict[str, Any]) -> Any:
         # - structural validation
         # - semantic validation
         # - handler execution
-        return skill.run(**args)
+        output = skill.run(**args)
+        return CoreResult.from_tool(skill.name, output)
 
     except Exception as e:
-        raise ToolExecutionError(f"Tool '{skill.name}' failed: {e}") from e
+        return CoreResult.from_error(
+            ToolExecutionError(f"Tool '{skill.name}' failed: {e}")
+        )
