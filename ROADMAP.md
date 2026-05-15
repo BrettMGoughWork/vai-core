@@ -52,9 +52,9 @@ X. Implement corestep(state) — one LLM → tool → result transition.
 35. Implement HTTP simple skill — allowlist, limits.  
 36. Implement math utilities — parse, convert.  
 37. Implement text utilities — split, regex.  
-38. (opinionated custom skill. To remove from official repo) Implement notes skill — CRUD, indexing.  
-39. (opinionated custom skill. To remove from official repo) Implement Spotify skill — typed, safe.  
-40. (opinionated custom skill. To remove from official repo) Implement Last.fm skill — typed, safe.
+38. Define plugin interface — simple Python module exposing register_all()  
+39. Implement plugin loader — load skills from external repos  
+40. Document how to build personal plugins (e.g., vai‑personal)  
 
 ---
 
@@ -105,73 +105,80 @@ X. Implement corestep(state) — one LLM → tool → result transition.
 
 # PHASE 8 — FastAPI & WebSocket Layer
 
-71. Create FastAPI skeleton  
-72. Add simple HTTP endpoint  
-73. Add WebSocket endpoint  
-74. Define client protocol  
-75. Implement request → job mapping  
-76. Implement result streaming  
-77. Add auth layer  
-78. Add rate limiting  
-79. Add tracing IDs  
-80. Add health checks
+71. Define Channel interface — receive → runtime → send  
+72. Implement CLI channel — stdin/stdout  
+73. Implement Web channel — HTTP POST wrapper  
+74. Implement WebSocket channel — streaming  
+75. Propose Flutter channel — optional, personal  
+76. Propose OpenClaw‑style webhook channel — message envelope → runtime  
+77. Document how to build custom channels  
+Existing FastAPI/WebSocket tasks
+78. Create FastAPI skeleton  
+79. Add simple HTTP endpoint  
+80. Add WebSocket endpoint  
+81. Implement request → job mapping  
+82. Implement result streaming  
+83. Add auth layer  
+84. Add rate limiting  
+85. Add tracing IDs  
+86. Add health checks  
 
 ---
 
 # PHASE 9 — Agent Runtime (Above the Core Loop)
 
-81. Define AgentSpec — instructions, tools, loop policy.  
-82. Implement agent registry  
-83. Implement agent context — memory, settings.  
-84. Implement agentstep — inject instructions.  
-85. Implement agentloop — wraps coreloop.  
-86. Add agent permissions  
-87. Add agent templates  
-88. Add multi‑agent orchestration  
-89. Add scheduled agents  
-90. Add agent debugging view
+87. Define AgentSpec — instructions, tools, loop policy.  
+88. Implement agent registry  
+89. Implement agent context — memory, settings.  
+90. Implement agentstep — inject instructions.  
+91. Implement agentloop — wraps coreloop.  
+92. Add agent permissions  
+93. Add agent templates  
+94. Add multi‑agent orchestration  
+95. Add scheduled agents  
+96. Add agent debugging view
 
 ---
 
 # PHASE 10 — Resilience, Self‑Healing, Health
 
-91. Classify loop health — healthy, stalled, poisoned.  
-92. Detect stalled loops  
-93. Auto‑abort stalled loops  
-94. Auto‑downgrade behaviour  
-95. Add global watchdog  
-96. Add auto‑scaling hooks  
-97. Add panic reporting  
-98. Add resilience tests  
-99. Add recovery drills  
-100. Document failure modes
+97. Classify loop health — healthy, stalled, poisoned.  
+98. Detect stalled loops  
+99. Auto‑abort stalled loops  
+100. Auto‑downgrade behaviour  
+101. Add global watchdog  
+102. Add auto‑scaling hooks  
+103. Add panic reporting  
+104. Add resilience tests  
+105. Add recovery drills  
+106. Document failure modes
 
 ---
 
 # PHASE 11 — Observability & Developer Experience
 
-101. Add structured logging  
-102. Add metrics exporter  
-103. Add tracing spans  
-104. Add flamegraph timings  
-105. Add local dev CLI  
-106. Add replay tooling  
-107. Add config inspector  
-108. Add skill inspector  
-109. Add agent inspector  
-110. Add end‑to‑end smoke tests
+107. Add structured logging  
+108. Add metrics exporter  
+109. Add tracing spans  
+110. Add flamegraph timings  
+111. Add local dev CLI  
+112. Add replay tooling  
+113. Add config inspector  
+114. Add skill inspector  
+115. Add agent inspector  
+116. Add end‑to‑end smoke tests
 
 ---
 
 # PHASE 12 — Hardening & Polish
 
-111. Security review of skills  
-112. Security review of fetch stack  
-113. LLM prompt hardening  
-114. Config profiles — dev, prod, paranoid.  
-115. Backwards‑compatible APIs  
-116. Performance tuning  
-117. Load testing  
-118. Graceful degradation strategy  
-119. Disaster recovery story  
-120. Write architecture doc — for future contributors.
+117. Security review of skills  
+118. Security review of fetch stack  
+119. LLM prompt hardening  
+120. Config profiles — dev, prod, paranoid.  
+121. Backwards‑compatible APIs  
+122. Performance tuning  
+123. Load testing  
+124. Graceful degradation strategy  
+125. Disaster recovery story  
+126. Write architecture doc — for future contributors.
