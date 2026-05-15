@@ -1,4 +1,5 @@
 from src.core.loop import CoreLoop
+from src.core.llm.transport import LLMTransport
 from src.governance.schema import Governance
 from src.execution.executor import Executor
 from src.skills.registry import SkillRegistry
@@ -55,7 +56,16 @@ def create_runtime():
 
 if __name__ == "__main__":
     runtime = create_runtime()
-    print(runtime.run("add 1 and 2"))
+    
+    # Also wire transport layer for direct LLM calls
+    llm_client = DeepSeekLLM()
+    transport = LLMTransport(llm_client.client)
+    
+    # Run a command through the core loop
+    result = runtime.run("add 1 and 2")
+    print("\nCore loop result:")
+    print(result)
+    
     if runtime.telemetry:
         print("\nTelemetry snapshot:")
         print(runtime.telemetry.snapshot())
