@@ -6,6 +6,7 @@ from .registry import SkillRegistry
 from .categories import SkillCategory
 from .side_effects import SideEffect
 from .schema import generate_schema_from_handler
+from .validator import validate_structural, ValidationError
 
 @dataclass
 class BaseSkill:
@@ -58,8 +59,9 @@ class BaseSkill:
     # ---------------------------------------------------------
     def run(self, **kwargs) -> Any:
         """
-        Validate arguments (later) and execute the handler.
+        Validate arguments and execute the handler.
         """
+        validate_structural(self.spec.schema, kwargs)
         return self.spec.run(**kwargs)
 
     # ---------------------------------------------------------
