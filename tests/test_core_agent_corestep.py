@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from src.core.agent.config import AgentConfig
 from src.core.agent.corestep import core_step
+from src.core.agent.outcome import StepOutcome
 from src.core.agent.state import ConversationState
 from src.core.llm.types import CoreLLMResponse
 from src.core.skills.categories import SkillCategory
@@ -26,11 +27,12 @@ def test_core_step_returns_text_and_updates_state(mock_all_specs_for_agent):
     transport.call.return_value = CoreLLMResponse(text="done")
     state = ConversationState(input="start")
 
-    result, new_state = core_step(state=state, transport=transport, config=_make_config())
+    result, new_state, outcome = core_step(state=state, transport=transport, config=_make_config())
 
     assert result.text == "done"
     assert new_state.last_result == result
     assert new_state.history == ["LLM: done"]
+    assert outcome == StepOutcome.SUCCESS
     call_kwargs = transport.call.call_args.kwargs
     assert call_kwargs["prompt"] == "User: start"
     assert call_kwargs["tools"] == []
@@ -52,12 +54,13 @@ def test_core_step_executes_tool_and_appends_tool_history(
     mock_execute_tool.return_value = CoreResult.from_tool("echo", "ok")
     state = ConversationState(input="start")
 
-    result, new_state = core_step(state=state, transport=transport, config=_make_config())
+    result, new_state, outcome = core_step(state=state, transport=transport, config=_make_config())
 
     assert result.tool_name == "echo"
     assert result.tool_output == "ok"
     assert new_state.last_result == result
     assert new_state.history == ["TOOL echo: ok"]
+    assert outcome == StepOutcome.RECOVERABLE
     mock_execute_tool.assert_called_once_with(spec, {"text": "hi"})
 
 
@@ -77,9 +80,10 @@ def test_core_step_appends_error_history_when_tool_fails(
     mock_execute_tool.return_value = CoreResult.from_error(RuntimeError("boom"))
     state = ConversationState(input="start")
 
-    result, new_state = core_step(state=state, transport=transport, config=_make_config())
+    result, new_state, outcome = core_step(state=state, transport=transport, config=_make_config())
 
     assert result.is_error is True
     assert result.error == "boom"
     assert new_state.last_result == result
     assert new_state.history == ["TOOL echo ERROR: boom"]
+    assert outcome == StepOutcome.FATAL
