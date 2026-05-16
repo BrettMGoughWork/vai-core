@@ -11,6 +11,7 @@ class LoopPolicy:
     max_wall_time: Optional[float] = None
     max_errors: int = 1
     max_fatals: int = 1
+    per_step_timeout: Optional[float] = None
 
 
 @dataclass
