@@ -23,8 +23,8 @@ X. Classify step outcomes — success, recoverable, fatal, noop.
 X. Define isdone(state) — goal reached, limits hit.  
 X. Implement coreloop(state, policy) — while not done → step.  
 X. Define loop policy model — max steps, wall time, errors.  
-19. Add per‑step timeout — kill slow steps.  
-20. Add per‑loop timeout — kill runaway loops.  
+X. Add per‑step timeout — kill slow steps.  
+X. Add per‑loop timeout — kill runaway loops.  
 21. Add loop trace log — append step summaries.
 
 ---
