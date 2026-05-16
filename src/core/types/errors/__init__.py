@@ -1,9 +1,9 @@
 """
-Error Types - Core error taxonomy for agent runtime.
+Error Types and Recovery Semantics - Core error taxonomy and recovery mapping for agent runtime.
 
-Exports the AgentError dataclass and all factory functions for creating
-typed errors across the planning, mapping, execution, and state management
-subsystems.
+Exports:
+  - AgentError dataclass and factory functions for error creation
+  - RecoveryAction enum and mapping function for recovery semantics
 """
 
 from .error_types import (
@@ -16,6 +16,10 @@ from .error_types import (
     confidence_error,
     semantic_error,
 )
+from .recovery import (
+    RecoveryAction,
+    map_error_to_recovery,
+)
 
 __all__ = [
     "AgentError",
@@ -26,4 +30,6 @@ __all__ = [
     "governance_error",
     "confidence_error",
     "semantic_error",
+    "RecoveryAction",
+    "map_error_to_recovery",
 ]
