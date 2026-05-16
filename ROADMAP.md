@@ -20,7 +20,7 @@ X. Define CoreResult type — success, error, metadata.
 X. Define ConversationState — input, history, last tool call, metadata.  
 X. Implement corestep(state) — one LLM → tool → result transition.  
 X. Classify step outcomes — success, recoverable, fatal, noop.  
-16. Define isdone(state) — goal reached, limits hit.  
+X. Define isdone(state) — goal reached, limits hit.  
 17. Implement coreloop(state, policy) — while not done → step.  
 18. Define loop policy model — max steps, wall time, errors.  
 19. Add per‑step timeout — kill slow steps.  
