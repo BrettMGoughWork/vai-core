@@ -7,9 +7,24 @@ from src.core.llm.providers.deepseek_client import DeepSeekClient
 
 
 def test_deepseek_client_requires_api_key():
-    with patch.dict("os.environ", {}, clear=True):
+    with patch("src.core.llm.providers.deepseek_client.load_dotenv", return_value=False), patch.dict(
+        "os.environ",
+        {},
+        clear=True,
+    ):
         with pytest.raises(ValueError):
             DeepSeekClient()
+
+
+def test_deepseek_client_loads_dotenv_on_init():
+    with patch("src.core.llm.providers.deepseek_client.load_dotenv") as mock_load_dotenv, patch.dict(
+        "os.environ",
+        {"DEEPSEEK_API_KEY": "env-key"},
+        clear=True,
+    ):
+        DeepSeekClient()
+
+    mock_load_dotenv.assert_called_once_with(override=False)
 
 
 def test_deepseek_client_posts_chat_completion_payload():
