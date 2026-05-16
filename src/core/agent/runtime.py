@@ -1,4 +1,6 @@
 from typing import Optional
+import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from src.core.agent.state import ConversationState
 from src.core.agent.corestep import core_step
@@ -22,9 +24,29 @@ class AgentRuntime:
         state = ConversationState(input=prompt)
         outcome = StepOutcome.NOOP
         result = None
+        timeout = self.config.loop_policy.per_step_timeout
+        max_wall_time = self.config.loop_policy.max_wall_time
+        loop_start = time.monotonic()
 
         while not isdone(state, outcome, self.config):
-            result, state, outcome = core_step(state, self.transport, self.config)
+            if max_wall_time is not None:
+                elapsed = time.monotonic() - loop_start
+                if elapsed > max_wall_time:
+                    outcome = StepOutcome.FATAL
+                    state.last_error = "Loop exceeded max wall time"
+                    break
+
+            if timeout is not None:
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(core_step, state, self.transport, self.config)
+                    try:
+                        result, state, outcome = future.result(timeout=timeout)
+                    except TimeoutError:
+                        outcome = StepOutcome.FATAL
+                        state.last_error = "Step timed out"
+                        break
+            else:
+                result, state, outcome = core_step(state, self.transport, self.config)
 
         return result or CoreResult.from_error(
             RuntimeError("Agent reached max_steps without result")

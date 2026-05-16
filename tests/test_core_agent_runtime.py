@@ -1,11 +1,13 @@
 from unittest.mock import MagicMock, patch
+import time
 
-from src.core.agent.config import AgentConfig
+from src.core.agent.config import AgentConfig, LoopPolicy
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.runtime import AgentRuntime
 from src.core.skills.categories import SkillCategory
 from src.core.skills.side_effects import SideEffect
 from src.core.types.result import CoreResult
+from concurrent.futures import TimeoutError
 
 
 def _make_config(max_steps: int = 4) -> AgentConfig:
@@ -108,3 +110,56 @@ def test_run_returns_last_result_after_max_steps_for_noop():
         result = runtime.run("start")
 
     assert result == step2
+
+
+def test_run_handles_step_timeout():
+    transport = MagicMock()
+    
+    loop_policy = LoopPolicy(per_step_timeout=0.1)
+    config = AgentConfig(
+        model="test-model",
+        allowed_tools=["echo"],
+        allowed_categories=[SkillCategory.GENERAL],
+        allowed_side_effects=[SideEffect.NONE],
+        loop_policy=loop_policy,
+    )
+    runtime = AgentRuntime(transport=transport, config=config)
+
+    step1_result = CoreResult.from_tool("echo", "ok")
+    
+    def slow_core_step(*args, **kwargs):
+        time.sleep(0.5)
+        return (step1_result, MagicMock(), StepOutcome.RECOVERABLE)
+
+    with patch("src.core.agent.runtime.core_step", side_effect=slow_core_step):
+        result = runtime.run("start")
+
+    assert result is not None
+    assert result.is_error is True
+
+
+def test_run_handles_wall_time_timeout():
+    transport = MagicMock()
+    
+    loop_policy = LoopPolicy(max_wall_time=0.2)
+    config = AgentConfig(
+        model="test-model",
+        allowed_tools=["echo"],
+        allowed_categories=[SkillCategory.GENERAL],
+        allowed_side_effects=[SideEffect.NONE],
+        max_steps=10,
+        loop_policy=loop_policy,
+    )
+    runtime = AgentRuntime(transport=transport, config=config)
+
+    step_result = CoreResult.from_tool("echo", "ok")
+    
+    def slow_core_step(*args, **kwargs):
+        time.sleep(0.15)
+        return (step_result, MagicMock(), StepOutcome.RECOVERABLE)
+
+    with patch("src.core.agent.runtime.core_step", side_effect=slow_core_step):
+        result = runtime.run("start")
+
+    assert result is not None
+    assert result.is_error is True
