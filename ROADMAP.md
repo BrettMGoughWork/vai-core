@@ -33,11 +33,11 @@ X. Add loop trace log — append step summaries.
 
 X. Plan Schema
 23. Local Planner
-24. Plan Validation
-25. Skill Metadata
+X. Plan Validation
+X. Skill Metadata
 26. Skill Filtering
 27. Skill Ranking
-28. Executor Contract
+X. Executor Contract
 29. Single-Skill Execution
 30. Error Types
 31. CoreStep Pipeline
