@@ -1,8 +1,16 @@
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Optional, Any, Dict
 
 from src.core.skills.categories import SkillCategory
 from src.core.skills.side_effects import SideEffect
+
+
+@dataclass
+class LoopPolicy:
+    max_steps: int = 5
+    max_wall_time: Optional[float] = None
+    max_errors: int = 1
+    max_fatals: int = 1
 
 
 @dataclass
@@ -12,3 +20,18 @@ class AgentConfig:
     allowed_categories: List[SkillCategory]
     allowed_side_effects: List[SideEffect]
     max_steps: int = 4
+    loop_policy: LoopPolicy = field(default_factory=LoopPolicy)
+
+    @classmethod
+    def from_yaml(cls, data: Dict[str, Any]) -> "AgentConfig":
+        """
+        Create AgentConfig from a YAML dictionary.
+        Loads loop_policy if present in data.
+        """
+        loop_policy_data = data.pop("loop_policy", None)
+        loop_policy = LoopPolicy(**loop_policy_data) if loop_policy_data else LoopPolicy()
+        
+        return cls(
+            **data,
+            loop_policy=loop_policy,
+        )
