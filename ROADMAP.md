@@ -25,7 +25,25 @@ X. Implement coreloop(state, policy) — while not done → step.
 X. Define loop policy model — max steps, wall time, errors.  
 X. Add per‑step timeout — kill slow steps.  
 X. Add per‑loop timeout — kill runaway loops.  
-21. Add loop trace log — append step summaries.
+X. Add loop trace log — append step summaries.
+
+---
+
+# PHASE 2.1 - Core Intelligence implementation
+
+22. Plan Schema
+23. Local Planner
+24. Plan Validation
+25. Skill Metadata
+26. Skill Filtering
+27. Skill Ranking
+28. Executor Contract
+29. Single-Skill Execution
+30. Error Types
+31. CoreStep Pipeline
+32. Logging
+33. Unit Tests
+34. Integration Tests
 
 ---
 

@@ -7,6 +7,7 @@ from src.core.agent.corestep import core_step
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.config import AgentConfig
 from src.core.agent.isdone import isdone
+from src.core.agent.trace import StepTrace
 from src.core.llm.transport import LLMTransport
 from src.core.types.result import CoreResult
 
@@ -40,13 +41,31 @@ class AgentRuntime:
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(core_step, state, self.transport, self.config)
                     try:
-                        result, state, outcome = future.result(timeout=timeout)
+                        result, new_state, outcome = future.result(timeout=timeout)
+                        state = new_state
+                        state.trace.append(
+                            StepTrace(
+                                step=state.step_count,
+                                outcome=outcome,
+                                summary=result.summary if result else "",
+                                error=state.last_error,
+                            )
+                        )
                     except TimeoutError:
                         outcome = StepOutcome.FATAL
                         state.last_error = "Step timed out"
                         break
             else:
-                result, state, outcome = core_step(state, self.transport, self.config)
+                result, new_state, outcome = core_step(state, self.transport, self.config)
+                state = new_state
+                state.trace.append(
+                    StepTrace(
+                        step=state.step_count,
+                        outcome=outcome,
+                        summary=result.summary if result else "",
+                        error=state.last_error,
+                    )
+                )
 
         return result or CoreResult.from_error(
             RuntimeError("Agent reached max_steps without result")
