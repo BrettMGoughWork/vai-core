@@ -4,6 +4,7 @@ from src.core.agent.state import ConversationState
 from src.core.agent.corestep import core_step
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.config import AgentConfig
+from src.core.agent.isdone import isdone
 from src.core.llm.transport import LLMTransport
 from src.core.types.result import CoreResult
 
@@ -19,18 +20,12 @@ class AgentRuntime:
 
     def run(self, prompt: str) -> CoreResult:
         state = ConversationState(input=prompt)
-        last: Optional[CoreResult] = None
+        outcome = StepOutcome.NOOP
+        result = None
 
-        for _ in range(self.config.max_steps):
+        while not isdone(state, outcome, self.config):
             result, state, outcome = core_step(state, self.transport, self.config)
-            last = result
 
-            if outcome in (StepOutcome.SUCCESS, StepOutcome.FATAL):
-                return result
-
-            # RECOVERABLE -> continue
-            # NOOP -> continue (Step 16 will refine this)
-
-        return last or CoreResult.from_error(
+        return result or CoreResult.from_error(
             RuntimeError("Agent reached max_steps without result")
         )
