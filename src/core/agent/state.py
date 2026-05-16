@@ -1,6 +1,15 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Any
 from src.core.types.result import CoreResult
+from src.core.agent.outcome import StepOutcome
+
+
+@dataclass
+class StepTrace:
+    step: int
+    outcome: StepOutcome
+    summary: str
+    error: Optional[str] = None
 
 
 @dataclass
@@ -16,6 +25,9 @@ class ConversationState:
 
     # Arbitrary metadata (step count, timestamps, etc.)
     metadata: dict = field(default_factory=dict)
+
+    # Loop trace (step outcomes)
+    trace: List[StepTrace] = field(default_factory=list)
 
     def append_llm(self, text: str) -> None:
         self.history.append(f"LLM: {text}")
