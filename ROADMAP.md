@@ -21,7 +21,7 @@ X. Define ConversationState — input, history, last tool call, metadata.
 X. Implement corestep(state) — one LLM → tool → result transition.  
 X. Classify step outcomes — success, recoverable, fatal, noop.  
 X. Define isdone(state) — goal reached, limits hit.  
-17. Implement coreloop(state, policy) — while not done → step.  
+X. Implement coreloop(state, policy) — while not done → step.  
 18. Define loop policy model — max steps, wall time, errors.  
 19. Add per‑step timeout — kill slow steps.  
 20. Add per‑loop timeout — kill runaway loops.  
@@ -36,7 +36,7 @@ X. Define isdone(state) — goal reached, limits hit.
 24. Add LLM retry wrapper — transient network/timeouts.  
 25. Add tool retry wrapper — idempotent tools only.  
 26. Add circuit breaker per tool — stop repeated failures.  
-27. Add degraded mode — fallback to simpler behaviour.  
+27. Add degraded mode — fallback to simpler behaviour.      
 28. Add safe failure response — structured error.  
 29. Add panic guard — catch unexpected exceptions.  
 30. Add loop self‑healing — adjust state, continue.  
