@@ -1,15 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Any
 from src.core.types.result import CoreResult
-from src.core.agent.outcome import StepOutcome
-
-
-@dataclass
-class StepTrace:
-    step: int
-    outcome: StepOutcome
-    summary: str
-    error: Optional[str] = None
+from src.core.agent.trace import StepTrace
 
 
 @dataclass
