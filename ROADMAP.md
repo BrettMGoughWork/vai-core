@@ -32,18 +32,18 @@ X. Add loop trace log — append step summaries.
 # PHASE 2.1 - Core Intelligence implementation
 
 X. Plan Schema
-23. Local Planner
+(defined). Local Planner
 X. Plan Validation
 X. Skill Metadata
-26. Skill Filtering
-27. Skill Ranking
+(defined). Skill Filtering
+(defined). Skill Ranking
 X. Executor Contract
 X. Single-Skill Execution
 30. Error Types
-31. CoreStep Pipeline
-32. Logging
-33. Unit Tests
-34. Integration Tests
+X. CoreStep Pipeline
+X. Logging
+X. Unit Tests
+X. Integration Tests
 
 ---
 
