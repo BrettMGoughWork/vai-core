@@ -10,38 +10,25 @@ from src.skills._dev.test_math import test_math_add
 
 # Fake LLM that always calls the tool
 class FakeLLM:
-    def __init__(self):
-        self.chat = type("Chat", (), {"completions": self._Completions()})()
-
-    class _Completions:
-        @staticmethod
-        def create(model, messages, tools, temperature):
-            class Msg:
-                tool_calls = [
-                    type(
-                        "TC",
-                        (),
-                        {
-                            "function": type(
-                                "F",
-                                (),
-                                {
+    @staticmethod
+    def chat(model, messages, tools, temperature):
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "function": {
                                     "name": "test_math_add",
-                                    "arguments": {"a": 1, "b": 2},
-                                },
-                            )
-                        },
-                    )
-                ]
-                content = None
-
-            class Choice:
-                message = Msg()
-
-            class Response:
-                choices = [Choice()]
-
-            return Response()
+                                    "arguments": '{"a": 1, "b": 2}',
+                                }
+                            }
+                        ],
+                        "content": None,
+                    }
+                }
+            ]
+        }
 
 
 def test_agent_loop_end_to_end():

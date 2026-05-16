@@ -9,7 +9,7 @@ A minimal, layered agent runtime built around deterministic boundaries, canonica
 uv sync
 
 # Run the runtime entrypoint
-uv run --with openai --with python-dotenv python main.py
+uv run python main.py
 
 # Run test suite
 uv run --with pytest --with python-dotenv pytest -q
@@ -32,8 +32,7 @@ src/
 │   └── llm/           # LLM transport layer
 │       ├── transport.py  # Provider-agnostic LLM interface
 │       └── types.py      # Response types
-├── transport/         # External service clients
-│   └── llm.py         # DeepSeekLLM (OpenAI-compatible)
+├── transport/         # External service clients (reserved)
 ├── governance/        # Action shape validation & canonicalisation
 ├── execution/         # Skill execution and routing
 ├── policy/            # Runtime constraints (allowed tools, size limits)
@@ -44,7 +43,7 @@ src/
 
 config/
 ├── default.json       # Default LLM and policy settings
-├── llms.yaml          # LLM model configurations
+├── llms.yaml          # LLM aliases and model mappings
 └── agents.yaml        # Agent definitions
 
 tests/
@@ -127,7 +126,7 @@ DEEPSEEK_API_KEY=sk-...
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 ```
 
-These are automatically loaded by `DeepSeekLLM.__init__()` via `python-dotenv`.
+`DEEPSEEK_API_KEY` is read by `DeepSeekClient` at runtime.
 
 ## Testing
 
@@ -137,8 +136,9 @@ All layers have focused unit tests:
 - `test_core_skills_validator.py` — structural validation
 - `test_core_skills_schema.py` — schema inference
 - `test_core_skills_base.py` — skill execution
+- `test_core_llm_deepseek_client.py` — DeepSeek provider client
 - `test_core_llm_transport.py` — LLM transport
-- `test_e2e.py` — full stack integration
+- `test_agent_e2e.py` — full stack integration
 
 `pytest.ini` scopes discovery to `tests/`.
 
