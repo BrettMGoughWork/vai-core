@@ -1,44 +1,44 @@
-import logging
+from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 import json
-import sys
+from typing import Any
 
-# ANSI colours
-RESET = "\033[0m"
-CYAN = "\033[36m"
-GREEN = "\033[32m"
-YELLOW = "\033[33m"
-MAGENTA = "\033[35m"
 
-class StructuredLogger:
-    """
-    MVP: structured, colourised logs for core loop events.
-    """
+class Logger(ABC):
+    @abstractmethod
+    def log(self, event: str, payload: dict) -> None:
+        pass
 
-    def __init__(self, name="vai-core"):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
 
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter("%(message)s"))
-
-        self.logger.handlers = [handler]
-
-    def _emit(self, colour, event, payload):
-        msg = {
+class StdoutLogger(Logger):
+    def log(self, event: str, payload: dict) -> None:
+        record = {
             "event": event,
             "payload": payload,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        line = colour + json.dumps(msg, ensure_ascii=False) + RESET
-        self.logger.info(line)
+        print(json.dumps(record, ensure_ascii=False), flush=True)
 
-    def core(self, event, payload):
-        self._emit(CYAN, event, payload)
 
-    def governance(self, event, payload):
-        self._emit(GREEN, event, payload)
+class StructuredLogger(Logger):
+    """
+    Backward-compatible facade preserving existing call sites.
+    """
 
-    def execution(self, event, payload):
-        self._emit(YELLOW, event, payload)
+    def __init__(self, sink: Logger | None = None):
+        self.sink = sink or StdoutLogger()
 
-    def policy(self, event, payload):
-        self._emit(MAGENTA, event, payload)
+    def log(self, event: str, payload: dict) -> None:
+        self.sink.log(event, payload)
+
+    def core(self, event: str, payload: dict[str, Any]) -> None:
+        self.log(event, payload)
+
+    def governance(self, event: str, payload: dict[str, Any]) -> None:
+        self.log(event, payload)
+
+    def execution(self, event: str, payload: dict[str, Any]) -> None:
+        self.log(event, payload)
+
+    def policy(self, event: str, payload: dict[str, Any]) -> None:
+        self.log(event, payload)

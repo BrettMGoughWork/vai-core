@@ -11,6 +11,19 @@ from src.core.agent.trace import StepTrace
 from src.core.llm.transport import LLMTransport
 from src.core.types.result import CoreResult
 
+
+def _result_summary(result: CoreResult | None) -> str:
+    if result is None:
+        return ""
+    if result.is_error:
+        return result.error or ""
+    if result.is_text:
+        return result.text or ""
+    if result.is_tool:
+        return f"{result.tool_name}: {result.tool_output}"
+    return ""
+
+
 class AgentRuntime:
     def __init__(self, transport: LLMTransport, config: AgentConfig):
         self.transport = transport
@@ -42,12 +55,14 @@ class AgentRuntime:
                     future = executor.submit(core_step, state, self.transport, self.config)
                     try:
                         result, new_state, outcome = future.result(timeout=timeout)
-                        state = new_state
+                        if isinstance(new_state, ConversationState):
+                            state = new_state
+                        state.step_count += 1
                         state.trace.append(
                             StepTrace(
                                 step=state.step_count,
                                 outcome=outcome,
-                                summary=result.summary if result else "",
+                                summary=_result_summary(result),
                                 error=state.last_error,
                             )
                         )
@@ -57,15 +72,20 @@ class AgentRuntime:
                         break
             else:
                 result, new_state, outcome = core_step(state, self.transport, self.config)
-                state = new_state
+                if isinstance(new_state, ConversationState):
+                    state = new_state
+                state.step_count += 1
                 state.trace.append(
                     StepTrace(
                         step=state.step_count,
                         outcome=outcome,
-                        summary=result.summary if result else "",
+                        summary=_result_summary(result),
                         error=state.last_error,
                     )
                 )
+
+        if state.last_error and (result is None or not result.is_error):
+            return CoreResult.from_error(RuntimeError(state.last_error))
 
         return result or CoreResult.from_error(
             RuntimeError("Agent reached max_steps without result")
