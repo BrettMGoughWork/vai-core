@@ -8,7 +8,7 @@ llms:
     temperature: 0.0
     max_tokens: 4096
 
-  deepseek-pro:
+  deepseek-reasoner:
     model: "deepseek-reasoner"
     temperature: 0.0
     max_tokens: 8192

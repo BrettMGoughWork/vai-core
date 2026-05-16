@@ -1,8 +1,10 @@
 from __future__ import annotations
+import json
 from typing import List, Dict, Any
 
 from .types import CoreLLMResponse
 from src.core.skills.toolspec import ToolSpec
+from src.core.llm.providers.base import ChatProvider
 
 
 class LLMTransport:
@@ -11,8 +13,8 @@ class LLMTransport:
     Vendor-specific logic lives here only.
     """
 
-    def __init__(self, client):
-        self.client = client  # e.g. OpenAI, Anthropic, DeepSeek
+    def __init__(self, client: ChatProvider):
+        self.client = client
 
     def call(
         self,
@@ -28,7 +30,7 @@ class LLMTransport:
         tool_defs = [self._convert_tool_spec(t) for t in tools]
 
         # Call the provider
-        raw = self.client.chat.completions.create(
+        raw = self.client.chat(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             tools=tool_defs,
@@ -54,15 +56,18 @@ class LLMTransport:
     # Parse provider response → CoreLLMResponse
     # ---------------------------------------------------------
     def _parse_response(self, raw) -> CoreLLMResponse:
-        msg = raw.choices[0].message
+        msg = raw["choices"][0]["message"]
 
         # Tool call
-        if msg.tool_calls:
-            tc = msg.tool_calls[0]
+        if msg.get("tool_calls"):
+            tc = msg["tool_calls"][0]
+            args = tc["function"].get("arguments")
+            if isinstance(args, str):
+                args = json.loads(args)
             return CoreLLMResponse(
-                tool_name=tc.function.name,
-                tool_args=tc.function.arguments,
+                tool_name=tc["function"]["name"],
+                tool_args=args,
             )
 
         # Normal text
-        return CoreLLMResponse(text=msg.content)
+        return CoreLLMResponse(text=msg.get("content"))
