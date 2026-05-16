@@ -5,6 +5,12 @@ import os
 from urllib import request
 from typing import Any, Dict, List, Optional
 
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional dependency fallback
+    def load_dotenv(*args, **kwargs):
+        return False
+
 from .base import ChatProvider
 
 
@@ -24,6 +30,9 @@ class DeepSeekClient(ChatProvider):
         base_url: str = "https://api.deepseek.com/v1",
         timeout: float = 30.0,
     ) -> None:
+        # Load local .env values for dev/runtime environments where env vars
+        # are not pre-exported by the shell/session.
+        load_dotenv(override=False)
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY", "")
         if not self.api_key:
             raise ValueError("DeepSeekClient requires an API key (env DEEPSEEK_API_KEY or api_key=...)")
