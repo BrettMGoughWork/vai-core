@@ -38,7 +38,7 @@ X. Skill Metadata
 26. Skill Filtering
 27. Skill Ranking
 X. Executor Contract
-29. Single-Skill Execution
+X. Single-Skill Execution
 30. Error Types
 31. CoreStep Pipeline
 32. Logging
