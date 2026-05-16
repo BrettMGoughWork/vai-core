@@ -13,7 +13,13 @@ def isdone(state: ConversationState, outcome: StepOutcome, config: AgentConfig) 
     """
     if outcome in (StepOutcome.SUCCESS, StepOutcome.FATAL):
         return True
-    step_count = getattr(state, 'step_count', state.metadata.get('step_count', 0))
+    attr_count = getattr(state, "step_count", 0)
+    meta_count = state.metadata.get("step_count", attr_count)
+    if not isinstance(attr_count, int):
+        attr_count = 0
+    if not isinstance(meta_count, int):
+        meta_count = 0
+    step_count = max(attr_count, meta_count)
     if step_count >= config.max_steps:
         return True
     return False

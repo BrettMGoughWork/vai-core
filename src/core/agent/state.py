@@ -15,6 +15,12 @@ class ConversationState:
     # Last tool call result (CoreResult)
     last_result: Optional[CoreResult] = None
 
+    # Last runtime error message, if any
+    last_error: Optional[str] = None
+
+    # Number of completed core steps
+    step_count: int = 0
+
     # Arbitrary metadata (step count, timestamps, etc.)
     metadata: dict = field(default_factory=dict)
 
