@@ -20,3 +20,23 @@ def test_append_error_records_error_entry():
     state.append_error("echo", "failure")
 
     assert state.history == ["TOOL echo ERROR: failure"]
+
+
+def test_reset_clears_runtime_state_and_preserves_input():
+    state = ConversationState(input="run")
+    state.append_llm("hello")
+    state.last_result = object()
+    state.last_error = "oops"
+    state.step_count = 2
+    state.metadata["k"] = "v"
+    state.trace.append(object())
+
+    state.reset()
+
+    assert state.input == "run"
+    assert state.history == []
+    assert state.last_result is None
+    assert state.last_error is None
+    assert state.step_count == 0
+    assert state.metadata == {}
+    assert state.trace == []

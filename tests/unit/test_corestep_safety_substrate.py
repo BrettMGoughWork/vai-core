@@ -224,3 +224,24 @@ def test_core_step_executor_panic_guard_catches_unexpected_errors(mock_call_with
     # Should return SafeFailure with panic metadata
     assert hasattr(result, 'error_type')
     assert result.metadata.get("panic") is True
+
+
+@patch("src.core.agent.corestep.execute_with_retry")
+@patch("src.core.agent.corestep.SkillRegistry.all_specs_for_agent")
+@patch("src.core.agent.corestep.call_with_retry")
+def test_degraded_mode_active_disables_tool_execution(mock_call_with_retry, mock_all_specs_for_agent, mock_execute_with_retry):
+    """When degraded mode is active, tool execution is blocked safely."""
+    mock_all_specs_for_agent.return_value = [MagicMock()]
+    mock_call_with_retry.return_value = CoreLLMResponse(tool_name="echo", tool_args={"text": "hi"})
+
+    state = ConversationState(input="start")
+    degraded = DegradedModeController(threshold=1)
+    degraded.record_failure()
+    executor = CoreStepExecutor(MagicMock(), _make_config(), degraded_mode=degraded)
+
+    result, new_state, outcome = executor.run(state)
+
+    assert hasattr(result, "error_type")
+    assert result.metadata.get("degraded_mode") is True
+    assert outcome == StepOutcome.FATAL
+    mock_execute_with_retry.assert_not_called()

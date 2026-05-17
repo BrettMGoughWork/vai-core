@@ -15,17 +15,17 @@ def execute_with_retry(tool, args):
     """
     Execute a tool with automatic retry logic.
 
-    Wraps tool.execute() with retry behavior based on RetryPolicy.
+    Wraps tool.run(**args) with retry behavior based on RetryPolicy.
     Catches tool execution errors, respects tool idempotency constraints,
     and retries according to strategy. Re-raises when retries are exhausted
     or not allowed.
 
     Args:
-        tool: Tool instance with execute(args) method and is_idempotent attribute
-        args: Arguments dict to pass to tool.execute()
+        tool: Tool instance with run(**kwargs) method and is_idempotent attribute
+        args: Arguments dict to pass to tool.run(**args)
 
     Returns:
-        Result from successful tool.execute() call
+        Result from successful tool.run(**args) call
 
     Raises:
         Exception: If tool operation fails and retries exhausted or not allowed
@@ -48,7 +48,7 @@ def execute_with_retry(tool, args):
 
     while True:
         try:
-            return tool.execute(args)
+            return tool.run(**args)
         except Exception as e:
             # Classify caught exception as ToolError or SystemError
             # ToolError for tool-specific failures, SystemError for other failures

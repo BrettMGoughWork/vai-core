@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
@@ -10,11 +10,14 @@ from src.core.agent.isdone import isdone
 from src.core.agent.trace import StepTrace
 from src.core.llm.transport import LLMTransport
 from src.core.types.result import CoreResult
+from src.execution.safe_failure import SafeFailure
 
 
-def _result_summary(result: CoreResult | None) -> str:
+def _result_summary(result: Union[CoreResult, SafeFailure, None]) -> str:
     if result is None:
         return ""
+    if isinstance(result, SafeFailure):
+        return f"{result.error_type}: {result.message}"
     if result.is_error:
         return result.error or ""
     if result.is_text:
@@ -34,7 +37,7 @@ class AgentRuntime:
         result, _, _ = core_step(state, self.transport, self.config)
         return result
 
-    def run(self, prompt: str) -> CoreResult:
+    def run(self, prompt: str) -> Union[CoreResult, SafeFailure]:
         state = ConversationState(input=prompt)
         outcome = StepOutcome.NOOP
         result = None
@@ -66,6 +69,8 @@ class AgentRuntime:
                                 error=state.last_error,
                             )
                         )
+                        if isinstance(result, SafeFailure):
+                            return result
                     except TimeoutError:
                         outcome = StepOutcome.FATAL
                         state.last_error = "Step timed out"
@@ -83,7 +88,11 @@ class AgentRuntime:
                         error=state.last_error,
                     )
                 )
+                if isinstance(result, SafeFailure):
+                    return result
 
+        if isinstance(result, SafeFailure):
+            return result
         if state.last_error and (result is None or not result.is_error):
             return CoreResult.from_error(RuntimeError(state.last_error))
 
