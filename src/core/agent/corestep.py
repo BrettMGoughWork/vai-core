@@ -16,6 +16,7 @@ from src.execution.retry.tool_retry_wrapper import execute_with_retry
 from src.execution.safe_failure import make_safe_failure, SafeFailure
 from src.execution.retry.circuit_breaker import CircuitBreaker
 from src.execution.degraded_mode import DegradedModeController
+from src.execution.poison_job_detector import PoisonJobDetector
 from src.core.types.errors.ToolError import ToolError
 
 
@@ -29,22 +30,36 @@ class CoreStepExecutor:
         circuit_breaker: CircuitBreaker | None = None,
         degraded_mode: DegradedModeController | None = None,
         self_healing: SelfHealingController | None = None,
+        poison_job_detector: PoisonJobDetector | None = None,
     ):
         self.llm_client = llm_client
         self.config = config
         self.circuit_breaker = circuit_breaker or CircuitBreaker(failure_threshold=3, cooldown=5.0)
         self.degraded_mode = degraded_mode or DegradedModeController(threshold=5)
         self.self_healing = self_healing or SelfHealingController(failure_threshold=3)
+        self.poison_job_detector = poison_job_detector or PoisonJobDetector(failure_threshold=5)
 
     def run(self, state: ConversationState) -> Tuple[Union[CoreResult, SafeFailure], ConversationState, StepOutcome]:
         """Run one step of the core agent loop with safety substrate."""
         if self.self_healing.should_self_heal():
             return perform_self_heal(state), state, StepOutcome.FATAL
 
+        job_id = str(state.metadata.get("job_id") or state.input)
+        if self.poison_job_detector.is_poison(job_id):
+            poison_error = ToolError(
+                type="ToolError",
+                message="Poison job detected",
+                details={"job_id": job_id},
+                timestamp="",
+                recoverable=False,
+            )
+            return make_safe_failure(poison_error, {"job_id": job_id, "poison_job": True}), state, StepOutcome.FATAL
+
         tool = None
         try:
             prompt = state.as_prompt()
-            tools = SkillRegistry.all_specs_for_agent(self.config)
+            degraded_active = self.degraded_mode.is_active()
+            tools = [] if degraded_active else SkillRegistry.all_specs_for_agent(self.config)
             request = {
                 "prompt": prompt,
                 "tools": tools,
@@ -58,6 +73,15 @@ class CoreStepExecutor:
                 state.last_result = result
                 tool = None
             else:
+                if degraded_active:
+                    degraded_error = ToolError(
+                        type="ToolError",
+                        message="Tool execution disabled in degraded mode",
+                        details={},
+                        timestamp="",
+                        recoverable=False,
+                    )
+                    return make_safe_failure(degraded_error, {"degraded_mode": True}), state, StepOutcome.FATAL
                 tool = select_tool(
                     tool_name=llm_resp.tool_name,
                     allowed_tools=self.config.allowed_tools,
@@ -85,12 +109,14 @@ class CoreStepExecutor:
             if not result.is_error:
                 self.self_healing.record_success()
                 self.degraded_mode.record_success()
+                self.poison_job_detector.record_success(job_id)
                 if tool is not None:
                     self.circuit_breaker.record_success(tool.name)
                     state.append_tool(tool.name, result.tool_output)
             else:
                 self.self_healing.record_failure()
                 self.degraded_mode.record_failure()
+                self.poison_job_detector.record_failure(job_id)
                 if tool is not None:
                     self.circuit_breaker.record_failure(tool.name)
                     state.append_error(tool.name, result.error)
@@ -101,6 +127,7 @@ class CoreStepExecutor:
         except Exception as error:
             self.self_healing.record_failure()
             self.degraded_mode.record_failure()
+            self.poison_job_detector.record_failure(job_id)
             if tool is not None and isinstance(error, ToolError):
                 self.circuit_breaker.record_failure(tool.name)
             metadata = {"panic": True}
