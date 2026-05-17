@@ -77,6 +77,8 @@ class CoreStepExecutor:
                     return make_safe_failure(circuit_breaker_error, {"tool": tool.name}), state, StepOutcome.FATAL
 
                 result = execute_with_retry(tool, llm_resp.tool_args or {})
+                if not isinstance(result, CoreResult):
+                    result = CoreResult.from_tool(tool.name, result)
 
             state.last_result = result
 

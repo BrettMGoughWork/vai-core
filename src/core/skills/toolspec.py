@@ -37,9 +37,15 @@ class ToolSpec:
     # Optional: whether this tool is only for development/testing and should not be used in production
     dev_only: bool = False
 
+    # Optional: whether retries may assume the tool is idempotent
+    is_idempotent: bool = True
+
     def run(self, **kwargs) -> Any:
         """
         Execute the tool with validated arguments.
         Validation is handled by BaseSkill before calling this.
         """
         return self.handler(**kwargs)
+
+    def execute(self, args: dict[str, Any]) -> Any:
+        return self.run(**args)
