@@ -56,7 +56,7 @@
 # PHASE 1.4 — Error Model, Retries, Resilience
 *Depends On*: PHASE 3
 
-1.4.1. Define error taxonomy — LLMError, ToolError, ValidationError, SystemError.  
+✅ 1.4.1. Define error taxonomy — LLMError, ToolError, ValidationError, SystemError.  
 1.4.2. Implement retry policy — per error type.  
 1.4.3. Add LLM retry wrapper — transient network/timeouts.  
 1.4.4. Add tool retry wrapper — idempotent tools only.  
