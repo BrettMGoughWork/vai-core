@@ -38,11 +38,11 @@ def test_core_step_returns_text_and_updates_state(mock_all_specs_for_agent):
     assert call_kwargs["tools"] == []
 
 
-@patch("src.core.agent.corestep.execute_tool")
+@patch("src.core.agent.corestep.execute_with_retry")
 @patch("src.core.agent.corestep.select_tool")
 @patch("src.core.agent.corestep.SkillRegistry.all_specs_for_agent")
 def test_core_step_executes_tool_and_appends_tool_history(
-    mock_all_specs_for_agent, mock_select_tool, mock_execute_tool
+    mock_all_specs_for_agent, mock_select_tool, mock_execute_with_retry
 ):
     mock_all_specs_for_agent.return_value = [MagicMock()]
     transport = MagicMock()
@@ -51,7 +51,7 @@ def test_core_step_executes_tool_and_appends_tool_history(
     spec = MagicMock()
     spec.name = "echo"
     mock_select_tool.return_value = spec
-    mock_execute_tool.return_value = CoreResult.from_tool("echo", "ok")
+    mock_execute_with_retry.return_value = CoreResult.from_tool("echo", "ok")
     state = ConversationState(input="start")
 
     result, new_state, outcome = core_step(state=state, transport=transport, config=_make_config())
@@ -61,14 +61,14 @@ def test_core_step_executes_tool_and_appends_tool_history(
     assert new_state.last_result == result
     assert new_state.history == ["TOOL echo: ok"]
     assert outcome == StepOutcome.RECOVERABLE
-    mock_execute_tool.assert_called_once_with(spec, {"text": "hi"})
+    mock_execute_with_retry.assert_called_once_with(spec, {"text": "hi"})
 
 
-@patch("src.core.agent.corestep.execute_tool")
+@patch("src.core.agent.corestep.execute_with_retry")
 @patch("src.core.agent.corestep.select_tool")
 @patch("src.core.agent.corestep.SkillRegistry.all_specs_for_agent")
 def test_core_step_appends_error_history_when_tool_fails(
-    mock_all_specs_for_agent, mock_select_tool, mock_execute_tool
+    mock_all_specs_for_agent, mock_select_tool, mock_execute_with_retry
 ):
     mock_all_specs_for_agent.return_value = [MagicMock()]
     transport = MagicMock()
@@ -77,7 +77,7 @@ def test_core_step_appends_error_history_when_tool_fails(
     spec = MagicMock()
     spec.name = "echo"
     mock_select_tool.return_value = spec
-    mock_execute_tool.return_value = CoreResult.from_error(RuntimeError("boom"))
+    mock_execute_with_retry.return_value = CoreResult.from_error(RuntimeError("boom"))
     state = ConversationState(input="start")
 
     result, new_state, outcome = core_step(state=state, transport=transport, config=_make_config())

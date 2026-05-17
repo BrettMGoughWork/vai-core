@@ -1,59 +1,126 @@
-from typing import Tuple
+from typing import Tuple, Union
 
 from src.core.agent.state import ConversationState
 from src.core.llm.transport import LLMTransport
 from src.core.agent.config import AgentConfig
 from src.core.skills.registry import SkillRegistry
 from src.governance.tool_selection import select_tool
-from src.execution.engine import execute_tool
 from src.core.types.result import CoreResult
 from src.core.agent.outcome import classify_step, StepOutcome
 
+# Safety substrate imports
+from src.execution.panic_guard import with_panic_guard
+from src.execution.self_healing import perform_self_heal, SelfHealingController
+from src.execution.retry.llm_retry_wrapper import call_with_retry
+from src.execution.retry.tool_retry_wrapper import execute_with_retry
+from src.execution.safe_failure import make_safe_failure, SafeFailure
+from src.execution.retry.circuit_breaker import CircuitBreaker
+from src.execution.degraded_mode import DegradedModeController
+from src.core.types.errors.AgentError import AgentError
+from src.core.types.errors.ToolError import ToolError
+
+
+class CoreStepExecutor:
+    """Executes a single step of the core agent loop with safety substrate."""
+
+    def __init__(
+        self,
+        llm_client: LLMTransport,
+        config: AgentConfig,
+        circuit_breaker: CircuitBreaker | None = None,
+        degraded_mode: DegradedModeController | None = None,
+        self_healing: SelfHealingController | None = None,
+    ):
+        self.llm_client = llm_client
+        self.config = config
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(failure_threshold=3, cooldown=5.0)
+        self.degraded_mode = degraded_mode or DegradedModeController(threshold=5)
+        self.self_healing = self_healing or SelfHealingController(failure_threshold=3)
+
+    def run(self, state: ConversationState) -> Tuple[Union[CoreResult, SafeFailure], ConversationState, StepOutcome]:
+        """Run one step of the core agent loop with safety substrate."""
+        if self.self_healing.should_self_heal():
+            return perform_self_heal(state), state, StepOutcome.FATAL
+
+        tool = None
+        try:
+            prompt = state.as_prompt()
+            tools = SkillRegistry.all_specs_for_agent(self.config)
+            request = {
+                "prompt": prompt,
+                "tools": tools,
+                "model": self.config.model,
+            }
+            llm_resp = call_with_retry(self.llm_client, request)
+
+            if not llm_resp.tool_name:
+                result = CoreResult.from_text(llm_resp.text or "")
+                state.append_llm(result.text)
+                state.last_result = result
+                self.self_healing.record_success()
+                self.degraded_mode.record_success()
+                return result, state, classify_step(result)
+
+            tool = select_tool(
+                tool_name=llm_resp.tool_name,
+                allowed_tools=self.config.allowed_tools,
+                allowed_categories=self.config.allowed_categories,
+                allowed_side_effects=self.config.allowed_side_effects,
+                registry=SkillRegistry,
+            )
+
+            if self.circuit_breaker.is_open(tool.name):
+                circuit_breaker_error = ToolError(
+                    type="ToolError",
+                    message="Circuit breaker open",
+                    details={"tool": tool.name},
+                    timestamp="",
+                    recoverable=False,
+                )
+                return make_safe_failure(circuit_breaker_error, {"tool": tool.name}), state, StepOutcome.FATAL
+
+            result = execute_with_retry(tool, llm_resp.tool_args or {})
+        except AgentError as error:
+            self.self_healing.record_failure()
+            self.degraded_mode.record_failure()
+            if tool is not None and isinstance(error, ToolError):
+                self.circuit_breaker.record_failure(tool.name)
+            metadata = {}
+            if tool is not None:
+                metadata["tool"] = tool.name
+            return make_safe_failure(error, metadata), state, StepOutcome.FATAL
+        except Exception as error:
+            self.self_healing.record_failure()
+            self.degraded_mode.record_failure()
+            metadata = {}
+            if tool is not None:
+                metadata["tool"] = tool.name
+            return make_safe_failure(error, metadata), state, StepOutcome.FATAL
+
+        state.last_result = result
+
+        if not result.is_error:
+            self.self_healing.record_success()
+            self.degraded_mode.record_success()
+            self.circuit_breaker.record_success(tool.name)
+            state.append_tool(tool.name, result.tool_output)
+        else:
+            self.self_healing.record_failure()
+            self.degraded_mode.record_failure()
+            self.circuit_breaker.record_failure(tool.name)
+            state.append_error(tool.name, result.error)
+
+        outcome = classify_step(result)
+
+        return result, state, outcome
+
+
+@with_panic_guard
 def core_step(
     state: ConversationState,
     transport: LLMTransport,
     config: AgentConfig,
 ) -> Tuple[CoreResult, ConversationState, StepOutcome]:
-
-    # 1. Build prompt from state
-    prompt = state.as_prompt()
-
-    # 2. Filter tools for this agent
-    tools = SkillRegistry.all_specs_for_agent(config)
-
-    # 3. LLM call
-    llm_resp = transport.call(
-        prompt=prompt,
-        tools=tools,
-        model=config.model,
-    )
-
-    # 4. No tool → final text
-    if not llm_resp.tool_name:
-        result = CoreResult.from_text(llm_resp.text or "")
-        state.append_llm(result.text)
-        state.last_result = result
-        return result, state, classify_step(result)
-
-    # 5. Governance
-    spec = select_tool(
-        tool_name=llm_resp.tool_name,
-        allowed_tools=config.allowed_tools,
-        allowed_categories=config.allowed_categories,
-        allowed_side_effects=config.allowed_side_effects,
-        registry=SkillRegistry,
-    )
-
-    # 6. Execute tool
-    result = execute_tool(spec, llm_resp.tool_args or {})
-
-    state.last_result = result
-
-    if result.is_error:
-        state.append_error(spec.name, result.error)
-    else:
-        state.append_tool(spec.name, result.tool_output)
-
-    outcome = classify_step(result)
-
-    return result, state, outcome
+    """Execute a single step of the core agent loop (backward-compatible function)."""
+    executor = CoreStepExecutor(transport, config)
+    return executor.run(state)
