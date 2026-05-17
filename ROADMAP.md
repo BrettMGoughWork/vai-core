@@ -65,7 +65,7 @@
 ✅ 1.4.7. Add safe failure response — structured error.  
 ✅ 1.4.8. Add panic guard — catch unexpected exceptions.  
 ✅ 1.4.9. Add loop self‑healing — adjust state, continue.  
-1.4.10. Detect poison jobs — mark unrecoverable inputs.
+✅ 1.4.10. Detect poison jobs — mark unrecoverable inputs.
 
 ---
 🚀 Release 0 — "The Substrate"
