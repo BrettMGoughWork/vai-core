@@ -30,6 +30,9 @@ DEEPSEEK_API_KEY=sk-...
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 ```
 
+## Design principles and Philosophy
+Resilient Hierarchical Execution: Abandoned brittle linear planning in favor of a stratified subgoal architecture. Features independent *Subplan Managers* that allow local recovery, dynamic task slotting, and minimized cognitive/computational load during complex multi-step operations.
+
 ## Runtime flow (current)
 
 `main.py` builds an `AgentRuntime` with:
