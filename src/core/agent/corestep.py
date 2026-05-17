@@ -16,7 +16,6 @@ from src.execution.retry.tool_retry_wrapper import execute_with_retry
 from src.execution.safe_failure import make_safe_failure, SafeFailure
 from src.execution.retry.circuit_breaker import CircuitBreaker
 from src.execution.degraded_mode import DegradedModeController
-from src.core.types.errors.AgentError import AgentError
 from src.core.types.errors.ToolError import ToolError
 
 
@@ -57,62 +56,55 @@ class CoreStepExecutor:
                 result = CoreResult.from_text(llm_resp.text or "")
                 state.append_llm(result.text)
                 state.last_result = result
+                tool = None
+            else:
+                tool = select_tool(
+                    tool_name=llm_resp.tool_name,
+                    allowed_tools=self.config.allowed_tools,
+                    allowed_categories=self.config.allowed_categories,
+                    allowed_side_effects=self.config.allowed_side_effects,
+                    registry=SkillRegistry,
+                )
+
+                if self.circuit_breaker.is_open(tool.name):
+                    circuit_breaker_error = ToolError(
+                        type="ToolError",
+                        message="Circuit breaker open",
+                        details={"tool": tool.name},
+                        timestamp="",
+                        recoverable=False,
+                    )
+                    return make_safe_failure(circuit_breaker_error, {"tool": tool.name}), state, StepOutcome.FATAL
+
+                result = execute_with_retry(tool, llm_resp.tool_args or {})
+
+            state.last_result = result
+
+            if not result.is_error:
                 self.self_healing.record_success()
                 self.degraded_mode.record_success()
-                return result, state, classify_step(result)
+                if tool is not None:
+                    self.circuit_breaker.record_success(tool.name)
+                    state.append_tool(tool.name, result.tool_output)
+            else:
+                self.self_healing.record_failure()
+                self.degraded_mode.record_failure()
+                if tool is not None:
+                    self.circuit_breaker.record_failure(tool.name)
+                    state.append_error(tool.name, result.error)
 
-            tool = select_tool(
-                tool_name=llm_resp.tool_name,
-                allowed_tools=self.config.allowed_tools,
-                allowed_categories=self.config.allowed_categories,
-                allowed_side_effects=self.config.allowed_side_effects,
-                registry=SkillRegistry,
-            )
+            outcome = classify_step(result)
 
-            if self.circuit_breaker.is_open(tool.name):
-                circuit_breaker_error = ToolError(
-                    type="ToolError",
-                    message="Circuit breaker open",
-                    details={"tool": tool.name},
-                    timestamp="",
-                    recoverable=False,
-                )
-                return make_safe_failure(circuit_breaker_error, {"tool": tool.name}), state, StepOutcome.FATAL
-
-            result = execute_with_retry(tool, llm_resp.tool_args or {})
-        except AgentError as error:
+            return result, state, outcome
+        except Exception as error:
             self.self_healing.record_failure()
             self.degraded_mode.record_failure()
             if tool is not None and isinstance(error, ToolError):
                 self.circuit_breaker.record_failure(tool.name)
-            metadata = {}
+            metadata = {"panic": True}
             if tool is not None:
                 metadata["tool"] = tool.name
             return make_safe_failure(error, metadata), state, StepOutcome.FATAL
-        except Exception as error:
-            self.self_healing.record_failure()
-            self.degraded_mode.record_failure()
-            metadata = {}
-            if tool is not None:
-                metadata["tool"] = tool.name
-            return make_safe_failure(error, metadata), state, StepOutcome.FATAL
-
-        state.last_result = result
-
-        if not result.is_error:
-            self.self_healing.record_success()
-            self.degraded_mode.record_success()
-            self.circuit_breaker.record_success(tool.name)
-            state.append_tool(tool.name, result.tool_output)
-        else:
-            self.self_healing.record_failure()
-            self.degraded_mode.record_failure()
-            self.circuit_breaker.record_failure(tool.name)
-            state.append_error(tool.name, result.error)
-
-        outcome = classify_step(result)
-
-        return result, state, outcome
 
 
 @with_panic_guard

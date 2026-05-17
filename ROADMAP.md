@@ -75,22 +75,22 @@
 *Invariant*: Stratum 2 must be pure: no side effects, no tool calls, no LLM calls. It only produces subgoals and plan segments for Stratum 1 to execute.
 
 # PHASE 2.1 - Multi-Step Loop Foundation
-*Depends on*: PHASE 1.4
-2.1.1. Step State - the per-state state container
-2.1.2. Step Result - the structured output of each step
-2.1.3. Multi-Step Core - CoreStep v2
-2.1.4. Loop Policy - max steps, timeouts, etc
-2.1.5. Step Outcome Classifier - LLM model that says continue|stop|tool needed|error
-2.1.6. Loop Orchestrator - deterministic loop controller
+*Depends on*: PHASE 1.4  
+2.1.1. Step State - the per-state state container  
+2.1.2. Step Result - the structured output of each step  
+2.1.3. Multi-Step Core - CoreStep v2  
+2.1.4. Loop Policy - max steps, timeouts, etc  
+2.1.5. Step Outcome Classifier - LLM model that says continue|stop|tool needed|error  
+2.1.6. Loop Orchestrator - deterministic loop controller  
 
 # PHASE 2.2 - Flat Planner (non-hierarchical)
-*Depends on*: PHASE 2.1
-2.2.1. Plan Generator - LLM generates a list of steps
-2.2.2. Plan Validator - ensures the plan is safe
-2.2.3. Plan Executor - executes steps sequentially
-2.2.4. Plan State - tracks progress
-2.2.5. Plan Repair - minimal repair rules
-2.2.6. Plan Execution Safety Layer
+*Depends on*: PHASE 2.1  
+2.2.1. Plan Generator - LLM generates a list of steps  
+2.2.2. Plan Validator - ensures the plan is safe  
+2.2.3. Plan Executor - executes steps sequentially  
+2.2.4. Plan State - tracks progress  
+2.2.5. Plan Repair - minimal repair rules  
+2.2.6. Plan Execution Safety Layer  
 
 # PHASE 2.3 - Hierarchical planning
 *Depends On*: PHASE 2.2  
@@ -106,11 +106,11 @@
 2.3.10. Subgoal Validation Rules    
 
 # PHASE 2.4 - Memory Model v1
-*Depends On*: PHASE 2.3
-2.4.1. Subgoal memory
-2.4.2. Segment memory
-2.4.3. Plan memory
-2.4.4. Drift memory (plan divergence)
+*Depends On*: PHASE 2.3  
+2.4.1. Subgoal memory  
+2.4.2. Segment memory  
+2.4.3. Plan memory  
+2.4.4. Drift memory (plan divergence)  
 
 ---
 🚀 Release 1 — "Hierarchical Reasoner"
