@@ -46,6 +46,3 @@ class ToolSpec:
         Validation is handled by BaseSkill before calling this.
         """
         return self.handler(**kwargs)
-
-    def execute(self, args: dict[str, Any]) -> Any:
-        return self.run(**args)

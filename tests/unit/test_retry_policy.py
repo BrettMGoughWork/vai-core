@@ -165,7 +165,7 @@ class TestToolRetryWrapper:
             is_idempotent = True
             call_count = 0
 
-            def execute(self, args):
+            def run(self, **args):
                 self.call_count += 1
                 return {"result": "success"}
 
@@ -183,7 +183,7 @@ class TestToolRetryWrapper:
             is_idempotent = True
             call_count = 0
 
-            def execute(self, args):
+            def run(self, **args):
                 self.call_count += 1
                 if self.call_count == 1:
                     raise RuntimeError("Tool failed")
@@ -203,7 +203,7 @@ class TestToolRetryWrapper:
             is_idempotent = False
             call_count = 0
 
-            def execute(self, args):
+            def run(self, **args):
                 self.call_count += 1
                 raise RuntimeError("Tool failed")
 
@@ -222,7 +222,7 @@ class TestToolRetryWrapper:
             is_idempotent = True
             call_count = 0
 
-            def execute(self, args):
+            def run(self, **args):
                 self.call_count += 1
                 if self.call_count == 1:
                     raise Exception("System error")

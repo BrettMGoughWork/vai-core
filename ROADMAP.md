@@ -66,6 +66,8 @@
 ✅ 1.4.8. Add panic guard — catch unexpected exceptions.  
 ✅ 1.4.9. Add loop self‑healing — adjust state, continue.  
 ✅ 1.4.10. Detect poison jobs — mark unrecoverable inputs.
+✅ 1.4.11. CLI helper that prints the plan (python3 main.py agent plan)
+✅ 1.4.12. Bug fixes leading to stable Release 0 
 
 ---
 🚀 Release 0 — "The Substrate"

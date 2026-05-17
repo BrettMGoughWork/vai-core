@@ -46,3 +46,11 @@ class ConversationState:
         if not self.history:
             return base
         return base + "\n" + "\n".join(self.history)
+
+    def reset(self) -> None:
+        self.history.clear()
+        self.last_result = None
+        self.last_error = None
+        self.step_count = 0
+        self.metadata.clear()
+        self.trace.clear()
