@@ -61,9 +61,9 @@
 ✅ 1.4.3. Add LLM retry wrapper — transient network/timeouts.  
 ✅ 1.4.4. Add tool retry wrapper — idempotent tools only.  
 ✅ 1.4.5. Add circuit breaker per tool — stop repeated failures.  
-1.4.6. Add degraded mode — fallback to simpler behaviour.      
-1.4.7. Add safe failure response — structured error.  
-1.4.8. Add panic guard — catch unexpected exceptions.  
+✅ 1.4.6. Add degraded mode — fallback to simpler behaviour.      
+✅ 1.4.7. Add safe failure response — structured error.  
+✅ 1.4.8. Add panic guard — catch unexpected exceptions.  
 1.4.9. Add loop self‑healing — adjust state, continue.  
 1.4.10. Detect poison jobs — mark unrecoverable inputs.
 
