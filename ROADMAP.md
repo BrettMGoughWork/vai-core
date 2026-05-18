@@ -78,15 +78,15 @@
 
 ### PHASE 1.5 - STRATUM 1 Invariant Checker
 *Depends On*: PHASE 1.4
-1.6.1 — File System & Import Graph Scanner  
-1.6.2 — Rule Engine Framework  
-1.6.3 — Stratum Boundary Enforcement Rules  
-1.6.4 — Execution Purity Rules (S1 Constraints)  
-1.6.5 — Type & Schema Invariant Checks  
-1.6.6 — Substrate Purity Checks  
-1.6.7 — CLI Tool  
-1.6.8 — Reporter & Output System  
-1.6.9 — Deployment Gate Integration (optional github action workflow)  
+✅ 1.5.1 — File System & Import Graph Scanner  
+✅ 1.5.2 — Rule Engine Framework  
+✅ 1.5.3 — Stratum Boundary Enforcement Rules  
+✅ 1.5.4 — Execution Purity Rules (S1 Constraints)  
+✅ 1.5.5 — Type & Schema Invariant Checks  
+✅ 1.5.6 — Substrate Purity Checks  
+✅ 1.5.7 — CLI Tool  
+✅ 1.5.8 — Reporter & Output System  
+1.5.9 — Deployment Gate Integration (optional github action workflow)  
 
 ---
 🚀 Release 0 — "The Substrate"
@@ -95,12 +95,12 @@
 ### PHASE 1.6 — Provider Integrations (ChatProvider implementations)
 *Depends On*: PHASE 1.5  
 
-1.5.1. Anthropic (Claude) provider  
-1.5.2. OpenAI provider  
-1.5.3. Google (Gemini) provider  
-1.5.4. Mistral provider  
-1.5.5. Alibaba (Qwen) provider  
-1.5.6. Meta (Llama) provider  
+1.6.1. Anthropic (Claude) provider  
+1.6.2. OpenAI provider  
+1.6.3. Google (Gemini) provider  
+1.6.4. Mistral provider  
+1.6.5. Alibaba (Qwen) provider  
+1.6.6. Meta (Llama) provider  
 
 ## STRATUM 2 - Hierarchical Intelligence
 *Invariant*: Stratum 2 must be pure: no side effects, no tool calls, no LLM calls. It only produces subgoals and plan segments for Stratum 1 to execute.  
