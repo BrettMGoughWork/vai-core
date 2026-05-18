@@ -40,8 +40,8 @@
 ---
 
 ### PHASE 1.3 - Execution Semantics
-*Depends On*: PHASE 1.2
-*Note*: This phase defines schemas and contracts only. No planning or reasoning logic is implemented here.
+*Depends On*: PHASE 1.2  
+*Note*: This phase defines schemas and contracts only. No planning or reasoning logic is implemented here.  
 
 ✅ 1.3.1. Plan Schema  
 ✅ 1.3.2. Local Planner  
@@ -77,7 +77,7 @@
 ✅ 1.4.12. Bug fixes leading to stable Release 0   
 
 ### PHASE 1.5 - STRATUM 1 Invariant Checker
-*Depends On*: PHASE 1.4
+*Depends On*: PHASE 1.4  
 ✅ 1.5.1 — File System & Import Graph Scanner  
 ✅ 1.5.2 — Rule Engine Framework  
 ✅ 1.5.3 — Stratum Boundary Enforcement Rules  
@@ -317,8 +317,10 @@
 - Implement DriftMemory store  
 - Add DriftMemory retrieval
 
-2.4.5 - Memory governance
-2.4.6 - Summarisation rules
+2.4.5 - Memory governance  
+
+2.4.6 - Summarisation rules  
+
 2.4.7 - Memory eviction rules
 - LRU or LFU
 - Drift-triggered eviction
@@ -326,7 +328,7 @@
 - Summarised-state replacement
 
 ## PHASE 2.5 Full Hierarchical Reasoner
-*Depends On*: PHASE 2.4
+*Depends On*: PHASE 2.4  
 *Note*: builds on skeleton iterations above to complete Stratum 2
 
 2.5.1 — Plan Repair
@@ -361,7 +363,7 @@
 *Invariant*: Stratum 3 orchestrates agents, capabilities and external intefaces, but never performs long-horizion reasoning planning, and execution itself. It delegates all reasoning to Stratum 2 and all action execution to Stratum 1
 
 ### PHASE 3.1 — Skill & Capability Layer (Core Skill)
-*Depends On*: PHASE 2.5
+*Depends On*: PHASE 2.5  
 *Note:: Stratum 3 requires the full hierarchical reasoner to ensure agent-level planning is stable
 
 3.1.1. Implement skill registry — register skills, metadata, ToolSpecs.  
@@ -392,10 +394,10 @@
 3.3.1. Define FetchError taxonomy  
 3.3.2. Define fetchurl skill interface — url, mode="auto".    
 3.3.3. Implement simple httpx fetch — fast, strict.    
-3.3.4. Implement hardened HTTP (CRW) — anti‑bot header (opinionated?).    
-3.3.5. Implement Playwright headless — JS rendering (opinionated?)    
-3.3.6. Implement Playwright stealth — heavy, rate‑limited (opnionated?)  
-3.3.7. Implement search — query → URLs (see 3.4 search provider)  
+3.3.4. Implement hardened HTTP (CRW) — anti‑bot header (opinionated).    
+3.3.5. Implement Playwright headless — JS rendering (opinionated)    
+3.3.6. Implement Playwright stealth — heavy, rate‑limited (opnionated)  
+3.3.7. Implement search — query → URLs (see 3.3b search provider)  
 3.3.8. Implement fetch heuristics — escalation logic.    
 3.3.9. Implement fallback chain — simple → hardened → browser → stealth → search.    
 3.3.10. Add per‑domain policy — allowlists, rate limits.    
