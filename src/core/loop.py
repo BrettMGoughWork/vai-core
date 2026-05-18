@@ -2,24 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.core.skills.registry import SkillRegistry
+from src.skills.registry import SkillRegistry
 from src.execution.executor_contract import Executor
-
-try:
-    from src.skills.skill_filter import SkillFilter
-except ModuleNotFoundError:
-    from src.core.skills.skillfilter import SkillFilter
-
-try:
-    from src.skills.skill_ranker import SkillRanker
-except ModuleNotFoundError:
-    SkillRanker = Any  # type: ignore[assignment]
-
-try:
-    from src.core.planning.local_planner import LocalPlanner
-except ModuleNotFoundError:
-    LocalPlanner = Any  # type: ignore[assignment]
-
+from src.skills.skill_filter import SkillFilter
+from src.skills.skill_ranker import SkillRanker
+from src.core.planning.local_planner import LocalPlanner
 from src.core.planning.plan_validator import PlanValidator
 
 

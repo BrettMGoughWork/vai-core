@@ -9,9 +9,9 @@ from src.core.agent.config import AgentConfig
 from src.core.agent.runtime import AgentRuntime
 from src.core.llm.providers.deepseek_client import DeepSeekClient
 from src.core.llm.transport import LLMTransport
-from src.core.skills.categories import SkillCategory
-from src.core.skills.registry import SkillRegistry
-from src.core.skills.side_effects import SideEffect
+from src.skills.categories import SkillCategory
+from src.skills.registry import SkillRegistry
+from src.skills.side_effects import SideEffect
 
 
 def _load_llm_alias_map(path: Path) -> tuple[str, Dict[str, str]]:

@@ -1,7 +1,7 @@
 import pytest
 
-from src.core.skills.base import BaseSkill
-from src.core.skills.registry import SkillRegistry
+from src.skills.base import BaseSkill
+from src.skills.registry import SkillRegistry
 
 
 @pytest.fixture(autouse=True)

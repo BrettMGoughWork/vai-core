@@ -3,7 +3,7 @@ from typing import Tuple, Union
 from src.core.agent.state import ConversationState
 from src.core.llm.transport import LLMTransport
 from src.core.agent.config import AgentConfig
-from src.core.skills.registry import SkillRegistry
+from src.skills.registry import SkillRegistry
 from src.governance.tool_selection import select_tool
 from src.core.types.result import CoreResult
 from src.core.agent.outcome import classify_step, StepOutcome

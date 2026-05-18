@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from src.core.llm.transport import LLMTransport
 from src.core.llm.types import CoreLLMResponse
-from src.core.skills.toolspec import ToolSpec
+from src.skills.toolspec import ToolSpec
 
 
 def test_transport_converts_toolspec_to_schema():

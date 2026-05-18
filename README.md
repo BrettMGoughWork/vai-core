@@ -65,6 +65,15 @@ config/                    # Runtime/model config
 main.py                    # CLI entrypoint
 src/
   core/                    # Agent runtime, planning, core skills, LLM transport/types
+    agent/
+    config/
+    llm/
+      providers/
+    planning/
+    skills/
+    types/
+      errors/
+      validation/
   execution/               # Execution engine, contract, single-skill executor
   governance/              # Tool selection and guardrails
   observability/           # Structured logging

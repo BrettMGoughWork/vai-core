@@ -1,4 +1,4 @@
-from src.core.skills.canonical import canonicalise_args, canonicalize_args
+from src.skills.canonical import canonicalise_args, canonicalize_args
 
 
 def test_canonicalise_args_trims_and_coerces_values():

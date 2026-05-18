@@ -1,7 +1,7 @@
 from typing import List
-from src.core.skills.toolspec import ToolSpec
-from src.core.skills.categories import SkillCategory
-from src.core.skills.side_effects import SideEffect
+from src.skills.toolspec import ToolSpec
+from src.skills.categories import SkillCategory
+from src.skills.side_effects import SideEffect
 from .errors import GovernanceError
 
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from src.core.planning.plan import Plan
-from src.core.skills.registry import SkillRegistry
-from src.core.skills.skill import Skill
-from src.core.skills import validator
+from src.skills.registry import SkillRegistry
+from src.skills.skill import Skill
+from src.skills import validator
 from src.execution.executor_contract import ExecutionResult, Executor
 
 
