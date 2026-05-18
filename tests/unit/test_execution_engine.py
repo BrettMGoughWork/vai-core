@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from src.execution.engine import execute_tool
 from src.execution.errors import ToolExecutionError
 from src.core.types.result import CoreResult
-from src.core.skills.base import BaseSkill
+from src.skills.base import BaseSkill
 
 
 def test_execute_tool_returns_core_result_on_success():
@@ -102,7 +102,7 @@ def test_execute_tool_with_multiple_args():
 
 def test_execute_tool_handles_validation_errors():
     """execute_tool catches and returns ValidationError as CoreResult."""
-    from src.core.skills.validator import ValidationError
+    from src.skills.validator import ValidationError
 
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "validate_skill"

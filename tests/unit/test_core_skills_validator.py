@@ -1,6 +1,6 @@
 import pytest
 
-from src.core.skills.validator import ValidationError, validate_structural
+from src.skills.validator import ValidationError, validate_structural
 
 
 def test_validate_structural_accepts_valid_args():

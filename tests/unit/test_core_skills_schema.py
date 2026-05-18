@@ -1,6 +1,6 @@
 from typing import Optional
 
-from src.core.skills.schema import generate_schema_from_handler
+from src.skills.schema import generate_schema_from_handler
 
 
 def test_generate_schema_from_handler_maps_common_python_types():

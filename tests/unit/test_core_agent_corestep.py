@@ -5,8 +5,8 @@ from src.core.agent.corestep import core_step
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.state import ConversationState
 from src.core.llm.types import CoreLLMResponse
-from src.core.skills.categories import SkillCategory
-from src.core.skills.side_effects import SideEffect
+from src.skills.categories import SkillCategory
+from src.skills.side_effects import SideEffect
 from src.core.types.result import CoreResult
 
 

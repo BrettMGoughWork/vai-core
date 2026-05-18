@@ -1,5 +1,5 @@
-from src.core.skills.skill import Skill
-from src.core.skills.skillmetadata import SkillMetadata
+from src.skills.skill import Skill
+from src.skills.skillmetadata import SkillMetadata
 
 
 class SkillFilter:

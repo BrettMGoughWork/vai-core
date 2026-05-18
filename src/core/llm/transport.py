@@ -3,7 +3,7 @@ import json
 from typing import List, Dict, Any
 
 from .types import CoreLLMResponse
-from src.core.skills.toolspec import ToolSpec
+from src.skills.toolspec import ToolSpec
 from src.core.llm.providers.base import ChatProvider
 
 

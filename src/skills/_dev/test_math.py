@@ -1,6 +1,6 @@
-from src.core.skills.base import BaseSkill
-from src.core.skills.categories import SkillCategory
-from src.core.skills.side_effects import SideEffect
+from src.skills.base import BaseSkill
+from src.skills.categories import SkillCategory
+from src.skills.side_effects import SideEffect
 
 def add(a: int, b: int) -> int:
     return a + b

@@ -1,7 +1,13 @@
+# Project roadmap
+- This roadmap is a guide rather than an explicit checklist 
+- Changes, challenges, suggestions are encouraged. The expectation is that phases and strata are goals to be met, and tasks a list of breadcrumbs to reach those goals 
+- Expect entire phases to be inserted where gaps in the plan may exist
+- Where required, detail is generally added prior to the next phase or stratum
+
 ## STRATUM 1 - Execution Substrate
 *Invariant*: Stratum 1 must remain deterministic, reactive, and free of long-horizon reasoning
 
-# PHASE 1.1 — Core Runtime Foundation (with BaseSkill + ToolSpec)
+### PHASE 1.1 — Core Runtime Foundation (with BaseSkill + ToolSpec)
 
 ✅ 1.1.1. Define core config model — LLM, timeouts, limits, skill paths.  
 ✅ 1.1.2. Define ToolSpec class — name, description, schema, side‑effects, category.  
@@ -18,14 +24,14 @@
 
 ---
 
-# PHASE 1.2 — State Machine & Loop Semantics
+### PHASE 1.2 — State Machine & Loop Semantics
 *Depends On*: PHASE 1.1
 
 ✅ 1.2.1. Define ConversationState — input, history, last tool call, metadata.  
-✅ 1.2.2. Implement corestep(state) — one LLM → tool → result transition.  
+✅ 1.2.2. Implement CoreStep(state) — one LLM → tool → result transition.  
 ✅ 1.2.3. Classify step outcomes — success, recoverable, fatal, noop.  
 ✅ 1.2.4. Define isdone(state) — goal reached, limits hit.  
-✅ 1.2.5. Implement coreloop(state, policy) — while not done → step.  
+✅ 1.2.5. Implement CoreStep loop(state, policy) — while not done → step.  
 ✅ 1.2.6. Define loop policy model — max steps, wall time, errors.  
 ✅ 1.2.7. Add per‑step timeout — kill slow steps.  
 ✅ 1.2.8. Add per‑loop timeout — kill runaway loops.  
@@ -33,8 +39,9 @@
 
 ---
 
-# PHASE 1.3 - Execution Semantics
+### PHASE 1.3 - Execution Semantics
 *Depends On*: PHASE 1.2
+*Note*: This phase defines schemas and contracts only. No planning or reasoning logic is implemented here.
 
 ✅ 1.3.1. Plan Schema  
 ✅ 1.3.2. Local Planner  
@@ -53,8 +60,8 @@
 
 ---
 
-# PHASE 1.4 — Error Model, Retries, Resilience
-*Depends On*: PHASE 3
+### PHASE 1.4 — Error Model, Retries, Resilience
+*Depends On*: PHASE 1.3
 
 ✅ 1.4.1. Define error taxonomy — LLMError, ToolError, ValidationError, SystemError.  
 ✅ 1.4.2. Implement retry policy — per error type.  
@@ -65,54 +72,286 @@
 ✅ 1.4.7. Add safe failure response — structured error.  
 ✅ 1.4.8. Add panic guard — catch unexpected exceptions.  
 ✅ 1.4.9. Add loop self‑healing — adjust state, continue.  
-✅ 1.4.10. Detect poison jobs — mark unrecoverable inputs.
-✅ 1.4.11. CLI helper that prints the plan (python3 main.py agent plan)
-✅ 1.4.12. Bug fixes leading to stable Release 0 
+✅ 1.4.10. Detect poison jobs — mark unrecoverable inputs.  
+✅ 1.4.11. CLI helper that prints the plan (python3 main.  py agent plan)  
+✅ 1.4.12. Bug fixes leading to stable Release 0   
+
+### PHASE 1.5 - STRATUM 1 Invariant Checker
+*Depends On*: PHASE 1.4
+1.6.1 — File System & Import Graph Scanner  
+1.6.2 — Rule Engine Framework  
+1.6.3 — Stratum Boundary Enforcement Rules  
+1.6.4 — Execution Purity Rules (S1 Constraints)  
+1.6.5 — Type & Schema Invariant Checks  
+1.6.6 — Substrate Purity Checks  
+1.6.7 — CLI Tool  
+1.6.8 — Reporter & Output System  
+1.6.9 — Deployment Gate Integration (optional github action workflow)  
 
 ---
 🚀 Release 0 — "The Substrate"
 ---
 
+### PHASE 1.6 — Provider Integrations (ChatProvider implementations)
+*Depends On*: PHASE 1.5  
+
+1.5.1. Anthropic (Claude) provider  
+1.5.2. OpenAI provider  
+1.5.3. Google (Gemini) provider  
+1.5.4. Mistral provider  
+1.5.5. Alibaba (Qwen) provider  
+1.5.6. Meta (Llama) provider  
+
 ## STRATUM 2 - Hierarchical Intelligence
-*Invariant*: Stratum 2 must be pure: no side effects, no tool calls, no LLM calls. It only produces subgoals and plan segments for Stratum 1 to execute.
+*Invariant*: Stratum 2 must be pure: no side effects, no tool calls, no LLM calls. It only produces subgoals and plan segments for Stratum 1 to execute.  
 
-# PHASE 2.1 - Multi-Step Loop Foundation
+---
+
+*Note*: Stratum 2 operates as a hierarchy of deterministic state machines:
+
+*Layer 1 — Step Machine*  
+- *Processes a single cognitive step*  
+- *Input: StepState*  
+- *Output: StepResult*  
+
+*Layer 2 — Plan Machine*  
+- *Processes a sequence of steps (flat plan)*  
+- *Input: PlanState*  
+- *Output: Updated PlanState*  
+
+*Layer 3 — Hierarchical Agent Machine*  
+- *Manages subgoals and plan segments*  
+- *Input: AgentState (ConversationState + Subgoals + Memory)*  
+- *Output: Updated AgentState*  
+
+*Each layer*:  
+- *Is pure (no side effects)*  
+- *Is deterministic*  
+- *Operates only on structured inputs*  
+- *Produces structured outputs*  
+
+*S1 executes actions*  
+*S2 decides what should happen next*  
+
+---
+
+#### Core Abstractions
+*Hierarchy*:
+
+*Step → atomic cognitive decision*  
+*Plan → ordered list of Steps*  
+*Segment → coherent subset of a Plan*  
+*Subgoal → objective satisfied by one or more Segments*
+
+---
+
+*Subgoal*  
+*contains → Segments*
+
+*Segment*  
+*contains → Plan*  
+
+*Plan*  
+*contains → Steps*
+
+--- 
+
+### PHASE 2.1 - Multi-Step Loop Foundation
 *Depends on*: PHASE 1.4  
-2.1.1. Step State - the per-state state container  
-2.1.2. Step Result - the structured output of each step  
-2.1.3. Multi-Step Core - CoreStep v2  
-2.1.4. Loop Policy - max steps, timeouts, etc  
-2.1.5. Step Outcome Classifier - LLM model that says continue|stop|tool needed|error  
-2.1.6. Loop Orchestrator - deterministic loop controller  
 
-# PHASE 2.2 - Flat Planner (non-hierarchical)
+2.1.1 — Step State
+- Define StepState model — fields, lifecycle, immutability rules  
+- Implement StepState transitions — pending → running → done → error  
+- Add StepState validation — ensure shape, required fields  
+
+2.1.2 — Step Result
+- Define StepResult schema — success, failure, tool_needed, continue  
+- Implement StepResult factory — helpers for each result type  
+- Add StepResult validators — ensure consistency  
+
+2.1.3 — CoreStep v2 
+- Implement CoreStep lifecycle — init → run → classify → output  
+- Implement CoreStep error handling — integrate substrate error envelope  
+- Implement CoreStep transitions — deterministic state machine  
+- Integrate OutcomeClassifier — call classifier, map to StepResult
+
+*Note*: CoreStep v2 must operate only on provided cognitive inputs; all LLM calls are delegated to Stratum 1
+
+2.1.4 — Loop Policy
+- Define LoopPolicy model — max steps, timeouts, retry budget  
+- Implement LoopPolicy enforcement — stop conditions  
+- Add LoopPolicy metrics — counters, durations  
+
+2.1.5 — Step Outcome Classifier
+- Define classifier prompt  
+- Implement classifier wrapper  
+- Add classifier validation  
+*Note*: Classifer wrapper must not call the LLM; it only interprets classifier outputs provided by Stratum 1
+
+2.1.6 — Loop Orchestrator 
+- Implement LoopController — deterministic loop engine  
+- Implement LoopTermination logic — stop, continue, error  
+- Add LoopOrchestrator metrics — step count, durations
+
+2.1.7 - Determinism rules
+- Define invariants that guarantee identical cognitive inputs always produce identical outputs
+- Specify canonical ordering, stable hashing, strict immutability of StepState/StepResult
+- Add deterministic tie-breaking rules for ambiguous classification or transitions
+
+2.1.8 - Cognitive contract
+- Define the interface between Stratum 1 and Stratum 2: what Stratum 2 receives (state, last result, memory) and what it must return (subgoal, segment, plan, or classification)
+- Specify allowed input/output shapes and error semantics
+- Ensure the contract is pure: no side effects, no execution, no tool selection
+
+2.1.9 - Cognitive trace
+- Define a structured trace object capturing *why* each cognitive decision was made
+- Record: chosen transitions, rejected alternatives, drift signals, validation outcomes
+- Ensure the trace is append-only, immutable, and serialisable for debugging
+
+2.1.10 — Subgoal/Segment State
+- Extend ConversationState  
+- Add SubgoalState model  
+- Add SegmentState model  
+
+2.1.11 - Purity Enforcement Layer
+- Validate no tool calls
+- Validate no LLM calls
+- Validate no side effects
+- Validate immutability of cognitive inputs
+- Validate determinstic outputs
+
+2.1.12 - Cognitive Normalisation Layer
+- Stable ordering of inputs
+- Stable hashing of cognitive state
+- Canonical normalisation of cognitive structures
+
+### PHASE 2.2 - Flat Planner (non-hierarchical)
 *Depends on*: PHASE 2.1  
-2.2.1. Plan Generator - LLM generates a list of steps  
-2.2.2. Plan Validator - ensures the plan is safe  
-2.2.3. Plan Executor - executes steps sequentially  
-2.2.4. Plan State - tracks progress  
-2.2.5. Plan Repair - minimal repair rules  
-2.2.6. Plan Execution Safety Layer  
 
-# PHASE 2.3 - Hierarchical planning
+2.2.1 — Plan Generator
+- Define plan generation prompt  
+- Implement PlanGenerator wrapper  
+- Add plan generation validators  
+*Note*: PlanGenerator produces a prompt template only; Stratum 1 performs the actual LLM call
+
+2.2.2 — Plan Validator
+- Define Plan schema  
+- Implement PlanValidator rules — safety, allowed actions  
+- Add PlanValidator error reporting  
+
+2.2.3 — Plan Executor
+- Implement StepDispatcher — run each step via CoreStep  
+- Implement PlanError propagation — map step errors → plan errors  
+- Add PlanExecutor metrics  
+
+2.2.4 — Plan State
+- Define PlanState model  
+- Implement PlanState transitions  
+- Add PlanState validators  
+
+2.2.5 — Plan Execution Safety Layer
+- Define safety rules that prevent invalid or dangerous plan execution
+- Wrap StepDispatcher with pre-execution checks and post-execution validation
+- Implement safety checks — forbidden actions, invalid transitions 
+- Add safety logging  
+
+### PHASE 2.3 - Hierarchical planning
 *Depends On*: PHASE 2.2  
-2.3.1. Define Subgoal model  
-2.3.2. Define PlanSegment model   
-2.3.3. Implement Subgoal Manager  
-2.3.4. Implement Plan Manager  
-2.3.5. Add Governed Signals  
-2.3.6. Add Subgoal/Segment State to ConversationState    
-2.3.7. Implement Agent-level loop (agentloop v2)    
-2.3.8. Define Subgoal Transition Rules    
-2.3.9. Define Drift Detection Model    
-2.3.10. Subgoal Validation Rules    
 
-# PHASE 2.4 - Memory Model v1
+2.3.1 — Subgoal Model
+- Define Subgoal schema  
+- Add Subgoal validators  
+
+2.3.2 — PlanSegment Model
+- Define PlanSegment schema  
+- Add PlanSegment validators  
+
+2.3.3 — Subgoal Manager
+- Implement Subgoal creation  
+- Implement Subgoal validation  
+- Implement Subgoal transitions  
+
+2.3.4 — Plan Manager
+- Implement Segment creation  
+- Implement Segment stitching  
+- Implement Segment validation  
+
+2.3.5 — Governed Signals
+- Define governed signals — drift, stuck, unsafe  
+- Implement signal emitters  
+
+2.3.6 — Agent‑Level Loop Skeleton
+- Implement AgentLoop controller  
+- Implement AgentLoop reflection  
+- Implement AgentLoop error handling  
+
+2.3.7 — Subgoal Transition Rules
+- Define transition rules  
+- Implement transition engine  
+
+2.3.8 — Drift Detection
+- Define drift signals  
+- Define drift thresholds  
+- Implement drift recovery  
+
+2.3.9 — Subgoal Validation Rules
+- Define validation rules  
+- Implement validation engine      
+
+### PHASE 2.4 - Memory Model v1
 *Depends On*: PHASE 2.3  
-2.4.1. Subgoal memory  
-2.4.2. Segment memory  
-2.4.3. Plan memory  
-2.4.4. Drift memory (plan divergence)  
+
+2.4.1 — Subgoal Memory
+- Implement SubgoalMemory store  
+- Add SubgoalMemory retrieval  
+
+2.4.2 — Segment Memory
+- Implement SegmentMemory store  
+- Add SegmentMemory retrieval  
+
+2.4.3 — Plan Memory
+- Implement PlanMemory store  
+- Add PlanMemory retrieval  
+
+2.4.4 — Drift Memory
+- Implement DriftMemory store  
+- Add DriftMemory retrieval
+
+2.4.5 - Memory governance
+2.4.6 - Summarisation rules
+2.4.7 - Memory eviction rules
+- LRU or LFU
+- Drift-triggered eviction
+- Subgoal completion eviction
+- Summarised-state replacement
+
+## PHASE 2.5 Full Hierarchical Reasoner
+*Depends On*: PHASE 2.4
+*Note*: builds on skeleton iterations above to complete Stratum 2
+
+2.5.1 — Plan Repair
+- Implement full repair logic: detect broken plans, identif minimal fixes, regenerate segments, or re-decompose subgoals
+- Integrate memory, drift signals, and validationr rules
+
+2.5.2 - Full transition rules
+- Expand the skeleton rules into a complete transition graph covering all subgoal and segment states
+- Add edge cases, fallback paths, and error transitions
+
+2.5.3 - Full drift detection
+- Implement multi-signal drift detection combining behavioural, structural, and temporal signals
+- Add confidence scoring and multi-step drift confirmation
+
+2.5.4 - Full validation rules
+- Integrate all validation layers: subgoal, segment, plan, memory and safety
+- Ensure validation is deterministic and composable
+
+2.5.5 - Reflection Loop
+- Implement a full reflection cycle: evaluate progress, detect drift, refine subgoals, adjust plans, and update memory
+- Ensure reflection is pure and deterministic
+
+2.5.6 - Agent-level loop v2 (Full Implementation)
+- Implement the complete agent loop: hierarchical reasoning, reflection, memory integration, and governed transitions
+- Add full error handling, fallback strategies, and trace generation
 
 ---
 🚀 Release 1 — "Hierarchical Reasoner"
@@ -121,8 +360,9 @@
 ## STRATUM 3 - Agent Runtime
 *Invariant*: Stratum 3 orchestrates agents, capabilities and external intefaces, but never performs long-horizion reasoning planning, and execution itself. It delegates all reasoning to Stratum 2 and all action execution to Stratum 1
 
-# PHASE 3.1 — Skill & Capability Layer (Core Skill)
-*Depends On*: PHASE 2.3
+### PHASE 3.1 — Skill & Capability Layer (Core Skill)
+*Depends On*: PHASE 2.5
+*Note:: Stratum 3 requires the full hierarchical reasoner to ensure agent-level planning is stable
 
 3.1.1. Implement skill registry — register skills, metadata, ToolSpecs.  
 3.1.2. Add permission model — allow/deny categories per agent/runtime.  
@@ -135,7 +375,7 @@
 🚀 Release 2 — "Skillful Agent"
 ---
 
-# PHASE 3.2 — Skill & Capability Layer (Extension Skills)
+### PHASE 3.2 — Skill & Capability Layer (Extension Skills)
 *Depends On*: PHASE 3.1
 
 3.2.1. Define plugin interface — simple Python module exposing register_all()  
@@ -146,7 +386,7 @@
 🚀 Release 3 — "Extensible Agent"
 ---
 
-# PHASE 3.3 — Fetch Orchestrator
+### PHASE 3.3a — Fetch Orchestrator
 *Depends On*: PHASE 3.2
 
 3.3.1. Define FetchError taxonomy  
@@ -155,7 +395,7 @@
 3.3.4. Implement hardened HTTP (CRW) — anti‑bot header (opinionated?).    
 3.3.5. Implement Playwright headless — JS rendering (opinionated?)    
 3.3.6. Implement Playwright stealth — heavy, rate‑limited (opnionated?)  
-3.3.7. Implement Tavily search — query → URLs (opinionated ($), so may require a separate phase for search providers)  
+3.3.7. Implement search — query → URLs (see 3.4 search provider)  
 3.3.8. Implement fetch heuristics — escalation logic.    
 3.3.9. Implement fallback chain — simple → hardened → browser → stealth → search.    
 3.3.10. Add per‑domain policy — allowlists, rate limits.    
@@ -163,7 +403,12 @@
 
 ---
 
-# PHASE 3.4 — Queue & Job Model
+### PHASE 3.3b - Search Provider
+*Depends On*: PHASE 3.2 (Note: this may need to swap with fetch orchestrator phase)
+
+---
+
+### PHASE 3.4 — Queue & Job Model
 *Depends On*: PHASE 3.3
 
 3.4.1. Choose queue backend — Redis/SQLite.  
@@ -181,10 +426,10 @@
 🚀 Release 4 — "Distributed Agent Runtime"
 ---
 
-# PHASE 3.5 — Worker Pool & Supervision
+### PHASE 3.5 — Worker Pool & Supervision
 *Depends On*: PHASE 3.4
 
-3.5.1. Implement worker entrypoint — dequeue → core_loop → store result.  
+3.5.1. Implement worker entrypoint — dequeue → CoreStep → store result.  
 3.5.2. Add worker config — concurrency, queues, limits.  
 3.5.3. Add worker telemetry  
 3.5.4. Add worker heartbeat  
@@ -199,7 +444,7 @@
 🚀 Release 5 — "API-Driven Agent Platform"
 ---
 
-# PHASE 3.6 — FastAPI & WebSocket Layer
+### PHASE 3.6 — FastAPI & WebSocket Layer
 *Depends On*: PHASE 3.5
 
 3.6.1. Define Channel interface — receive → runtime → send  
@@ -223,14 +468,14 @@
 🚀 Release 6 — "Multi-Agent System"
 ---
 
-# PHASE 3.7 — Agent Runtime (Above the Core Loop)
+### PHASE 3.7 — Agent Runtime (Above the CoreStep Loop)
 *Depends On*: PHASE 3.6
 
 3.7.1. Define AgentSpec — instructions, tools, loop policy.  
 3.7.2. Implement agent registry  
 3.7.3. Implement agent context — memory, settings.  
 3.7.4. Implement agentstep — inject instructions.  
-3.7.5. Implement agentloop — wraps coreloop.  
+3.7.5. Implement agentloop — wraps CoreStep.  
 3.7.6. Add agent permissions  
 3.7.7. Add agent templates  
 3.7.8. Add multi‑agent orchestration  
@@ -242,7 +487,7 @@
 
 ---
 
-# PHASE 3.8 — Resilience, Self‑Healing, Health
+### PHASE 3.8 — Resilience, Self‑Healing, Health
 *Depends On*: PHASE 3.7
 
 3.8.1. Classify loop health — healthy, stalled, poisoned.  
@@ -260,7 +505,7 @@
 🚀 Release 7 — "Production-Ready Runtime"
 ---
 
-# PHASE 3.9 — Observability & Developer Experience
+### PHASE 3.9 — Observability & Developer Experience
 *Depends On*: PHASE 3.8
 
 3.9.1. Add structured logging  
@@ -278,7 +523,7 @@
 🚀 Release 8 — "Observable and Developer-Friendly Runtime"
 ---
 
-# PHASE 3.10 — Hardening & Polish
+### PHASE 3.10 — Hardening & Polish
 *Depends On*: PHASE 3.9
 
 3.10.1. Security review of skills  
@@ -298,14 +543,14 @@
 
 ## STRATUM 4 - Cognitive Systems and Meta-Agents
 
-# PHASE 4.1 - Meta-Planning and Self-Reflection
+### PHASE 4.1 - Meta-Planning and Self-Reflection
 
-# PHASE 4.2 - Long-Term Memory and Knowledge Graphs
+### PHASE 4.2 - Long-Term Memory and Knowledge Graphs
 
-# PHASE 4.3 - Multi-Agent Societies
+### PHASE 4.3 - Multi-Agent Societies
 
-# PHASE 4.4 - Tool Learning and Skill Synthesis
+### PHASE 4.4 - Tool Learning and Skill Synthesis
 
-# PHASE 4.5 - Autonomy and Governance
+### PHASE 4.5 - Autonomy and Governance
 
 ---
