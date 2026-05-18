@@ -5,11 +5,11 @@ import os
 from urllib import request
 from typing import Any, Dict, List, Optional
 
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - optional dependency fallback
-    def load_dotenv(*args, **kwargs):
-        return False
+#try:
+from dotenv import load_dotenv
+#except ImportError:  # pragma: no cover - optional dependency fallback
+#    def load_dotenv(*args, **kwargs):
+#        return False
 
 from .base import ChatProvider
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict
 
-from src.core.skills.base import BaseSkill
+from src.skills.base import BaseSkill
 from src.execution.errors import ToolExecutionError
 from src.core.types.result import CoreResult
 

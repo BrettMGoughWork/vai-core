@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Any, Dict
 
-from src.core.skills.categories import SkillCategory
-from src.core.skills.side_effects import SideEffect
+from src.skills.categories import SkillCategory
+from src.skills.side_effects import SideEffect
 
 
 @dataclass
