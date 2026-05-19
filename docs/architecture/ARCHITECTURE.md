@@ -11,60 +11,60 @@ Each directory defines a *bounded responsibility*. Avoid cross-cutting logic out
 
 ---
 
-config/                     # Runtime configuration files (YAML/JSON/env overrides)
-main.py                     # CLI entrypoint (bootstraps config → agent → execution)
+config/                     # S1 - Runtime configuration files (YAML/JSON/env overrides)
+main.py                     # S1 - CLI entrypoint (bootstraps config → agent → execution)
 
 src/
   core/                     # Fundamental abstractions and shared runtime primitives
-    agent/                  # Agent orchestration (main control loop, lifecycle)
-    config/                 # Typed config models + loaders/validators
-    llm/                    # LLM interfaces and transport layer (no business logic)
-      providers/            # Concrete LLM provider implementations (OpenAI, etc.)
-    planning/               # Planning strategies (task decomposition, sequencing)
-    types/                  # Core shared types (pure, dependency-free)
-      errors/               # Error models and exception hierarchy
-      validation/           # Input/output validation utilities
+    agent/                  # S5 - Agent orchestration (main control loop, lifecycle)
+    config/                 # S1 - Typed config models + loaders/validators
+    llm/                    # S1 - LLM interfaces and transport layer (no business logic)
+      providers/            # S1 - Concrete LLM provider implementations (OpenAI, etc.)
+    planning/               # S2 - Planning strategies (task decomposition, sequencing)
+    types/                  # S1 - Core shared types (pure, dependency-free)
+      errors/               # S1 - Error models and exception hierarchy
+      validation/           # S1 - Input/output validation utilities
 
-  execution/                # Execution engine
+  execution/                # S1 - Execution engine
                             # - Runs a *single selected skill*
                             # - Enforces execution contract and lifecycle
                             # - No planning, only execution
 
-  governance/               # Guardrails and decision constraints
+  governance/               # S1 - Guardrails and decision constraints
                             # - Tool/skill selection boundaries
                             # - Safety and policy enforcement hooks
 
-  observability/            # Structured logging and trace emission
+  observability/            # S1 - Structured logging and trace emission
                             # - No business logic
                             # - Designed for debugging + monitoring
 
-  policy/                   # Runtime policy hooks
+  policy/                   # S1 - Runtime policy hooks
                             # - Extendable rules applied during execution
                             # - Complements governance (more dynamic/custom)
 
-  capabilities/             # Capability discovery and filtering
+  capabilities/             # S3 - Capability discovery and filtering
                             # - Ranking, scoring, and selection helpers
                             # - Defines *what can be done*, not *how to do it*
 
-  skills/                   # Skill implementations (atomic units of work)
-    standard/               # Built-in, maintained skill set
-    custom/                 # User/plugin-defined skills (extension point)
+  skills/                   # S3 - Skill implementations (atomic units of work)
+    standard/               # S3 - Built-in, maintained skill set
+    custom/                 # S3 - User/plugin-defined skills (extension point)
 
-  telemetry/                # Metrics and usage reporting hooks
+  telemetry/                # S1 - Metrics and usage reporting hooks
                             # - Performance, cost, and usage tracking
 
 tests/
   unit/                     # Isolated unit tests (fast, no external deps)
   integration/              # End-to-end and cross-module tests
 
-util/                       # General-purpose helpers (keep minimal and stateless)
+util/                       # S1 - General-purpose helpers (keep minimal and stateless)
                             # Prefer placing logic in core or features when possible
 
 tools/                      # Developer tooling and enforcement scripts
   code_analysers/           
-    shared/                 # Shared analyser utilities
-    stratum1/               # S1 invariant enforcement (strict, foundational rules)
-    stratum2/               # S2 invariant enforcement (higher-level guarantees)
+    shared/                 # S1 - Shared analyser utilities
+    stratum1/               # S1 - S1 invariant enforcement (strict, foundational rules)
+    stratum2/               # S2 - S2 invariant enforcement (higher-level guarantees)
 
 ---
 
