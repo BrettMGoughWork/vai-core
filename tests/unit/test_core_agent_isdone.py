@@ -2,8 +2,8 @@ from src.core.agent.isdone import isdone
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.state import ConversationState
 from src.core.agent.config import AgentConfig
-from src.skills.categories import SkillCategory
-from src.skills.side_effects import SideEffect
+from src.capabilities.categories import SkillCategory
+from src.capabilities.side_effects import SideEffect
 
 
 def test_isdone_true_on_success():

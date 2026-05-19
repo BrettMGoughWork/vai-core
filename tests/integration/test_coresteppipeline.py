@@ -18,8 +18,8 @@ from src.core.planning.local_planner import LocalPlanner
 from src.core.planning.plan_validator import PlanValidationError, PlanValidator
 from src.execution.singleskillexecutor import SingleSkillExecutor
 from src.observability.logger import StdoutLogger
-from src.skills.skill_filter import SkillFilter
-from src.skills.skill_ranker import SkillRanker
+from src.capabilities.skill_filter import SkillFilter
+from src.capabilities.skill_ranker import SkillRanker
 
 import src.core.loop as loop_module
 import src.execution.singleskillexecutor as executor_module

@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.llm.providers.deepseek_client import DeepSeekClient
+from src.core.llm.providers.deepseek import DeepSeekClient
 
 
 def test_deepseek_client_requires_api_key():

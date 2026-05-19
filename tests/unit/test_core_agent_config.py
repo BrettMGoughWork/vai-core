@@ -1,6 +1,6 @@
 from src.core.agent.config import AgentConfig, LoopPolicy
-from src.skills.categories import SkillCategory
-from src.skills.side_effects import SideEffect
+from src.capabilities.categories import SkillCategory
+from src.capabilities.side_effects import SideEffect
 
 
 def test_loop_policy_defaults():

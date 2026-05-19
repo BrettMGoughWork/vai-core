@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Callable
 
-from .toolspec import ToolSpec
-from .registry import SkillRegistry
-from .categories import SkillCategory
-from .side_effects import SideEffect
-from .schema import generate_schema_from_handler
-from .validator import validate_structural, ValidationError
-from .semantic import validate_semantic, SemanticValidationError
-from .canonical import canonicalize_args
+from src.capabilities.toolspec import ToolSpec
+from src.capabilities.registry import SkillRegistry
+from src.capabilities.categories import SkillCategory
+from src.capabilities.side_effects import SideEffect
+from src.capabilities.schema import generate_schema_from_handler
+from src.capabilities.validator import validate_structural, ValidationError
+from src.capabilities.semantic import validate_semantic, SemanticValidationError
+from src.capabilities.canonical import canonicalize_args
 
 @dataclass
 class BaseSkill:
