@@ -10,67 +10,67 @@ This layout is organised around a clear separation of concerns:
 Each directory defines a *bounded responsibility*. Avoid cross-cutting logic outside intended layers.
 
 ---
-
-config/                     # S1 - Runtime configuration files (YAML/JSON/env overrides)
-main.py                     # S1 - CLI entrypoint (bootstraps config → agent → execution)
+```
+config/                 # S1 - Runtime configuration files (YAML/JSON/env overrides)
+main.py                 # S1 - CLI entrypoint (bootstraps config → agent → execution)
 
 src/
-  core/                     # Fundamental abstractions and shared runtime primitives
-    agent/                  # S5 - Agent orchestration (main control loop, lifecycle)
-    config/                 # S1 - Typed config models + loaders/validators
-    llm/                    # S1 - LLM interfaces and transport layer (no business logic)
-      providers/            # S1 - Concrete LLM provider implementations (OpenAI, etc.)
-    planning/               # S2 - Planning strategies (task decomposition, sequencing)
-    types/                  # S1 - Core shared types (pure, dependency-free)
-      errors/               # S1 - Error models and exception hierarchy
-      validation/           # S1 - Input/output validation utilities
+  core/                 # Fundamental abstractions and shared runtime primitives
+    agent/              # S5 - Agent orchestration (main control loop, lifecycle)
+    config/             # S1 - Typed config models + loaders/validators
+    llm/                # S1 - LLM interfaces and transport layer (no business logic)
+      providers/        # S1 - Concrete LLM provider implementations (OpenAI, etc.)
+    planning/           # S2 - Planning strategies (task decomposition, sequencing)
+    types/              # S1 - Core shared types (pure, dependency-free)
+      errors/           # S1 - Error models and exception hierarchy
+      validation/       # S1 - Input/output validation utilities
 
-  execution/                # S1 - Execution engine
-                            # - Runs a *single selected skill*
-                            # - Enforces execution contract and lifecycle
-                            # - No planning, only execution
+  execution/            # S1 - Execution engine
+                        # - Runs a *single selected skill*
+                        # - Enforces execution contract and lifecycle
+                        # - No planning, only execution
 
-  governance/               # S1 - Guardrails and decision constraints
-                            # - Tool/skill selection boundaries
-                            # - Safety and policy enforcement hooks
+  governance/           # S1 - Guardrails and decision constraints
+                        # - Tool/skill selection boundaries
+                        # - Safety and policy enforcement hooks
 
-  observability/            # S1 - Structured logging and trace emission
-                            # - No business logic
-                            # - Designed for debugging + monitoring
+  observability/        # S1 - Structured logging and trace emission
+                        # - No business logic
+                        # - Designed for debugging + monitoring
 
-  policy/                   # S1 - Runtime policy hooks
-                            # - Extendable rules applied during execution
-                            # - Complements governance (more dynamic/custom)
+  policy/               # S1 - Runtime policy hooks
+                        # - Extendable rules applied during execution
+                        # - Complements governance (more dynamic/custom)
 
-  capabilities/             # S3 - Capability discovery and filtering
-                            # - Ranking, scoring, and selection helpers
-                            # - Defines *what can be done*, not *how to do it*
+  capabilities/         # S3 - Capability discovery and filtering
+                        # - Ranking, scoring, and selection helpers
+                        # - Defines *what can be done*, not *how to do it*
 
-  skills/                   # S3 - Skill implementations (atomic units of work)
-    standard/               # S3 - Built-in, maintained skill set
-    custom/                 # S3 - User/plugin-defined skills (extension point)
+  skills/               # S3 - Skill implementations (atomic units of work)
+    standard/           # S3 - Built-in, maintained skill set
+    custom/             # S3 - User/plugin-defined skills (extension point)
 
-  telemetry/                # S1 - Metrics and usage reporting hooks
-                            # - Performance, cost, and usage tracking
+  telemetry/            # S1 - Metrics and usage reporting hooks
+                        # - Performance, cost, and usage tracking
 
 tests/
-  unit/                     # Isolated unit tests (fast, no external deps)
-  integration/              # End-to-end and cross-module tests
+  unit/                 # Isolated unit tests (fast, no external deps)
+  integration/          # End-to-end and cross-module tests
 
-util/                       # S1 - General-purpose helpers (keep minimal and stateless)
-                            # Prefer placing logic in core or features when possible
+util/                   # S1 - General-purpose helpers (keep minimal and stateless)
+                        # Prefer placing logic in core or features when possible
 
-tools/                      # Developer tooling and enforcement scripts
+tools/                  # Developer tooling and enforcement scripts
   code_analysers/           
-    shared/                 # S1 - Shared analyser utilities
-    stratum1/               # S1 - S1 invariant enforcement (strict, foundational rules)
-    stratum2/               # S2 - S2 invariant enforcement (higher-level guarantees)
+    shared/             # S1 - Shared analyser utilities
+    stratum1/           # S1 - S1 invariant enforcement (strict, foundational rules)
+    stratum2/           # S2 - S2 invariant enforcement (higher-level guarantees)
 
 ---
 
 ## Architectural Guidelines
 
-### 1. LayerHere’s a cleaned‑up, Copilot-friendly version of your structure with clearer intent, consistent phrasing, and actionable descriptions. It’s optimised so future contributors (and GitHub Copilot) can infer responsibilities and boundaries.
+### 1. Layer
 
 ```md
 # Architecture Overview
