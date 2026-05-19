@@ -3,8 +3,8 @@ import json
 from typing import List, Dict, Any
 
 from .types import CoreLLMResponse
-from src.skills.toolspec import ToolSpec
-from src.core.llm.providers.base import ChatProvider
+from src.capabilities.toolspec import ToolSpec
+from src.core.llm.providers._base import ChatProvider
 
 
 class LLMTransport:

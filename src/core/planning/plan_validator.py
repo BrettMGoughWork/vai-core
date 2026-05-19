@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.core.planning.plan import Plan
-from src.skills.validator import ValidationError, validate_structural
+from src.capabilities.validator import ValidationError, validate_structural
 
 
 class PlanValidationError(Exception):

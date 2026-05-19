@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.skills.skill_filter import SkillFilter
+from src.capabilities.skill_filter import SkillFilter
 
 
 @dataclass

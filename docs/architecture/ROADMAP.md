@@ -95,12 +95,11 @@
 ### PHASE 1.6 — Provider Integrations (ChatProvider implementations)
 *Depends On*: PHASE 1.5  
 
-1.6.1. Anthropic (Claude) provider  
-1.6.2. OpenAI provider  
-1.6.3. Google (Gemini) provider  
-1.6.4. Mistral provider  
-1.6.5. Alibaba (Qwen) provider  
-1.6.6. Meta (Llama) provider  
+[untested]✅ 1.6.1. Anthropic (Claude) provider  
+[untested]✅ 1.6.2. OpenAI provider  
+[untested]✅ 1.6.3. Google (Gemini) provider  
+[untested]✅ 1.6.4. Mistral provider  
+[untested]✅ 1.6.5. Alibaba (Qwen) provider  
 
 ## STRATUM 2 - Hierarchical Intelligence
 *Invariant*: Stratum 2 must be pure: no side effects, no tool calls, no LLM calls. It only produces subgoals and plan segments for Stratum 1 to execute.  
@@ -410,87 +409,94 @@
 
 ---
 
-### PHASE 3.4 — Queue & Job Model
+## STRATUM 4 - Distributed Runtime and System Infrastructure
+*Invariant*: Provides distributed execution, workers, queues, channels  
+
+### PHASE 4.1 — Queue & Job Model
 *Depends On*: PHASE 3.3
 
-3.4.1. Choose queue backend — Redis/SQLite.  
-3.4.2. Define Job envelope — id, payload, metadata.  
-3.4.3. Define JobResult envelope — status, result, error.  
-3.4.4. Implement enqueue API  
-3.4.5. Implement dequeue API  
-3.4.6. Implement result store  
-3.4.7. Add dead‑letter queue  
-3.4.8. Add queue metrics  
-3.4.9. Add priority queues  
-3.4.10. Add backpressure handling
+4.1.1. Choose queue backend — Redis/SQLite.  
+4.1.2. Define Job envelope — id, payload, metadata.  
+4.1.3. Define JobResult envelope — status, result, error.  
+4.1.4. Implement enqueue API  
+4.1.5. Implement dequeue API  
+4.1.6. Implement result store  
+4.1.7. Add dead‑letter queue  
+4.1.8. Add queue metrics  
+4.1.9. Add priority queues  
+4.1.10. Add backpressure handling
 
 ---
 🚀 Release 4 — "Distributed Agent Runtime"
 ---
 
-### PHASE 3.5 — Worker Pool & Supervision
-*Depends On*: PHASE 3.4
+### PHASE 4.2 — Worker Pool & Supervision
+*Depends On*: PHASE 4.1
 
-3.5.1. Implement worker entrypoint — dequeue → CoreStep → store result.  
-3.5.2. Add worker config — concurrency, queues, limits.  
-3.5.3. Add worker telemetry  
-3.5.4. Add worker heartbeat  
-3.5.5. Implement worker supervisor — restart on crash.  
-3.5.6. Add graceful shutdown  
-3.5.7. Add worker circuit breaker  
-3.5.8. Add job cancellation  
-3.5.9. Add job timeouts  
-3.5.10. Add heavy‑skill worker pool — browser/stealth.
+4.2.1. Implement worker entrypoint — dequeue → CoreStep → store result.  
+4.2.2. Add worker config — concurrency, queues, limits.  
+4.2.3. Add worker telemetry  
+4.2.4. Add worker heartbeat  
+4.2.5. Implement worker supervisor — restart on crash.  
+4.2.6. Add graceful shutdown  
+4.2.7. Add worker circuit breaker  
+4.2.8. Add job cancellation  
+4.2.9. Add job timeouts  
+4.2.10. Add heavy‑skill worker pool — browser/stealth.
 
 ---
 🚀 Release 5 — "API-Driven Agent Platform"
 ---
 
-### PHASE 3.6 — FastAPI & WebSocket Layer
-*Depends On*: PHASE 3.5
+### PHASE 4.3 — FastAPI & WebSocket Layer
+*Depends On*: PHASE 4.2  
+*Note*: This is currently opinionated around what human interaction should look like (rather than decisions made in the previous version of this project). When this gets a bit closer, it needs a strategy around channels, abstractions, etc.  
 
-3.6.1. Define Channel interface — receive → runtime → send  
-3.6.2. Implement CLI channel — stdin/stdout  
-3.6.3. Implement Web channel — HTTP POST wrapper  
-3.6.4. Implement WebSocket channel — streaming  
-3.6.5. Propose Flutter channel — optional, personal  
-3.6.6. Propose OpenClaw‑style webhook channel — message envelope → runtime  
-3.6.7. Document how to build custom channels  
-3.6.8. Create FastAPI skeleton  
-3.6.9. Add simple HTTP endpoint  
-3.6.10. Add WebSocket endpoint  
-3.6.11. Implement request → job mapping  
-3.6.12. Implement result streaming  
-3.6.13. Add auth layer  
-3.6.14. Add rate limiting  
-3.6.15. Add tracing IDs  
-3.6.16. Add health checks  
+4.3.1. Define Channel interface — receive → runtime → send  
+4.3.2. Implement CLI channel — stdin/stdout  
+4.3.3. Implement Web channel — HTTP POST wrapper  
+4.3.4. Implement WebSocket channel — streaming  
+4.3.5. Propose Flutter channel — optional, personal  
+4.3.6. Propose OpenClaw‑style webhook channel — message envelope → runtime  
+4.3.7. Document how to build custom channels  
+4.3.8. Create FastAPI skeleton  
+4.3.9. Add simple HTTP endpoint  
+4.3.10. Add WebSocket endpoint  
+4.3.11. Implement request → job mapping  
+4.3.12. Implement result streaming  
+4.3.13. Add auth layer  
+4.3.14. Add rate limiting  
+4.3.15. Add tracing IDs  
+4.3.16. Add health checks  
 
 ---
 🚀 Release 6 — "Multi-Agent System"
 ---
 
-### PHASE 3.7 — Agent Runtime (Above the CoreStep Loop)
-*Depends On*: PHASE 3.6
+## STRATUM 5 - Agent Runtime (Above CoreStep)
+*Invariant*: Orchestrates agents, memory, identity, multi-agent systems.  
 
-3.7.1. Define AgentSpec — instructions, tools, loop policy.  
-3.7.2. Implement agent registry  
-3.7.3. Implement agent context — memory, settings.  
-3.7.4. Implement agentstep — inject instructions.  
-3.7.5. Implement agentloop — wraps CoreStep.  
-3.7.6. Add agent permissions  
-3.7.7. Add agent templates  
-3.7.8. Add multi‑agent orchestration  
-3.7.9. Add scheduled agents  
-3.7.10. Add agent debugging view
-3.7.11. Agent Memory Model
-3.7.12. Agent Identity & Persona Model
-3.7.13. Agent Capability Graph
+### PHASE 5.1 — Agent Runtime Core
+*Depends On*: PHASE 4.3
+
+5.1.1. Define AgentSpec — instructions, tools, loop policy.  
+5.1.2. Implement agent registry  
+5.1.3. Implement agent context — memory, settings.  
+5.1.4. Implement agentstep — inject instructions.  
+5.1.5. Implement agentloop — wraps CoreStep.  
+5.1.6. Add agent permissions  
+5.1.7. Add agent templates  
+5.1.8. Add multi‑agent orchestration  
+5.1.9. Add scheduled agents  
+5.1.10. Add agent debugging view
+5.1.11. Agent Memory Model
+5.1.12. Agent Identity & Persona Model
+5.1.13. Agent Capability Graph
 
 ---
 
-### PHASE 3.8 — Resilience, Self‑Healing, Health
-*Depends On*: PHASE 3.7
+### PHASE 5.2 — Resilience, Self‑Healing, Health
+*Depends On*: PHASE 5.1
 
 3.8.1. Classify loop health — healthy, stalled, poisoned.  
 3.8.2. Detect stalled loops  
@@ -507,52 +513,53 @@
 🚀 Release 7 — "Production-Ready Runtime"
 ---
 
-### PHASE 3.9 — Observability & Developer Experience
-*Depends On*: PHASE 3.8
+### PHASE 5.3 — Observability & Developer Experience
+*Depends On*: PHASE 5.2
 
-3.9.1. Add structured logging  
-3.9.2. Add metrics exporter  
-3.9.3. Add tracing spans  
-3.9.4. Add flamegraph timings  
-3.9.5. Add local dev CLI  
-3.9.6. Add replay tooling  
-3.9.7. Add config inspector  
-3.9.8. Add skill inspector  
-3.9.9. Add agent inspector  
-3.9.10. Add end‑to‑end smoke tests
+5.3.1. Add structured logging  
+5.3.2. Add metrics exporter  
+5.3.3. Add tracing spans  
+5.3.4. Add flamegraph timings  
+5.3.5. Add local dev CLI  
+5.3.6. Add replay tooling  
+5.3.7. Add config inspector  
+5.3.8. Add skill inspector  
+5.3.9. Add agent inspector  
+5.3.10. Add end‑to‑end smoke tests
 
 ---
 🚀 Release 8 — "Observable and Developer-Friendly Runtime"
 ---
 
-### PHASE 3.10 — Hardening & Polish
-*Depends On*: PHASE 3.9
+### PHASE 5.4 — Hardening & Polish
+*Depends On*: PHASE 5.3
 
-3.10.1. Security review of skills  
-3.10.2. Security review of fetch stack  
-3.10.3. LLM prompt hardening  
-3.10.4. Config profiles — dev, prod, paranoid.  
-3.10.5. Backwards‑compatible APIs  
-3.10.6. Performance tuning  
-3.10.7. Load testing  
-3.10.8. Graceful degradation strategy  
-3.10.9. Disaster recovery story  
-3.10.10. Write architecture doc — for future contributors.
+5.4.1. Security review of skills  
+5.4.2. Security review of fetch stack  
+5.4.3. LLM prompt hardening  
+5.4.4. Config profiles — dev, prod, paranoid.  
+5.4.5. Backwards‑compatible APIs  
+5.4.6. Performance tuning  
+5.4.7. Load testing  
+5.4.8. Graceful degradation strategy  
+5.4.9. Disaster recovery story  
+5.4d.10. Write architecture doc — for future contributors.
 
 ---
 🚀 Release 9 — "Hardened Runtime"
 ---
 
-## STRATUM 4 - Cognitive Systems and Meta-Agents
+## STRATUM 6 - Cognitive Systems and Meta-Agents
+*Note*: Future considerations of what is possible, rather than on the roadmap
 
-### PHASE 4.1 - Meta-Planning and Self-Reflection
+### PHASE 6.1 - Meta-Planning and Self-Reflection
 
-### PHASE 4.2 - Long-Term Memory and Knowledge Graphs
+### PHASE 6.2 - Long-Term Memory and Knowledge Graphs
 
-### PHASE 4.3 - Multi-Agent Societies
+### PHASE 6.3 - Multi-Agent Societies
 
-### PHASE 4.4 - Tool Learning and Skill Synthesis
+### PHASE 6.4 - Tool Learning and Skill Synthesis
 
-### PHASE 4.5 - Autonomy and Governance
+### PHASE 6.5 - Autonomy and Governance
 
 ---

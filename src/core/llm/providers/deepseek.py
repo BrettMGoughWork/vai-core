@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 #    def load_dotenv(*args, **kwargs):
 #        return False
 
-from .base import ChatProvider
+from ._base import ChatProvider
 
 
 class DeepSeekClient(ChatProvider):
