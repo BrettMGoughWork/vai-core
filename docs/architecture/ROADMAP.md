@@ -158,17 +158,17 @@
 ### PHASE 2.1 - Multi-Step Loop Foundation
 *Depends on*: PHASE 1.4  
 
-2.1.1 — Step State
+✅ 2.1.1 — Step State
 - Define StepState model — fields, lifecycle, immutability rules  
 - Implement StepState transitions — pending → running → done → error  
 - Add StepState validation — ensure shape, required fields  
 
-2.1.2 — Step Result
+✅ 2.1.2 — Step Result
 - Define StepResult schema — success, failure, tool_needed, continue  
 - Implement StepResult factory — helpers for each result type  
 - Add StepResult validators — ensure consistency  
 
-2.1.3 — CoreStep v2 
+✅ 2.1.3 — CoreStep v2 
 - Implement CoreStep lifecycle — init → run → classify → output  
 - Implement CoreStep error handling — integrate substrate error envelope  
 - Implement CoreStep transitions — deterministic state machine  
@@ -176,7 +176,7 @@
 
 *Note*: CoreStep v2 must operate only on provided cognitive inputs; all LLM calls are delegated to Stratum 1
 
-2.1.4 — Loop Policy
+✅ 2.1.4 — Loop Policy
 - Define LoopPolicy model — max steps, timeouts, retry budget  
 - Implement LoopPolicy enforcement — stop conditions  
 - Add LoopPolicy metrics — counters, durations  
