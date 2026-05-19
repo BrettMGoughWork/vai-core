@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Any, Dict
 
-from src.skills.categories import SkillCategory
-from src.skills.side_effects import SideEffect
-
+from src.capabilities.categories import SkillCategory
+from src.capabilities.side_effects import SideEffect
 
 @dataclass
 class LoopPolicy:

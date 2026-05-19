@@ -60,30 +60,11 @@ Resilient Hierarchical Execution: Abandoned brittle linear planning in favor of 
 
 ## Repository layout
 
-```text
-config/                    # Runtime/model config
-main.py                    # CLI entrypoint
-src/
-  core/                    # Agent runtime, planning, core skills, LLM transport/types
-    agent/
-    config/
-    llm/
-      providers/
-    planning/
-    skills/
-    types/
-      errors/
-      validation/
-  execution/               # Execution engine, contract, single-skill executor
-  governance/              # Tool selection and guardrails
-  observability/           # Structured logging
-  policy/                  # Runtime policy hooks
-  skills/                  # Skill ranking/filtering and builtins
-  telemetry/               # Telemetry hooks
-tests/
-  unit/                    # Unit tests
-  integration/             # Integration tests
-```
+-- see /docs/architecture/ARCHITECTURE.md
+
+## Roadmap
+
+-- see /docs/architecture/ROADMAP.md
 
 ## Testing
 
