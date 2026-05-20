@@ -6,9 +6,8 @@ from urllib import request, error
 from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
-
 from ._base import ChatProvider
-
+from ._factory import factory
 
 @factory.register("anthropic", ChatProvider)
 class AnthropicClient(ChatProvider):

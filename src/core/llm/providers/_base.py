@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Protocol
 
+"""Base protocol that all LLM chat providers must implement."""
 class ChatProvider(Protocol):
     def chat(
         self,

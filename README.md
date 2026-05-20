@@ -27,8 +27,9 @@ Create a `.env` file in the repo root:
 
 ```env
 DEEPSEEK_API_KEY=sk-...
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+GEMINI_API_KEY=AI...
 ```
+(*Note* deepseek and gemini selected because they have been tested)
 
 ## Design principles and Philosophy
 Resilient Hierarchical Execution: Abandoned brittle linear planning in favor of a stratified subgoal architecture. Features independent *Subplan Managers* that allow local recovery, dynamic task slotting, and minimized cognitive/computational load during complex multi-step operations.
