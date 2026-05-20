@@ -6,8 +6,8 @@ from urllib import request, error
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-
 from ._base import ChatProvider
+from ._factory import factory
 
 @factory.register("mistral", ChatProvider)
 class MistralClient(ChatProvider):
