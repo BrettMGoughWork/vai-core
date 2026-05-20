@@ -97,7 +97,7 @@
 
 [untested]✅ 1.6.1. Anthropic (Claude) provider  
 [untested]✅ 1.6.2. OpenAI provider  
-[untested]✅ 1.6.3. Google (Gemini) provider  
+✅ 1.6.3. Google (Gemini) provider  
 [untested]✅ 1.6.4. Mistral provider  
 [untested]✅ 1.6.5. Alibaba (Qwen) provider  
 

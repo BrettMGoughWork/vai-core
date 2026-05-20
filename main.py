@@ -5,6 +5,8 @@ from pathlib import Path
 import sys
 from typing import Dict
 
+from src.execution.safe_failure import SafeFailure
+from src.core.llm.builder import create_llm_transport
 from src.core.agent.config import AgentConfig
 from src.core.agent.runtime import AgentRuntime
 from src.core.llm.providers.deepseek import DeepSeekClient
@@ -51,11 +53,24 @@ def _create_agent_config(model_alias: str) -> AgentConfig:
 
 
 def _display_result(result) -> str:
-    if result.error:
-        return f"ERROR: {result.error}"
-    if result.tool_name:
+    """Safely display any result returned from AgentRuntime.run()"""
+    
+    # Handle SafeFailure (from execution safety layer)
+    if isinstance(result, SafeFailure):
+        return f"ERROR: [{result.error_type}] {result.message}"
+    
+    # Handle CoreResult
+    if hasattr(result, 'is_error') and result.is_error:
+        return f"ERROR: {result.error or 'Unknown error'}"
+    
+    if hasattr(result, 'tool_name') and result.tool_name:
         return f"{result.tool_name}: {result.tool_output}"
-    return result.text or ""
+    
+    if hasattr(result, 'text'):
+        return result.text or ""
+    
+    # Fallback
+    return str(result) if result else "(No result)"
 
 
 def _extract_plan_from_record(record: dict):
@@ -123,8 +138,7 @@ def main() -> None:
     default_alias, alias_to_model = _load_llm_alias_map(llms_path)
     model_name = alias_to_model.get(default_alias, default_alias)
 
-    client = DeepSeekClient()
-    transport = LLMTransport(client)
+    transport = create_llm_transport()
     config = _create_agent_config(model_alias=model_name)
     runtime = AgentRuntime(transport, config)
 

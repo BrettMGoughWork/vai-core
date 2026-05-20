@@ -13,7 +13,8 @@ from src.core.types.result import CoreResult
 from src.execution.safe_failure import SafeFailure
 
 
-def _result_summary(result: Union[CoreResult, SafeFailure, None]) -> str:
+def _result_summary(result: Union[CoreResult, SafeFailure, None]) -> str: # sanity check to ensure we see output even if the agent loop hangs
+
     if result is None:
         return ""
     if isinstance(result, SafeFailure):
