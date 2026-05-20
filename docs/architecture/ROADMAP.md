@@ -104,6 +104,8 @@
 ### PHASE 1.7 - Dead-code Analyser
 *Depends On*: None
 
+✅ 1.7.1 Dead-code analyser
+
 ## STRATUM 2 - Hierarchical Intelligence
 *Invariant*: Stratum 2 must be pure: no side effects, no tool calls, no LLM calls. It only produces subgoals and plan segments for Stratum 1 to execute.  
 
