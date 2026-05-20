@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from ._base import ChatProvider
 
-
+@factory.register("mistral", ChatProvider)
 class MistralClient(ChatProvider):
     """
     Thin HTTP client for Mistral Chat Completions.

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from ._base import ChatProvider
 
-
+@factory.register("openai", ChatProvider)
 class OpenAIClient(ChatProvider):
     """
     Thin HTTP client for OpenAI chat completions.
