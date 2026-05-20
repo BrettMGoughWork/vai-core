@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 from ._base import ChatProvider
 
-
+@factory.register("deepseek", ChatProvider)
 class DeepSeekClient(ChatProvider):
     """
     Thin HTTP client for DeepSeek chat completions.

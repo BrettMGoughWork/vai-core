@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from ._base import ChatProvider
 
-
+@factory.register("gemini", ChatProvider)
 class GeminiClient(ChatProvider):
     """
     Thin HTTP client for the Gemini API (Google AI for Developers).

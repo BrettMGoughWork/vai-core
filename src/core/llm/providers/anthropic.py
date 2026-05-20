@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from ._base import ChatProvider
 
 
+@factory.register("anthropic", ChatProvider)
 class AnthropicClient(ChatProvider):
     """
     Thin HTTP client for Anthropic Claude Messages API.

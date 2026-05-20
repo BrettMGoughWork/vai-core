@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from ._base import ChatProvider
 
-
+@factory.register("qwen", ChatProvider)
 class QwenClient(ChatProvider):
     """
     Thin HTTP client for Alibaba Cloud Model Studio (DashScope) Qwen models,
