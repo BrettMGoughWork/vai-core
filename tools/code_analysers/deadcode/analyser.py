@@ -2,37 +2,57 @@ import ast
 from pathlib import Path
 from collections import defaultdict
 
+
 def collect_python_files(root: str | Path):
     root = Path(root)
-    return [p for p in root.rglob("*.py") 
-            if not any(part.startswith(".") or part == "__pycache__" for part in p.parts)]
+    return [
+        p for p in root.rglob("*.py")
+        if not any(part.startswith(".") or part == "__pycache__" for part in p.parts)
+    ]
+
 
 class SmartDeadCodeVisitor(ast.NodeVisitor):
     def __init__(self):
-        self.defined = defaultdict(list)      # name -> list of (type, node)
+        self.defined = defaultdict(list)  # name -> list of (type, node)
         self.referenced = set()
-        self.registered = set()               # names registered via decorators
+        self.ignored = set()              # names marked with @deadcode_ignore
+
+    def _has_deadcode_ignore(self, decorators) -> bool:
+        """
+        Detect:
+          @deadcode_ignore
+          @deadcode_ignore(...)
+          @x.deadcode_ignore
+          @x.deadcode_ignore(...)
+        """
+        for d in decorators:
+            # @deadcode_ignore
+            if isinstance(d, ast.Name) and d.id == "deadcode_ignore":
+                return True
+
+            # @module.deadcode_ignore
+            if isinstance(d, ast.Attribute) and d.attr == "deadcode_ignore":
+                return True
+
+            # @deadcode_ignore(...) or @module.deadcode_ignore(...)
+            if isinstance(d, ast.Call):
+                if isinstance(d.func, ast.Name) and d.func.id == "deadcode_ignore":
+                    return True
+                if isinstance(d.func, ast.Attribute) and d.func.attr == "deadcode_ignore":
+                    return True
+
+        return False
 
     def visit_FunctionDef(self, node):
         self.defined[node.name].append(("func", node))
+        if self._has_deadcode_ignore(node.decorator_list):
+            self.ignored.add(node.name)
         self.generic_visit(node)
 
     def visit_ClassDef(self, node):
         self.defined[node.name].append(("class", node))
-
-        # Detect registration via decorators (this is the key part)
-        for dec in node.decorator_list:
-            if isinstance(dec, ast.Name):                                   # @register
-                if any(k in dec.id.lower() for k in ("register", "factory")):
-                    self.registered.add(node.name)
-            elif isinstance(dec, ast.Attribute):                            # @factory.something
-                if any(k in dec.attr.lower() for k in ("register", "factory")):
-                    self.registered.add(node.name)
-            elif isinstance(dec, ast.Call):                                 # @factory.register("key", BaseClass)
-                if isinstance(dec.func, ast.Attribute):
-                    if "register" in dec.func.attr.lower():
-                        self.registered.add(node.name)
-
+        if self._has_deadcode_ignore(node.decorator_list):
+            self.ignored.add(node.name)
         self.generic_visit(node)
 
     def visit_Name(self, node):
@@ -45,9 +65,7 @@ def find_dead_code(root_path: str = "."):
     files = collect_python_files(root_path)
     all_defined = {}          # (path, name, typ) -> lineno
     references = set()
-    registered = set()
-
-    IGNORE_NAMES = {"Factory", "Registry", "Builder", "Provider", "Manager"}
+    ignored = set()
 
     for file in files:
         try:
@@ -67,26 +85,22 @@ def find_dead_code(root_path: str = "."):
                     all_defined[key] = node.lineno
 
             references.update(visitor.referenced)
-            registered.update(visitor.registered)
+            ignored.update(visitor.ignored)
 
         except Exception as e:
             print(f"Skipping {file}: {e}")
 
-    # Build unused list with filtering
+    # Build unused list
     unused = []
     for (path, name, typ), lineno in all_defined.items():
         if name.startswith("_"):
             continue
 
-        # 1. Ignore explicitly registered classes
-        if name in registered:
+        # ✅ explicit ignore only
+        if name in ignored:
             continue
 
-        # 2. Ignore common factory/registry patterns
-        if any(ignore in name for ignore in IGNORE_NAMES) or name.endswith(("Factory", "Registry")):
-            continue
-
-        # 3. Check if it's actually never referenced
+        # ✅ never referenced
         if name not in references:
             unused.append({
                 "path": path,
