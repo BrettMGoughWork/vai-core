@@ -76,22 +76,13 @@ class CoreStepV2:
         # Minimal trace: record canonical hash + outcome
         new_trace = state.trace + [{
             "core_step_v2": {
-                "hash": stable_hash(...),
+                "hash": stable_hash({
+                    "step_id": state.step_id,
+                    "cognitive_input": state.cognitive_input,
+                    "last_result": state.last_result,
+                }),
                 "outcome": result.outcome.value,
             }
         }]
-        new_trace = {
-            **state.trace,
-            "core_step_v2": {
-                "hash": stable_hash(
-                    {
-                        "step_id": state.step_id,
-                        "cognitive_input": state.cognitive_input,
-                        "last_result": state.last_result,
-                    }
-                ),
-                "outcome": result.outcome.value,
-            },
-        }
 
         return state.replace(trace=new_trace)
