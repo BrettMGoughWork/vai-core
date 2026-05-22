@@ -4,5 +4,6 @@ from .gemini import GeminiClient
 from .mistral import MistralClient
 from .openai import OpenAIClient
 from .qwen import QwenClient
+from .deepseek import DeepSeekClient
 
-__all__ = ["GeminiClient", "MistralClient", "QwenClient", "ChatProvider", "AnthropicClient", "OpenAIClient", ...]
+__all__ = ["DeepSeekClient", "GeminiClient", "MistralClient", "QwenClient", "ChatProvider", "AnthropicClient", "OpenAIClient", ...]

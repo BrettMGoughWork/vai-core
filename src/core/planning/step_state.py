@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import Enum
 from typing import Any, Dict, Optional
 from src.core.types.validation import validate_pure_structure
@@ -59,3 +59,9 @@ class StepState:
             "attempt": self.attempt,
             "created_at": self.created_at,
         }))
+
+    def replace(self, **changes) -> StepState:
+        # Helper for creating modified copies of StepState (since it's frozen)
+        data = {field.name: getattr(self, field.name) for field in fields(self)}
+        data.update(changes)
+        return StepState(**data)
