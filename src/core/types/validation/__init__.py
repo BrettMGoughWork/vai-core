@@ -11,8 +11,11 @@ from .plan_validation import (
     validate_plan,
 )
 
+from .purity_validation import validate_pure_structure
+
 __all__ = [
     "CapabilityRegistry",
     "PlanValidationResult",
     "validate_plan",
+    "validate_pure_structure",
 ]

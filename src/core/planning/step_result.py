@@ -2,8 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
-from core.types.validation import validate_pure_structure
-from core.types.errors import ValidationError
+from src.core.types.validation import validate_pure_structure
+from src.core.types.errors import ValidationError
 
 
 class StepOutcome(Enum):
