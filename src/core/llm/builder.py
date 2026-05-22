@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any
 
 from src.core.config.loader import Config
-from .providers._factory import factory
 from .transport import LLMTransport
 
 

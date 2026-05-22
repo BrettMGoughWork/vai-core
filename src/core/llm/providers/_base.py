@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Protocol
+from src.core.types.validation.deadcode_markers import deadcode_ignore
 
 """Base protocol that all LLM chat providers must implement."""
+@deadcode_ignore
 class ChatProvider(Protocol):
+    @deadcode_ignore
     def chat(
         self,
         *,

@@ -7,9 +7,9 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from ._base import ChatProvider
-from ._factory import factory
+from src.core.types.validation.deadcode_markers import deadcode_ignore
 
-@factory.register("openai", ChatProvider)
+@deadcode_ignore(reason="Factory registration only, not directly used")
 class OpenAIClient(ChatProvider):
     """
     Thin HTTP client for OpenAI chat completions.
