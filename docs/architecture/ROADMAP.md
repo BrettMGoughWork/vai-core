@@ -186,13 +186,13 @@
 - Implement LoopPolicy enforcement — stop conditions  
 - Add LoopPolicy metrics — counters, durations  
 
-2.1.5 — Step Outcome Classifier
+✅ 2.1.5 — Step Outcome Classifier
 - Define classifier prompt  
 - Implement classifier wrapper  
 - Add classifier validation  
 *Note*: Classifer wrapper must not call the LLM; it only interprets classifier outputs provided by Stratum 1
 
-2.1.6 — Loop Orchestrator 
+✅ 2.1.6 — Loop Orchestrator 
 - Implement LoopController — deterministic loop engine  
 - Implement LoopTermination logic — stop, continue, error  
 - Add LoopOrchestrator metrics — step count, durations

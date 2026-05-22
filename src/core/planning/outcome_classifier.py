@@ -11,8 +11,8 @@ from .step_result_factory import (
     tool_needed,
     continue_reasoning,
 )
-from core.types.validation import validate_pure_structure
-from core.types.errors.error_types import (
+from src.core.types.validation import validate_pure_structure
+from src.core.types.errors.error_types import (
     semantic_error,
     confidence_error,
 )
