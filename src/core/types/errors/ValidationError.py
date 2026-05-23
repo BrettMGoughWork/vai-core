@@ -8,7 +8,22 @@ or type/schema validation.
 from .AgentError import AgentError
 
 
-class ValidationError(AgentError):
+from datetime import datetime
+
+class ValidationError(AgentError, Exception):
+    def __init__(self, message, details=None, timestamp=None, recoverable=False):
+        if details is None:
+            details = {}
+        if timestamp is None:
+            timestamp = datetime.utcnow().isoformat()
+        super().__init__(
+            type="ValidationError",
+            message=message,
+            details=details,
+            timestamp=timestamp,
+            recoverable=recoverable
+        )
+
     """
     Error raised when validation operations fail.
 

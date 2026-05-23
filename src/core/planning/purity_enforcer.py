@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable
 
 from src.core.types.validation import validate_pure_structure
-from src.core.types.errors import ValidationError
+from src.core.types.errors.ValidationError import ValidationError
 
 CognitiveOutput = Dict[str, Any]
 

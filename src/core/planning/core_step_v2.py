@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
+from src.core.planning.cognitive_normaliser import normalise_cognitive_structure
+
 from .outcome_classifier import OutcomeClassifier
 from src.core.planning.step_state import StepState, StepStatus
 from src.core.planning.step_result import StepOutcome, StepResult
@@ -53,10 +55,15 @@ class CoreStepV2:
 
     def _classify(self, state: StepState) -> StepResult:
         raw = state.cognitive_input["raw_classifier_output"]
+
+        # Run classifier
         result = self.classifier.classify(state, raw)
 
-        # enforce purity on cognitive output
-        enforce_cognitive_purity(result.to_dict())
+        # Canonical normalisation of cognitive output
+        normalised = normalise_cognitive_structure(result.to_dict())
+
+        # Enforce purity on the normalised structure
+        enforce_cognitive_purity(normalised)
 
         return result
 
