@@ -3,15 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
-from .outcome_classifier import OutcomeClassifier, DefaultOutcomeClassifier
+from .outcome_classifier import OutcomeClassifier
 from src.core.planning.step_state import StepState, StepStatus
 from src.core.planning.step_result import StepOutcome, StepResult
-from src.core.planning.step_result_factory import (
-    success,
-    failure,
-    tool_needed,
-    continue_reasoning,
-)
 from src.core.types.validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.hashing import stable_hash
@@ -23,7 +17,7 @@ class CoreStepV2:
     """
     Pure cognitive step executor (Stratum 2).
     """
-    classifier: OutcomeClassifier = DefaultOutcomeClassifier()
+    classifier: OutcomeClassifier = OutcomeClassifier()
 
     def run(self, state: StepState) -> Tuple[StepState, StepResult]:
         # 1. Validate input purity

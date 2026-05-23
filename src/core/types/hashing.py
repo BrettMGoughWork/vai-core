@@ -3,6 +3,7 @@ import hashlib
 import json
 from typing import Any
 
+from .canonical import to_canonical
 
 def _canonicalise(value: Any) -> Any:
     """
@@ -28,7 +29,7 @@ def stable_hash(value: Any) -> str:
     Deterministic, canonical, stable hash for cognitive state.
     Produces identical output for identical logical structures.
     """
-    canonical = _canonicalise(value)
+    canonical = to_canonical(value)
 
     # JSON with sorted keys ensures deterministic serialisation
     encoded = json.dumps(canonical, separators=(",", ":"), sort_keys=True)

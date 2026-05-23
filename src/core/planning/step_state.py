@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from src.core.types.validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.hashing import stable_hash
@@ -19,6 +19,18 @@ class StepState:
     """
     Pure cognitive state for a single reasoning step.
     Stratum‑2 invariant: immutable, deterministic, serialisable.
+
+    Determinism Invariants (Stratum 2):
+    D1 - Input-Output Determinism
+        Identical cognitive_input + identical configuration => identical StepState/StepResult sequences.
+
+    D2 - Purity
+        All structures must be JSON-pure (dict/list/scalar), validated via validate_pure_structure
+    
+    D3 - No hidden entropy
+        No wall-clock time, randomness, environment state, or non-canonical ordering.
+        created_at is logical time, not wall-clock.
+        canonical_hash depends solely on cognitive_input
     """
 
     # --- Identity ---
@@ -35,13 +47,18 @@ class StepState:
     # --- Metadata ---
     created_at: int = 0 # logical timestamp, not wall‑clock
     attempt: int = 0 # retry counter (pure, no side effects)
-    trace: Dict[str, Any] = field(default_factory=dict)
+    trace: List[Any] = field(default_factory=list) # optional, pure JSON-serialisable trace of the step's execution
 
     # --- Canonical hash ---
     canonical_hash: str = ""
 
     def __post_init__(self):
-        # Validate purity
+        # Determinism invariants
+        assert isinstance(self.created_at, int), "created_at must be logical time (int)"
+        assert self.created_at >= 0, "created_at cannot be negative"
+        assert self.status in StepStatus, "invalid status enum"
+
+        # Purity
         try:
             validate_pure_structure(self.cognitive_input)
             validate_pure_structure(self.last_result)
@@ -49,16 +66,12 @@ class StepState:
         except Exception as e:
             raise ValidationError(f"StepState is not pure: {e}")
 
-        # Compute canonical hash
-        object.__setattr__(self, "canonical_hash", stable_hash({
-            "step_id": self.step_id,
-            "parent_id": self.parent_id,
-            "cognitive_input": self.cognitive_input,
-            "last_result": self.last_result,
-            "status": self.status.value,
-            "attempt": self.attempt,
-            "created_at": self.created_at,
-        }))
+        # Canonical hash depends ONLY on cognitive_input
+        object.__setattr__(
+            self,
+            "canonical_hash",
+            stable_hash(self.cognitive_input),
+        )
 
     def replace(self, **changes) -> StepState:
         # Helper for creating modified copies of StepState (since it's frozen)

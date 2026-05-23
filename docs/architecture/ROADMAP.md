@@ -197,7 +197,7 @@
 - Implement LoopTermination logic — stop, continue, error  
 - Add LoopOrchestrator metrics — step count, durations
 
-2.1.7 - Determinism rules
+✅ 2.1.7 - Determinism rules
 - Define invariants that guarantee identical cognitive inputs always produce identical outputs
 - Specify canonical ordering, stable hashing, strict immutability of StepState/StepResult
 - Add deterministic tie-breaking rules for ambiguous classification or transitions
