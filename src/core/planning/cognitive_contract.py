@@ -1,22 +1,22 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional
 
-from src.core.planning.step_state import StepState
-from src.core.planning.step_result import StepResult
+from src.core.types.step_state import StepState
+from src.core.types.step_result import StepResult
 from src.core.types.validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 
 
 def validate_cognitive_input(
     state: StepState,
-    last_result: Optional[StepResult],
+    last_result: Optional[Dict[str, Any]],
     memory_snapshot: Dict[str, Any],
 ) -> None:
     """
     Enforces the Stratum‑2 cognitive input contract:
     - state: StepState (already pure/deterministic)
     - last_result: optional StepResult (already pure/deterministic)
-    - memory_snapshot: JSON‑pure, read‑only
+    - memory_snapshot: JSON‑pure, read-only
     """
     # StepState / StepResult invariants are enforced in their own __post_init__,
     # so here we only need to validate the memory snapshot.

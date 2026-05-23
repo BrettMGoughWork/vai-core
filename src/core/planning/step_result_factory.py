@@ -1,4 +1,4 @@
-from src.core.planning.step_result import StepResult, StepOutcome
+from src.core.types.step_result import StepResult, StepOutcome
 from src.core.types.errors import ValidationError
 from src.core.types.validation import validate_pure_structure
 
