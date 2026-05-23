@@ -9,6 +9,7 @@ from src.core.planning.step_result import StepOutcome, StepResult
 from src.core.types.hashing import stable_hash
 from src.core.planning.cognitive_contract import validate_cognitive_input
 from src.core.planning.trace_event import TraceEventBuilder
+from src.core.planning.purity_enforcer import enforce_cognitive_purity
 
 # In practice, you’d inject this or construct it at a higher level.
 TRACE_BUILDER = TraceEventBuilder()
@@ -52,7 +53,12 @@ class CoreStepV2:
 
     def _classify(self, state: StepState) -> StepResult:
         raw = state.cognitive_input["raw_classifier_output"]
-        return self.classifier.classify(state, raw)
+        result = self.classifier.classify(state, raw)
+
+        # enforce purity on cognitive output
+        enforce_cognitive_purity(result.to_dict())
+
+        return result
 
     def _apply_outcome(self, state: StepState, result: StepResult) -> StepState:
         # For now, keep it simple: DONE on success/continue/tool, ERROR on failure.

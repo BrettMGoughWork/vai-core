@@ -217,7 +217,7 @@
 - Add SubgoalState model  
 - Add SegmentState model  
 
-2.1.11 - Purity Enforcement Layer
+✅ 2.1.11 - Purity Enforcement Layer
 - Validate no tool calls
 - Validate no LLM calls
 - Validate no side effects
