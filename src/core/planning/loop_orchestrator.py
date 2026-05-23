@@ -1,10 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
+
+from src.core.planning.outcome_classifier import OutcomeClassifier
+from src.core.planning.plan_generator import PlanGenerator
 
 from .core_step_v2 import CoreStepV2
-from .step_state import StepState
-from .step_result import StepResult
+from ..types.step_state import StepState
+from ..types.step_result import StepResult
 from .loop_controller import LoopController, LoopPolicy
 from .loop_metrics import LoopMetrics
 
@@ -21,10 +24,10 @@ class LoopOrchestrator:
     - LoopMetrics
     """
 
-    core_step: CoreStepV2 = CoreStepV2()
-    max_steps: Optional[int] = None
-    max_duration: Optional[int] = None
-    policy: Optional[LoopPolicy] = None
+    core_step: Any
+    max_steps: int
+    max_duration: int
+    policy: LoopPolicy
 
     def run(self, initial_state: StepState) -> Tuple[StepState, StepResult, LoopMetrics]:
         controller = LoopController(
