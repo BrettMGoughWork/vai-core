@@ -1,131 +1,80 @@
 from __future__ import annotations
-
-from dataclasses import dataclass
 from typing import Any, Dict
 
-from .step_state import StepState
-from .step_result import StepResult, StepOutcome
-from .step_result_factory import (
-    success,
-    failure,
-    tool_needed,
-    continue_reasoning,
-)
+from src.core.planning.step_result import StepOutcome, StepResult
 from src.core.types.validation import validate_pure_structure
-from src.core.types.errors.error_types import (
-    semantic_error,
-    confidence_error,
-)
+from src.core.types.errors import ValidationError, confidence_error
+
+
+# Deterministic priority order for ambiguous or missing labels
+OUTCOME_PRIORITY = [
+    StepOutcome.FAILURE,
+    StepOutcome.TOOL_NEEDED,
+    StepOutcome.SUCCESS,
+    StepOutcome.CONTINUE,
+]
 
 
 class OutcomeClassifier:
     """
-    Interface for pure outcome classifiers (Stratum 2).
-
-    Invariants:
-    - No LLM calls
-    - No tool calls
-    - No side effects
-    - Deterministic: same StepState -> same StepResult
+    Deterministic Stratum‑2 classifier.
+    Converts Stratum‑1 classifier output into a StepResult.
     """
 
-    def classify(self, state: StepState) -> StepResult: # pragma: no cover - interface
-        raise NotImplementedError
-
-
-@dataclass(frozen=True)
-class DefaultOutcomeClassifier(OutcomeClassifier):
-    """
-    Default Step Outcome Classifier (PHASE 2.1.5).
-
-    Expects Stratum 1 to provide a structured classifier output in:
-
-        state.cognitive_input["classifier"] = {
-            "label": "success" | "failure" | "tool_needed" | "continue",
-            "reason": "<short explanation>",
-            "metadata": { ... } # optional, pure JSON object
-        }
-
-    This wrapper:
-    - Validates purity of the classifier payload
-    - Maps label -> StepOutcome
-    - Falls back to FAILURE with an embedded AgentError on invalid input
-    """
-
-    def classify(self, state: StepState) -> StepResult:
-        cognitive_input = state.cognitive_input or {}
-
-        if "classifier" not in cognitive_input:
-            err = semantic_error(
-                "Missing classifier output in StepState.cognitive_input",
-                details={
-                    "step_id": getattr(state, "step_id", None),
-                    "cognitive_input_keys": list(cognitive_input.keys()),
-                },
-            )
-            return failure(
-                reason=err.message,
-                payload={"error": err.to_dict() if hasattr(err, "to_dict") else err.__dict__},
-            )
-
-        raw = cognitive_input["classifier"]
-
-        # Ensure classifier payload is pure and JSON‑serialisable
+    def classify(self, state, raw: Dict[str, Any]) -> StepResult:
+        # D2: purity
         try:
             validate_pure_structure(raw)
         except Exception as e:
-            err = semantic_error(
-                "Non‑pure classifier output",
-                details={
-                    "step_id": getattr(state, "step_id", None),
-                    "exception": str(e),
-                },
-            )
-            return failure(
-                reason=err.message,
-                payload={"error": err.to_dict() if hasattr(err, "to_dict") else err.__dict__},
+            err = ValidationError(f"Classifier output not pure: {e}")
+            return StepResult(
+                outcome=StepOutcome.FAILURE,
+                reason=str(err),
+                payload={"error": err.__dict__},
+                trace={},
             )
 
-        if not isinstance(raw, dict):
-            err = semantic_error(
-                "Classifier output must be a dict",
-                details={
-                    "step_id": getattr(state, "step_id", None),
-                    "actual_type": type(raw).__name__,
-                },
-            )
-            return failure(
-                reason=err.message,
-                payload={"error": err.to_dict() if hasattr(err, "to_dict") else err.__dict__},
-            )
-
-        label = raw.get("label")
+        # Extract fields
+        label_raw = raw.get("label")
         reason = raw.get("reason") or "No reason provided by classifier"
         metadata = raw.get("metadata") or {}
 
-        # Map label -> StepOutcome
-        if label == "success" or label == getattr(StepOutcome, "SUCCESS", "success"):
-            return success(reason=reason, payload=metadata)
+        # Canonicalise label
+        label = None
+        if isinstance(label_raw, str):
+            label = label_raw.strip().lower()
 
-        if label == "failure" or label == getattr(StepOutcome, "FAILURE", "failure"):
-            return failure(reason=reason, payload=metadata)
+        # Deterministic mapping
+        mapping = {
+            "success": StepOutcome.SUCCESS,
+            "failure": StepOutcome.FAILURE,
+            "tool_needed": StepOutcome.TOOL_NEEDED,
+            "continue": StepOutcome.CONTINUE,
+        }
 
-        if label == "tool_needed" or label == getattr(StepOutcome, "TOOL_NEEDED", "tool_needed"):
-            return tool_needed(reason=reason, payload=metadata)
+        outcome = mapping.get(label)
 
-        if label == "continue" or label == getattr(StepOutcome, "CONTINUE", "continue"):
-            return continue_reasoning(reason=reason, payload=metadata)
+        # Deterministic fallback for unknown/missing labels
+        if outcome is None:
+            err = confidence_error(
+                "Unknown classifier label",
+                details={
+                    "step_id": getattr(state, "step_id", None),
+                    "label": label_raw,
+                    "raw_classifier": raw,
+                },
+            )
+            return StepResult(
+                outcome=OUTCOME_PRIORITY[0], # FAILURE
+                reason=err.message,
+                payload={"error": err.to_dict()},
+                trace={},
+            )
 
-        # Unknown label -> confidence error -> FAILURE
-        err = confidence_error(
-            "Unknown classifier label",
-            details={
-                "step_id": getattr(state, "step_id", None),
-                "label": label,
-                "raw_classifier": raw,
-            },
-        )
-        return failure(
-            reason=err.message,
-            payload={"error": err.to_dict() if hasattr(err, "to_dict") else err.__dict__},
+        # Normal case
+        return StepResult(
+            outcome=outcome,
+            reason=reason,
+            payload=metadata,
+            trace={},
         )
