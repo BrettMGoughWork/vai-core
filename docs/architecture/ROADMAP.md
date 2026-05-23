@@ -212,7 +212,7 @@
 - Record: chosen transitions, rejected alternatives, drift signals, validation outcomes
 - Ensure the trace is append-only, immutable, and serialisable for debugging
 
-2.1.10 — Subgoal/Segment State
+✅ 2.1.10 — Subgoal/Segment State
 - Extend ConversationState  
 - Add SubgoalState model  
 - Add SegmentState model  
