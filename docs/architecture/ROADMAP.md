@@ -202,12 +202,12 @@
 - Specify canonical ordering, stable hashing, strict immutability of StepState/StepResult
 - Add deterministic tie-breaking rules for ambiguous classification or transitions
 
-2.1.8 - Cognitive contract
+✅ 2.1.8 - Cognitive contract
 - Define the interface between Stratum 1 and Stratum 2: what Stratum 2 receives (state, last result, memory) and what it must return (subgoal, segment, plan, or classification)
 - Specify allowed input/output shapes and error semantics
 - Ensure the contract is pure: no side effects, no execution, no tool selection
 
-2.1.9 - Cognitive trace
+✅ 2.1.9 - Cognitive trace
 - Define a structured trace object capturing *why* each cognitive decision was made
 - Record: chosen transitions, rejected alternatives, drift signals, validation outcomes
 - Ensure the trace is append-only, immutable, and serialisable for debugging
