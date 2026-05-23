@@ -2,7 +2,8 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Any
 from src.core.types.result import CoreResult
 from src.core.agent.trace import StepTrace
-
+from src.core.planning.subgoal_state import SubgoalState
+from src.core.planning.segment_state import SegmentState
 
 @dataclass
 class ConversationState:
@@ -26,6 +27,11 @@ class ConversationState:
 
     # Loop trace (step outcomes)
     trace: List[StepTrace] = field(default_factory=list)
+
+    subgoals: List[SubgoalState] = field(default_factory=list)
+    segments: List[SegmentState] = field(default_factory=list)
+    active_subgoal: Optional[str] = None
+    active_segment: Optional[str] = None
 
     def append_llm(self, text: str) -> None:
         self.history.append(f"LLM: {text}")
