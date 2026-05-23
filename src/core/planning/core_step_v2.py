@@ -8,6 +8,10 @@ from src.core.planning.step_state import StepState, StepStatus
 from src.core.planning.step_result import StepOutcome, StepResult
 from src.core.types.hashing import stable_hash
 from src.core.planning.cognitive_contract import validate_cognitive_input
+from src.core.planning.trace_event import TraceEventBuilder
+
+# In practice, you’d inject this or construct it at a higher level.
+TRACE_BUILDER = TraceEventBuilder()
 
 @dataclass(frozen=True)
 class CoreStepV2:
@@ -17,7 +21,7 @@ class CoreStepV2:
     classifier: OutcomeClassifier = OutcomeClassifier()
 
     def run(self, state: StepState) -> Tuple[StepState, StepResult]:
-        # 1. Validate input purity
+        # 1. Validate input purity / contract
         validate_cognitive_input(
             state=state,
             last_result=state.last_result,
@@ -40,6 +44,7 @@ class CoreStepV2:
         return final_state, result
 
     # --- Internal helpers (pure, deterministic) ---
+
     def _to_running(self, state: StepState) -> StepState:
         # You’ll likely implement a replace() helper on StepState;
         # for now assume a simple constructor pattern.
@@ -59,16 +64,12 @@ class CoreStepV2:
         return state.replace(status=new_status)
 
     def _append_trace(self, state: StepState, result: StepResult) -> StepState:
-        # Minimal trace: record canonical hash + outcome
-        new_trace = state.trace + [{
-            "core_step_v2": {
-                "hash": stable_hash({
-                    "step_id": state.step_id,
-                    "cognitive_input": state.cognitive_input,
-                    "last_result": state.last_result,
-                }),
-                "outcome": result.outcome.value,
-            }
-        }]
-
+        event = TRACE_BUILDER.classification(
+            outcome=result.outcome.value,
+            reason=result.reason,
+            raw_classifier_output=state.cognitive_input.get("raw_classifier_output", {}),
+            timestamp=state.created_at,
+        )
+        new_trace = state.trace + [event]
         return state.replace(trace=new_trace)
+
