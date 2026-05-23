@@ -1,9 +1,10 @@
 import pytest
 from src.core.planning.plan import Plan as RealPlan
-from src.core.planning.plan_validator import (
-    PlanValidator, PlanValidationError, PlanStructureError, UnknownCapabilityError,
+from src.core.planning.plan_errors import (
+    PlanStructureError, UnknownCapabilityError,
     ForbiddenCapabilityError, CapabilitySchemaError, PlanPurityError, PlanSafetyError
 )
+from src.core.planning.plan_validator import PlanValidator
 
 # Patch Plan with to_dict for test compatibility
 class Plan(RealPlan):
@@ -97,7 +98,7 @@ def test_plan_safety_error():
         validator.validate(plan, schema)
 
 
-from src.core.planning.plan_validator import PlanValidationError, PlanValidator
+from src.core.planning.plan_validator import PlanValidator
 
 
 def test_validate_accepts_valid_plan_and_args():

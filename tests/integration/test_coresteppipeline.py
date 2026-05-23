@@ -37,7 +37,11 @@ if ROOT_STR not in sys.path:
 
 from src.core.loop import CoreStep
 from src.core.planning.local_planner import LocalPlanner
-from src.core.planning.plan_validator import PlanValidationError, PlanValidator
+from src.core.planning.plan_errors import (
+    PlanStructureError, UnknownCapabilityError, ForbiddenCapabilityError,
+    CapabilitySchemaError, PlanPurityError, PlanSafetyError
+)
+from src.core.planning.plan_validator import PlanValidator
 from src.execution.singleskillexecutor import SingleSkillExecutor
 from src.observability.logger import StdoutLogger
 from src.capabilities.skill_filter import SkillFilter
@@ -178,7 +182,8 @@ def test_core_step_validator_error(monkeypatch: pytest.MonkeyPatch):
 
     updated = core_step.run("please do math", state)
 
-    assert isinstance(updated["last_error"], PlanValidationError)
+    # Accept either UnknownCapabilityError or CapabilitySchemaError
+    assert isinstance(updated["last_error"], (UnknownCapabilityError, CapabilitySchemaError))
     assert "Unknown capability" in str(updated["last_error"]) or "Plan arguments do not match skill input schema" in str(updated["last_error"])
     assert "lastexecutionresult" not in updated
 
