@@ -1,4 +1,4 @@
-from core.planning.step_state import StepState, StepStatus
+from src.core.types.step_state import StepState, StepStatus
 from core.types.validation import validate_pure_structure
 
 

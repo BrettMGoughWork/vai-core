@@ -224,7 +224,7 @@
 - Validate immutability of cognitive inputs
 - Validate determinstic outputs
 
-2.1.12 - Cognitive Normalisation Layer
+✅ 2.1.12 - Cognitive Normalisation Layer
 - Stable ordering of inputs
 - Stable hashing of cognitive state
 - Canonical normalisation of cognitive structures
@@ -232,7 +232,7 @@
 ### PHASE 2.2 - Flat Planner (non-hierarchical)
 *Depends on*: PHASE 2.1  
 
-2.2.1 — Plan Generator
+✅ 2.2.1 — Plan Generator
 - Define plan generation prompt  
 - Implement PlanGenerator wrapper  
 - Add plan generation validators  

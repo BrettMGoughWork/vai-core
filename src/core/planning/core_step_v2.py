@@ -6,12 +6,13 @@ from typing import Tuple
 from src.core.planning.cognitive_normaliser import normalise_cognitive_structure
 
 from .outcome_classifier import OutcomeClassifier
-from src.core.planning.step_state import StepState, StepStatus
-from src.core.planning.step_result import StepOutcome, StepResult
+from src.core.types.step_state import StepState, StepStatus
+from src.core.types.step_result import StepOutcome, StepResult
 from src.core.types.hashing import stable_hash
 from src.core.planning.cognitive_contract import validate_cognitive_input
 from src.core.planning.trace_event import TraceEventBuilder
 from src.core.planning.purity_enforcer import enforce_cognitive_purity
+from src.core.planning.plan_generator import PlanGenerator, PlanPrompt
 
 # In practice, you’d inject this or construct it at a higher level.
 TRACE_BUILDER = TraceEventBuilder()
@@ -22,28 +23,40 @@ class CoreStepV2:
     Pure cognitive step executor (Stratum 2).
     """
     classifier: OutcomeClassifier = OutcomeClassifier()
+    capabilities: dict = None
+    plan_generator: PlanGenerator = PlanGenerator(capabilities=capabilities)
+
+    def __post_init__(self):
+        if self.capabilities is None:
+            raise ValueError("CoreStepV2 requires a capabilities dictionary")
+        if self.plan_generator is None:
+            object.__setattr__(self, "plan_generator", PlanGenerator(capabilities=self.capabilities))
 
     def run(self, state: StepState) -> Tuple[StepState, StepResult]:
-        # 1. Validate input purity / contract
+        # Validate input purity / contract
         validate_cognitive_input(
             state=state,
             last_result=state.last_result,
             memory_snapshot=state.cognitive_input.get("memory", {}),
         )
 
-        # 2. Transition → RUNNING
+        # PLAN MODE
+        if state.cognitive_input.get("mode") == "plan":
+            return self._generate_plan(state)
+        
+        # Transition → RUNNING
         running_state = self._to_running(state)
 
-        # 3. Classify outcome (pure)
+        # Classify outcome (pure)
         result = self._classify(running_state)
 
-        # 4. Transition → DONE / ERROR based on outcome
+        # Transition → DONE / ERROR based on outcome
         final_state = self._apply_outcome(running_state, result)
 
-        # 5. Append trace
+        # Append trace
         final_state = self._append_trace(final_state, result)
 
-        # 6. Return new_state, result
+        # Return new_state, result
         return final_state, result
 
     # --- Internal helpers (pure, deterministic) ---
@@ -86,3 +99,35 @@ class CoreStepV2:
         new_trace = state.trace + [event]
         return state.replace(trace=new_trace)
 
+    def _generate_plan(self, state: StepState) -> Tuple[StepResult, StepState]:
+        """
+        Deterministic plan-generation path.
+        Produces a PlanPrompt and wraps it in a StepResult.
+        """
+        plan_prompt: PlanPrompt = self.plan_generator.generate(state)
+
+        result = StepResult(
+            outcome=StepOutcome.SUCCESS,
+            reason="plan_generated",
+            cognitive_output={
+                "kind": "plan_prompt",
+                "prompt": plan_prompt.prompt,
+                "metadata": plan_prompt.metadata,
+            },
+        )
+
+        # Transition -> DONE
+        final_state = state.replace(status=StepStatus.DONE)
+
+        # Append trace
+        event = TRACE_BUILDER.generic(
+            kind="plan_prompt_generated",
+            payload={
+                "prompt": plan_prompt.prompt,
+                "metadata": plan_prompt.metadata,
+            },
+            timestamp=state.created_at,
+        )
+        final_state = final_state.replace(trace=final_state.trace + [event])
+
+        return result, final_state

@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from .step_result import StepResult, StepOutcome
+from ..types.step_result import StepResult, StepOutcome
 
 
 TerminationReason = Literal[
