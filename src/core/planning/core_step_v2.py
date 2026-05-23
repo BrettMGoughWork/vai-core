@@ -6,11 +6,8 @@ from typing import Tuple
 from .outcome_classifier import OutcomeClassifier
 from src.core.planning.step_state import StepState, StepStatus
 from src.core.planning.step_result import StepOutcome, StepResult
-from src.core.types.validation import validate_pure_structure
-from src.core.types.errors import ValidationError
 from src.core.types.hashing import stable_hash
-
-
+from src.core.planning.cognitive_contract import validate_cognitive_input
 
 @dataclass(frozen=True)
 class CoreStepV2:
@@ -21,7 +18,11 @@ class CoreStepV2:
 
     def run(self, state: StepState) -> Tuple[StepState, StepResult]:
         # 1. Validate input purity
-        self._validate_state(state)
+        validate_cognitive_input(
+            state=state,
+            last_result=state.last_result,
+            memory_snapshot=state.cognitive_input.get("memory", {}),
+        )
 
         # 2. Transition → RUNNING
         running_state = self._to_running(state)
@@ -39,23 +40,14 @@ class CoreStepV2:
         return final_state, result
 
     # --- Internal helpers (pure, deterministic) ---
-
-    def _validate_state(self, state: StepState) -> None:
-        # StepState should already be pure, but we double‑check
-        try:
-            validate_pure_structure(state.cognitive_input)
-            validate_pure_structure(state.last_result)
-            validate_pure_structure(state.trace)
-        except Exception as e:
-            raise ValidationError(f"Invalid StepState for CoreStepV2: {e}")
-
     def _to_running(self, state: StepState) -> StepState:
         # You’ll likely implement a replace() helper on StepState;
         # for now assume a simple constructor pattern.
         return state.replace(status=StepStatus.RUNNING)
 
     def _classify(self, state: StepState) -> StepResult:
-        return self.classifier.classify(state)
+        raw = state.cognitive_input["raw_classifier_output"]
+        return self.classifier.classify(state, raw)
 
     def _apply_outcome(self, state: StepState, result: StepResult) -> StepState:
         # For now, keep it simple: DONE on success/continue/tool, ERROR on failure.
