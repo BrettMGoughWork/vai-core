@@ -31,3 +31,22 @@ class PlanPurityError(PlanValidationError):
 class PlanSafetyError(PlanValidationError):
     """Plan violates safety or allowed‑actions rules."""
     pass
+
+class PlanExecutionError(PlanValidationError):
+    """Capability execution failed."""
+    pass
+
+class PlanDispatchError(PlanValidationError):
+    """Unexpected step outcome during plan execution."""
+    pass
+
+def _map_step_error(self, result: StepResult) -> PlanValidationError:
+    if result.outcome == StepOutcome.FAILURE:
+        return PlanExecutionError(result.reason)
+
+    if result.outcome in (StepOutcome.CONTINUE, StepOutcome.TOOL_NEEDED):
+        return PlanDispatchError(
+            f"Unexpected step outcome during plan execution: {result.outcome}"
+        )
+
+    return PlanDispatchError("Unknown execution error")
