@@ -231,20 +231,238 @@ Fundamental building blocks for the agent system.
 
 ---
 
-## Guidance for Contributors (Copilot-aware)
+### Cognitive Contract (Stratum‑1 ↔ Stratum‑2 Interface)
 
-When making changes:
+1. Purpose
 
-- Prefer extending within existing modules before introducing new top-level folders.
-- Maintain clear boundaries:
-  - Planning never executes
-  - Execution never decides *what* to run
-  - Governance never performs execution
-- Add new skills under `skills/standard` or `skills/custom`, not in core logic.
-- Keep all provider-specific logic inside `core/llm/providers`.
-- Ensure new features include:
-  - Types (`core/types`)
-  - Validation where applicable
-  - Unit + integration tests
-- Update this file if responsibilities or boundaries change.
+The Cognitive Contract defines the pure, deterministic, side‑effect‑free interface between:
 
+- Stratum 1 — execution, tools, environment, effects  
+- Stratum 2 — reasoning, planning, classification, cognition  
+
+Stratum 2 must behave as a pure function:
+
+`
+PureInput → PureCognition → PureOutput
+`
+
+No execution, no tool calls, no environment access, no mutation.
+
+---
+
+2. Inputs Provided to Stratum 2
+
+Stratum 2 receives exactly three pure, deterministic inputs.
+
+2.1 StepState (current cognitive state)
+
+A frozen, JSON‑pure object containing:
+
+- step_id
+- parent_id
+- cognitive_input
+- last_result
+- status
+- created_at (logical time)
+- attempt
+- trace
+- canonical_hash
+
+This is the only state Stratum 2 may read.
+
+---
+
+2.2 Last StepResult (optional)
+
+If the previous step produced a result, Stratum 2 receives:
+
+- outcome
+- reason
+- payload
+- trace
+- canonical_hash
+
+Always pure and immutable.
+
+---
+
+2.3 Memory Snapshot (read‑only)
+
+A pure JSON structure representing:
+
+- long‑term memory  
+- working memory  
+- episodic memory  
+- agent configuration  
+- tool metadata  
+
+Memory is read‑only.  
+Stratum 2 cannot mutate memory; it may only propose memory updates via structured outputs.
+
+---
+
+3. Outputs Stratum 2 Must Return
+
+Stratum 2 must return exactly one of the following pure objects.
+
+3.1 Classification
+
+Used when the cognitive step is complete.
+
+`json
+{
+  "type": "classification",
+  "outcome": "success|failure|tool_needed|continue",
+  "reason": "string",
+  "payload": {}
+}
+`
+
+---
+
+3.2 Subgoal
+
+A single atomic cognitive objective.
+
+`json
+{
+  "type": "subgoal",
+  "goal": "string",
+  "context": {}
+}
+`
+
+---
+
+3.3 Segment
+
+A multi‑step cognitive unit.
+
+`json
+{
+  "type": "segment",
+  "steps": [],
+  "context": {}
+}
+`
+
+---
+
+3.4 Plan
+
+A hierarchical plan.
+
+`json
+{
+  "type": "plan",
+  "root": {},
+  "nodes": [],
+  "metadata": {}
+}
+`
+
+---
+
+3.5 Structured Error
+
+Stratum 2 never throws exceptions; it returns structured errors.
+
+`json
+{
+  "type": "error",
+  "error_type": "validation|planning|classification|unknown",
+  "message": "string",
+  "details": {}
+}
+`
+
+Stratum 1 decides how to handle errors.
+
+---
+
+4. Purity & Side‑Effect Rules
+
+Stratum 2 must obey the following constraints.
+
+4.1 No execution
+
+Stratum 2 cannot:
+
+- call tools  
+- run code  
+- perform I/O  
+- access environment state  
+
+---
+
+4.2 No side effects
+
+Stratum 2 cannot mutate:
+
+- StepState  
+- memory  
+- global state  
+- external systems  
+
+Trace is allowed but must be pure JSON.
+
+---
+
+4.3 Pure function requirement
+
+Given identical inputs, Stratum 2 must produce bit‑identical outputs.
+
+This is enforced by:
+
+- deterministic StepState  
+- deterministic StepResult  
+- deterministic OutcomeClassifier  
+- canonical hashing  
+- purity validation  
+
+---
+
+5. Allowed Input/Output Shapes
+
+Stratum 2 may only read/write:
+
+- dict  
+- list  
+- str  
+- int  
+- float  
+- bool  
+- null  
+
+No custom objects, classes, functions, datetimes, or bytes.
+
+Everything must be JSON‑pure.
+
+---
+
+6. Contract Summary
+
+Stratum 2 is a pure cognitive engine.
+
+It receives:
+
+- StepState  
+- Last StepResult  
+- Memory snapshot  
+
+It returns exactly one:
+
+- classification  
+- subgoal  
+- segment  
+- plan  
+- structured error  
+
+It must not:
+
+- execute tools  
+- mutate memory  
+- perform side effects  
+- depend on environment state  
+
+It must be pure, deterministic, and replayable.
