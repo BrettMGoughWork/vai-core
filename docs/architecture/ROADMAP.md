@@ -243,12 +243,12 @@
 - Implement PlanValidator rules — safety, allowed actions  
 - Add PlanValidator error reporting  
 
-2.2.3 — Plan Executor
+✅ 2.2.3 — Plan Executor
 - Implement StepDispatcher — run each step via CoreStep  
 - Implement PlanError propagation — map step errors → plan errors  
 - Add PlanExecutor metrics  
 
-2.2.4 — Plan State
+✅ 2.2.4 — Plan State
 - Define PlanState model  
 - Implement PlanState transitions  
 - Add PlanState validators  
