@@ -1,0 +1,23 @@
+{
+  "$id": "core.plan.schema",
+  "type": "object",
+  "required": ["intent", "targetSkillId", "arguments", "reasoningSummary"],
+  "additionalProperties": false,
+  "properties": {
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetSkillId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arguments": {
+      "type": "object"
+    },
+    "reasoningSummary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
