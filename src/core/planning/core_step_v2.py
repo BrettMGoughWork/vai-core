@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from src.core.planning.cognitive_normaliser import normalise_cognitive_structure
+from src.core.planning.plan_validator import PlanValidator
+from src.core.planning.plan import Plan
 
 from .outcome_classifier import OutcomeClassifier
 from src.core.types.step_state import StepState, StepStatus
@@ -25,12 +27,20 @@ class CoreStepV2:
     classifier: OutcomeClassifier = OutcomeClassifier()
     capabilities: dict = None
     plan_generator: PlanGenerator = PlanGenerator(capabilities=capabilities)
+    plan_validator: PlanValidator | None = None
 
     def __post_init__(self):
         if self.capabilities is None:
             raise ValueError("CoreStepV2 requires a capabilities dictionary")
         if self.plan_generator is None:
             object.__setattr__(self, "plan_generator", PlanGenerator(capabilities=self.capabilities))
+
+        if self.plan_validator is None:
+            object.__setattr__(
+                self,
+                "plan_validator",
+                PlanValidator(self.capabilities),
+            )
 
     def run(self, state: StepState) -> Tuple[StepState, StepResult]:
         # Validate input purity / contract
@@ -44,6 +54,9 @@ class CoreStepV2:
         if state.cognitive_input.get("mode") == "plan":
             return self._generate_plan(state)
         
+        if mode == "plan_validate":
+            return self._validate_plan(state)
+
         # Transition → RUNNING
         running_state = self._to_running(state)
 
@@ -131,3 +144,60 @@ class CoreStepV2:
         final_state = final_state.replace(trace=final_state.trace + [event])
 
         return result, final_state
+
+    def _validate_plan(self, state: StepState) -> tuple[StepState, StepResult]:
+        raw_plan = state.cognitive_input.get("plan")
+        if raw_plan is None:
+            result = StepResult.failure(
+                reason="No plan provided for validation",
+                payload={"error_type": "PlanMissing"},
+                trace=[],
+            )
+            return state, result
+
+        try:
+            plan = Plan.from_dict(raw_plan)
+        except Exception as exc:
+            result = StepResult.failure(
+                reason="Invalid plan structure",
+                payload={"error_type": "PlanDeserialisationError", "detail": str(exc)},
+                trace=[],
+            )
+            return state, result
+
+        target_skill_id = plan.targetskillid
+        capability = self.capabilities.get(target_skill_id)
+        if capability is None:
+            result = StepResult.failure(
+                reason=f"Unknown capability: {target_skill_id}",
+                payload={"error_type": "UnknownCapability", "targetSkillId": target_skill_id},
+                trace=[],
+            )
+            return state, result
+
+        skill_schema = capability.get("input_schema", {})
+
+        try:
+            assert self.plan_validator is not None
+            self.plan_validator.validate(plan, skill_schema)
+        except Exception as exc:
+            result = StepResult.failure(
+                reason="Plan failed validation",
+                payload={
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                    "targetSkillId": target_skill_id,
+                },
+                trace=[],
+            )
+            return state, result
+
+        result = StepResult.success(
+            reason="Plan validated successfully",
+            payload={
+                "targetSkillId": target_skill_id,
+                "intent": plan.intent,
+            },
+            trace=[],
+        )
+        return state, result

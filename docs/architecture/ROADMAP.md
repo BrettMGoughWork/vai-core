@@ -238,7 +238,7 @@
 - Add plan generation validators  
 *Note*: PlanGenerator produces a prompt template only; Stratum 1 performs the actual LLM call
 
-2.2.2 — Plan Validator
+✅ 2.2.2 — Plan Validator
 - Define Plan schema  
 - Implement PlanValidator rules — safety, allowed actions  
 - Add PlanValidator error reporting  
