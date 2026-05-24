@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, List
 
 from src.core.planning.plan import Plan
-from src.core.planning.plan_state import PlanState, PlanStatus
+from src.core.planning.models.plan_state import PlanState, PlanStatus
 from src.core.planning.plan_errors import (
     PlanSafetyPolicyError,
     PlanTransitionSafetyError,
 )
-from src.core.planning.core_step import StepResult # adjust import if needed
+from src.core.planning.dispatch.core_step import StepResult # adjust import if needed
 
 
 @dataclass(frozen=True)

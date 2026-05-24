@@ -1,10 +1,10 @@
-from src.core.planning.loop_orchestrator import LoopOrchestrator
+from src.core.planning.orchestration.loop_orchestrator import LoopOrchestrator
 from src.core.planning.loop_controller import LoopPolicy
-from src.core.types.step_state import StepState, StepStatus
+from src.core.planning.models.step_state import StepState, StepStatus
 from src.core.types.step_result import StepOutcome, StepResult
-from src.core.planning.core_step import CoreStep
+from src.core.planning.dispatch.core_step import CoreStep
 
-from src.core.planning.plan_generator import PlanGenerator
+from src.core.planning.generator.plan_generator import PlanGenerator
 
 
 # Minimal fake capabilities manifest (required by CoreStepV2 + PlanGenerator)
@@ -70,7 +70,7 @@ def test_loop_orchestrator_basic():
     )
 
     # Wrap FakeCoreStep inside a CoreStepV2 so the orchestrator can use it
-    from src.core.planning.plan_validator import PlanValidator
+    from src.core.planning.validators.plan_validator import PlanValidator
     core_step = CoreStep(
         classifier=FakeCoreStep(),          # <-- this is the fake step logic
         capabilities=FAKE_CAPABILITIES,     # <-- required by new CoreStepV2

@@ -1,4 +1,4 @@
-from src.core.planning.plan_state import PlanState, PlanStatus
+from src.core.planning.models.plan_state import PlanState, PlanStatus
 
 class PlanStateValidationError(Exception):
     pass

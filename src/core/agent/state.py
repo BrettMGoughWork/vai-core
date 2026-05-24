@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Any
 from src.core.types.result import CoreResult
 from src.core.agent.trace import StepTrace
-from src.core.planning.subgoal_state import SubgoalState
-from src.core.planning.segment_state import SegmentState
+from src.core.planning.models.subgoal_state import SubgoalState
+from src.core.planning.models.segment_state import SegmentState
 
 @dataclass
 class ConversationState:

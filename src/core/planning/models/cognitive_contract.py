@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional
 
-from src.core.types.step_state import StepState
+from src.core.planning.models.step_state import StepState
 from src.core.types.step_result import StepResult
 from src.core.types.validation import validate_pure_structure
 from src.core.types.errors import ValidationError

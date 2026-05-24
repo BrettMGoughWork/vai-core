@@ -2,12 +2,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-        from src.core.planning.step_dispatcher import StepDispatcher
+        from src.core.planning.dispatch.step_dispatcher import StepDispatcher
 
-from src.core.types.step_state import StepState
-from src.core.planning.plan_state import PlanState
+from src.core.planning.models.step_state import StepState
+from src.core.planning.models.plan_state import PlanState
 from src.core.types.step_result import StepResult
-from src.core.planning.safety_policies import SafetyContext
+from src.core.planning.safety.safety_policies import SafetyContext
 
 class SafeStepDispatcher:
     """
