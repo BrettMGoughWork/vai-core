@@ -1,4 +1,9 @@
-from src.core.planning.safe_step_dispatcher import StepDispatcher
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+        from src.core.planning.step_dispatcher import StepDispatcher
+
 from src.core.types.step_state import StepState
 from src.core.planning.plan_state import PlanState
 from src.core.types.step_result import StepResult
@@ -8,7 +13,7 @@ class SafeStepDispatcher:
     Wraps StepDispatcher with safety checks.
     """
 
-    def __init__(self, dispatcher: StepDispatcher, safety_policies: list[SafetyPolicy]):
+    def __init__(self, dispatcher: "StepDispatcher", safety_policies: list[SafetyPolicy]):
         self.dispatcher = dispatcher
         self.safety_policies = safety_policies
 

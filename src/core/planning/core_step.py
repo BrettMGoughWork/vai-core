@@ -20,7 +20,7 @@ from src.core.planning.plan_generator import PlanGenerator, PlanPrompt
 TRACE_BUILDER = TraceEventBuilder()
 
 @dataclass(frozen=True)
-class CoreStepV2:
+class CoreStep:
     """
     Pure cognitive step executor (Stratum 2).
     """
@@ -31,7 +31,7 @@ class CoreStepV2:
 
     def __post_init__(self):
         if self.capabilities is None:
-            raise ValueError("CoreStepV2 requires a capabilities dictionary")
+            raise ValueError("CoreStep requires a capabilities dictionary")
         if self.plan_generator is None:
             object.__setattr__(self, "plan_generator", PlanGenerator(capabilities=self.capabilities))
 
@@ -54,7 +54,7 @@ class CoreStepV2:
         if state.cognitive_input.get("mode") == "plan":
             return self._generate_plan(state)
         
-        if mode == "plan_validate":
+        if state.cognitive_input.get("mode") == "plan_validate":
             return self._validate_plan(state)
 
         # Transition → RUNNING

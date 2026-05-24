@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from src.core.planning.safe_step_dispatcher import SafeStepDispatcher
 from src.core.planning.plan_state import PlanState
 from src.core.planning.plan_errors import PlanDispatchError, PlanValidationError, PlanExecutionError
-from src.core.planning.step_dispatcher import StepDispatcher
-from src.core.loop import CoreStepV2, StepState, StepResult, StepOutcome
+from src.core.types.step_state import StepState
+from src.core.types.step_result import StepResult, StepOutcome
 from src.core.planning.plan import Plan
 
 @dataclass(frozen=True)
@@ -24,11 +24,16 @@ class PlanExecutor:
     def __init__(self, dispatcher: SafeStepDispatcher):
         self.dispatcher = dispatcher
 
-    def execute(self, plan: Plan) -> tuple[StepState, StepResult, PlanExecutorMetrics]:
+    def execute(
+        self, 
+        plan: Plan,
+        plan_state: PlanState | None = None
+    ) -> tuple[StepState, StepResult, PlanExecutorMetrics]:
+        
         start = 0
-        state, result = self.dispatcher.dispatch(plan)
+
         try:
-            state, result = self.dispatcher.dispatch(plan)
+            state, result = self.dispatcher.dispatch(plan, plan_state=plan_state)
         except Exception as exc:
             # catastrophic substrate error
             result = StepResult.failure(

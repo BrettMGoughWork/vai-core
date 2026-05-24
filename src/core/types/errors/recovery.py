@@ -8,7 +8,7 @@ The actual execution of recovery actions is handled by Phase 2.3 (Recovery Execu
 
 from enum import Enum
 
-from .error_types import AgentError
+from .AgentError import AgentError
 
 
 class RecoveryAction(Enum):

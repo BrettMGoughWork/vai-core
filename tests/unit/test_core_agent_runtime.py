@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 import time
 
 from src.core.agent.config import AgentConfig, LoopPolicy
-from src.core.agent.corestep import CoreStepExecutor
+from src.core.agent.core_step_executor import CoreStepExecutor
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.runtime import AgentRuntime, _result_summary
 from src.core.llm.types import CoreLLMResponse
@@ -273,8 +273,8 @@ def test_runtime_sequential_safety_path_remains_stable():
         return executor.run(state)
 
     with patch("src.core.agent.runtime.core_step", side_effect=delegated_core_step), patch(
-        "src.core.agent.corestep.SkillRegistry.all_specs_for_agent", return_value=[spec]
-    ), patch("src.core.agent.corestep.select_tool", return_value=spec):
+        "src.core.agent.core_step_executor.SkillRegistry.all_specs_for_agent", return_value=[spec]
+    ), patch("src.core.agent.core_step_executor.select_tool", return_value=spec):
         r1 = runtime.run("phase-retry")
         r2 = runtime.run("phase-breaker-open")
         r3 = runtime.run("phase-breaker-block")

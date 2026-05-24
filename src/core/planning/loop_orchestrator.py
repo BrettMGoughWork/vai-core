@@ -5,7 +5,7 @@ from typing import Any, Optional, Tuple
 from src.core.planning.outcome_classifier import OutcomeClassifier
 from src.core.planning.plan_generator import PlanGenerator
 
-from .core_step_v2 import CoreStepV2
+from .core_step import CoreStep
 from ..types.step_state import StepState
 from ..types.step_result import StepResult
 from .loop_controller import LoopController, LoopPolicy
@@ -18,7 +18,7 @@ class LoopOrchestrator:
     Public Stratum-2 loop API.
 
     Orchestrates:
-    - CoreStepV2
+    - CoreStep
     - LoopController
     - LoopTermination
     - LoopMetrics

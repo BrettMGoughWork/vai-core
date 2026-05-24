@@ -7,7 +7,7 @@ from src.core.planning.plan_errors import (
     PlanSafetyPolicyError,
     PlanTransitionSafetyError,
 )
-from src.core.steps.core_step_v2 import StepResult # adjust import if needed
+from src.core.planning.core_step import StepResult # adjust import if needed
 
 
 @dataclass(frozen=True)
