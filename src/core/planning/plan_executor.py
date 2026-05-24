@@ -6,6 +6,7 @@ from src.core.planning.plan_errors import PlanDispatchError, PlanValidationError
 from src.core.types.step_state import StepState
 from src.core.types.step_result import StepResult, StepOutcome
 from src.core.planning.plan import Plan
+from src.core.planning.purity_enforcer import enforce_cognitive_purity
 
 @dataclass(frozen=True)
 class PlanExecutorMetrics:
@@ -32,10 +33,18 @@ class PlanExecutor:
         
         start = 0
 
+        state = PlanState.initial(plan)
+
+        state = PlanState.initial(plan)
         try:
             state, result = self.dispatcher.dispatch(plan, plan_state=plan_state)
         except Exception as exc:
             # catastrophic substrate error
+            import traceback
+            print("[PlanExecutorInternalError] Exception type:", type(exc).__name__)
+            print("[PlanExecutorInternalError] Exception message:", exc)
+            print("[PlanExecutorInternalError] Traceback:")
+            traceback.print_exc()
             result = StepResult.failure(
                 reason=str(exc),
                 payload={"error_type": "PlanExecutorInternalError"},
@@ -62,11 +71,26 @@ class PlanExecutor:
             return state, failure_result, metrics
 
         # Success
+        # Enforce purity only on capability outputs (result.payload if dict)
+        if isinstance(result.payload, dict):
+            enforce_cognitive_purity(result.payload)
         metrics = PlanExecutorMetrics(
             duration=state.created_at,
             termination_reason="success",
         )
-        return state, result, metrics
+        # Mark plan as complete
+        from src.core.planning.plan_state import PlanStatus
+        completed_state = state.__class__(
+            plan_id=state.plan_id,
+            steps=state.steps,
+            current_step_index=state.current_step_index,
+            status=PlanStatus.COMPLETED,
+            last_result=state.last_result,
+            trace=state.trace,
+            created_at=state.created_at,
+            updated_at=state.updated_at,
+        )
+        return completed_state, result, metrics
 
     def _map_step_error(self, result: StepResult) -> PlanValidationError:
         if result.outcome == StepOutcome.FAILURE:

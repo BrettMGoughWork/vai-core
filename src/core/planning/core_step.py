@@ -80,6 +80,14 @@ class CoreStep:
         return state.replace(status=StepStatus.RUNNING)
 
     def _classify(self, state: StepState) -> StepResult:
+        if "raw_classifier_output" not in state.cognitive_input:
+            # No classifier output present; skip classification or return a safe default
+            # You may want to return a default StepResult or handle as appropriate
+            return StepResult.failure(
+                reason="No classifier output present",
+                payload={},
+                trace=[],
+            )
         raw = state.cognitive_input["raw_classifier_output"]
 
         # Run classifier

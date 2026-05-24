@@ -32,22 +32,22 @@ class PlanValidator:
     # ----------------------------------------------------------------------
     # Public API
     # ----------------------------------------------------------------------
-    def validate(self, plan: Plan, skillinput_schema: dict) -> None:
+    def validate(self, plan: Plan) -> None:
         """
         Raises a typed PlanValidationError subclass on failure.
         Returns None on success.
         """
-        self._validate_structure(plan)
+        cap = self.capabilities.get(plan.targetskillid)
+        input_schema = cap["input_schema"] if cap and "input_schema" in cap else {}
+        self._validate_structure(input_schema, plan)
         self._validate_capability_exists(plan)
         self._validate_capability_allowed(plan)
-        self._validate_arguments_schema(plan, skillinput_schema)
-        self._validate_purity(plan)
         self._validate_safety(plan)
 
     # ----------------------------------------------------------------------
     # Structural validation
     # ----------------------------------------------------------------------
-    def _validate_structure(self, plan: Plan) -> None:
+    def _validate_structure(self, schema: dict, plan: Plan) -> None:
         if not isinstance(plan.intent, str) or not plan.intent:
             raise PlanStructureError("Plan intent must be a non-empty string")
 
@@ -59,6 +59,8 @@ class PlanValidator:
 
         if not isinstance(plan.reasoning_summary, str):
             raise PlanStructureError("Plan reasoning_summary must be a string")
+        
+        validate_structural(schema, plan.arguments)
 
     # ----------------------------------------------------------------------
     # Capability existence

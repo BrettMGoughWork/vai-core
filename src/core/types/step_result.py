@@ -17,6 +17,15 @@ class StepOutcome(Enum):
 
 @dataclass(frozen=True)
 class StepResult:
+    @staticmethod
+    def failure(reason: str, payload: dict | None = None, trace: list | None = None) -> 'StepResult':
+        return StepResult(
+            outcome=StepOutcome.FAILURE,
+            reason=reason,
+            payload=payload if payload is not None else {},
+            trace=trace if trace is not None else [],
+        )
+
     """
     Pure cognitive output of a single reasoning step.
     Stratum‑2 invariant: immutable, deterministic, serialisable.
