@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from typing import Dict, Any
 
 from src.core.planning.cognitive_normaliser import normalise_cognitive_structure
-from src.core.planning.purity_enforcer import enforce_cognitive_purity
+from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity
 from src.core.types.errors import ValidationError
-from src.core.types.step_state import StepState
+from src.core.planning.models.step_state import StepState
 
 from src.core.planning.validators.plan_validators import (
     validate_plan_prompt_structure,

@@ -5,7 +5,7 @@ from src.core.planning.plan_errors import (
     PlanStructureError, UnknownCapabilityError,
     ForbiddenCapabilityError, CapabilitySchemaError, PlanPurityError, PlanSafetyError
 )
-from src.core.planning.plan_validator import PlanValidator
+from src.core.planning.validators.plan_validator import PlanValidator
 
 # Patch Plan with to_dict for test compatibility
 class Plan(RealPlan):
@@ -87,8 +87,8 @@ def test_plan_purity_error_on_capability_output():
     """
     from src.core.planning.plan_executor import PlanExecutor
     from src.core.types.errors.ValidationError import ValidationError
-    from src.core.planning.plan_state import PlanState
-    from src.core.types.step_state import StepState
+    from src.core.planning.models.plan_state import PlanState
+    from src.core.planning.models.step_state import StepState
     from src.core.types.step_result import StepResult, StepOutcome
 
     class DummyCapability:
@@ -100,7 +100,7 @@ def test_plan_purity_error_on_capability_output():
             self.core_step = type("CoreStep", (), {"capabilities": {"dummy": {}}})()
         def dispatch(self, plan, plan_state=None):
             # Always return a successful StepState and forbidden output
-            from src.core.types.step_state import StepStatus
+            from src.core.planning.models.step_state import StepStatus
             return StepState(
                 step_id="dummy",
                 parent_id=None,
@@ -131,8 +131,6 @@ def test_plan_safety_error():
     with pytest.raises(PlanSafetyError):
         validator.validate(plan)
 
-
-from src.core.planning.plan_validator import PlanValidator
 
 
 def test_validate_accepts_valid_plan_and_args():

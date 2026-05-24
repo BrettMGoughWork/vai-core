@@ -6,16 +6,16 @@ substrate components. It is intended for internal testing only and is
 not integrated into the agent loop.
 """
 
-from src.core.planning.plan_generator import PlanGenerator
-from src.core.planning.plan_validator import PlanValidator
+from src.core.planning.generator.plan_generator import PlanGenerator
+from src.core.planning.validators.plan_validator import PlanValidator
 from src.core.planning.plan_executor import PlanExecutor
-from src.core.planning.step_dispatcher import StepDispatcher
-from src.core.planning.safe_step_dispatcher import SafeStepDispatcher
-from src.core.planning.safety_policies import (
+from src.core.planning.dispatch.step_dispatcher import StepDispatcher
+from src.core.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
+from src.core.planning.safety.safety_policies import (
     ForbiddenCapabilityPolicy,
     PlanTransitionPolicy,
 )
-from src.core.planning.core_step import CoreStep
+from src.core.planning.dispatch.core_step import CoreStep
 
 
 def build_planning_substrate():

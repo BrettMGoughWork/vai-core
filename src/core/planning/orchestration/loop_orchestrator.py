@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from typing import Any, Optional, Tuple
 
 from src.core.planning.outcome_classifier import OutcomeClassifier
-from src.core.planning.plan_generator import PlanGenerator
+from src.core.planning.generator.plan_generator import PlanGenerator
 
-from .core_step import CoreStep
-from ..types.step_state import StepState
-from ..types.step_result import StepResult
-from .loop_controller import LoopController, LoopPolicy
+from ..dispatch.core_step import CoreStep
+from ..models.step_state import StepState
+from ...types.step_result import StepResult
+from ..loop_controller import LoopController, LoopPolicy
 from .loop_metrics import LoopMetrics
 
 
