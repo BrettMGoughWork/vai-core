@@ -6,16 +6,10 @@ Exports:
   - RecoveryAction enum and mapping function for recovery semantics
 """
 
-from .error_types import (
-    AgentError,
-    planning_error,
-    mapping_error,
-    execution_error,
-    state_error,
-    governance_error,
-    confidence_error,
-    semantic_error,
-)
+from .AgentError import AgentError, SemanticError, GovernanceError, ConfidenceError, StateError, ExecutionError, MappingError, PlanningError
+from .LLMError import LLMError
+from .SystemError import SystemError
+from .ToolError import ToolError
 from .recovery import (
     RecoveryAction,
     map_error_to_recovery,
@@ -23,13 +17,17 @@ from .recovery import (
 
 __all__ = [
     "AgentError",
-    "planning_error",
-    "mapping_error",
-    "execution_error",
-    "state_error",
-    "governance_error",
-    "confidence_error",
-    "semantic_error",
+    "SystemError",
+    "ToolError",
+    "ValidationError",
+    "LLMError",
     "RecoveryAction",
+    "SemanticError",
+    "GovernanceError",
+    "ConfidenceError",
+    "StateError",
+    "ExecutionError",
+    "MappingError",
+    "PlanningError",
     "map_error_to_recovery",
 ]

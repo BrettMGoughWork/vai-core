@@ -1,9 +1,14 @@
+from src.core.types.step_state import StepState, StepStatus
+from src.core.types.step_result import StepResult
+from src.core.planning.plan import Plan
+from src.core.planning.core_step import CoreStep
+
 class StepDispatcher:
     """
-    Executes a single validated plan step via CoreStepV2.
+    Executes a single validated plan step via CoreStep.
     """
 
-    def __init__(self, core_step: CoreStepV2):
+    def __init__(self, core_step: CoreStep):
         self.core_step = core_step
 
     def dispatch(self, plan: Plan) -> tuple[StepState, StepResult]:

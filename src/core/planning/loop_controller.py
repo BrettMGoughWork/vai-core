@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Protocol, Tuple
 
-from .core_step_v2 import CoreStepV2
+from .core_step import CoreStep
 from ..types.step_state import StepState
 from ..types.step_result import StepResult
 from .loop_metrics import LoopMetrics
@@ -38,7 +38,7 @@ class LoopController:
     - OR policy violation
     """
 
-    core_step: CoreStepV2
+    core_step: CoreStep
     max_steps: Optional[int] = None
     max_duration: Optional[int] = None # same unit as StepState.created_at
     policy: Optional[LoopPolicy] = None

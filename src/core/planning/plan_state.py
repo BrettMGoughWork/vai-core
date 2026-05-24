@@ -21,3 +21,16 @@ class PlanState:
     trace: List[Dict[str, Any]]
     created_at: int
     updated_at: int
+
+    @staticmethod
+    def initial(plan: 'Plan') -> 'PlanState':
+        return PlanState(
+            plan_id=getattr(plan, 'plan_id', 'unknown'),
+            steps=[],
+            current_step_index=0,
+            status=PlanStatus.PENDING,
+            last_result=None,
+            trace=[],
+            created_at=0,
+            updated_at=0,
+        )

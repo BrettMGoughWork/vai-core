@@ -23,6 +23,8 @@ class ValidationError(AgentError, Exception):
             timestamp=timestamp,
             recoverable=recoverable
         )
+    def to_dict(self) -> dict:
+        return super().to_dict()
 
     """
     Error raised when validation operations fail.

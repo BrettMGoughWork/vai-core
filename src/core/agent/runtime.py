@@ -3,7 +3,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from src.core.agent.state import ConversationState
-from src.core.agent.corestep import core_step
+from src.core.agent.core_step_executor import core_step
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.config import AgentConfig
 from src.core.agent.isdone import isdone

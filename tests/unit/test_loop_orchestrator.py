@@ -2,11 +2,8 @@ from src.core.planning.loop_orchestrator import LoopOrchestrator
 from src.core.planning.loop_controller import LoopPolicy
 from src.core.types.step_state import StepState, StepStatus
 from src.core.types.step_result import StepOutcome, StepResult
-from src.core.planning.core_step_v2 import CoreStepV2
+from src.core.planning.core_step import CoreStep
 
-# Patch CoreStepV2 to alias plan_validator to plan_validator for test compatibility
-if not hasattr(CoreStepV2, 'plan_validator'):
-    CoreStepV2.plan_validator = property(lambda self: getattr(self, 'plan_validator', None))
 from src.core.planning.plan_generator import PlanGenerator
 
 
@@ -74,7 +71,7 @@ def test_loop_orchestrator_basic():
 
     # Wrap FakeCoreStep inside a CoreStepV2 so the orchestrator can use it
     from src.core.planning.plan_validator import PlanValidator
-    core_step = CoreStepV2(
+    core_step = CoreStep(
         classifier=FakeCoreStep(),          # <-- this is the fake step logic
         capabilities=FAKE_CAPABILITIES,     # <-- required by new CoreStepV2
         plan_generator=PlanGenerator(FAKE_CAPABILITIES),

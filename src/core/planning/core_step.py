@@ -20,7 +20,7 @@ from src.core.planning.plan_generator import PlanGenerator, PlanPrompt
 TRACE_BUILDER = TraceEventBuilder()
 
 @dataclass(frozen=True)
-class CoreStepV2:
+class CoreStep:
     """
     Pure cognitive step executor (Stratum 2).
     """
@@ -31,7 +31,7 @@ class CoreStepV2:
 
     def __post_init__(self):
         if self.capabilities is None:
-            raise ValueError("CoreStepV2 requires a capabilities dictionary")
+            raise ValueError("CoreStep requires a capabilities dictionary")
         if self.plan_generator is None:
             object.__setattr__(self, "plan_generator", PlanGenerator(capabilities=self.capabilities))
 
@@ -54,7 +54,7 @@ class CoreStepV2:
         if state.cognitive_input.get("mode") == "plan":
             return self._generate_plan(state)
         
-        if mode == "plan_validate":
+        if state.cognitive_input.get("mode") == "plan_validate":
             return self._validate_plan(state)
 
         # Transition → RUNNING
@@ -80,6 +80,14 @@ class CoreStepV2:
         return state.replace(status=StepStatus.RUNNING)
 
     def _classify(self, state: StepState) -> StepResult:
+        if "raw_classifier_output" not in state.cognitive_input:
+            # No classifier output present; skip classification or return a safe default
+            # You may want to return a default StepResult or handle as appropriate
+            return StepResult.failure(
+                reason="No classifier output present",
+                payload={},
+                trace=[],
+            )
         raw = state.cognitive_input["raw_classifier_output"]
 
         # Run classifier

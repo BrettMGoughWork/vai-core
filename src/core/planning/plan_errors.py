@@ -40,13 +40,10 @@ class PlanDispatchError(PlanValidationError):
     """Unexpected step outcome during plan execution."""
     pass
 
-def _map_step_error(self, result: StepResult) -> PlanValidationError:
-    if result.outcome == StepOutcome.FAILURE:
-        return PlanExecutionError(result.reason)
+class PlanSafetyPolicyError(PlanValidationError):
+    """Plan blocked by safety policy."""
+    pass
 
-    if result.outcome in (StepOutcome.CONTINUE, StepOutcome.TOOL_NEEDED):
-        return PlanDispatchError(
-            f"Unexpected step outcome during plan execution: {result.outcome}"
-        )
-
-    return PlanDispatchError("Unknown execution error")
+class PlanTransitionSafetyError(PlanValidationError):
+    """Invalid or unsafe plan state transition."""
+    pass

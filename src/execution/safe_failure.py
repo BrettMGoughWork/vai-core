@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.core.types.errors.AgentError import AgentError
+from src.core.types.errors import AgentError
 
 
 @dataclass
