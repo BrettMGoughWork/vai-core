@@ -3,7 +3,8 @@ from typing import Any, Dict
 
 from src.core.types.step_result import StepOutcome, StepResult
 from src.core.types.validation import validate_pure_structure
-from src.core.types.errors import ValidationError, confidence_error
+from src.core.types.errors import ValidationError
+from src.core.types.errors.AgentError import ConfidenceError
 
 
 # Deterministic priority order for ambiguous or missing labels
@@ -56,7 +57,7 @@ class OutcomeClassifier:
 
         # Deterministic fallback for unknown/missing labels
         if outcome is None:
-            err = confidence_error(
+            err = ConfidenceError(
                 "Unknown classifier label",
                 details={
                     "step_id": getattr(state, "step_id", None),

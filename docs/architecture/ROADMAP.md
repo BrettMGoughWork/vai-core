@@ -253,11 +253,18 @@
 - Implement PlanState transitions  
 - Add PlanState validators  
 
-2.2.5 — Plan Execution Safety Layer
+✅ 2.2.5 — Plan Execution Safety Layer
 - Define safety rules that prevent invalid or dangerous plan execution
 - Wrap StepDispatcher with pre-execution checks and post-execution validation
 - Implement safety checks — forbidden actions, invalid transitions 
 - Add safety logging  
+
+✅ 2.2.6 — Planning Composition (Initial Wiring)
+- Expose substrate components (PlanGenerator, PlanValidator, PlanExecutor, SafeStepDispatcher)  
+- Provide a minimal composition root for internal testing  
+- Do not integrate into the agent loop yet  
+- Ensure all components are import‑stable for Phase 2.3  
+
 
 ### PHASE 2.3 - Hierarchical planning
 *Depends On*: PHASE 2.2  
@@ -280,23 +287,26 @@
 - Implement Segment stitching  
 - Implement Segment validation  
 
-2.3.5 — Governed Signals
-- Define governed signals — drift, stuck, unsafe  
+2.3.5 — Governed Signals (Merged with Drift Signals)
+- Define governed signals: drift, stuck, unsafe  
 - Implement signal emitters  
+- Implement drift thresholds and drift classification  
+- Provide unified signal interface for 2.5.x  
 
-2.3.6 — Agent‑Level Loop Skeleton
-- Implement AgentLoop controller  
-- Implement AgentLoop reflection  
-- Implement AgentLoop error handling  
+2.3.6 — Agent‑Level Loop Skeleton (Initial Wiring)
+- Assemble minimal agent loop using substrate components  
+- Integrate SafeStepDispatcher (first real wiring)  
+- Add basic reflection hooks (no memory yet)  
+- Add minimal error handling  
 
 2.3.7 — Subgoal Transition Rules
 - Define transition rules  
 - Implement transition engine  
 
-2.3.8 — Drift Detection
-- Define drift signals  
-- Define drift thresholds  
-- Implement drift recovery  
+2.3.8 — Drift Detection (Refined)
+- Implement multi‑signal drift detection using governed signals  
+- Add drift recovery hooks  
+- Add drift confidence scoring  
 
 2.3.9 — Subgoal Validation Rules
 - Define validation rules  
@@ -336,8 +346,9 @@
 *Note*: builds on skeleton iterations above to complete Stratum 2
 
 2.5.1 — Plan Repair
-- Implement full repair logic: detect broken plans, identif minimal fixes, regenerate segments, or re-decompose subgoals
-- Integrate memory, drift signals, and validationr rules
+- Implement full repair logic: detect broken plans, identify minimal fixes, regenerate segments, or re‑decompose subgoals  
+- Integrate memory, governed signals, and validation rules  
+- Add repair budget + retry limits
 
 2.5.2 - Full transition rules
 - Expand the skeleton rules into a complete transition graph covering all subgoal and segment states
@@ -355,9 +366,10 @@
 - Implement a full reflection cycle: evaluate progress, detect drift, refine subgoals, adjust plans, and update memory
 - Ensure reflection is pure and deterministic
 
-2.5.6 - Agent-level loop v2 (Full Implementation)
-- Implement the complete agent loop: hierarchical reasoning, reflection, memory integration, and governed transitions
-- Add full error handling, fallback strategies, and trace generation
+2.5.6 — Agent‑Level Loop v2 (Full Implementation)
+- Implement the complete agent loop: hierarchical reasoning, reflection, memory integration, and governed transitions  
+- Add full error handling, fallback strategies, and trace generation  
+- Final wiring of all substrate + safety + memory components 
 
 ---
 🚀 Release 1 — "Hierarchical Reasoner"

@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from src.core.agent.config import AgentConfig
-from src.core.agent.corestep import core_step
+from src.core.agent.core_step_executor import core_step
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.state import ConversationState
 from src.core.llm.types import CoreLLMResponse
@@ -20,7 +20,7 @@ def _make_config() -> AgentConfig:
     )
 
 
-@patch("src.core.agent.corestep.SkillRegistry.all_specs_for_agent")
+@patch("src.core.agent.core_step_executor.SkillRegistry.all_specs_for_agent")
 def test_core_step_returns_text_and_updates_state(mock_all_specs_for_agent):
     mock_all_specs_for_agent.return_value = []
     transport = MagicMock()
@@ -38,9 +38,9 @@ def test_core_step_returns_text_and_updates_state(mock_all_specs_for_agent):
     assert call_kwargs["tools"] == []
 
 
-@patch("src.core.agent.corestep.execute_with_retry")
-@patch("src.core.agent.corestep.select_tool")
-@patch("src.core.agent.corestep.SkillRegistry.all_specs_for_agent")
+@patch("src.core.agent.core_step_executor.execute_with_retry")
+@patch("src.core.agent.core_step_executor.select_tool")
+@patch("src.core.agent.core_step_executor.SkillRegistry.all_specs_for_agent")
 def test_core_step_executes_tool_and_appends_tool_history(
     mock_all_specs_for_agent, mock_select_tool, mock_execute_with_retry
 ):
@@ -64,9 +64,9 @@ def test_core_step_executes_tool_and_appends_tool_history(
     mock_execute_with_retry.assert_called_once_with(spec, {"text": "hi"})
 
 
-@patch("src.core.agent.corestep.execute_with_retry")
-@patch("src.core.agent.corestep.select_tool")
-@patch("src.core.agent.corestep.SkillRegistry.all_specs_for_agent")
+@patch("src.core.agent.core_step_executor.execute_with_retry")
+@patch("src.core.agent.core_step_executor.select_tool")
+@patch("src.core.agent.core_step_executor.SkillRegistry.all_specs_for_agent")
 def test_core_step_appends_error_history_when_tool_fails(
     mock_all_specs_for_agent, mock_select_tool, mock_execute_with_retry
 ):
