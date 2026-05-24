@@ -273,7 +273,7 @@
 - Define Subgoal schema  
 - Add Subgoal validators  
 
-2.3.2 — PlanSegment Model
+✅ 2.3.2 — PlanSegment Model
 - Define PlanSegment schema  
 - Add PlanSegment validators  
 

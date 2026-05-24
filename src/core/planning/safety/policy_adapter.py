@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..loop_controller import LoopPolicy
+from ..orchestration.loop_controller import LoopPolicy
 from ..models.step_state import StepState
 from ...types.step_result import StepResult
 from .loop_policy_enforcer import LoopPolicyEnforcer # adjust import if name differs
