@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from src.core.planning.safe_step_dispatcher import SafeStepDispatcher
+from src.core.planning.plan_state import PlanState
 from src.core.planning.plan_errors import PlanDispatchError, PlanValidationError, PlanExecutionError
 from src.core.planning.step_dispatcher import StepDispatcher
 from src.core.loop import CoreStepV2, StepState, StepResult, StepOutcome
@@ -19,12 +21,12 @@ class PlanExecutor:
     - PlanExecutorMetrics
     """
 
-    def __init__(self, dispatcher: StepDispatcher):
+    def __init__(self, dispatcher: SafeStepDispatcher):
         self.dispatcher = dispatcher
 
     def execute(self, plan: Plan) -> tuple[StepState, StepResult, PlanExecutorMetrics]:
         start = 0
-
+        state, result = self.dispatcher.dispatch(plan)
         try:
             state, result = self.dispatcher.dispatch(plan)
         except Exception as exc:
