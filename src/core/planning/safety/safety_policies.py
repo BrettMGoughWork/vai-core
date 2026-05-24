@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, List
 
-from src.core.planning.plan import Plan
+from src.core.planning.models.plan import Plan
 from src.core.planning.models.plan_state import PlanState, PlanStatus
-from src.core.planning.plan_errors import (
+from src.core.types.errors.plan_errors import (
     PlanSafetyPolicyError,
     PlanTransitionSafetyError,
 )

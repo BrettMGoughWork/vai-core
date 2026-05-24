@@ -1,6 +1,6 @@
 import pytest
-from src.core.planning.cognitive_normaliser import normalise_cognitive_structure
-from src.core.types.validation.purity_validation import validate_pure_structure
+from src.core.planning.validators.cognitive_normaliser import normalise_cognitive_structure
+from src.core.planning.safety.purity_validation import validate_pure_structure
 from src.core.types.errors.ValidationError import ValidationError
 
 @pytest.fixture

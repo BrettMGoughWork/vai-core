@@ -1,7 +1,7 @@
 import pytest
 from src.capabilities.validator import ValidationError
-from src.core.planning.plan import Plan as RealPlan
-from src.core.planning.plan_errors import (
+from src.core.planning.models.plan import Plan as RealPlan
+from src.core.types.errors.plan_errors import (
     PlanStructureError, UnknownCapabilityError,
     ForbiddenCapabilityError, CapabilitySchemaError, PlanPurityError, PlanSafetyError
 )
@@ -85,7 +85,7 @@ def test_plan_purity_error_on_capability_output():
     Purity is enforced on capability outputs, not on PlanValidator.
     This test creates a dummy capability that returns a forbidden key in its output.
     """
-    from src.core.planning.plan_executor import PlanExecutor
+    from src.core.planning.dispatch.plan_executor import PlanExecutor
     from src.core.types.errors.ValidationError import ValidationError
     from src.core.planning.models.plan_state import PlanState
     from src.core.planning.models.step_state import StepState

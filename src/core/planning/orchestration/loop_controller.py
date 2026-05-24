@@ -2,10 +2,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Protocol, Tuple
 
-from .dispatch.core_step import CoreStep
-from .models.step_state import StepState
-from ..types.step_result import StepResult
-from .orchestration.loop_metrics import LoopMetrics
+from ..dispatch.core_step import CoreStep
+from ..models.step_state import StepState
+from ...types.step_result import StepResult
+from .loop_metrics import LoopMetrics
 from .loop_termination import decide_termination
 from src.core.types.hashing import stable_hash
 

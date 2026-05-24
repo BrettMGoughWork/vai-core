@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from src.core.planning.plan import Plan
+from src.core.planning.models.plan import Plan
 
 
 @dataclass
