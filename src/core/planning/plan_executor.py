@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 
-from src.core.planning.safe_step_dispatcher import SafeStepDispatcher
-from src.core.planning.plan_state import PlanState
+from src.core.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
+from src.core.planning.models.plan_state import PlanState
 from src.core.planning.plan_errors import PlanDispatchError, PlanValidationError, PlanExecutionError
-from src.core.types.step_state import StepState
+from src.core.planning.models.step_state import StepState
 from src.core.types.step_result import StepResult, StepOutcome
 from src.core.planning.plan import Plan
-from src.core.planning.purity_enforcer import enforce_cognitive_purity
+from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity
 
 @dataclass(frozen=True)
 class PlanExecutorMetrics:
@@ -79,7 +79,7 @@ class PlanExecutor:
             termination_reason="success",
         )
         # Mark plan as complete
-        from src.core.planning.plan_state import PlanStatus
+        from src.core.planning.models.plan_state import PlanStatus
         completed_state = state.__class__(
             plan_id=state.plan_id,
             steps=state.steps,

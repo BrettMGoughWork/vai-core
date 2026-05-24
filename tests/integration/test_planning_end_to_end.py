@@ -1,6 +1,6 @@
 from src.core.planning.plan import Plan
 from src.core.planning.planning_composition import build_planning_substrate
-from src.core.planning.safety_policies import SafetyContext 
+from src.core.planning.safety.safety_policies import SafetyContext 
 
 def test_end_to_end_planning_execution():
     """
@@ -29,7 +29,7 @@ def test_end_to_end_planning_execution():
     state, result, metrics = plan_executor.execute(plan)
 
     # Assertions
-    from src.core.types.step_state import StepStatus
+    from src.core.planning.models.step_state import StepStatus
     assert state.status == StepStatus.ERROR  # Should be error if classifier output is missing
     assert result.reason == "No classifier output present"
     # Optionally, check that result.outcome == StepOutcome.FAILURE

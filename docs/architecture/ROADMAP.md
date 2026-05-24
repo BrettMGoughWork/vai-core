@@ -269,7 +269,7 @@
 ### PHASE 2.3 - Hierarchical planning
 *Depends On*: PHASE 2.2  
 
-2.3.1 — Subgoal Model
+✅ 2.3.1 — Subgoal Model
 - Define Subgoal schema  
 - Add Subgoal validators  
 

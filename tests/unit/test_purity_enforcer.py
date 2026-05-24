@@ -1,5 +1,5 @@
 import pytest
-from src.core.planning.purity_enforcer import enforce_cognitive_purity
+from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity
 from src.core.types.errors.ValidationError import ValidationError
 from dataclasses import dataclass, FrozenInstanceError
 
