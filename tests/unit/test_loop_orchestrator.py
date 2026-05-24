@@ -1,5 +1,5 @@
 from src.core.planning.orchestration.loop_orchestrator import LoopOrchestrator
-from src.core.planning.loop_controller import LoopPolicy
+from src.core.planning.orchestration.loop_controller import LoopPolicy
 from src.core.planning.models.step_state import StepState, StepStatus
 from src.core.types.step_result import StepOutcome, StepResult
 from src.core.planning.dispatch.core_step import CoreStep

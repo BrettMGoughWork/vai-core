@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.core.planning.plan import Plan
+from src.core.planning.models.plan import Plan
 
 
 class LocalPlanner:

@@ -5,13 +5,13 @@ Exports the PlanValidationResult dataclass and validate_plan() function
 for validating plan structure, safety, and completeness.
 """
 
-from .plan_validation import (
+from ...planning.validators.plan_validation import (
     CapabilityRegistry,
     PlanValidationResult,
     validate_plan,
 )
 
-from .purity_validation import validate_pure_structure
+from ...planning.safety.purity_validation import validate_pure_structure
 
 __all__ = [
     "CapabilityRegistry",

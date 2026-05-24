@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from core.planning.loop_policy import LoopPolicy
+from src.core.planning.safety.loop_policy import LoopPolicy
 from core.types.errors import ValidationError
 
 

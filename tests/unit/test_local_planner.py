@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from src.core.planning.local_planner import LocalPlanner
+from src.core.planning.generator.local_planner import LocalPlanner
 
 
 @dataclass

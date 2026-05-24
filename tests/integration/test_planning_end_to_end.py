@@ -1,4 +1,4 @@
-from src.core.planning.plan import Plan
+from src.core.planning.models.plan import Plan
 from src.core.planning.planning_composition import build_planning_substrate
 from src.core.planning.safety.safety_policies import SafetyContext 
 

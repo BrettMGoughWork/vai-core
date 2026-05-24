@@ -8,7 +8,7 @@ not integrated into the agent loop.
 
 from src.core.planning.generator.plan_generator import PlanGenerator
 from src.core.planning.validators.plan_validator import PlanValidator
-from src.core.planning.plan_executor import PlanExecutor
+from src.core.planning.dispatch.plan_executor import PlanExecutor
 from src.core.planning.dispatch.step_dispatcher import StepDispatcher
 from src.core.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
 from src.core.planning.safety.safety_policies import (
