@@ -1,7 +1,7 @@
 from src.core.planning.models.step_state import StepState, StepStatus
 from src.core.types.step_result import StepResult
 from src.core.planning.models.plan import Plan
-from src.core.planning.dispatch.core_step import CoreStep
+from src.core.planning.core_step import CoreStep
 
 class StepDispatcher:
     """

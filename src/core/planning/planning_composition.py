@@ -15,7 +15,7 @@ from src.core.planning.safety.safety_policies import (
     ForbiddenCapabilityPolicy,
     PlanTransitionPolicy,
 )
-from src.core.planning.dispatch.core_step import CoreStep
+from src.core.planning.core_step import CoreStep
 
 
 def build_planning_substrate():

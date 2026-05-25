@@ -277,7 +277,7 @@
 - Define PlanSegment schema  
 - Add PlanSegment validators  
 
-2.3.3 — Subgoal Manager
+✅ 2.3.3 — Subgoal Manager
 - Implement Subgoal creation  
 - Implement Subgoal validation  
 - Implement Subgoal transitions  
