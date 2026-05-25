@@ -65,6 +65,9 @@ class SubgoalState:
         if not active_roots:
             return []
 
+        # Deterministic: choose lexicographically smallest active root
+        active_roots.sort(key=lambda sg: sg.subgoal_id)
+        
         chain = []
         current = active_roots[0]
 

@@ -1,5 +1,3 @@
-# /src/core/planning/subgoals/errors.py
-
 class SubgoalError(Exception):
     """Base class for all subgoal-related errors."""
     pass

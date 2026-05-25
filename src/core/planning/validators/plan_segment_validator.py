@@ -31,13 +31,10 @@ class PlanSegmentValidator:
         # Canonical hash stability
         expected_hash = stable_hash(
             {
-                "segment_id": segment.segment_id,
                 "subgoal_id": segment.subgoal_id,
                 "steps": segment.steps,
                 "context": segment.context,
                 "metadata": segment.metadata,
-                "parent_segment_id": segment.parent_segment_id,
-                "created_at": segment.created_at,
             }
         )
 
