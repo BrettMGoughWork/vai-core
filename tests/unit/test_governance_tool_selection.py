@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 
 from src.governance.tool_selection import select_tool
 from src.governance.errors import GovernanceError
-from src.capabilities.toolspec import ToolSpec
-from src.capabilities.categories import SkillCategory
-from src.capabilities.side_effects import SideEffect
+from src.primitives.runtime.toolspec import ToolSpec
+from src.primitives.runtime.categories import SkillCategory
+from src.primitives.runtime.side_effects import SideEffect
 
 
 def _make_spec(name, category=SkillCategory.GENERAL, side_effects=SideEffect.NONE, enabled=True):

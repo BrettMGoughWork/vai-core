@@ -42,13 +42,19 @@ src/
                         # - Extendable rules applied during execution
                         # - Complements governance (more dynamic/custom)
 
-  capabilities/         # S3 - Capability discovery and filtering
+  primitives/
+    runtime/            # S3 - Capability discovery and filtering
                         # - Ranking, scoring, and selection helpers
                         # - Defines *what can be done*, not *how to do it*
 
-  skills/               # S3 - Skill implementations (atomic units of work)
-    standard/           # S3 - Built-in, maintained skill set
-    custom/             # S3 - User/plugin-defined skills (extension point)
+                        # S3 - Primitive implementations (atomic units of work)
+    standard/           # S3 - Built-in, maintained primitive set
+    custom/             # S3 - User/plugin-defined primitives (extension point)
+
+  skills/
+    library/            # S3 - markdown instruction sets
+    custom/             # S3 - custom instruction sets
+    registry/           # S3 - registration of skills
 
   telemetry/            # S1 - Metrics and usage reporting hooks
                         # - Performance, cost, and usage tracking
@@ -143,21 +149,32 @@ Fundamental building blocks for the agent system.
 
 ### Capabilities & Skills
 
-- `capabilities/`  
+- `primitives/runtime/`  
   Capability discovery and ranking:
-  - Skill filtering
+  - "Skill" filtering
   - Relevance scoring
   - Built-in capability definitions
 
-- `skills/`  
-  Executable skills used by the agent.
+- `primitives/`  
+  Executable primitive skills used by the agent.
 
   - `standard/`  
-    Built-in, supported skills shipped with the system.
+    Built-in, supported primitive skills shipped with the system.
 
   - `custom/`  
-    Extension point for user-defined or plugin-based skills.
+    Extension point for user-defined or plugin-based primitive skills.
 
+- `skills/`
+  Markdown skill instruction sets used by the agent.
+
+  - `library/`
+    Built-in, supported library of skill instructions shipped with the system.
+
+  - `custom/`
+    Extension point for user- or agent-defined or plugin-based instruction sets
+
+  - `registry/`
+    Registration logic that defines allowed instruction sets
 ---
 
 ### Policy

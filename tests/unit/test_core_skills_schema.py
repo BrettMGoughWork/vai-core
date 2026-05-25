@@ -1,6 +1,6 @@
 from typing import Optional
 
-from src.capabilities.schema import generate_schema_from_handler
+from src.primitives.runtime.schema import generate_schema_from_handler
 
 
 def test_generate_schema_from_handler_maps_common_python_types():

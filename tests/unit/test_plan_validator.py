@@ -1,5 +1,5 @@
 import pytest
-from src.capabilities.validator import ValidationError
+from src.primitives.runtime.validator import ValidationError
 from src.core.planning.models.plan import Plan as RealPlan
 from src.core.types.errors.plan_errors import (
     PlanStructureError, UnknownCapabilityError,
