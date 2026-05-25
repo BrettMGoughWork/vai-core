@@ -1,7 +1,7 @@
 import pytest
 
-from src.skills.base import BaseSkill
-from src.capabilities.registry import SkillRegistry
+from src.primitives.base import BaseSkill
+from src.primitives.runtime.registry import SkillRegistry
 
 @pytest.fixture(autouse=True)
 def _isolate_registry():

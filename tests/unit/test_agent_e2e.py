@@ -2,11 +2,11 @@ from src.core.agent.runtime import AgentRuntime
 from src.core.agent.config import AgentConfig
 from src.core.llm.transport import LLMTransport
 from src.core.types.result import CoreResult
-from src.capabilities.categories import SkillCategory
-from src.capabilities.side_effects import SideEffect
+from src.primitives.runtime.categories import SkillCategory
+from src.primitives.runtime.side_effects import SideEffect
 
 # import the dev skill so it registers itself
-from src.skills._dev.test_math import test_math_add
+from src.primitives._dev.test_math import test_math_add
 
 # Fake LLM that always calls the tool
 class FakeLLM:

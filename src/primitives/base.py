@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Callable
 
-from src.capabilities.toolspec import ToolSpec
-from src.capabilities.registry import SkillRegistry
-from src.capabilities.categories import SkillCategory
-from src.capabilities.side_effects import SideEffect
-from src.capabilities.schema import generate_schema_from_handler
-from src.capabilities.validator import validate_structural, ValidationError
-from src.capabilities.semantic import validate_semantic, SemanticValidationError
-from src.capabilities.canonical import canonicalize_args
+from src.primitives.runtime.toolspec import ToolSpec
+from src.primitives.runtime.registry import SkillRegistry
+from src.primitives.runtime.categories import SkillCategory
+from src.primitives.runtime.side_effects import SideEffect
+from src.primitives.runtime.schema import generate_schema_from_handler
+from src.primitives.runtime.validator import validate_structural, ValidationError
+from src.primitives.runtime.semantic import validate_semantic, SemanticValidationError
+from src.primitives.runtime.canonical import canonicalize_args
 
 @dataclass
 class BaseSkill:

@@ -97,7 +97,6 @@ class Subgoal:
                     "metadata": self.metadata,
                     "parent_id": self.parent_id,
                     "state": self.state.value,
-                    "created_at": self.created_at,
                 }
             ),
         )

@@ -1,3 +1,11 @@
+# Read this first
+vai-core is undergoing structural work:
+ - Stratum 2: foundational
+ - Stratum 3: Changing terminology: "skills" will be markdown rather than primitive python code, "primitives" will replace the original concept of skills.
+ 
+## Planned folder structure changes:
+ - /src/capabilities will be changed to /src/skills/
+
 # vai-core
 
 `vai-core` is a lightweight, layered Python agent runtime focused on clear boundaries, explicit contracts, and testable execution.

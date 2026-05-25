@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.capabilities.skillmetadata import SkillMetadata
+from src.primitives.runtime.skillmetadata import SkillMetadata
 
 
 @dataclass
