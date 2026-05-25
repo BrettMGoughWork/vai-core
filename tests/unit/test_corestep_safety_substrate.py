@@ -7,8 +7,8 @@ from src.core.agent.core_step_executor import CoreStepExecutor
 from src.core.agent.outcome import StepOutcome
 from src.core.agent.state import ConversationState
 from src.core.llm.types import CoreLLMResponse
-from src.capabilities.categories import SkillCategory
-from src.capabilities.side_effects import SideEffect
+from src.primitives.runtime.categories import SkillCategory
+from src.primitives.runtime.side_effects import SideEffect
 from src.core.types.result import CoreResult
 from src.execution.degraded_mode import DegradedModeController
 from src.execution.retry.circuit_breaker import CircuitBreaker

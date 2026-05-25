@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.capabilities.skill_ranker import SkillRanker
+from src.primitives.runtime.skill_ranker import SkillRanker
 
 
 @dataclass

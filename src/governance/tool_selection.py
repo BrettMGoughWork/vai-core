@@ -1,7 +1,7 @@
 from typing import List
-from src.capabilities.toolspec import ToolSpec
-from src.capabilities.categories import SkillCategory
-from src.capabilities.side_effects import SideEffect
+from src.primitives.runtime.toolspec import ToolSpec
+from src.primitives.runtime.categories import SkillCategory
+from src.primitives.runtime.side_effects import SideEffect
 from .errors import GovernanceError
 
 

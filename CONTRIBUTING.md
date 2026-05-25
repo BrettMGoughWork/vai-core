@@ -34,8 +34,9 @@ Use existing folders and keep scope narrow.
 - `src/core/`: agent loop, config, llm transport/providers, shared types, planning contracts.
 - `src/execution/`: execution engine and retry/safety runtime behavior.
 - `src/governance/`: tool and policy guardrails.
-- `src/capabilities/`: tool specs, registry, schema generation, filtering/ranking.
-- `src/skills/`: skill implementations.
+- `src/primitives/runtime`: tool specs, registry, schema generation, filtering/ranking.
+- `src/primitives/`: skill implementations.
+- `src/skills/`: skill instruction sets (markdown)
 - `src/observability/`, `src/telemetry/`, `src/policy/`: logging, telemetry hooks, runtime policy hooks.
 - `tests/unit/`, `tests/integration/`: test suites.
 - `tools/code_analysers/`: local architecture and dead code checks.
@@ -56,7 +57,7 @@ When you change code, keep logic in its stratum and avoid cross-layer leakage.
 
 Current skill registration is import-driven via `BaseSkill`.
 
-1. Create or update a skill module under `src/skills/`.
+1. Create or update a skill module under `src/primitives/`.
 2. Add a handler function with clear typed args.
 3. Instantiate `BaseSkill(...)` with:
    - `name`
@@ -65,15 +66,15 @@ Current skill registration is import-driven via `BaseSkill`.
    - `category` (`SkillCategory`)
    - `side_effects` (`SideEffect`)
 4. Ensure the module is imported on startup so registration runs.
-   - today this can be done by importing the skill module from `main.py` or `src/skills/__init__.py`.
+   - today this can be done by importing the skill module from `main.py` or `src/primitives/__init__.py`.
 5. Add/update tests for behavior and validation.
 
 Minimal example:
 
 ```python
-from src.skills.base import BaseSkill
-from src.capabilities.categories import SkillCategory
-from src.capabilities.side_effects import SideEffect
+from src.primitives.runtime.base import BaseSkill
+from src.primitives.runtime.categories import SkillCategory
+from src.primitives.runtime.side_effects import SideEffect
 
 def add(a: int, b: int) -> int:
     return a + b
