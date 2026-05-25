@@ -7,7 +7,7 @@ from src.core.planning.validators.cognitive_normaliser import normalise_cognitiv
 from src.core.planning.validators.plan_validator import PlanValidator
 from src.core.planning.models.plan import Plan
 
-from .outcome_classifier import OutcomeClassifier
+from .dispatch.outcome_classifier import OutcomeClassifier
 from src.core.planning.models.step_state import StepState, StepStatus
 from src.core.types.step_result import StepOutcome, StepResult
 from src.core.types.hashing import stable_hash
