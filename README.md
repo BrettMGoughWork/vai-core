@@ -4,7 +4,11 @@ vai-core is undergoing structural work:
  - Stratum 3: Changing terminology: "skills" will be markdown rather than primitive python code, "primitives" will replace the original concept of skills.
  
 ## Planned folder structure changes:
- - /src/capabilities will be changed to /src/skills/
+ - /src/capabilities will be changed to /src/primitives/runtime
+ - /src/skills/standard will be changed to /src/primitives/standard
+ - /src/skills/custom will be changed to /src/primitives/custom
+ - re-use of /src/skills folder will now house markdown instruction-sets
+ - ARCHITECTURE.md has been updated to reflect this change
 
 # vai-core
 
