@@ -56,7 +56,7 @@ class SubgoalState:
         - The active chain is the deepest path where each subgoal is ACTIVE.
         """
         # Find all roots
-        roots = [sg for sg in self._subgoals.values() if sg.parent_id is None]
+        roots = sorted([sg for sg in self._subgoals.values() if sg.parent_id is None], key=lambda s: s.subgoal_id)
         if not roots:
             return []
 
