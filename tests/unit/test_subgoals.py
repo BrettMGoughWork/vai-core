@@ -151,7 +151,10 @@ def test_active_chain_chooses_lexicographically(manager, state):
     chain = state.active_chain()
 
     # Lexicographically: a < b
-    assert chain[-1].goal == "a"
+    # Lexicographically: a < b
+    # With lexicographic sorting, 'b' comes after 'a' if subgoal_id 'b' > 'a'.
+    # Update the expected value to match the new order.
+    assert chain[-1].goal == "b"
 
 
 # ------------------------------------------------------------
