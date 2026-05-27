@@ -1,7 +1,7 @@
-from src.core.agent.isdone import isdone
-from src.core.agent.outcome import StepOutcome
-from src.core.agent.state import ConversationState
-from src.core.agent.config import AgentConfig
+from src.core.state.isdone import isdone
+from src.core.state.outcome import StepOutcome
+from src.core.state.state import ConversationState
+from src.core.state.config import AgentConfig
 from src.primitives.runtime.categories import SkillCategory
 from src.primitives.runtime.side_effects import SideEffect
 

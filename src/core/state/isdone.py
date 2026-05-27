@@ -1,6 +1,6 @@
-from src.core.agent.outcome import StepOutcome
-from src.core.agent.state import ConversationState
-from src.core.agent.config import AgentConfig
+from src.core.state.outcome import StepOutcome
+from src.core.state.state import ConversationState
+from src.core.state.config import AgentConfig
 
 
 def isdone(state: ConversationState, outcome: StepOutcome, config: AgentConfig) -> bool:

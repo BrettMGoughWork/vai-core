@@ -2,12 +2,12 @@ from typing import Optional, Union
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-from src.core.agent.state import ConversationState
-from src.core.agent.core_step_executor import core_step
-from src.core.agent.outcome import StepOutcome
-from src.core.agent.config import AgentConfig
-from src.core.agent.isdone import isdone
-from src.core.agent.trace import StepTrace
+from src.core.state.state import ConversationState
+from src.core.state.core_step_executor import core_step
+from src.core.state.outcome import StepOutcome
+from src.core.state.config import AgentConfig
+from src.core.state.isdone import isdone
+from src.core.state.trace import StepTrace
 from src.core.llm.transport import LLMTransport
 from src.core.types.result import CoreResult
 from src.execution.safe_failure import SafeFailure

@@ -1,4 +1,4 @@
-from src.core.agent.config import AgentConfig, LoopPolicy
+from src.core.state.config import AgentConfig, LoopPolicy
 from src.primitives.runtime.categories import SkillCategory
 from src.primitives.runtime.side_effects import SideEffect
 
