@@ -12,7 +12,7 @@ import socket
 import time
 import pytest
 
-from src.execution.retry.retry_policy import RetryPolicy, RetryStrategy
+from src.execution.retry.retry_policy import RetryPolicy
 from src.execution.retry.circuit_breaker import CircuitBreaker
 
 

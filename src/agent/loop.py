@@ -9,8 +9,6 @@ from src.core.signals.model import GovernedSignal, SignalSeverity
 from src.core.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
 from src.core.state.core_step_executor import CoreStepExecutor
 from src.core.types.errors import AgentError
-from src.core.types.step import CoreStep
-
 
 @dataclass
 class AgentLoopConfig:

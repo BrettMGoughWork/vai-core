@@ -1,6 +1,6 @@
 import pytest
 
-from src.core.planning.generator.plan_generator import PlanGenerator, PlanPrompt
+from src.core.planning.generator.plan_generator import PlanGenerator
 from src.core.planning.models.step_state import StepState, StepStatus
 from src.core.types.errors.ValidationError import ValidationError
 

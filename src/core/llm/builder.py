@@ -6,7 +6,6 @@ from src.core.config.loader import Config
 from .transport import LLMTransport
 from .llm_factory import factory
 
-
 def create_llm_transport(llm_alias: str = None) -> LLMTransport:
     """Create LLMTransport using llms.yaml configuration."""
     

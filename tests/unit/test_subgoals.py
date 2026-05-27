@@ -5,10 +5,7 @@ import pytest
 from src.core.planning.subgoals.manager import SubgoalManager
 from src.core.planning.subgoals.state import SubgoalState
 from src.core.planning.subgoals.validator import SubgoalValidator
-from src.core.planning.subgoals.model import (
-    Subgoal,
-    SubgoalLifecycleState,
-)
+from src.core.planning.subgoals.model import SubgoalLifecycleState
 from src.core.planning.subgoals.errors import (
     SubgoalNotFoundError,
     InvalidSubgoalError,

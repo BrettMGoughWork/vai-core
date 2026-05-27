@@ -34,7 +34,7 @@ def test_core_step_returns_text_and_updates_state(mock_all_specs_for_agent):
     assert new_state.history == ["LLM: done"]
     assert outcome == StepOutcome.SUCCESS
     call_kwargs = transport.call.call_args.kwargs
-    assert call_kwargs["prompt"] == "User: start"
+    assert call_kwargs["prompt"] == "USER: start"
     assert call_kwargs["tools"] == []
 
 
@@ -59,7 +59,7 @@ def test_core_step_executes_tool_and_appends_tool_history(
     assert result.tool_name == "echo"
     assert result.tool_output == "ok"
     assert new_state.last_result == result
-    assert new_state.history == ["TOOL echo: ok"]
+    assert new_state.history == ["TOOL (echo): ok"]
     assert outcome == StepOutcome.RECOVERABLE
     mock_execute_with_retry.assert_called_once_with(spec, {"text": "hi"})
 
@@ -85,5 +85,5 @@ def test_core_step_appends_error_history_when_tool_fails(
     assert result.is_error is True
     assert result.error == "boom"
     assert new_state.last_result == result
-    assert new_state.history == ["TOOL echo ERROR: boom"]
+    assert new_state.history == ["ERROR (echo): boom"]
     assert outcome == StepOutcome.FATAL

@@ -1,3 +1,6 @@
+# Stratum 1 AND Stratum 3 
+# CoreResult: unified output type for the agent runtime.
+
 from dataclasses import dataclass
 from typing import Any, Optional
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, TypeVar, overload
+from typing import Any, Optional, TypeVar
 
 T = TypeVar("T", bound=Any)
 
