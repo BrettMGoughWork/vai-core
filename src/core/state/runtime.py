@@ -1,3 +1,7 @@
+# Stratum 3
+# AgentRuntime: minimal agent loop implementation for 2.3.6.
+# Uses core_step and isdone from stratum 1.
+
 from typing import Optional, Union
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -29,6 +33,10 @@ def _result_summary(result: Union[CoreResult, SafeFailure, None]) -> str: # sani
 
 
 class AgentRuntime:
+    """
+    Controls the agent loop with step limits, timeouts, and safety substrate.
+    """
+
     def __init__(self, transport: LLMTransport, config: AgentConfig):
         self.transport = transport
         self.config = config

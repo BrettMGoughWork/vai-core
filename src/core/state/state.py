@@ -11,6 +11,13 @@ from src.core.types.result import CoreResult
 
 @dataclass
 class SubgoalSubstrateState:
+    """
+    Stratum‑1 substrate representation of subgoals.
+    Used by:
+      - evaluate_signals()
+      - emit_drift_from_subgoals()
+      - AgentLoop
+    """
     subgoals: List[Any] = field(default_factory=list)
 
     def active_chain(self):

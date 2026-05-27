@@ -1,3 +1,6 @@
+# Stratum 3
+# CoreStepExecutor: executes a single step of the core agent loop with safety substrate.
+
 from typing import Tuple, Union
 
 from src.core.state.state import ConversationState

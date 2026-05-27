@@ -1,3 +1,6 @@
+# Stratum: 1 # substrate
+# CoreStep: minimal, pure, deterministic representation of a reasoning step.
+
 from dataclasses import dataclass
 from typing import Dict, Any
 
