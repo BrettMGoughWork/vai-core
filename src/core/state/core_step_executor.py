@@ -1,3 +1,6 @@
+# Stratum 3
+# CoreStepExecutor: executes a single step of the core agent loop with safety substrate.
+
 from typing import Tuple, Union
 
 from src.core.state.state import ConversationState
@@ -19,9 +22,11 @@ from src.execution.degraded_mode import DegradedModeController
 from src.execution.poison_job_detector import PoisonJobDetector
 from src.core.types.errors.ToolError import ToolError
 
-
 class CoreStepExecutor:
-    """Executes a single step of the core agent loop with safety substrate."""
+    """
+    Executes a single agent step of the core agent loop with safety substrate.
+    Handles safety substrate, retries, degraded mode, and failure classification.
+    """
 
     def __init__(
         self,

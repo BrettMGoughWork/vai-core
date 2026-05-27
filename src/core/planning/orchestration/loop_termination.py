@@ -4,7 +4,6 @@ from typing import Literal, Optional
 
 from ...types.step_result import StepResult, StepOutcome
 
-
 TerminationReason = Literal[
     "success",
     "failure",

@@ -1,21 +1,21 @@
-"""
-Plan Validation - Validates plans before execution.
+from .deadcode_markers import deadcode_ignore
 
-Exports the PlanValidationResult dataclass and validate_plan() function
-for validating plan structure, safety, and completeness.
-"""
+def validate_structural(obj, schema) -> None:
+    """
+    Placeholder for structural validator.
+    
+    The real implementation lived in the planning/validation layer,
+    but for 2.3.6a the runtime only needs this to exist and be callable..
+    """
+    from src.primitives.runtime.validator import validate_structural as _validate_structural
+    return _validate_structural(obj, schema)
 
-from ...planning.validators.plan_validation import (
-    CapabilityRegistry,
-    PlanValidationResult,
-    validate_plan,
-)
-
-from ...planning.safety.purity_validation import validate_pure_structure
-
-__all__ = [
-    "CapabilityRegistry",
-    "PlanValidationResult",
-    "validate_plan",
-    "validate_pure_structure",
-]
+def validate_pure_structure(plan) -> None:
+    """
+    Placeholder for pure structure validator.
+    
+    The real implementation lived in the planning/validation layer,
+    but for 2.3.6a the runtime only needs this to exist and be callable..
+    """
+    from src.core.planning.safety.purity_validation import validate_pure_structure as _validate_pure_structure
+    return _validate_pure_structure(plan)

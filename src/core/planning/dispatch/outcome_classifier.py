@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from src.core.types.step_result import StepOutcome, StepResult
-from src.core.types.validation import validate_pure_structure
+from src.core.planning.safety.purity_validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.errors.AgentError import ConfidenceError
 

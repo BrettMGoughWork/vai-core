@@ -1,4 +1,3 @@
-from pathlib import Path
 from tools.code_analysers.shared.fs_walker import collect_python_files
 from tools.code_analysers.shared.import_graph import build_import_graph
 from tools.code_analysers.shared.reporter import Reporter
@@ -39,6 +38,7 @@ def _default_config(root: str):
             "src/observability",
             "src/policy",
             "src/skills",
+            "src/primitives",
             "src/telemetry",
         ],
         "stratum1_forbidden_roots": [

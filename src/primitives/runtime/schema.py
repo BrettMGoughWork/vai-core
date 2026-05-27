@@ -1,6 +1,6 @@
 from __future__ import annotations
 import inspect
-from typing import Any, Callable, Dict, get_type_hints, List, Optional, Union
+from typing import Any, Callable, Dict, get_type_hints, List, Union
 
 
 def _python_type_to_json(t: Any) -> Dict[str, Any]:

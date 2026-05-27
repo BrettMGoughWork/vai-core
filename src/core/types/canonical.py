@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List
+from typing import Any
 
 
 ALLOWED_SCALARS = (str, int, float, bool, type(None))

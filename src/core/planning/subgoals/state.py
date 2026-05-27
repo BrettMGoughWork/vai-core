@@ -5,7 +5,6 @@ from typing import Dict, List, Optional
 from .model import Subgoal
 from .errors import SubgoalNotFoundError
 
-
 class SubgoalState:
     """
     Deterministic in-memory store for subgoals and their events.

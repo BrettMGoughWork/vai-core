@@ -10,7 +10,6 @@ from src.core.planning.models.plan import Plan
 from .dispatch.outcome_classifier import OutcomeClassifier
 from src.core.planning.models.step_state import StepState, StepStatus
 from src.core.types.step_result import StepOutcome, StepResult
-from src.core.types.hashing import stable_hash
 from src.core.planning.models.cognitive_contract import validate_cognitive_input
 from src.core.planning.events.trace_event import TraceEventBuilder
 from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity

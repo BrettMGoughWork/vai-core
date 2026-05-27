@@ -299,6 +299,11 @@
 - Add basic reflection hooks (no memory yet)  
 - Add minimal error handling  
 
+✅ 2.3.6a - Janitor cleanup
+- cleanup drift
+- remove duplication
+- restructure
+
 2.3.7 — Subgoal Transition Rules
 - Define transition rules  
 - Implement transition engine  
