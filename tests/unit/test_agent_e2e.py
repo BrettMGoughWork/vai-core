@@ -1,5 +1,5 @@
-from src.core.agent.runtime import AgentRuntime
-from src.core.agent.config import AgentConfig
+from src.core.state.runtime import AgentRuntime
+from src.core.state.config import AgentConfig
 from src.core.llm.transport import LLMTransport
 from src.core.types.result import CoreResult
 from src.primitives.runtime.categories import SkillCategory

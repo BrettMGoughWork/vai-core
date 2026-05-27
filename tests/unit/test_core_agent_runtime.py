@@ -1,10 +1,10 @@
 from unittest.mock import MagicMock, patch
 import time
 
-from src.core.agent.config import AgentConfig, LoopPolicy
-from src.core.agent.core_step_executor import CoreStepExecutor
-from src.core.agent.outcome import StepOutcome
-from src.core.agent.runtime import AgentRuntime, _result_summary
+from src.core.state.config import AgentConfig, LoopPolicy
+from src.core.state.core_step_executor import CoreStepExecutor
+from src.core.state.outcome import StepOutcome
+from src.core.state.runtime import AgentRuntime, _result_summary
 from src.core.llm.types import CoreLLMResponse
 from src.primitives.runtime.categories import SkillCategory
 from src.primitives.runtime.side_effects import SideEffect
@@ -42,7 +42,7 @@ def test_step_returns_text_when_no_tool_requested():
     runtime = AgentRuntime(transport=transport, config=_make_config())
 
     expected = CoreResult.from_text("hello")
-    with patch("src.core.agent.runtime.core_step", return_value=(expected, MagicMock(), StepOutcome.SUCCESS)) as mock_core_step:
+    with patch("src.core.state.runtime.core_step", return_value=(expected, MagicMock(), StepOutcome.SUCCESS)) as mock_core_step:
         result = runtime.step("say hi")
 
     assert result == expected
@@ -57,7 +57,7 @@ def test_run_returns_on_success_outcome():
 
     expected = CoreResult.from_text("done")
     with patch(
-        "src.core.agent.runtime.core_step",
+        "src.core.state.runtime.core_step",
         side_effect=[(expected, MagicMock(), StepOutcome.SUCCESS)],
     ) as mock_core_step:
         result = runtime.run("start")
@@ -72,7 +72,7 @@ def test_run_returns_on_fatal_outcome():
 
     expected = CoreResult.from_error(RuntimeError("boom"))
     with patch(
-        "src.core.agent.runtime.core_step",
+        "src.core.state.runtime.core_step",
         side_effect=[(expected, MagicMock(), StepOutcome.FATAL)],
     ) as mock_core_step:
         result = runtime.run("start")
@@ -88,7 +88,7 @@ def test_run_continues_on_recoverable_and_returns_later_success():
     tool_result = CoreResult.from_tool("echo", "ok")
     final_result = CoreResult.from_text("complete")
     with patch(
-        "src.core.agent.runtime.core_step",
+        "src.core.state.runtime.core_step",
         side_effect=[
             (tool_result, MagicMock(), StepOutcome.RECOVERABLE),
             (final_result, MagicMock(), StepOutcome.SUCCESS),
@@ -107,7 +107,7 @@ def test_run_returns_last_result_after_max_steps_for_noop():
     step1 = CoreResult.from_tool("echo", None)
     step2 = CoreResult.from_tool("echo", None)
     with patch(
-        "src.core.agent.runtime.core_step",
+        "src.core.state.runtime.core_step",
         side_effect=[
             (step1, MagicMock(), StepOutcome.NOOP),
             (step2, MagicMock(), StepOutcome.NOOP),
@@ -137,7 +137,7 @@ def test_run_handles_step_timeout():
         time.sleep(0.5)
         return (step1_result, MagicMock(), StepOutcome.RECOVERABLE)
 
-    with patch("src.core.agent.runtime.core_step", side_effect=slow_core_step):
+    with patch("src.core.state.runtime.core_step", side_effect=slow_core_step):
         result = runtime.run("start")
 
     assert result is not None
@@ -164,7 +164,7 @@ def test_run_handles_wall_time_timeout():
         time.sleep(0.15)
         return (step_result, MagicMock(), StepOutcome.RECOVERABLE)
 
-    with patch("src.core.agent.runtime.core_step", side_effect=slow_core_step):
+    with patch("src.core.state.runtime.core_step", side_effect=slow_core_step):
         result = runtime.run("start")
 
     assert result is not None
@@ -191,7 +191,7 @@ def test_run_self_heal_clears_real_state_and_returns_safe_failure():
         executor.self_healing.failure_count = executor.self_healing.failure_threshold
         return executor.run(state)
 
-    with patch("src.core.agent.runtime.core_step", side_effect=trigger_self_heal):
+    with patch("src.core.state.runtime.core_step", side_effect=trigger_self_heal):
         result = runtime.run("start")
 
     state = captured_state["state"]
@@ -216,7 +216,7 @@ def test_run_safe_failure_is_stable_and_summary_is_ui_safe():
     )
 
     with patch(
-        "src.core.agent.runtime.core_step",
+        "src.core.state.runtime.core_step",
         return_value=(safe_failure, MagicMock(), StepOutcome.FATAL),
     ):
         result = runtime.run("start")
@@ -272,9 +272,9 @@ def test_runtime_sequential_safety_path_remains_stable():
     def delegated_core_step(state, _transport, _config):
         return executor.run(state)
 
-    with patch("src.core.agent.runtime.core_step", side_effect=delegated_core_step), patch(
-        "src.core.agent.core_step_executor.SkillRegistry.all_specs_for_agent", return_value=[spec]
-    ), patch("src.core.agent.core_step_executor.select_tool", return_value=spec):
+    with patch("src.core.state.runtime.core_step", side_effect=delegated_core_step), patch(
+        "src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent", return_value=[spec]
+    ), patch("src.core.state.core_step_executor.select_tool", return_value=spec):
         r1 = runtime.run("phase-retry")
         r2 = runtime.run("phase-breaker-open")
         r3 = runtime.run("phase-breaker-block")
