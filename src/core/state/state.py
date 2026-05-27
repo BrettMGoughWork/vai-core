@@ -83,12 +83,57 @@ class ConversationState:
     last_result: Optional[CoreResult] = None
     trace: List[Any] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-
+    
     # Substrate states
     subgoal_state: SubgoalSubstrateState = field(default_factory=SubgoalSubstrateState)
     segment_state: SegmentSubstrateState = field(default_factory=SegmentSubstrateState)
 
     termination_reason: Optional[str] = None
+
+    # runtime layer
+    last_error: Exception | None = None
+    llm_history: List[str] = field(default_factory=list)
+    tool_history: list[tuple[str, Any]] = field(default_factory=list)
+    error_history: list[tuple[str, Exception]] = field(default_factory=list)
+    history: list[str] = field(default_factory=list)
+
+    def append_llm(self, text:str):
+        self.llm_history.append(text)
+        self.history.append(f"LLM: {text}")
+
+    def append_tool(self, tool_name: str, output: Any) -> None:
+        self.tool_history.append((tool_name, output))
+        self.history.append(f"TOOL ({tool_name}): {output}")
+
+    def append_error(self, tool_name: str, error: Exception) -> None:
+        self.error_history.append((tool_name, error))
+        self.last_error = error
+        self.history.append(f"ERROR ({tool_name}): {error}")
+
+    def reset(self) -> None:
+        self.step_count = 0
+        self.last_result = None
+        self.last_error = None
+
+        self.llm_history.clear()
+        self.tool_history.clear()
+        self.error_history.clear()
+        self.history.clear()
+        self.trace.clear()
+        self.metadata.clear()
+        self.termination_reason = None
+        
+    def as_prompt(self) -> str:
+        """
+        Build the prompt from conversation history and input.
+        Tests expect:
+        - if no history: return user input only
+        - otherwise: include history entries then user input
+        """
+        lines = [f"USER: {self.input}"]
+        for entry in self.history:
+            lines.append(entry)
+        return "\n".join(lines)
 
     @classmethod
     def initial(cls, user_input: str) -> "ConversationState":

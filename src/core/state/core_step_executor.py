@@ -22,9 +22,11 @@ from src.execution.degraded_mode import DegradedModeController
 from src.execution.poison_job_detector import PoisonJobDetector
 from src.core.types.errors.ToolError import ToolError
 
-
 class CoreStepExecutor:
-    """Executes a single step of the core agent loop with safety substrate."""
+    """
+    Executes a single agent step of the core agent loop with safety substrate.
+    Handles safety substrate, retries, degraded mode, and failure classification.
+    """
 
     def __init__(
         self,

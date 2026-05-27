@@ -7,6 +7,8 @@ from src.primitives.runtime.categories import SkillCategory
 from src.primitives.runtime.side_effects import SideEffect
 from src.primitives.runtime.schema import generate_schema_from_handler
 from src.primitives.runtime.canonical import canonicalize_args
+from src.primitives.runtime.validator import validate_structural
+from src.primitives.runtime.semantic import validate_semantic
 
 @dataclass
 class BaseSkill:

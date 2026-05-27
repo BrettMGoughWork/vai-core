@@ -3,7 +3,7 @@
 from functools import wraps
 
 from src.execution.safe_failure import make_safe_failure
-
+from src.core.state.outcome import StepOutcome
 
 def with_panic_guard(fn):
     """Decorator that guards against unexpected exceptions.
@@ -23,6 +23,8 @@ def with_panic_guard(fn):
         try:
             return fn(*args, **kwargs)
         except Exception as e:
-            return make_safe_failure(e, {"panic": True})
+            state = args[0] # ConversationState is expected to be the first argument
+            failure = make_safe_failure(e, {"panic": True})
+            return failure, state, StepOutcome.FATAL
 
     return wrapper
