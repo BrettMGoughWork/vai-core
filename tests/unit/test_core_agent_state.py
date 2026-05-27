@@ -1,4 +1,4 @@
-from src.core.agent.state import ConversationState
+from src.core.state.state import ConversationState
 
 
 def test_as_prompt_without_history_uses_user_input_only():

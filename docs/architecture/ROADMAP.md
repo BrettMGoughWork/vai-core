@@ -287,13 +287,13 @@
 - Implement Segment stitching  
 - Implement Segment validation  
 
-2.3.5 — Governed Signals (Merged with Drift Signals)
+✅ 2.3.5 — Governed Signals (Merged with Drift Signals)
 - Define governed signals: drift, stuck, unsafe  
 - Implement signal emitters  
 - Implement drift thresholds and drift classification  
 - Provide unified signal interface for 2.5.x  
 
-2.3.6 — Agent‑Level Loop Skeleton (Initial Wiring)
+✅ 2.3.6 — Agent‑Level Loop Skeleton (Initial Wiring)
 - Assemble minimal agent loop using substrate components  
 - Integrate SafeStepDispatcher (first real wiring)  
 - Add basic reflection hooks (no memory yet)  

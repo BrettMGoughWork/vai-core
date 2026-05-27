@@ -7,7 +7,8 @@ if TYPE_CHECKING:
 from src.core.planning.models.step_state import StepState
 from src.core.planning.models.plan_state import PlanState
 from src.core.types.step_result import StepResult
-from src.core.planning.safety.safety_policies import SafetyContext
+from src.core.planning.safety.safety_policies import SafetyContext, SafetyPolicy
+from src.core.planning.models.plan import Plan
 
 class SafeStepDispatcher:
     """

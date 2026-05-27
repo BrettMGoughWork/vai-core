@@ -1,167 +1,22 @@
-#!/usr/bin/env python3
+from src.agent.dispatcher import AgentDispatcher
+from src.core.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
+from src.execution.minimal_executor import MinimalCoreStepExecutor
+from src.agent.loop import AgentLoop
+from src.core.planning.safety.minimal_policy import MinimalSafetyPolicy
 
-import json
-from pathlib import Path
-import sys
-from typing import Dict
-
-from src.execution.safe_failure import SafeFailure
-from src.core.llm.builder import create_llm_transport
-from src.core.agent.config import AgentConfig
-from src.core.agent.runtime import AgentRuntime
-from src.core.llm.providers.deepseek import DeepSeekClient
-from src.core.llm.transport import LLMTransport
-from src.primitives.runtime.categories import SkillCategory
-from src.primitives.runtime.registry import SkillRegistry
-from src.primitives.runtime.side_effects import SideEffect
-
-def _load_llm_alias_map(path: Path) -> tuple[str, Dict[str, str]]:
-    default_alias = "deepseek-chat"
-    alias_to_model: Dict[str, str] = {}
-
-    current_alias = None
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.rstrip()
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-
-        if line.startswith("default:"):
-            default_alias = line.split(":", 1)[1].strip().strip('"')
-            continue
-
-        if line.startswith("  ") and stripped.endswith(":"):
-            current_alias = stripped[:-1]
-            continue
-
-        if current_alias and stripped.startswith("model:"):
-            model_name = stripped.split(":", 1)[1].strip().strip('"')
-            alias_to_model[current_alias] = model_name
-
-    return default_alias, alias_to_model
+def main():
+    dispatcher = AgentDispatcher()
+    safety_policies = [
+        MinimalSafetyPolicy(),
+    ]
+    safe_dispatcher = SafeStepDispatcher(dispatcher, safety_policies)
+    executor = MinimalCoreStepExecutor()
 
 
-def _create_agent_config(model_alias: str) -> AgentConfig:
-    allowed_tools = [spec.name for spec in SkillRegistry.all_specs()]
-    return AgentConfig(
-        model=model_alias,
-        allowed_tools=allowed_tools,
-        allowed_categories=list(SkillCategory),
-        allowed_side_effects=list(SideEffect),
-        max_steps=4,
+    loop = AgentLoop(
+        dispatcher=safe_dispatcher,
+        engine=executor,
     )
-
-
-def _display_result(result) -> str:
-    """Safely display any result returned from AgentRuntime.run()"""
-    
-    # Handle SafeFailure (from execution safety layer)
-    if isinstance(result, SafeFailure):
-        return f"ERROR: [{result.error_type}] {result.message}"
-    
-    # Handle CoreResult
-    if hasattr(result, 'is_error') and result.is_error:
-        return f"ERROR: {result.error or 'Unknown error'}"
-    
-    if hasattr(result, 'tool_name') and result.tool_name:
-        return f"{result.tool_name}: {result.tool_output}"
-    
-    if hasattr(result, 'text'):
-        return result.text or ""
-    
-    # Fallback
-    return str(result) if result else "(No result)"
-
-
-def _extract_plan_from_record(record: dict):
-    payload = record.get("payload")
-    if isinstance(payload, dict):
-        plan = payload.get("plan")
-        if isinstance(plan, dict):
-            return plan
-        if {"intent", "targetskillid", "arguments"}.issubset(payload.keys()):
-            return payload
-
-    plan = record.get("last_plan")
-    if isinstance(plan, dict):
-        return plan
-
-    if {"intent", "targetskillid", "arguments"}.issubset(record.keys()):
-        return record
-    return None
-
-
-def _load_latest_plan_from_logs(logs_dir: Path):
-    if not logs_dir.exists() or not logs_dir.is_dir():
-        return None
-
-    files = sorted(
-        [path for path in logs_dir.rglob("*") if path.is_file()],
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-
-    for path in files:
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-        except UnicodeDecodeError:
-            continue
-        except OSError:
-            continue
-
-        for line in reversed(lines):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(record, dict):
-                plan = _extract_plan_from_record(record)
-                if plan is not None:
-                    return plan
-    return None
-
-
-def main() -> None:
-    if sys.argv[1:] == ["agent", "plan"]:
-        logs_dir = Path(__file__).resolve().parent / "logs"
-        plan = _load_latest_plan_from_logs(logs_dir)
-        if plan is None:
-            print("No plan found in logs.")
-        else:
-            print(json.dumps(plan, indent=2, ensure_ascii=False))
-        return
-
-    llms_path = Path(__file__).resolve().parent / "config" / "llms.yaml"
-    default_alias, alias_to_model = _load_llm_alias_map(llms_path)
-    model_name = alias_to_model.get(default_alias, default_alias)
-
-    transport = create_llm_transport()
-    config = _create_agent_config(model_alias=model_name)
-    runtime = AgentRuntime(transport, config)
-
-    print("VAI Runtime - stdin mode")
-    print("Type 'exit' or Ctrl-D to quit.\n")
-
-    while True:
-        try:
-            prompt = input("> ").strip()
-        except EOFError:
-            print("\nExiting.")
-            break
-
-        if prompt.lower() in ("exit", "quit"):
-            print("Goodbye.")
-            break
-
-        if not prompt:
-            continue
-
-        result = runtime.run(prompt)
-        print(f"\n{_display_result(result)}\n")
-
 
 if __name__ == "__main__":
     main()
