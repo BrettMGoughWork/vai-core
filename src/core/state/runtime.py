@@ -2,7 +2,7 @@
 # AgentRuntime: minimal agent loop implementation for 2.3.6.
 # Uses core_step and isdone from stratum 1.
 
-from typing import Optional, Union
+from typing import Union
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 

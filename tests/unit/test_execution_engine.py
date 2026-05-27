@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from src.execution.engine import execute_tool
-from src.execution.errors import ToolExecutionError
 from src.core.types.result import CoreResult
 from src.primitives.base import BaseSkill
 

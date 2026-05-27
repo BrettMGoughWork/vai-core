@@ -6,7 +6,6 @@ from src.core.planning.segments.errors import (
     SegmentValidationError,
     SegmentStitchingError,
 )
-from src.core.planning.segments.model import PlanSegment
 
 
 # ------------------------------------------------------------

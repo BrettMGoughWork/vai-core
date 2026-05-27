@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol, List
+from typing import Any, Dict, Optional, Protocol
 
 from src.core.planning.models.plan import Plan
 from src.core.planning.models.plan_state import PlanState, PlanStatus

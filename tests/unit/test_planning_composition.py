@@ -1,5 +1,4 @@
 from src.core.planning import build_planning_substrate
-from src.core.planning.models.plan import Plan
 
 
 def test_planning_substrate_composes():

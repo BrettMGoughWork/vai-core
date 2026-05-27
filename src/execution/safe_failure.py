@@ -3,9 +3,6 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.core.types.errors import AgentError
-
-
 @dataclass
 class SafeFailure:
     """Safely represents a failure with error type, message, and metadata."""

@@ -9,7 +9,6 @@ automatic retries according to configured strategies.
 import socket
 import time
 from .retry_policy import RetryPolicy
-from src.core.types.errors import LLMError, SystemError
 
 
 def call_with_retry(llm_client, request):

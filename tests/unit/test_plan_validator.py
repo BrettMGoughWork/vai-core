@@ -2,8 +2,8 @@ import pytest
 from src.primitives.runtime.validator import ValidationError
 from src.core.planning.models.plan import Plan as RealPlan
 from src.core.types.errors.plan_errors import (
-    PlanStructureError, UnknownCapabilityError,
-    ForbiddenCapabilityError, CapabilitySchemaError, PlanPurityError, PlanSafetyError
+    PlanStructureError,
+    ForbiddenCapabilityError, PlanSafetyError
 )
 from src.core.planning.validators.plan_validator import PlanValidator
 

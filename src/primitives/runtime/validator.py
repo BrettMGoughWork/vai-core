@@ -1,8 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List
-
-from .schema import generate_schema_from_handler
-
+from typing import Any, Dict
 
 class ValidationError(Exception):
     pass

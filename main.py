@@ -12,7 +12,6 @@ def main():
     safe_dispatcher = SafeStepDispatcher(dispatcher, safety_policies)
     executor = MinimalCoreStepExecutor()
 
-
     loop = AgentLoop(
         dispatcher=safe_dispatcher,
         engine=executor,

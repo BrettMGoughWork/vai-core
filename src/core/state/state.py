@@ -82,6 +82,7 @@ class ConversationState:
     step_count: int = 0
     last_result: Optional[CoreResult] = None
     trace: List[Any] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Substrate states
     subgoal_state: SubgoalSubstrateState = field(default_factory=SubgoalSubstrateState)
