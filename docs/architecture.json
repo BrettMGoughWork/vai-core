@@ -314,33 +314,6 @@
       "path": "tests/unit/primitives/runtime",
       "imports": [],
       "exports": []
-    },
-    {
-      "name": "tools.code_analysers.shared",
-      "path": "tools/code_analysers/shared",
-      "imports": [],
-      "exports": []
-    },
-    {
-      "name": "tools.code_analysers.stratum1",
-      "path": "tools/code_analysers/stratum1",
-      "imports": [],
-      "exports": []
-    },
-    {
-      "name": "tools.code_analysers.stratum1.rules",
-      "path": "tools/code_analysers/stratum1/rules",
-      "imports": [
-        "folder_boundaries.FolderBoundariesRule",
-        "no_llm.NoLLMRule",
-        "corestep_purity.CoreStepPurityRule",
-        "substrate_purity.SubstratePurityRule",
-        "event_envelope.EventEnvelopeRule",
-        "type_invariants.TypeInvariantsRule"
-      ],
-      "exports": [
-        "load_rules"
-      ]
     }
   ],
   "classes": [
@@ -2121,7 +2094,7 @@
         "SubgoalError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 2,
+      "fan_in": 12,
       "fan_out": 1,
       "dead_code_ignored": false
     },
@@ -2219,7 +2192,7 @@
         "src.core.types.subgoal.Subgoal",
         "src.core.types.subgoal.SubgoalLifecycleState",
         "src.core.planning.validators.subgoal_validator.SubgoalValidator",
-        "transitions.TransitionEngine",
+        "transitions.LifecycleTransitionEngine",
         "state.SubgoalState",
         "errors.SubgoalNotFoundError",
         "errors.InvalidSubgoalError",
@@ -2234,7 +2207,7 @@
         "List",
         "SubgoalState",
         "SubgoalValidator",
-        "TransitionEngine",
+        "LifecycleTransitionEngine",
         "SubgoalLifecycleState",
         "Dict",
         "SubgoalCreatedEvent",
@@ -2287,6 +2260,74 @@
     },
     {
       "name": "TransitionEngine",
+      "file": "src/core/planning/subgoals/transition_engine.py",
+      "package": "src.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "is_allowed",
+        "assert_allowed",
+        "next_state"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "typing.Dict",
+        "typing.Tuple",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.subgoals.transition_rules.ALLOWED_TRANSITIONS",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.subgoals.errors.IllegalSubgoalTransitionError"
+      ],
+      "references": [
+        "SubgoalLifecycleState",
+        "ALLOWED_TRANSITIONS",
+        "SubgoalEvent",
+        "IllegalSubgoalTransitionError"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 6,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SubgoalEvent",
+      "file": "src/core/planning/subgoals/transition_rules.py",
+      "package": "src.core.planning.subgoals",
+      "inherits": [
+        "str",
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "enum.Enum",
+        "typing.Dict",
+        "typing.Tuple",
+        "src.core.types.subgoal.SubgoalLifecycleState"
+      ],
+      "references": [
+        "str",
+        "Enum",
+        "VALIDATE",
+        "ACTIVATE",
+        "START",
+        "SUCCEED",
+        "FAIL",
+        "BLOCK",
+        "UNBLOCK",
+        "RETRY",
+        "RESUME"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 8,
+      "fan_out": 11,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "LifecycleTransitionEngine",
       "file": "src/core/planning/subgoals/transitions.py",
       "package": "src.core.planning.subgoals",
       "inherits": [],
@@ -3310,13 +3351,20 @@
         "PENDING",
         "ACTIVE",
         "SATISFIED",
-        "FAILED",
         "ABANDONED",
-        "CLOSED"
+        "CLOSED",
+        "CREATED",
+        "VALIDATED",
+        "READY",
+        "RUNNING",
+        "SUCCESS",
+        "FAILED",
+        "BLOCKED",
+        "RETRYING"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 5,
-      "fan_out": 8,
+      "fan_in": 14,
+      "fan_out": 15,
       "dead_code_ignored": false
     },
     {
@@ -5160,6 +5208,205 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestTransitionRules",
+      "file": "tests/unit/core/planning/subgoals/test_transition_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_exactly_nine_allowed_transitions",
+        "test_all_required_transitions_present",
+        "test_all_transitions_have_non_empty_reason",
+        "test_no_self_transitions_in_execution_states"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "itertools",
+        "pytest",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.subgoals.transition_rules.ALLOWED_TRANSITIONS",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.subgoals.transition_engine.TransitionEngine",
+        "src.core.planning.subgoals.transition_engine._EVENT_TRANSITIONS",
+        "src.core.planning.subgoals.errors.IllegalSubgoalTransitionError"
+      ],
+      "references": [
+        "REQUIRED_TRANSITIONS",
+        "EXECUTION_STATES",
+        "ALLOWED_TRANSITIONS"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestIsAllowed",
+      "file": "tests/unit/core/planning/subgoals/test_transition_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_allowed_transitions_accepted",
+        "test_disallowed_transitions_rejected"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "itertools",
+        "pytest",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.subgoals.transition_rules.ALLOWED_TRANSITIONS",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.subgoals.transition_engine.TransitionEngine",
+        "src.core.planning.subgoals.transition_engine._EVENT_TRANSITIONS",
+        "src.core.planning.subgoals.errors.IllegalSubgoalTransitionError"
+      ],
+      "references": [
+        "REQUIRED_TRANSITIONS",
+        "EXECUTION_STATES"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestAssertAllowed",
+      "file": "tests/unit/core/planning/subgoals/test_transition_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_does_not_raise_for_valid_transition",
+        "test_raises_for_invalid_transition",
+        "test_error_message_contains_state_names"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "itertools",
+        "pytest",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.subgoals.transition_rules.ALLOWED_TRANSITIONS",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.subgoals.transition_engine.TransitionEngine",
+        "src.core.planning.subgoals.transition_engine._EVENT_TRANSITIONS",
+        "src.core.planning.subgoals.errors.IllegalSubgoalTransitionError"
+      ],
+      "references": [
+        "REQUIRED_TRANSITIONS",
+        "IllegalSubgoalTransitionError",
+        "SUCCESS",
+        "RUNNING"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestNextState",
+      "file": "tests/unit/core/planning/subgoals/test_transition_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_event_produces_correct_next_state",
+        "test_invalid_event_raises",
+        "test_error_message_contains_state_and_event"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "itertools",
+        "pytest",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.subgoals.transition_rules.ALLOWED_TRANSITIONS",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.subgoals.transition_engine.TransitionEngine",
+        "src.core.planning.subgoals.transition_engine._EVENT_TRANSITIONS",
+        "src.core.planning.subgoals.errors.IllegalSubgoalTransitionError"
+      ],
+      "references": [
+        "REQUIRED_EVENT_TRANSITIONS",
+        "IllegalSubgoalTransitionError",
+        "SUCCESS",
+        "START"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestConsistency",
+      "file": "tests/unit/core/planning/subgoals/test_transition_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_every_event_transition_is_also_allowed",
+        "test_event_transition_count_matches_allowed_execution_count"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "itertools",
+        "pytest",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.subgoals.transition_rules.ALLOWED_TRANSITIONS",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.subgoals.transition_engine.TransitionEngine",
+        "src.core.planning.subgoals.transition_engine._EVENT_TRANSITIONS",
+        "src.core.planning.subgoals.errors.IllegalSubgoalTransitionError"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestStateTopology",
+      "file": "tests/unit/core/planning/subgoals/test_transition_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_success_is_terminal",
+        "test_running_has_three_outgoing",
+        "test_blocked_returns_only_to_ready",
+        "test_failed_goes_only_to_retrying"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "itertools",
+        "pytest",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.subgoals.transition_rules.ALLOWED_TRANSITIONS",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.subgoals.transition_engine.TransitionEngine",
+        "src.core.planning.subgoals.transition_engine._EVENT_TRANSITIONS",
+        "src.core.planning.subgoals.errors.IllegalSubgoalTransitionError"
+      ],
+      "references": [
+        "EXECUTION_STATES",
+        "SUCCESS",
+        "FAILED",
+        "BLOCKED",
+        "READY",
+        "RETRYING",
+        "RUNNING"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestCognitiveStepOutcome",
       "file": "tests/unit/core/types/test_types.py",
       "package": "tests.unit.core.types",
@@ -5320,261 +5567,6 @@
       "inferred_stratum": "test",
       "fan_in": 0,
       "fan_out": 5,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "CheckerContext",
-      "file": "tools/code_analysers/shared/context.py",
-      "package": "tools.code_analysers.shared",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [
-        "module_for_path"
-      ],
-      "public_attributes": [
-        "root",
-        "files",
-        "import_graph",
-        "config"
-      ],
-      "imports": [
-        "dataclasses.dataclass"
-      ],
-      "references": [],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 0,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "Reporter",
-      "file": "tools/code_analysers/shared/reporter.py",
-      "package": "tools.code_analysers.shared",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [
-        "add_violation",
-        "summary",
-        "render"
-      ],
-      "public_attributes": [
-        "output_format",
-        "strict"
-      ],
-      "imports": [
-        "json",
-        "dataclasses.asdict"
-      ],
-      "references": [],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 0,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "Violation",
-      "file": "tools/code_analysers/shared/rule_base.py",
-      "package": "tools.code_analysers.shared",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "rule_id",
-        "message",
-        "file",
-        "line",
-        "severity"
-      ],
-      "imports": [
-        "dataclasses.dataclass"
-      ],
-      "references": [],
-      "inferred_stratum": "test",
-      "fan_in": 8,
-      "fan_out": 0,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "Rule",
-      "file": "tools/code_analysers/shared/rule_base.py",
-      "package": "tools.code_analysers.shared",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [
-        "run"
-      ],
-      "public_attributes": [
-        "id",
-        "description"
-      ],
-      "imports": [
-        "dataclasses.dataclass"
-      ],
-      "references": [
-        "NotImplementedError"
-      ],
-      "inferred_stratum": "test",
-      "fan_in": 12,
-      "fan_out": 1,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "CoreStepPurityRule",
-      "file": "tools/code_analysers/stratum1/rules/corestep_purity.py",
-      "package": "tools.code_analysers.stratum1.rules",
-      "inherits": [
-        "Rule"
-      ],
-      "implements": [],
-      "public_methods": [
-        "run"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "ast",
-        "pathlib.Path",
-        "tools.code_analysers.shared.rule_base.Rule",
-        "tools.code_analysers.shared.rule_base.Violation"
-      ],
-      "references": [
-        "Rule",
-        "Import",
-        "Path",
-        "Violation"
-      ],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 4,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "EventEnvelopeRule",
-      "file": "tools/code_analysers/stratum1/rules/event_envelope.py",
-      "package": "tools.code_analysers.stratum1.rules",
-      "inherits": [
-        "Rule"
-      ],
-      "implements": [],
-      "public_methods": [
-        "run"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "ast",
-        "pathlib.Path",
-        "tools.code_analysers.shared.rule_base.Rule",
-        "tools.code_analysers.shared.rule_base.Violation"
-      ],
-      "references": [
-        "Rule",
-        "Path",
-        "ClassDef",
-        "AnnAssign",
-        "Violation"
-      ],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 5,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "FolderBoundariesRule",
-      "file": "tools/code_analysers/stratum1/rules/folder_boundaries.py",
-      "package": "tools.code_analysers.stratum1.rules",
-      "inherits": [
-        "Rule"
-      ],
-      "implements": [],
-      "public_methods": [
-        "run"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "pathlib.Path",
-        "tools.code_analysers.shared.rule_base.Rule",
-        "tools.code_analysers.shared.rule_base.Violation"
-      ],
-      "references": [
-        "Rule",
-        "Path",
-        "Violation"
-      ],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 3,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "NoLLMRule",
-      "file": "tools/code_analysers/stratum1/rules/no_llm.py",
-      "package": "tools.code_analysers.stratum1.rules",
-      "inherits": [
-        "Rule"
-      ],
-      "implements": [],
-      "public_methods": [
-        "run"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "pathlib.Path",
-        "tools.code_analysers.shared.rule_base.Rule",
-        "tools.code_analysers.shared.rule_base.Violation"
-      ],
-      "references": [
-        "Rule",
-        "Path",
-        "Violation"
-      ],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 3,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "SubstratePurityRule",
-      "file": "tools/code_analysers/stratum1/rules/substrate_purity.py",
-      "package": "tools.code_analysers.stratum1.rules",
-      "inherits": [
-        "Rule"
-      ],
-      "implements": [],
-      "public_methods": [
-        "run"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "tools.code_analysers.shared.rule_base.Rule"
-      ],
-      "references": [
-        "Rule"
-      ],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 1,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "TypeInvariantsRule",
-      "file": "tools/code_analysers/stratum1/rules/type_invariants.py",
-      "package": "tools.code_analysers.stratum1.rules",
-      "inherits": [
-        "Rule"
-      ],
-      "implements": [],
-      "public_methods": [
-        "run"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "tools.code_analysers.shared.rule_base.Rule"
-      ],
-      "references": [
-        "Rule"
-      ],
-      "inferred_stratum": "test",
-      "fan_in": 0,
-      "fan_out": 1,
       "dead_code_ignored": false
     }
   ],
@@ -6736,7 +6728,7 @@
     },
     {
       "source": "SubgoalManager",
-      "target": "TransitionEngine",
+      "target": "LifecycleTransitionEngine",
       "type": "import"
     },
     {
@@ -6791,7 +6783,7 @@
     },
     {
       "source": "SubgoalManager",
-      "target": "TransitionEngine",
+      "target": "LifecycleTransitionEngine",
       "type": "call"
     },
     {
@@ -6856,6 +6848,41 @@
     },
     {
       "source": "TransitionEngine",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "TransitionEngine",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "import"
+    },
+    {
+      "source": "TransitionEngine",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TransitionEngine",
+      "target": "SubgoalEvent",
+      "type": "call"
+    },
+    {
+      "source": "TransitionEngine",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "call"
+    },
+    {
+      "source": "SubgoalEvent",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "LifecycleTransitionEngine",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "LifecycleTransitionEngine",
       "target": "SubgoalLifecycleState",
       "type": "call"
     },
@@ -8050,6 +8077,136 @@
       "type": "call"
     },
     {
+      "source": "TestTransitionRules",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestTransitionRules",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestTransitionRules",
+      "target": "TransitionEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestTransitionRules",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "import"
+    },
+    {
+      "source": "TestIsAllowed",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestIsAllowed",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestIsAllowed",
+      "target": "TransitionEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestIsAllowed",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertAllowed",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertAllowed",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertAllowed",
+      "target": "TransitionEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertAllowed",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertAllowed",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "call"
+    },
+    {
+      "source": "TestNextState",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestNextState",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestNextState",
+      "target": "TransitionEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestNextState",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "import"
+    },
+    {
+      "source": "TestNextState",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "call"
+    },
+    {
+      "source": "TestConsistency",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistency",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistency",
+      "target": "TransitionEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistency",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "import"
+    },
+    {
+      "source": "TestStateTopology",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestStateTopology",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestStateTopology",
+      "target": "TransitionEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestStateTopology",
+      "target": "IllegalSubgoalTransitionError",
+      "type": "import"
+    },
+    {
       "source": "TestCognitiveStepOutcome",
       "target": "CognitiveStepOutcome",
       "type": "import"
@@ -8173,106 +8330,6 @@
       "source": "TestStepResultValidation",
       "target": "CognitiveStepOutcome",
       "type": "call"
-    },
-    {
-      "source": "CoreStepPurityRule",
-      "target": "Rule",
-      "type": "import"
-    },
-    {
-      "source": "CoreStepPurityRule",
-      "target": "Violation",
-      "type": "import"
-    },
-    {
-      "source": "CoreStepPurityRule",
-      "target": "Rule",
-      "type": "inheritance"
-    },
-    {
-      "source": "CoreStepPurityRule",
-      "target": "Violation",
-      "type": "call"
-    },
-    {
-      "source": "EventEnvelopeRule",
-      "target": "Rule",
-      "type": "import"
-    },
-    {
-      "source": "EventEnvelopeRule",
-      "target": "Violation",
-      "type": "import"
-    },
-    {
-      "source": "EventEnvelopeRule",
-      "target": "Rule",
-      "type": "inheritance"
-    },
-    {
-      "source": "EventEnvelopeRule",
-      "target": "Violation",
-      "type": "call"
-    },
-    {
-      "source": "FolderBoundariesRule",
-      "target": "Rule",
-      "type": "import"
-    },
-    {
-      "source": "FolderBoundariesRule",
-      "target": "Violation",
-      "type": "import"
-    },
-    {
-      "source": "FolderBoundariesRule",
-      "target": "Rule",
-      "type": "inheritance"
-    },
-    {
-      "source": "FolderBoundariesRule",
-      "target": "Violation",
-      "type": "call"
-    },
-    {
-      "source": "NoLLMRule",
-      "target": "Rule",
-      "type": "import"
-    },
-    {
-      "source": "NoLLMRule",
-      "target": "Violation",
-      "type": "import"
-    },
-    {
-      "source": "NoLLMRule",
-      "target": "Rule",
-      "type": "inheritance"
-    },
-    {
-      "source": "NoLLMRule",
-      "target": "Violation",
-      "type": "call"
-    },
-    {
-      "source": "SubstratePurityRule",
-      "target": "Rule",
-      "type": "import"
-    },
-    {
-      "source": "SubstratePurityRule",
-      "target": "Rule",
-      "type": "inheritance"
-    },
-    {
-      "source": "TypeInvariantsRule",
-      "target": "Rule",
-      "type": "import"
-    },
-    {
-      "source": "TypeInvariantsRule",
-      "target": "Rule",
-      "type": "inheritance"
     }
   ]
 }

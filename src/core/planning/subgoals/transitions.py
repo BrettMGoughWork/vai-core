@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict, Set
 from src.core.types.subgoal import SubgoalLifecycleState
 
-class TransitionEngine:
+class LifecycleTransitionEngine:
     """
     Pure deterministic transition legality engine.
 
