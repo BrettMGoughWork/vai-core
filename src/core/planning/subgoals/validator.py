@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .model import Subgoal
+from ..models.subgoal import Subgoal
 from src.core.planning.validators.subgoal_validator import SubgoalValidator as _CoreSubgoalValidator
 
 

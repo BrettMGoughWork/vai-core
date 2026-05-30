@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Set
-from .model import SubgoalLifecycleState
+from ..models.subgoal import SubgoalLifecycleState
 
 class TransitionEngine:
     """

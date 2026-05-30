@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.planning.segments.model import PlanSegment
+from src.core.planning.models.plan_segment import PlanSegment
 from src.core.planning.validators.plan_segment_validator import PlanSegmentValidator as _CorePlanSegmentValidator
 
 

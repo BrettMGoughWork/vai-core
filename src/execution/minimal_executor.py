@@ -1,5 +1,5 @@
 from src.core.state.state import ConversationState
-from src.core.state.outcome import StepOutcome
+from src.core.types.step_outcome import StepOutcome
 from src.core.types.result import CoreResult
 from src.execution.safe_failure import SafeFailure
 from src.core.config.model import AgentConfig

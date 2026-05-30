@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from src.core.state.state import ConversationState
-from src.core.state.outcome import StepOutcome
+from src.core.types.step_outcome import StepOutcome
 from src.core.state.isdone import isdone
 from src.core.state.trace import StepTrace
 from src.core.types.result import CoreResult

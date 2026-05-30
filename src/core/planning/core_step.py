@@ -14,7 +14,7 @@ from src.core.planning.models.cognitive_contract import validate_cognitive_input
 from src.core.planning.events.trace_event import TraceEventBuilder
 from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity
 from src.core.planning.generator.plan_generator import PlanGenerator, PlanPrompt
-from src.core.state.outcome import StepOutcome
+from src.core.types.step_outcome import StepOutcome
 
 # In practice, you’d inject this or construct it at a higher level.
 TRACE_BUILDER = TraceEventBuilder()

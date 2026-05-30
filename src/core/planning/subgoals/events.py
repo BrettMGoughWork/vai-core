@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-from .model import Subgoal
+from ..models.subgoal import Subgoal
 
 
 class SubgoalCreatedEvent:

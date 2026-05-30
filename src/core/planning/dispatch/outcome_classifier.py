@@ -5,7 +5,7 @@ from src.core.types.step_result import StepResult
 from src.core.planning.safety.purity_validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.errors.AgentError import ConfidenceError
-from src.core.state.outcome import StepOutcome
+from src.core.types.step_outcome import StepOutcome
 
 # Canonical Stratum‑2 priority order
 # Highest → lowest

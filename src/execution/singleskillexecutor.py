@@ -6,7 +6,7 @@ from src.core.planning.models.plan import Plan
 from src.primitives.runtime.registry import SkillRegistry
 from src.primitives.runtime.skill import Skill
 from src.primitives.runtime import validator
-from src.execution.executor_contract import ExecutionResult, Executor
+from src.execution.executor_interface import ExecutionResult, Executor
 
 
 class SingleSkillExecutor(Executor):

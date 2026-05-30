@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, Dict, List
 
-from .model import Subgoal, SubgoalLifecycleState
+from ..models.subgoal import Subgoal, SubgoalLifecycleState
 from .validator import SubgoalValidator
 from .transitions import TransitionEngine
 from .state import SubgoalState

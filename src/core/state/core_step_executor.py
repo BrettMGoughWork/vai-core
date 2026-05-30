@@ -8,7 +8,7 @@ from src.core.llm.transport import LLMTransport
 from src.primitives.runtime.registry import SkillRegistry
 from src.governance.tool_selection import select_tool
 from src.core.types.result import CoreResult
-from src.core.state.outcome import classify_step, StepOutcome
+from src.core.types.step_outcome import classify_step, StepOutcome
 from src.core.config.model import AgentConfig
 
 # Safety substrate imports

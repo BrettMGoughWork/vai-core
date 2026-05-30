@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from src.core.planning.segments.errors import SegmentNotFoundError
-from src.core.planning.segments.model import PlanSegment
+from src.core.planning.models.plan_segment import PlanSegment
 
 
 class SegmentState:

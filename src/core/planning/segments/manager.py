@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from src.core.planning.segments.model import PlanSegment
+from src.core.planning.models.plan_segment import PlanSegment
 from src.core.planning.segments.state import SegmentState
 from src.core.planning.segments.validator import SegmentValidator
 from src.core.planning.segments.stitcher import SegmentStitcher

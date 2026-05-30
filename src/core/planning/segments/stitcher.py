@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from src.core.planning.segments.model import PlanSegment
+from src.core.planning.models.plan_segment import PlanSegment
 from src.core.planning.segments.errors import SegmentStitchingError
 
 
