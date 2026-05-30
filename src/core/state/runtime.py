@@ -14,7 +14,6 @@ from src.execution.safe_failure import SafeFailure
 # IMPORTANT: CoreConfig + AgentConfig
 from src.core.config.model import CoreConfig, AgentConfig
 
-
 class StepExecutor(Protocol):
     def execute(
         self,
