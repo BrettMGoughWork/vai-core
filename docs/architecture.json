@@ -47,6 +47,12 @@
       "exports": []
     },
     {
+      "name": "src.core.memory.summarisation",
+      "path": "src/core/memory/summarisation",
+      "imports": [],
+      "exports": []
+    },
+    {
       "name": "src.core.planning",
       "path": "src/core/planning",
       "imports": [
@@ -228,6 +234,12 @@
     {
       "name": "tests.unit.core.memory.governance",
       "path": "tests/unit/core/memory/governance",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.memory.summarisation",
+      "path": "tests/unit/core/memory/summarisation",
       "imports": [],
       "exports": []
     },
@@ -908,7 +920,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 23,
+      "fan_in": 34,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1020,7 +1032,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 24,
+      "fan_in": 35,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1127,7 +1139,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 25,
+      "fan_in": 36,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1233,7 +1245,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 23,
+      "fan_in": 34,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1388,6 +1400,226 @@
       "inferred_stratum": "infrastructure",
       "fan_in": 11,
       "fan_out": 14,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SummarisationRules",
+      "file": "src/core/memory/summarisation/summarisation_rules.py",
+      "package": "src.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "summarise_segment_list",
+        "summarise_subgoal_chain",
+        "summarise_plan",
+        "summarise_segment_chain",
+        "summarise_drift",
+        "is_stale"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "src.core.types.hashing.stable_hash",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "SegmentListSummary",
+        "SubgoalChainSummary",
+        "PlanSummary",
+        "SegmentChainSummary",
+        "DriftSummary",
+        "PlanMemoryRecord",
+        "Dict",
+        "Optional",
+        "SummaryMetadata",
+        "List",
+        "SegmentMemoryRecord",
+        "SubgoalMemoryRecord",
+        "DriftEvent"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 9,
+      "fan_out": 13,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SummaryMetadata",
+      "file": "src/core/memory/summarisation/summary_types.py",
+      "package": "src.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "generated_at",
+        "source_count",
+        "source_fingerprint"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Dict",
+        "typing.Optional"
+      ],
+      "references": [],
+      "inferred_stratum": "utility",
+      "fan_in": 16,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SegmentListSummary",
+      "file": "src/core/memory/summarisation/summary_types.py",
+      "package": "src.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "count",
+        "first_id",
+        "last_id",
+        "meta"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Dict",
+        "typing.Optional"
+      ],
+      "references": [
+        "SummaryMetadata",
+        "Optional"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SubgoalChainSummary",
+      "file": "src/core/memory/summarisation/summary_types.py",
+      "package": "src.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "depth",
+        "root_id",
+        "leaf_id",
+        "meta"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Dict",
+        "typing.Optional"
+      ],
+      "references": [
+        "SummaryMetadata",
+        "Optional"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "PlanSummary",
+      "file": "src/core/memory/summarisation/summary_types.py",
+      "package": "src.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "segment_count",
+        "created_at",
+        "has_metadata",
+        "meta"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Dict",
+        "typing.Optional"
+      ],
+      "references": [
+        "SummaryMetadata"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SegmentChainSummary",
+      "file": "src/core/memory/summarisation/summary_types.py",
+      "package": "src.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "chain_length",
+        "terminal_state",
+        "meta"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Dict",
+        "typing.Optional"
+      ],
+      "references": [
+        "SummaryMetadata"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftSummary",
+      "file": "src/core/memory/summarisation/summary_types.py",
+      "package": "src.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "drift_events",
+        "last_drift_at",
+        "signal_type_counts",
+        "meta"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Dict",
+        "typing.Optional"
+      ],
+      "references": [
+        "SummaryMetadata",
+        "Optional",
+        "Dict"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 3,
       "dead_code_ignored": false
     },
     {
@@ -7243,6 +7475,397 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestSummariseSegmentList",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty",
+        "test_single",
+        "test_multiple_ordered_by_created_at",
+        "test_tie_broken_by_segment_id",
+        "test_metadata_generated_at",
+        "test_deterministic_given_same_input"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW",
+        "SegmentListSummary"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSummariseSubgoalChain",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty",
+        "test_single",
+        "test_chain",
+        "test_deterministic"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW",
+        "SubgoalChainSummary"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSummarisePlan",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_basic",
+        "test_has_metadata_true",
+        "test_empty_segments",
+        "test_deterministic",
+        "test_meta_source_count_is_one"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW",
+        "PlanSummary"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSummariseSegmentChain",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty",
+        "test_state_none_defaults_to_pending",
+        "test_state_used_when_not_none",
+        "test_chain_length",
+        "test_terminal_state_from_last_record",
+        "test_deterministic"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW",
+        "SegmentChainSummary"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSummariseDrift",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty",
+        "test_single_event",
+        "test_multiple_signal_types",
+        "test_signal_type_counts_sorted_keys",
+        "test_last_drift_at_is_max_timestamp",
+        "test_deterministic"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW",
+        "DriftSummary"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestIsStale",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_fresh_summary_not_stale",
+        "test_stale_when_count_changes",
+        "test_stale_when_fingerprint_changes",
+        "test_stale_when_content_changes_same_count",
+        "test_stale_when_order_changes_chain"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSummaryMetadata",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_frozen",
+        "test_fingerprint_is_string"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW",
+        "AttributeError",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDriftSummaryMutability",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_signal_type_counts_is_deep_copied"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestFingerprintHelpers",
+      "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
+      "package": "tests.unit.core.memory.summarisation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_segment_list_fingerprint_stable",
+        "test_segment_list_fingerprint_different_for_different_records",
+        "test_subgoal_chain_fingerprint_sensitive_to_state",
+        "test_plan_fingerprint_sensitive_to_segment_count",
+        "test_plan_fingerprint_sensitive_to_metadata_presence",
+        "test_drift_fingerprint_sensitive_to_signal_type",
+        "test_drift_fingerprint_sensitive_to_event_order",
+        "test_drift_fingerprint_stable_across_calls",
+        "test_segment_chain_fingerprint_sensitive_to_state"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._subgoal_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._plan_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._segment_chain_fingerprint",
+        "src.core.memory.summarisation.summarisation_rules._drift_fingerprint",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summary_types.SegmentListSummary",
+        "src.core.memory.summarisation.summary_types.SubgoalChainSummary",
+        "src.core.memory.summarisation.summary_types.PlanSummary",
+        "src.core.memory.summarisation.summary_types.SegmentChainSummary",
+        "src.core.memory.summarisation.summary_types.DriftSummary"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestComputeConfidence",
       "file": "tests/unit/core/planning/drift/test_drift_detector.py",
       "package": "tests.unit.core.planning.drift",
@@ -8632,6 +9255,131 @@
     {
       "source": "MemoryGovernance",
       "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SegmentListSummary",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SubgoalChainSummary",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "PlanSummary",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SegmentChainSummary",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "DriftSummary",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SummaryMetadata",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "SummarisationRules",
+      "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "SegmentListSummary",
+      "target": "SummaryMetadata",
+      "type": "call"
+    },
+    {
+      "source": "SubgoalChainSummary",
+      "target": "SummaryMetadata",
+      "type": "call"
+    },
+    {
+      "source": "PlanSummary",
+      "target": "SummaryMetadata",
+      "type": "call"
+    },
+    {
+      "source": "SegmentChainSummary",
+      "target": "SummaryMetadata",
+      "type": "call"
+    },
+    {
+      "source": "DriftSummary",
+      "target": "SummaryMetadata",
       "type": "call"
     },
     {
@@ -12562,6 +13310,526 @@
     {
       "source": "TestCheckConsistency",
       "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentList",
+      "target": "SegmentListSummary",
+      "type": "call"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSubgoalChain",
+      "target": "SubgoalChainSummary",
+      "type": "call"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummarisePlan",
+      "target": "PlanSummary",
+      "type": "call"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseSegmentChain",
+      "target": "SegmentChainSummary",
+      "type": "call"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummariseDrift",
+      "target": "DriftSummary",
+      "type": "call"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestIsStale",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestSummaryMetadata",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftSummaryMutability",
+      "target": "DriftSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "SegmentListSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "SubgoalChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "PlanSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "SegmentChainSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestFingerprintHelpers",
+      "target": "DriftSummary",
       "type": "import"
     },
     {
