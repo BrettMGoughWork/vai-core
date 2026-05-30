@@ -13,8 +13,11 @@ class LLMTransport:
     Vendor-specific logic lives here only.
     """
 
-    def __init__(self, client: ChatProvider):
+    def __init__(self, client, model: str, temperature: float, max_tokens: int):
         self.client = client
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
 
     def call(
         self,
@@ -71,3 +74,12 @@ class LLMTransport:
 
         # Normal text
         return CoreLLMResponse(text=msg.get("content"))
+
+    def complete(self, prompt: str) -> str:
+        resp = self.client.chat(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+        )
+        return resp["choices"][0]["message"]["content"]

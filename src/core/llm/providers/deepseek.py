@@ -83,4 +83,6 @@ class DeepSeekClient(ChatProvider):
             method="POST",
         )
         with request.urlopen(req, timeout=self.timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            result = json.loads(resp.read().decode("utf-8"))
+
+            return result

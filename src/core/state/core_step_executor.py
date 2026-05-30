@@ -5,11 +5,11 @@ from typing import Tuple, Union
 
 from src.core.state.state import ConversationState
 from src.core.llm.transport import LLMTransport
-from src.core.state.config import AgentConfig
 from src.primitives.runtime.registry import SkillRegistry
 from src.governance.tool_selection import select_tool
 from src.core.types.result import CoreResult
 from src.core.state.outcome import classify_step, StepOutcome
+from src.core.config.model import AgentConfig
 
 # Safety substrate imports
 from src.execution.panic_guard import with_panic_guard

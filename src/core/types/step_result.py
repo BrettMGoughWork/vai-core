@@ -8,13 +8,6 @@ from src.core.types.errors import ValidationError
 from src.core.types.hashing import stable_hash
 
 
-class StepOutcome(Enum):
-    SUCCESS = "success"
-    FAILURE = "failure"
-    TOOL_NEEDED = "tool_needed"
-    CONTINUE = "continue"
-
-
 @dataclass(frozen=True)
 class StepResult:
     @staticmethod

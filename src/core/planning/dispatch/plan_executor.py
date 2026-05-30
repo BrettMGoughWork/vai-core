@@ -13,7 +13,6 @@ class PlanExecutorMetrics:
     duration: int
     termination_reason: str
 
-
 class PlanExecutor:
     """
     Executes a validated plan and returns:

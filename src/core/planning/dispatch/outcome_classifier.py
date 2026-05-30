@@ -1,18 +1,19 @@
 from __future__ import annotations
 from typing import Any, Dict
 
-from src.core.types.step_result import StepOutcome, StepResult
+from src.core.types.step_result import StepResult
 from src.core.planning.safety.purity_validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.errors.AgentError import ConfidenceError
+from src.core.state.outcome import StepOutcome
 
-
-# Deterministic priority order for ambiguous or missing labels
+# Canonical Stratum‑2 priority order
+# Highest → lowest
 OUTCOME_PRIORITY = [
-    StepOutcome.FAILURE,
-    StepOutcome.TOOL_NEEDED,
-    StepOutcome.SUCCESS,
-    StepOutcome.CONTINUE,
+    StepOutcome.FATAL, # unrecoverable
+    StepOutcome.RECOVERABLE, # tool_needed / retryable
+    StepOutcome.SUCCESS, # terminal success
+    StepOutcome.NOOP, # continue reasoning
 ]
 
 
@@ -23,13 +24,13 @@ class OutcomeClassifier:
     """
 
     def classify(self, state, raw: Dict[str, Any]) -> StepResult:
-        # D2: purity
+        # D2: purity validation
         try:
             validate_pure_structure(raw)
         except Exception as e:
             err = ValidationError(f"Classifier output not pure: {e}")
             return StepResult(
-                outcome=StepOutcome.FAILURE,
+                outcome=StepOutcome.FATAL,
                 reason=str(err),
                 payload={"error": err.__dict__},
                 trace={},
@@ -40,17 +41,17 @@ class OutcomeClassifier:
         reason = raw.get("reason") or "No reason provided by classifier"
         metadata = raw.get("metadata") or {}
 
-        # Canonicalise label
+        # Normalise label
         label = None
         if isinstance(label_raw, str):
             label = label_raw.strip().lower()
 
-        # Deterministic mapping
+        # Stratum‑1 → Stratum‑2 mapping
         mapping = {
             "success": StepOutcome.SUCCESS,
-            "failure": StepOutcome.FAILURE,
-            "tool_needed": StepOutcome.TOOL_NEEDED,
-            "continue": StepOutcome.CONTINUE,
+            "failure": StepOutcome.FATAL,
+            "tool_needed": StepOutcome.RECOVERABLE,
+            "continue": StepOutcome.NOOP,
         }
 
         outcome = mapping.get(label)
@@ -66,7 +67,7 @@ class OutcomeClassifier:
                 },
             )
             return StepResult(
-                outcome=OUTCOME_PRIORITY[0], # FAILURE
+                outcome=OUTCOME_PRIORITY[0], # FATAL
                 reason=err.message,
                 payload={"error": err.to_dict()},
                 trace={},
