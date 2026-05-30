@@ -35,6 +35,12 @@
       ]
     },
     {
+      "name": "src.core.memory",
+      "path": "src/core/memory",
+      "imports": [],
+      "exports": []
+    },
+    {
       "name": "src.core.planning",
       "path": "src/core/planning",
       "imports": [
@@ -204,6 +210,12 @@
     {
       "name": "tests.unit.core.llm",
       "path": "tests/unit/core/llm",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.memory",
+      "path": "tests/unit/core/memory",
       "imports": [],
       "exports": []
     },
@@ -808,6 +820,111 @@
       "fan_in": 0,
       "fan_out": 11,
       "dead_code_ignored": true
+    },
+    {
+      "name": "SubgoalMemory",
+      "file": "src/core/memory/subgoal_memory.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "put",
+        "get",
+        "exists",
+        "list_all",
+        "get_chain",
+        "get_children",
+        "snapshot",
+        "load_snapshot"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "SubgoalMemorySnapshot",
+        "Subgoal",
+        "Optional",
+        "List",
+        "SubgoalMemoryRecord",
+        "Dict",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 7,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SubgoalMemoryRecord",
+      "file": "src/core/memory/subgoal_memory_types.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "subgoal_id",
+        "parent_id",
+        "state",
+        "goal",
+        "context",
+        "metadata",
+        "created_at"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Optional",
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 9,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SubgoalMemorySnapshot",
+      "file": "src/core/memory/subgoal_memory_types.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "records"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Tuple",
+        "SubgoalMemoryRecord"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 9,
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "StepProcessor",
@@ -3588,7 +3705,7 @@
         "RETRYING"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 22,
+      "fan_in": 32,
       "fan_out": 15,
       "dead_code_ignored": false
     },
@@ -3634,7 +3751,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 28,
+      "fan_in": 36,
       "fan_out": 5,
       "dead_code_ignored": false
     },
@@ -5261,6 +5378,190 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestPutGetExists",
+      "file": "tests/unit/core/memory/test_subgoal_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_get_returns_none_for_unknown",
+        "test_exists_returns_false_for_unknown",
+        "test_put_then_exists",
+        "test_put_then_get_returns_equivalent_subgoal",
+        "test_put_overwrites_existing",
+        "test_get_does_not_return_same_object_reference",
+        "test_metadata_mutation_after_put_does_not_affect_store"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "RUNNING",
+        "CREATED",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestListAll",
+      "file": "tests/unit/core/memory/test_subgoal_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_store_returns_empty_list",
+        "test_list_all_returns_all_stored",
+        "test_list_all_sorted_by_created_at",
+        "test_list_all_deterministic"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRecordSerialisation",
+      "file": "tests/unit/core/memory/test_subgoal_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_record_state_stored_as_string",
+        "test_record_fields_match_subgoal"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "RUNNING",
+        "VALIDATED",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestGetChain",
+      "file": "tests/unit/core/memory/test_subgoal_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_chain_for_unknown_id_is_empty",
+        "test_chain_for_root_is_single_record",
+        "test_chain_is_root_to_leaf",
+        "test_chain_stops_at_missing_parent",
+        "test_chain_cycle_protection"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestGetChildren",
+      "file": "tests/unit/core/memory/test_subgoal_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_no_children_returns_empty",
+        "test_children_returned_for_parent",
+        "test_children_sorted_by_created_at",
+        "test_children_do_not_include_unrelated"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSnapshot",
+      "file": "tests/unit/core/memory/test_subgoal_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_snapshot_of_empty_store",
+        "test_snapshot_contains_all_records",
+        "test_snapshot_is_sorted_deterministically",
+        "test_load_snapshot_restores_records",
+        "test_snapshot_round_trip_fidelity",
+        "test_load_snapshot_replaces_existing_store",
+        "test_snapshot_is_immutable_type"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "SubgoalMemory",
+        "SubgoalMemorySnapshot"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestComputeConfidence",
       "file": "tests/unit/core/planning/drift/test_drift_detector.py",
       "package": "tests.unit.core.planning.drift",
@@ -6376,6 +6677,51 @@
       "source": "QwenClient",
       "target": "ChatProvider",
       "type": "inheritance"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "SubgoalMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "SubgoalMemory",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "SubgoalMemorySnapshot",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
     },
     {
       "source": "StepProcessor",
@@ -8776,6 +9122,176 @@
       "source": "TestLLMFactory",
       "target": "OpenAIClient",
       "type": "import"
+    },
+    {
+      "source": "TestPutGetExists",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestPutGetExists",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestPutGetExists",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestPutGetExists",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestPutGetExists",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestPutGetExists",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestListAll",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestListAll",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestListAll",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestListAll",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestListAll",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SubgoalMemorySnapshot",
+      "type": "call"
     },
     {
       "source": "TestComputeConfidence",
