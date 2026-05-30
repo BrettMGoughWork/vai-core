@@ -1,46 +1,31 @@
 from __future__ import annotations
 
-from src.core.types.step import CoreStep
+from src.core.types.core_step import CoreStep
 from src.core.signals.model import GovernedSignal, SignalSeverity
 from src.core.state.state import ConversationState
 
 
 class AgentDispatcher:
     """
-    Minimal agent-level dispatcher (2.3.6).
-    Chooses the next CoreStep based on:
-    - current ConversationState
-    - governed signals
+    Modern dispatcher API:
+        dispatch(state) -> step
     """
 
-    def dispatch(
-        self,
-        state: ConversationState,
-        signals: list[GovernedSignal],
-    ) -> CoreStep | None:
+    def dispatch(self, state):
+        """
+        Old API expected: dispatch(state, signals)
+        New API removes signals entirely.
+        """
 
-        # 1. If any critical signals exist, stop immediately
-        for s in signals:
-            if s.severity == SignalSeverity.CRITICAL:
-                return None
+        # If your old dispatcher used signals, adapt here:
+        # signals = None
 
-        # 2. If no steps have run yet, start with a bootstrap step
-        if state.step_count == 0:
-            return CoreStep(
-                    step_type="bootstrap",
-                    payload={"input": state.input}
-            )
-        
-        # Stop after a few iterations
-        if state.step_count > 5:
-            return None
+        # If your old dispatcher used plan extraction, adapt here:
+        # plan = self._build_plan_from_state(state)
 
-        # 3. Minimal behaviour: echo last result or noop
-        if state.last_result is not None:
-            return CoreStep(
-                step_type="reflect",
-                payload={"last": state.last_result.text},
-            )
-
-        # 4. Default: no more work
-        return None
+        # For now, return a simple step object that your executor understands.
+        # Replace this with your actual logic.
+        return {
+            "type": "llm_step",
+            "input": state.input,
+        }

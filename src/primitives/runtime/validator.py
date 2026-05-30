@@ -1,8 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict
 
-class ValidationError(Exception):
-    pass
+from src.core.types.errors import ValidationError
 
 
 def validate_structural(schema: Dict[str, Any], args: Dict[str, Any]) -> None:

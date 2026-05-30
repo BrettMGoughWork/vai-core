@@ -1,5 +1,8 @@
 from typing import Any, Dict
 
+from src.execution.executor_contract import ExecutionResult
+
+
 class Executor:
     """
     Executes canonical actions by routing them to skills.

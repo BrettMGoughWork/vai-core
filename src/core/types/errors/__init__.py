@@ -10,6 +10,7 @@ from .AgentError import AgentError, SemanticError, GovernanceError, ConfidenceEr
 from .LLMError import LLMError
 from .SystemError import SystemError
 from .ToolError import ToolError
+from .ValidationError import ValidationError
 from .recovery import (
     RecoveryAction,
     map_error_to_recovery,

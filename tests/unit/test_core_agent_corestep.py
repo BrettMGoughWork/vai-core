@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from src.core.state.config import AgentConfig
 from src.core.state.core_step_executor import core_step
-from src.core.state.outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 from src.core.state.state import ConversationState
 from src.core.llm.types import CoreLLMResponse
 from src.primitives.runtime.categories import SkillCategory

@@ -101,7 +101,7 @@ def test_execute_tool_with_multiple_args():
 
 def test_execute_tool_handles_validation_errors():
     """execute_tool catches and returns ValidationError as CoreResult."""
-    from src.primitives.runtime.validator import ValidationError
+    from src.core.types.errors import ValidationError
 
     mock_skill = MagicMock(spec=BaseSkill)
     mock_skill.name = "validate_skill"

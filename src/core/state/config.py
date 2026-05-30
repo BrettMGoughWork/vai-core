@@ -4,8 +4,17 @@ from typing import List, Optional, Any, Dict
 from src.primitives.runtime.categories import SkillCategory
 from src.primitives.runtime.side_effects import SideEffect
 
+
 @dataclass
-class LoopPolicy:
+class LLMConfig:
+    provider: str
+    model: str
+    temperature: float = 0.0
+    max_tokens: int = 4096
+
+
+@dataclass
+class LoopPolicyConfig:
     max_steps: int = 5
     max_wall_time: Optional[float] = None
     max_errors: int = 1
@@ -20,7 +29,7 @@ class AgentConfig:
     allowed_categories: List[SkillCategory]
     allowed_side_effects: List[SideEffect]
     max_steps: int = 4
-    loop_policy: LoopPolicy = field(default_factory=LoopPolicy)
+    loop_policy: LoopPolicyConfig = field(default_factory=LoopPolicyConfig)
 
     @classmethod
     def from_yaml(cls, data: Dict[str, Any]) -> "AgentConfig":
@@ -29,9 +38,15 @@ class AgentConfig:
         Loads loop_policy if present in data.
         """
         loop_policy_data = data.pop("loop_policy", None)
-        loop_policy = LoopPolicy(**loop_policy_data) if loop_policy_data else LoopPolicy()
+        loop_policy = LoopPolicyConfig(**loop_policy_data) if loop_policy_data else LoopPolicyConfig()
         
         return cls(
             **data,
             loop_policy=loop_policy,
         )
+
+
+@dataclass
+class CoreConfig:
+    llm: LLMConfig
+    agent: AgentConfig

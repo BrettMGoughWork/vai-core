@@ -4,12 +4,12 @@
 from typing import Tuple, Union
 
 from src.core.state.state import ConversationState
-from src.core.llm.transport import LLMTransport
+from src.core.llm.types import LLMCallable
 from src.core.state.config import AgentConfig
 from src.primitives.runtime.registry import SkillRegistry
 from src.governance.tool_selection import select_tool
 from src.core.types.result import CoreResult
-from src.core.state.outcome import classify_step, StepOutcome
+from src.core.state.step_outcome import classify_step, StepOutcome
 
 # Safety substrate imports
 from src.execution.panic_guard import with_panic_guard
@@ -30,7 +30,7 @@ class CoreStepExecutor:
 
     def __init__(
         self,
-        llm_client: LLMTransport,
+        llm_client: LLMCallable,
         config: AgentConfig,
         circuit_breaker: CircuitBreaker | None = None,
         degraded_mode: DegradedModeController | None = None,
@@ -144,7 +144,7 @@ class CoreStepExecutor:
 @with_panic_guard
 def core_step(
     state: ConversationState,
-    transport: LLMTransport,
+    transport: LLMCallable,
     config: AgentConfig,
 ) -> Tuple[CoreResult, ConversationState, StepOutcome]:
     """Execute a single step of the core agent loop (backward-compatible function)."""

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from src.core.planning.safety.loop_policy import LoopPolicy
-from core.types.errors import ValidationError
+from src.core.types.errors import ValidationError
 
 
 @dataclass(frozen=True)

@@ -43,6 +43,15 @@ class AgentError:
     timestamp: str
     recoverable: bool
 
+    def to_dict(self) -> dict:
+        return {
+            "type": self.type,
+            "message": self.message,
+            "details": self.details,
+            "timestamp": self.timestamp,
+            "recoverable": self.recoverable,
+        }
+
 
 class PlanningError(AgentError):
     def __init__(self, message: str, details: dict[str, Any] | None = None):
@@ -164,7 +173,7 @@ class StateError(AgentError):
     """
 
 
-class GovernanceError(AgentError):
+class GovernanceError(AgentError, Exception):
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(
             type="GovernanceError",

@@ -1,7 +1,7 @@
 from src.core.state.isdone import isdone
-from src.core.state.outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 from src.core.state.state import ConversationState
-from src.core.state.config import AgentConfig
+from src.core.state.config import AgentConfig, LoopPolicyConfig
 
 
 def test_isdone_true_on_success():
@@ -38,7 +38,8 @@ def test_isdone_true_on_max_steps():
         allowed_tools=[],
         allowed_categories=[],
         allowed_side_effects=[],
-        max_steps=4
+        max_steps=4,
+        loop_policy=LoopPolicyConfig(max_steps=4)
     )
     assert isdone(state, StepOutcome.RECOVERABLE, config) is True
 

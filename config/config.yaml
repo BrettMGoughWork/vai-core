@@ -1,0 +1,26 @@
+llm:
+  provider: deepseek
+  model: deepseek-chat
+  temperature: 0.0
+  max_tokens: 4096
+
+agent:
+  loop_policy:
+    max_steps: 50
+    per_step_timeout: 10
+    max_wall_time: 60
+
+policy:
+  allowed_tools:
+    - fetch_url
+    - http_get
+    - math
+    - text
+  max_arg_size: 2000
+  max_tool_name: 64
+
+logging:
+  enabled: true
+
+telemetry:
+  enabled: true
