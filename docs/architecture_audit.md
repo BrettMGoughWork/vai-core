@@ -1,8 +1,8 @@
 # Architecture Audit Report
 
-> **architecture.json snapshot**: `2026-05-30 13:18:07 UTC`  
-> **Audit generated**: `2026-05-30 13:18:07 UTC`  
-> **Classes analysed**: 355 | **References**: 2184
+> **architecture.json snapshot**: `2026-05-30 13:43:05 UTC`  
+> **Audit generated**: `2026-05-30 13:43:05 UTC`  
+> **Classes analysed**: 371 | **References**: 2492
 
 ## Summary
 
@@ -10,9 +10,9 @@
 |----------|-------|
 | 🔴 Critical | 0 |
 | 🟠 High     | 0 |
-| 🟡 Medium   | 55 |
+| 🟡 Medium   | 57 |
 | 🔵 Low      | 20 |
-| **Total**   | **75** |
+| **Total**   | **77** |
 
 ---
 
@@ -86,7 +86,7 @@ Defined in 4 files: `tests/unit/core/memory/test_drift_memory.py`, `tests/unit/c
 
 **Severity**: `medium`  
 **Category**: `near-duplicate`  
-**fan_in**: 29 | **fan_out**: 7
+**fan_in**: 51 | **fan_out**: 7
 
 `SegmentMemory` in `src/core/memory/segment_memory.py` (utility), `SubgoalMemory` in `src/core/memory/subgoal_memory.py` (utility). Shared methods: ['exists', 'get', 'get_chain', 'get_children', 'get_record', 'list_all', 'load_snapshot', 'put', 'snapshot']
 
@@ -98,13 +98,13 @@ _No issues found._
 
 ---
 
-## 3. Stratum Invariant Violations (27 found)
+## 3. Stratum Invariant Violations (29 found)
 
 ### 🟡 I3 — Utility class `PlanMemory` has reasoning keyword `plan` in name
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 29 | **fan_out**: 7
+**fan_in**: 51 | **fan_out**: 7
 
 `PlanMemory` in `src/core/memory/plan_memory.py`. Stratum 1 must be reactive and deterministic. Reasoning/planning logic belongs in Stratum 2 (domain).
 
@@ -112,7 +112,7 @@ _No issues found._
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 106 | **fan_out**: 3
+**fan_in**: 113 | **fan_out**: 3
 
 `PlanMemoryRecord` in `src/core/memory/plan_memory_types.py`. Stratum 1 must be reactive and deterministic. Reasoning/planning logic belongs in Stratum 2 (domain).
 
@@ -136,7 +136,7 @@ _No issues found._
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 14 | **fan_out**: 21
+**fan_in**: 16 | **fan_out**: 21
 
 `PlanRepair` in `src/core/memory/repair/plan_repair.py`. Stratum 1 must be reactive and deterministic. Reasoning/planning logic belongs in Stratum 2 (domain).
 
@@ -144,7 +144,7 @@ _No issues found._
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 14 | **fan_out**: 21
+**fan_in**: 16 | **fan_out**: 21
 
 `PlanRepair` in `src/core/memory/repair/plan_repair.py` references 21 other types. Suggests violation of single responsibility.
 
@@ -200,7 +200,7 @@ _No issues found._
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 12 | **fan_out**: 18
+**fan_in**: 14 | **fan_out**: 18
 
 `FullDriftDetector` in `src/core/planning/drift/full_drift_detector.py` references 18 other types. Suggests violation of single responsibility.
 
@@ -228,6 +228,22 @@ _No issues found._
 
 `PlanGenerator` in `src/core/planning/generator/plan_generator.py`. Stratum 1 must be reactive and deterministic. Reasoning/planning logic belongs in Stratum 2 (domain).
 
+### 🟡 I5 — Utility class `ReflectionLoop` has excessive fan_out (33)
+
+**Severity**: `medium`  
+**Category**: `invariant`  
+**fan_in**: 13 | **fan_out**: 33
+
+`ReflectionLoop` in `src/core/planning/reflection/reflection_loop.py` references 33 other types. Suggests violation of single responsibility.
+
+### 🟡 I3 — Utility class `PlanAdjustment` has reasoning keyword `plan` in name
+
+**Severity**: `medium`  
+**Category**: `invariant`  
+**fan_in**: 3 | **fan_out**: 2
+
+`PlanAdjustment` in `src/core/planning/reflection/reflection_types.py`. Stratum 1 must be reactive and deterministic. Reasoning/planning logic belongs in Stratum 2 (domain).
+
 ### 🟡 I3 — Utility class `PlanSegmentManager` has reasoning keyword `plan` in name
 
 **Severity**: `medium`  
@@ -248,7 +264,7 @@ _No issues found._
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 14 | **fan_out**: 28
+**fan_in**: 16 | **fan_out**: 28
 
 `FullValidationEngine` in `src/core/planning/validation/full_validation_engine.py` references 28 other types. Suggests violation of single responsibility.
 
@@ -645,71 +661,73 @@ _No issues found._
 | 5 | 🟡 `medium` | `invariant` | I5 — Utility class `SummarisationRules` has excessive fan_out (13) |
 | 6 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanBreakageReport` has reasoning keyword `plan` in name |
 | 7 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanRecordValidationResult` has reasoning keyword `plan` in name |
-| 8 | 🟡 `medium` | `invariant` | I3 — Utility class `RepairPlan` has reasoning keyword `plan` in name |
-| 9 | 🟡 `medium` | `invariant` | I5 — Utility class `FullValidationEngine` has excessive fan_out (28) |
-| 10 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanRepair` has reasoning keyword `plan` in name |
-| 11 | 🟡 `medium` | `invariant` | I5 — Utility class `PlanRepair` has excessive fan_out (21) |
+| 8 | 🟡 `medium` | `invariant` | I5 — Utility class `FullValidationEngine` has excessive fan_out (28) |
+| 9 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanRepair` has reasoning keyword `plan` in name |
+| 10 | 🟡 `medium` | `invariant` | I5 — Utility class `PlanRepair` has excessive fan_out (21) |
+| 11 | 🟡 `medium` | `invariant` | I3 — Utility class `RepairPlan` has reasoning keyword `plan` in name |
 | 12 | 🟡 `medium` | `invariant` | I5 — Utility class `FullDriftDetector` has excessive fan_out (18) |
-| 13 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanSummary` has reasoning keyword `plan` in name |
-| 14 | 🟡 `medium` | `invariant` | I5 — Utility class `EvictionRules` has excessive fan_out (14) |
-| 15 | 🟡 `medium` | `invariant` | I5 — Utility class `DriftDetector` has excessive fan_out (18) |
-| 16 | 🟡 `medium` | `invariant` | I5 — Utility class `StepProcessor` has excessive fan_out (18) |
-| 17 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanValidator` has reasoning keyword `plan` in name |
-| 18 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanGenerator` has reasoning keyword `plan` in name |
-| 19 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanPrompt` has reasoning keyword `plan` in name |
-| 20 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanSegmentValidator` has reasoning keyword `plan` in name |
-| 21 | 🟡 `medium` | `dead-code` | Unreferenced class: `CoreStepExecutor` (infrastructure) |
-| 22 | 🟡 `medium` | `invariant` | I5 — Utility class `SubgoalManager` has excessive fan_out (14) |
-| 23 | 🟡 `medium` | `dead-code` | Unreferenced class: `AgentRuntime` (infrastructure) |
-| 24 | 🟡 `medium` | `dead-code` | Unreferenced class: `SubgoalManager` (utility) |
-| 25 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanSegmentManager` has reasoning keyword `plan` in name |
-| 26 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanSegmentManager` (utility) |
-| 27 | 🟡 `medium` | `dead-code` | Unreferenced class: `BaseSkill` (domain) |
-| 28 | 🟡 `medium` | `dead-code` | Unreferenced class: `SingleSkillExecutor` (infrastructure) |
-| 29 | 🟡 `medium` | `dead-code` | Unreferenced class: `MinimalCoreStepExecutor` (infrastructure) |
-| 30 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanTransitionPolicy` (infrastructure) |
-| 31 | 🟡 `medium` | `dead-code` | Unreferenced class: `Config` (utility) |
-| 32 | 🟡 `medium` | `dead-code` | Unreferenced class: `LLMTransport` (infrastructure) |
-| 33 | 🟡 `medium` | `dead-code` | Unreferenced class: `EnforcedLoopPolicy` (infrastructure) |
-| 34 | 🟡 `medium` | `dead-code` | Unreferenced class: `Policy` (infrastructure) |
-| 35 | 🟡 `medium` | `invariant` | I3 — Utility class `LocalPlanner` has reasoning keyword `plan` in name |
-| 36 | 🟡 `medium` | `dead-code` | Unreferenced class: `Executor` (infrastructure) |
-| 37 | 🟡 `medium` | `dead-code` | Unreferenced class: `ForbiddenCapabilityPolicy` (infrastructure) |
-| 38 | 🟡 `medium` | `dead-code` | Unreferenced class: `LocalPlanner` (utility) |
-| 39 | 🟡 `medium` | `dead-code` | Unreferenced class: `RetryPolicy` (infrastructure) |
-| 40 | 🟡 `medium` | `dead-code` | Unreferenced class: `StructuredLogger` (infrastructure) |
-| 41 | 🟡 `medium` | `dead-code` | Unreferenced class: `CapabilityRegistry` (utility) |
-| 42 | 🟡 `medium` | `dead-code` | Unreferenced class: `Governance` (infrastructure) |
-| 43 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanStateValidationError` has reasoning keyword `plan` in name |
-| 44 | 🟡 `medium` | `invariant` | I6 — Test class `ToolValidator` is inside `src/` |
-| 45 | 🟡 `medium` | `dead-code` | Unreferenced class: `LoopTerminationDecision` (utility) |
-| 46 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillFilter` (domain) |
-| 47 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillRanker` (domain) |
-| 48 | 🟡 `medium` | `dead-code` | Unreferenced class: `Telemetry` (infrastructure) |
-| 49 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanValidationResult` has reasoning keyword `plan` in name |
-| 50 | 🟡 `medium` | `invariant` | I6 — Test class `ToolPromptBuilder` is inside `src/` |
-| 51 | 🟡 `medium` | `invariant` | I6 — Test class `ToolSchemaGenerator` is inside `src/` |
-| 52 | 🟡 `medium` | `dead-code` | Unreferenced class: `AgentDispatcher` (adapter) |
-| 53 | 🟡 `medium` | `dead-code` | Unreferenced class: `DeadCodeIgnore` (domain) |
-| 54 | 🟡 `medium` | `dead-code` | Unreferenced class: `MinimalSafetyPolicy` (infrastructure) |
-| 55 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanValidationResult` (utility) |
-| 56 | 🔵 `low` | `duplicate` | Duplicate class name: `TestComputeConfidence` |
-| 57 | 🔵 `low` | `dead-code` | Unreferenced class: `RecoveryAction` (domain) |
-| 58 | 🔵 `low` | `duplicate` | Duplicate class name: `TestRecordSerialisation` |
-| 59 | 🔵 `low` | `duplicate` | Duplicate class name: `TestSnapshot` |
-| 60 | 🔵 `low` | `dead-code` | Unreferenced class: `GovernanceError` (domain) |
-| 61 | 🔵 `low` | `duplicate` | Duplicate class name: `TestGetChain` |
-| 62 | 🔵 `low` | `dead-code` | Unreferenced class: `ExecutionError` (domain) |
-| 63 | 🔵 `low` | `dead-code` | Unreferenced class: `MappingError` (domain) |
-| 64 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanningError` (domain) |
-| 65 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticError` (domain) |
-| 66 | 🔵 `low` | `dead-code` | Unreferenced class: `StateError` (domain) |
-| 67 | 🔵 `low` | `duplicate` | Duplicate class name: `TestCrud` |
-| 68 | 🔵 `low` | `duplicate` | Duplicate class name: `TestDeterministicOrdering` |
-| 69 | 🔵 `low` | `duplicate` | Duplicate class name: `TestGetBySubgoal` |
-| 70 | 🔵 `low` | `duplicate` | Duplicate class name: `TestGetChildren` |
-| 71 | 🔵 `low` | `dead-code` | Unreferenced class: `LLMError` (domain) |
-| 72 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanStateValidationError` (utility) |
-| 73 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticValidationError` (domain) |
-| 74 | 🔵 `low` | `dead-code` | Unreferenced class: `SystemError` (domain) |
-| 75 | 🔵 `low` | `dead-code` | Unreferenced class: `ToolExecutionError` (infrastructure) |
+| 13 | 🟡 `medium` | `invariant` | I5 — Utility class `ReflectionLoop` has excessive fan_out (33) |
+| 14 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanSummary` has reasoning keyword `plan` in name |
+| 15 | 🟡 `medium` | `invariant` | I5 — Utility class `EvictionRules` has excessive fan_out (14) |
+| 16 | 🟡 `medium` | `invariant` | I5 — Utility class `DriftDetector` has excessive fan_out (18) |
+| 17 | 🟡 `medium` | `invariant` | I5 — Utility class `StepProcessor` has excessive fan_out (18) |
+| 18 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanValidator` has reasoning keyword `plan` in name |
+| 19 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanGenerator` has reasoning keyword `plan` in name |
+| 20 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanAdjustment` has reasoning keyword `plan` in name |
+| 21 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanPrompt` has reasoning keyword `plan` in name |
+| 22 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanSegmentValidator` has reasoning keyword `plan` in name |
+| 23 | 🟡 `medium` | `dead-code` | Unreferenced class: `CoreStepExecutor` (infrastructure) |
+| 24 | 🟡 `medium` | `invariant` | I5 — Utility class `SubgoalManager` has excessive fan_out (14) |
+| 25 | 🟡 `medium` | `dead-code` | Unreferenced class: `AgentRuntime` (infrastructure) |
+| 26 | 🟡 `medium` | `dead-code` | Unreferenced class: `SubgoalManager` (utility) |
+| 27 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanSegmentManager` has reasoning keyword `plan` in name |
+| 28 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanSegmentManager` (utility) |
+| 29 | 🟡 `medium` | `dead-code` | Unreferenced class: `BaseSkill` (domain) |
+| 30 | 🟡 `medium` | `dead-code` | Unreferenced class: `SingleSkillExecutor` (infrastructure) |
+| 31 | 🟡 `medium` | `dead-code` | Unreferenced class: `MinimalCoreStepExecutor` (infrastructure) |
+| 32 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanTransitionPolicy` (infrastructure) |
+| 33 | 🟡 `medium` | `dead-code` | Unreferenced class: `Config` (utility) |
+| 34 | 🟡 `medium` | `dead-code` | Unreferenced class: `LLMTransport` (infrastructure) |
+| 35 | 🟡 `medium` | `dead-code` | Unreferenced class: `EnforcedLoopPolicy` (infrastructure) |
+| 36 | 🟡 `medium` | `dead-code` | Unreferenced class: `Policy` (infrastructure) |
+| 37 | 🟡 `medium` | `invariant` | I3 — Utility class `LocalPlanner` has reasoning keyword `plan` in name |
+| 38 | 🟡 `medium` | `dead-code` | Unreferenced class: `Executor` (infrastructure) |
+| 39 | 🟡 `medium` | `dead-code` | Unreferenced class: `ForbiddenCapabilityPolicy` (infrastructure) |
+| 40 | 🟡 `medium` | `dead-code` | Unreferenced class: `LocalPlanner` (utility) |
+| 41 | 🟡 `medium` | `dead-code` | Unreferenced class: `RetryPolicy` (infrastructure) |
+| 42 | 🟡 `medium` | `dead-code` | Unreferenced class: `StructuredLogger` (infrastructure) |
+| 43 | 🟡 `medium` | `dead-code` | Unreferenced class: `CapabilityRegistry` (utility) |
+| 44 | 🟡 `medium` | `dead-code` | Unreferenced class: `Governance` (infrastructure) |
+| 45 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanStateValidationError` has reasoning keyword `plan` in name |
+| 46 | 🟡 `medium` | `invariant` | I6 — Test class `ToolValidator` is inside `src/` |
+| 47 | 🟡 `medium` | `dead-code` | Unreferenced class: `LoopTerminationDecision` (utility) |
+| 48 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillFilter` (domain) |
+| 49 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillRanker` (domain) |
+| 50 | 🟡 `medium` | `dead-code` | Unreferenced class: `Telemetry` (infrastructure) |
+| 51 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanValidationResult` has reasoning keyword `plan` in name |
+| 52 | 🟡 `medium` | `invariant` | I6 — Test class `ToolPromptBuilder` is inside `src/` |
+| 53 | 🟡 `medium` | `invariant` | I6 — Test class `ToolSchemaGenerator` is inside `src/` |
+| 54 | 🟡 `medium` | `dead-code` | Unreferenced class: `AgentDispatcher` (adapter) |
+| 55 | 🟡 `medium` | `dead-code` | Unreferenced class: `DeadCodeIgnore` (domain) |
+| 56 | 🟡 `medium` | `dead-code` | Unreferenced class: `MinimalSafetyPolicy` (infrastructure) |
+| 57 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanValidationResult` (utility) |
+| 58 | 🔵 `low` | `duplicate` | Duplicate class name: `TestComputeConfidence` |
+| 59 | 🔵 `low` | `dead-code` | Unreferenced class: `RecoveryAction` (domain) |
+| 60 | 🔵 `low` | `duplicate` | Duplicate class name: `TestRecordSerialisation` |
+| 61 | 🔵 `low` | `duplicate` | Duplicate class name: `TestSnapshot` |
+| 62 | 🔵 `low` | `dead-code` | Unreferenced class: `GovernanceError` (domain) |
+| 63 | 🔵 `low` | `duplicate` | Duplicate class name: `TestGetChain` |
+| 64 | 🔵 `low` | `dead-code` | Unreferenced class: `ExecutionError` (domain) |
+| 65 | 🔵 `low` | `dead-code` | Unreferenced class: `MappingError` (domain) |
+| 66 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanningError` (domain) |
+| 67 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticError` (domain) |
+| 68 | 🔵 `low` | `dead-code` | Unreferenced class: `StateError` (domain) |
+| 69 | 🔵 `low` | `duplicate` | Duplicate class name: `TestCrud` |
+| 70 | 🔵 `low` | `duplicate` | Duplicate class name: `TestDeterministicOrdering` |
+| 71 | 🔵 `low` | `duplicate` | Duplicate class name: `TestGetBySubgoal` |
+| 72 | 🔵 `low` | `duplicate` | Duplicate class name: `TestGetChildren` |
+| 73 | 🔵 `low` | `dead-code` | Unreferenced class: `LLMError` (domain) |
+| 74 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanStateValidationError` (utility) |
+| 75 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticValidationError` (domain) |
+| 76 | 🔵 `low` | `dead-code` | Unreferenced class: `SystemError` (domain) |
+| 77 | 🔵 `low` | `dead-code` | Unreferenced class: `ToolExecutionError` (infrastructure) |
