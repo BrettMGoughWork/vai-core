@@ -333,7 +333,7 @@
 - Implement PlanMemory store  
 - Add PlanMemory retrieval  
 
-2.4.4 — Drift Memory
+✅ 2.4.4 — Drift Memory
 - Implement DriftMemory store  
 - Add DriftMemory retrieval
 

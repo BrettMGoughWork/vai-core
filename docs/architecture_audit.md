@@ -1,8 +1,8 @@
 # Architecture Audit Report
 
-> **architecture.json snapshot**: `2026-05-30 11:20:10 UTC`  
-> **Audit generated**: `2026-05-30 11:20:11 UTC`  
-> **Classes analysed**: 216 | **References**: 798
+> **architecture.json snapshot**: `2026-05-30 11:28:14 UTC`  
+> **Audit generated**: `2026-05-30 11:28:14 UTC`  
+> **Classes analysed**: 225 | **References**: 827
 
 ## Summary
 
@@ -32,7 +32,7 @@ Defined in 2 files: `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/co
 **Category**: `duplicate`  
 **fan_in**: 0 | **fan_out**: 1
 
-Defined in 2 files: `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/core/memory/test_segment_memory.py`
+Defined in 3 files: `tests/unit/core/memory/test_drift_memory.py`, `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/core/memory/test_segment_memory.py`
 
 ### 🔵 Duplicate class name: `TestGetBySubgoal`
 
@@ -72,7 +72,7 @@ Defined in 3 files: `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/co
 **Category**: `duplicate`  
 **fan_in**: 0 | **fan_out**: 4
 
-Defined in 3 files: `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/core/memory/test_segment_memory.py`, `tests/unit/core/memory/test_subgoal_memory.py`
+Defined in 4 files: `tests/unit/core/memory/test_drift_memory.py`, `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/core/memory/test_segment_memory.py`, `tests/unit/core/memory/test_subgoal_memory.py`
 
 ### 🟡 Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 89%)
 
