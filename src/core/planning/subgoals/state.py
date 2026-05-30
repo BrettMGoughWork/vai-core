@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from .model import Subgoal
+from src.core.types.subgoal import Subgoal
 from .errors import SubgoalNotFoundError
 
 class SubgoalState:

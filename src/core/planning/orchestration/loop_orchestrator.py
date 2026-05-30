@@ -4,7 +4,8 @@ from typing import Any, Tuple
 
 from ..models.step_state import StepState
 from ...types.step_result import StepResult
-from .loop_controller import LoopController, LoopPolicy
+from .loop_controller import LoopController
+from ..safety.loop_policy import LoopPolicy
 from .loop_metrics import LoopMetrics
 
 

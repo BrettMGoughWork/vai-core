@@ -25,3 +25,11 @@ class LoopPolicy:
         if self.max_duration is None:
             return True
         return duration < self.max_duration
+
+    def allows_continue(
+        self,
+        state,
+        result,
+        step_count: int,
+    ) -> bool:
+        return self.allows_step(step_count)

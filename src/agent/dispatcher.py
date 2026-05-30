@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.types.step import CoreStep
+from src.core.types.core_step import CoreStep
 from src.core.signals.model import GovernedSignal, SignalSeverity
 from src.core.state.state import ConversationState
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.planning.subgoals.model import Subgoal
+from src.core.types.subgoal import Subgoal
 from src.core.types.json_pure import ensure_json_pure
 
 

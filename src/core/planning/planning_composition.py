@@ -15,7 +15,7 @@ from src.core.planning.safety.safety_policies import (
     ForbiddenCapabilityPolicy,
     PlanTransitionPolicy,
 )
-from src.core.planning.core_step import CoreStep
+from src.core.planning.step_processor import StepProcessor
 
 
 def build_planning_substrate():
@@ -30,7 +30,7 @@ def build_planning_substrate():
         "dummy": {},
         "echo": {"input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}
     }
-    core_step = CoreStep(capabilities=capabilities)
+    core_step = StepProcessor(capabilities=capabilities)
 
     # Base dispatcher
     dispatcher = StepDispatcher(core_step=core_step)

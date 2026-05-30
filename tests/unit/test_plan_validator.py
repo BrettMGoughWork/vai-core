@@ -1,5 +1,5 @@
 import pytest
-from src.primitives.runtime.validator import ValidationError
+from src.core.types.errors import ValidationError
 from src.core.planning.models.plan import Plan as RealPlan
 from src.core.types.errors.plan_errors import (
     PlanStructureError,
@@ -7,8 +7,8 @@ from src.core.types.errors.plan_errors import (
 )
 from src.core.planning.validators.plan_validator import PlanValidator
 
-# Patch Plan with to_dict for test compatibility
-class Plan(RealPlan):
+# Test double: adds to_dict for compatibility without polluting the real Plan class
+class PlanTestDouble(RealPlan):
     def __init__(self, *args, force_arguments_key=False, **kwargs):
         super().__init__(*args, **kwargs)
         self._force_arguments_key = force_arguments_key
@@ -30,7 +30,7 @@ FAKE_CAPABILITIES = {
 
 def test_valid_plan_passes():
     validator = PlanValidator(FAKE_CAPABILITIES)
-    plan = Plan(
+    plan = PlanTestDouble(
         intent="sum numbers",
         targetskillid="math_add",
         arguments={"a": 1, "b": 2},
@@ -42,40 +42,40 @@ def test_valid_plan_passes():
 def test_structure_errors():
     validator = PlanValidator(FAKE_CAPABILITIES)
     # Empty intent
-    plan = Plan("", "math_add", {"a": 1, "b": 2}, "summary")
+    plan = PlanTestDouble("", "math_add", {"a": 1, "b": 2}, "summary")
     with pytest.raises(PlanStructureError):
         validator.validate(plan)
     # Empty targetskillid
-    plan = Plan("intent", "", {"a": 1, "b": 2}, "summary")
+    plan = PlanTestDouble("intent", "", {"a": 1, "b": 2}, "summary")
     with pytest.raises(PlanStructureError):
         validator.validate(plan)
     # Arguments not a dict
-    plan = Plan("intent", "math_add", None, "summary")
+    plan = PlanTestDouble("intent", "math_add", None, "summary")
     with pytest.raises(PlanStructureError):
         validator.validate(plan)
     # Reasoning summary not a string
-    plan = Plan("intent", "math_add", {"a": 1, "b": 2}, None)
+    plan = PlanTestDouble("intent", "math_add", {"a": 1, "b": 2}, None)
     with pytest.raises(PlanStructureError):
         validator.validate(plan)
 
 
 def test_unknown_capability():
     validator = PlanValidator(FAKE_CAPABILITIES)
-    plan = Plan("intent", "not_real", {"a": 1, "b": 2}, "summary")
+    plan = PlanTestDouble("intent", "not_real", {"a": 1, "b": 2}, "summary")
     with pytest.raises(ValidationError):
         validator.validate(plan)
 
 
 def test_forbidden_capability():
     validator = PlanValidator(FAKE_CAPABILITIES, allowed_capabilities={"math_add"})
-    plan = Plan("intent", "dangerous", {}, "summary")
+    plan = PlanTestDouble("intent", "dangerous", {}, "summary")
     with pytest.raises(ForbiddenCapabilityError):
         validator.validate(plan)
 
 
 def test_argument_schema_mismatch():
     validator = PlanValidator(FAKE_CAPABILITIES)
-    plan = Plan("intent", "math_add", {"a": 1}, "summary")
+    plan = PlanTestDouble("intent", "math_add", {"a": 1}, "summary")
     with pytest.raises(ValidationError):
         validator.validate(plan)
 
@@ -89,7 +89,8 @@ def test_plan_purity_error_on_capability_output():
     from src.core.types.errors.ValidationError import ValidationError
     from src.core.planning.models.plan_state import PlanState
     from src.core.planning.models.step_state import StepState
-    from src.core.types.step_result import StepResult, StepOutcome
+    from src.core.types.step_result import StepResult
+    from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 
     class DummyCapability:
         def execute(self, arguments):
@@ -112,13 +113,13 @@ def test_plan_purity_error_on_capability_output():
                 trace=[],
                 canonical_hash="testhash"
             ), StepResult(
-                outcome=StepOutcome.SUCCESS,
+                outcome=CognitiveStepOutcome.SUCCESS,
                 reason="",
                 payload=DummyCapability().execute(plan.arguments),
                 trace={},
             )
 
-    plan = Plan("intent", "dummy", {}, "summary")
+    plan = PlanTestDouble("intent", "dummy", {}, "summary")
     executor = PlanExecutor(DummyDispatcher())
     with pytest.raises(ValidationError):
         executor.execute(plan)
@@ -127,7 +128,7 @@ def test_plan_purity_error_on_capability_output():
 
 def test_plan_safety_error():
     validator = PlanValidator(FAKE_CAPABILITIES)
-    plan = Plan("intent", "dangerous", {}, "summary")
+    plan = PlanTestDouble("intent", "dangerous", {}, "summary")
     with pytest.raises(PlanSafetyError):
         validator.validate(plan)
 
@@ -135,7 +136,7 @@ def test_plan_safety_error():
 
 def test_validate_accepts_valid_plan_and_args():
     validator = PlanValidator(FAKE_CAPABILITIES)
-    plan = Plan(
+    plan = PlanTestDouble(
         intent="sum numbers",
         targetskillid="math_add",
         arguments={"a": 1, "b": 2},
@@ -147,7 +148,7 @@ def test_validate_accepts_valid_plan_and_args():
 
 def test_validate_rejects_argument_schema_mismatch():
     validator = PlanValidator(FAKE_CAPABILITIES)
-    plan = Plan(
+    plan = PlanTestDouble(
         intent="sum numbers",
         targetskillid="math_add",
         arguments={"a": 1},
@@ -160,7 +161,7 @@ def test_validate_rejects_argument_schema_mismatch():
 
 def test_validate_rejects_invalid_plan_field_types():
     validator = PlanValidator(FAKE_CAPABILITIES)
-    plan = Plan(
+    plan = PlanTestDouble(
         intent="",
         targetskillid="math_add",
         arguments={},

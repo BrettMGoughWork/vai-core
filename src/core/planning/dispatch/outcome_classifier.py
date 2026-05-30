@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Any, Dict
 
-from src.core.types.step_result import StepOutcome, StepResult
+from src.core.types.step_result import StepResult
+from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.core.planning.safety.purity_validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.errors.AgentError import ConfidenceError
@@ -9,10 +10,10 @@ from src.core.types.errors.AgentError import ConfidenceError
 
 # Deterministic priority order for ambiguous or missing labels
 OUTCOME_PRIORITY = [
-    StepOutcome.FAILURE,
-    StepOutcome.TOOL_NEEDED,
-    StepOutcome.SUCCESS,
-    StepOutcome.CONTINUE,
+    CognitiveStepOutcome.FAILURE,
+    CognitiveStepOutcome.TOOL_NEEDED,
+    CognitiveStepOutcome.SUCCESS,
+    CognitiveStepOutcome.CONTINUE,
 ]
 
 
@@ -29,7 +30,7 @@ class OutcomeClassifier:
         except Exception as e:
             err = ValidationError(f"Classifier output not pure: {e}")
             return StepResult(
-                outcome=StepOutcome.FAILURE,
+                outcome=CognitiveStepOutcome.FAILURE,
                 reason=str(err),
                 payload={"error": err.__dict__},
                 trace={},
@@ -47,10 +48,10 @@ class OutcomeClassifier:
 
         # Deterministic mapping
         mapping = {
-            "success": StepOutcome.SUCCESS,
-            "failure": StepOutcome.FAILURE,
-            "tool_needed": StepOutcome.TOOL_NEEDED,
-            "continue": StepOutcome.CONTINUE,
+            "success": CognitiveStepOutcome.SUCCESS,
+            "failure": CognitiveStepOutcome.FAILURE,
+            "tool_needed": CognitiveStepOutcome.TOOL_NEEDED,
+            "continue": CognitiveStepOutcome.CONTINUE,
         }
 
         outcome = mapping.get(label)

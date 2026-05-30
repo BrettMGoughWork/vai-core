@@ -1,3 +1,3 @@
-class GovernanceError(Exception):
-    """Base class for governance-related errors."""
-    pass
+from src.core.types.errors import GovernanceError
+
+__all__ = ["GovernanceError"]

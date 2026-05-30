@@ -1,4 +1,4 @@
-from src.core.types.step import CoreStep
+from src.core.types.core_step import CoreStep
 from src.core.types.result import CoreResult
 
 class MinimalCoreStepExecutor:

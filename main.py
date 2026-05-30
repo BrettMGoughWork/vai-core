@@ -5,6 +5,7 @@ from src.agent.loop import AgentLoop
 from src.core.planning.safety.minimal_policy import MinimalSafetyPolicy
 
 def main():
+    print("Starting agent loop...")
     dispatcher = AgentDispatcher()
     safety_policies = [
         MinimalSafetyPolicy(),

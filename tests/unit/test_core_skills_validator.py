@@ -1,6 +1,7 @@
 import pytest
 
-from src.primitives.runtime.validator import ValidationError, validate_structural
+from src.primitives.runtime.validator import validate_structural
+from src.core.types.errors import ValidationError
 
 
 def test_validate_structural_accepts_valid_args():

@@ -4,8 +4,8 @@ import pytest
 
 from src.core.planning.subgoals.manager import SubgoalManager
 from src.core.planning.subgoals.state import SubgoalState
-from src.core.planning.subgoals.validator import SubgoalValidator
-from src.core.planning.subgoals.model import SubgoalLifecycleState
+from src.core.planning.validators.subgoal_validator import SubgoalValidator
+from src.core.types.subgoal import SubgoalLifecycleState
 from src.core.planning.subgoals.errors import (
     SubgoalNotFoundError,
     InvalidSubgoalError,
@@ -71,11 +71,11 @@ def test_create_subgoal_invalid_parent(manager):
 # ------------------------------------------------------------
 
 def test_invalid_subgoal_fails_validation(manager, validator):
-    # Force validator to fail
-    validator._validator.validate = lambda _: False
-
-    with pytest.raises(InvalidSubgoalError):
-        manager.create_subgoal("bad", {}, {})
+    # Force validator to fail by patching the validate method directly
+    from unittest.mock import patch
+    with patch.object(validator, 'validate', return_value=False):
+        with pytest.raises(InvalidSubgoalError):
+            manager.create_subgoal("bad", {}, {})
 
 
 # ------------------------------------------------------------
@@ -147,11 +147,11 @@ def test_active_chain_chooses_lexicographically(manager, state):
 
     chain = state.active_chain()
 
-    # Lexicographically: a < b
-    # Lexicographically: a < b
-    # With lexicographic sorting, 'b' comes after 'a' if subgoal_id 'b' > 'a'.
-    # Update the expected value to match the new order.
-    assert chain[-1].goal == "b"
+    # active_chain() sorts active children by subgoal_id (a stable hash),
+    # and picks the lexicographically smallest. The winner is determined by
+    # hash value, not goal text — so we derive the expected leaf from the IDs.
+    expected_leaf = a if a.subgoal_id < b.subgoal_id else b
+    assert chain[-1].subgoal_id == expected_leaf.subgoal_id
 
 
 # ------------------------------------------------------------

@@ -1,9 +1,9 @@
 from unittest.mock import MagicMock, patch
 import time
 
-from src.core.state.config import AgentConfig, LoopPolicy
+from src.core.state.config import AgentConfig, LoopPolicyConfig
 from src.core.state.core_step_executor import CoreStepExecutor
-from src.core.state.outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 from src.core.state.runtime import AgentRuntime, _result_summary
 from src.core.llm.types import CoreLLMResponse
 from src.primitives.runtime.categories import SkillCategory
@@ -121,7 +121,7 @@ def test_run_returns_last_result_after_max_steps_for_noop():
 def test_run_handles_step_timeout():
     transport = MagicMock()
     
-    loop_policy = LoopPolicy(per_step_timeout=0.1)
+    loop_policy = LoopPolicyConfig(per_step_timeout=0.1)
     config = AgentConfig(
         model="test-model",
         allowed_tools=["echo"],
@@ -147,7 +147,7 @@ def test_run_handles_step_timeout():
 def test_run_handles_wall_time_timeout():
     transport = MagicMock()
     
-    loop_policy = LoopPolicy(max_wall_time=0.2)
+    loop_policy = LoopPolicyConfig(max_wall_time=0.2)
     config = AgentConfig(
         model="test-model",
         allowed_tools=["echo"],
