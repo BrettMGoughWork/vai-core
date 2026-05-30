@@ -360,11 +360,11 @@
 - Expand the skeleton rules into a complete transition graph covering all subgoal and segment states
 - Add edge cases, fallback paths, and error transitions
 
-2.5.3 - Full drift detection
+✅ 2.5.3 - Full drift detection
 - Implement multi-signal drift detection combining behavioural, structural, and temporal signals
 - Add confidence scoring and multi-step drift confirmation
 
-2.5.4 - Full validation rules
+✅ 2.5.4 - Full validation rules
 - Integrate all validation layers: subgoal, segment, plan, memory and safety
 - Ensure validation is deterministic and composable
 
