@@ -303,8 +303,9 @@
 - cleanup drift
 - remove duplication
 - restructure
+- creation of a /tools/architecture/ci_architecture_check.py analyser which creates a /docs/architecture.json file which is a breakdown of packages, classes, references, and an architecture_audit.md, which is an analysis of deadcode, class duplication, drift, architecture and invariant violations, and finally, a prioritised list of issues. This is designed to fail if at least one critical or high priority issue exists.
 
-2.3.7 — Subgoal Transition Rules
+✅ 2.3.7 — Subgoal Transition Rules
 - Define transition rules  
 - Implement transition engine  
 

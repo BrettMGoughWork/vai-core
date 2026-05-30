@@ -45,6 +45,12 @@
       ]
     },
     {
+      "name": "src.core.planning.drift",
+      "path": "src/core/planning/drift",
+      "imports": [],
+      "exports": []
+    },
+    {
       "name": "src.core.tools",
       "path": "src/core/tools",
       "imports": [],
@@ -210,6 +216,12 @@
     {
       "name": "tests.unit.core.planning.dispatch",
       "path": "tests/unit/core/planning/dispatch",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.drift",
+      "path": "tests/unit/core/planning/drift",
       "imports": [],
       "exports": []
     },
@@ -1037,6 +1049,152 @@
       "inferred_stratum": "infrastructure",
       "fan_in": 1,
       "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftDetector",
+      "file": "src/core/planning/drift/drift_detector.py",
+      "package": "src.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "detect_drift",
+        "compute_confidence",
+        "recover_if_needed"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "typing.List",
+        "typing.Optional",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity",
+        "src.core.signals.model.SignalType",
+        "src.core.signals.model.SIGNAL_WEIGHTS",
+        "src.core.signals.model.DEFAULT_SIGNAL_WEIGHT",
+        "src.core.planning.drift.drift_types.DriftRecoveryAction",
+        "src.core.planning.drift.drift_types.DriftReport",
+        "src.core.planning.drift.drift_types.StepContext"
+      ],
+      "references": [
+        "DriftReport",
+        "SignalSeverity",
+        "DriftRecoveryAction",
+        "Optional",
+        "GovernedSignal",
+        "INFO",
+        "NONE",
+        "StepContext",
+        "CRITICAL",
+        "WARN",
+        "ABORT",
+        "REPLAN",
+        "RESET_SUBGOAL",
+        "List",
+        "DEFAULT_SIGNAL_WEIGHT",
+        "DRIFT",
+        "SIGNAL_WEIGHTS",
+        "SignalType"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 5,
+      "fan_out": 18,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftRecoveryAction",
+      "file": "src/core/planning/drift/drift_types.py",
+      "package": "src.core.planning.drift",
+      "inherits": [
+        "str",
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "enum.Enum",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity"
+      ],
+      "references": [
+        "str",
+        "Enum",
+        "NONE",
+        "RESET_SUBGOAL",
+        "REPLAN",
+        "ABORT"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 10,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "StepContext",
+      "file": "src/core/planning/drift/drift_types.py",
+      "package": "src.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "step_id",
+        "signals",
+        "timestamp"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "enum.Enum",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity"
+      ],
+      "references": [
+        "Tuple",
+        "GovernedSignal"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 7,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftReport",
+      "file": "src/core/planning/drift/drift_types.py",
+      "package": "src.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "signal",
+        "confidence",
+        "severity",
+        "recommended_action"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "enum.Enum",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity"
+      ],
+      "references": [
+        "SignalSeverity",
+        "DriftRecoveryAction",
+        "Optional",
+        "GovernedSignal"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 9,
+      "fan_out": 4,
       "dead_code_ignored": false
     },
     {
@@ -2554,7 +2712,7 @@
         "UNSAFE"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 1,
+      "fan_in": 10,
       "fan_out": 5,
       "dead_code_ignored": false
     },
@@ -2587,8 +2745,43 @@
         "CRITICAL"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 2,
+      "fan_in": 16,
       "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SignalSource",
+      "file": "src/core/signals/model.py",
+      "package": "src.core.signals",
+      "inherits": [
+        "str",
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Dict",
+        "typing.Any",
+        "time",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "str",
+        "Enum",
+        "PLANNING_DEVIATION",
+        "LOOP_ANOMALY",
+        "SUBGOAL_STALL",
+        "COGNITIVE_DISSONANCE",
+        "EXECUTION_MISMATCH"
+      ],
+      "inferred_stratum": "domain",
+      "fan_in": 7,
+      "fan_out": 7,
       "dead_code_ignored": false
     },
     {
@@ -2623,7 +2816,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 1,
+      "fan_in": 15,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -5036,6 +5229,208 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestComputeConfidence",
+      "file": "tests/unit/core/planning/drift/test_drift_detector.py",
+      "package": "tests.unit.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_signals_returns_zero",
+        "test_single_signal_returns_its_confidence",
+        "test_result_is_in_unit_interval",
+        "test_higher_weight_source_dominates",
+        "test_unknown_source_uses_default_weight",
+        "test_deterministic_same_input_same_output",
+        "test_legacy_source_accepted"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity",
+        "src.core.signals.model.SignalSource",
+        "src.core.signals.model.SignalType",
+        "src.core.planning.drift.drift_types.DriftRecoveryAction",
+        "src.core.planning.drift.drift_types.DriftReport",
+        "src.core.planning.drift.drift_types.StepContext",
+        "src.core.planning.drift.drift_detector.DriftDetector"
+      ],
+      "references": [
+        "PLANNING_DEVIATION",
+        "COGNITIVE_DISSONANCE",
+        "SUBGOAL_STALL",
+        "SignalSource",
+        "LOOP_ANOMALY",
+        "EXECUTION_MISMATCH"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDetectDrift",
+      "file": "tests/unit/core/planning/drift/test_drift_detector.py",
+      "package": "tests.unit.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_signals_returns_zero_confidence",
+        "test_non_drift_signals_are_ignored",
+        "test_drift_signals_are_aggregated",
+        "test_mixed_signal_types_only_drift_counted",
+        "test_stale_signals_reduce_confidence",
+        "test_primary_signal_is_highest_contributor",
+        "test_deterministic_ordering"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity",
+        "src.core.signals.model.SignalSource",
+        "src.core.signals.model.SignalType",
+        "src.core.planning.drift.drift_types.DriftRecoveryAction",
+        "src.core.planning.drift.drift_types.DriftReport",
+        "src.core.planning.drift.drift_types.StepContext",
+        "src.core.planning.drift.drift_detector.DriftDetector"
+      ],
+      "references": [
+        "SUBGOAL_STALL",
+        "COGNITIVE_DISSONANCE",
+        "PLANNING_DEVIATION",
+        "LOOP_ANOMALY",
+        "SignalSource",
+        "EXECUTION_MISMATCH"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSeverityBands",
+      "file": "tests/unit/core/planning/drift/test_drift_detector.py",
+      "package": "tests.unit.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_confidence_below_0_3_is_info",
+        "test_confidence_at_0_3_is_warn",
+        "test_confidence_at_0_59_is_warn",
+        "test_confidence_at_0_6_is_critical"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity",
+        "src.core.signals.model.SignalSource",
+        "src.core.signals.model.SignalType",
+        "src.core.planning.drift.drift_types.DriftRecoveryAction",
+        "src.core.planning.drift.drift_types.DriftReport",
+        "src.core.planning.drift.drift_types.StepContext",
+        "src.core.planning.drift.drift_detector.DriftDetector"
+      ],
+      "references": [
+        "DriftReport",
+        "GovernedSignal",
+        "INFO",
+        "WARN",
+        "CRITICAL",
+        "DRIFT",
+        "SignalSeverity",
+        "SignalType"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 8,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRecoveryThresholds",
+      "file": "tests/unit/core/planning/drift/test_drift_detector.py",
+      "package": "tests.unit.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_threshold_boundary"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity",
+        "src.core.signals.model.SignalSource",
+        "src.core.signals.model.SignalType",
+        "src.core.planning.drift.drift_types.DriftRecoveryAction",
+        "src.core.planning.drift.drift_types.DriftReport",
+        "src.core.planning.drift.drift_types.StepContext",
+        "src.core.planning.drift.drift_detector.DriftDetector"
+      ],
+      "references": [
+        "DriftRecoveryAction",
+        "GovernedSignal",
+        "DRIFT",
+        "WARN",
+        "NONE",
+        "RESET_SUBGOAL",
+        "REPLAN",
+        "ABORT",
+        "SignalType",
+        "SignalSeverity"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 10,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRecoverIfNeeded",
+      "file": "tests/unit/core/planning/drift/test_drift_detector.py",
+      "package": "tests.unit.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_returns_none_below_threshold",
+        "test_returns_none_at_zero",
+        "test_returns_action_at_reset_threshold",
+        "test_returns_replan",
+        "test_returns_abort"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity",
+        "src.core.signals.model.SignalSource",
+        "src.core.signals.model.SignalType",
+        "src.core.planning.drift.drift_types.DriftRecoveryAction",
+        "src.core.planning.drift.drift_types.DriftReport",
+        "src.core.planning.drift.drift_types.StepContext",
+        "src.core.planning.drift.drift_detector.DriftDetector"
+      ],
+      "references": [
+        "DriftReport",
+        "RESET_SUBGOAL",
+        "REPLAN",
+        "ABORT",
+        "INFO",
+        "NONE",
+        "DriftRecoveryAction",
+        "SignalSeverity"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 8,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestPlanSegmentConstruction",
       "file": "tests/unit/core/planning/models/test_models.py",
       "package": "tests.unit.core.planning.models",
@@ -6084,6 +6479,116 @@
     {
       "source": "StepDispatcher",
       "target": "StepStatus",
+      "type": "call"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "SignalType",
+      "type": "import"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "DriftRecoveryAction",
+      "type": "import"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "DriftReport",
+      "type": "import"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "StepContext",
+      "type": "import"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "DriftReport",
+      "type": "call"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "SignalSeverity",
+      "type": "call"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "DriftRecoveryAction",
+      "type": "call"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "GovernedSignal",
+      "type": "call"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "StepContext",
+      "type": "call"
+    },
+    {
+      "source": "DriftDetector",
+      "target": "SignalType",
+      "type": "call"
+    },
+    {
+      "source": "DriftRecoveryAction",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "DriftRecoveryAction",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "StepContext",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "StepContext",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "StepContext",
+      "target": "GovernedSignal",
+      "type": "call"
+    },
+    {
+      "source": "DriftReport",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "DriftReport",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "DriftReport",
+      "target": "SignalSeverity",
+      "type": "call"
+    },
+    {
+      "source": "DriftReport",
+      "target": "DriftRecoveryAction",
+      "type": "call"
+    },
+    {
+      "source": "DriftReport",
+      "target": "GovernedSignal",
       "type": "call"
     },
     {
@@ -7985,6 +8490,271 @@
       "source": "TestLLMFactory",
       "target": "OpenAIClient",
       "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "SignalSource",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "SignalType",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "DriftRecoveryAction",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "DriftReport",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "StepContext",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "DriftDetector",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeConfidence",
+      "target": "SignalSource",
+      "type": "call"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "SignalSource",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "SignalType",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "DriftRecoveryAction",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "DriftReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "StepContext",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "DriftDetector",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDrift",
+      "target": "SignalSource",
+      "type": "call"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "SignalSource",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "SignalType",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "DriftRecoveryAction",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "DriftReport",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "StepContext",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "DriftDetector",
+      "type": "import"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "DriftReport",
+      "type": "call"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "GovernedSignal",
+      "type": "call"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "SignalSeverity",
+      "type": "call"
+    },
+    {
+      "source": "TestSeverityBands",
+      "target": "SignalType",
+      "type": "call"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "SignalSource",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "SignalType",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "DriftRecoveryAction",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "DriftReport",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "StepContext",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "DriftDetector",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "DriftRecoveryAction",
+      "type": "call"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "GovernedSignal",
+      "type": "call"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "SignalType",
+      "type": "call"
+    },
+    {
+      "source": "TestRecoveryThresholds",
+      "target": "SignalSeverity",
+      "type": "call"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "SignalSource",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "SignalType",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "DriftRecoveryAction",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "DriftReport",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "StepContext",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "DriftDetector",
+      "type": "import"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "DriftReport",
+      "type": "call"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "DriftRecoveryAction",
+      "type": "call"
+    },
+    {
+      "source": "TestRecoverIfNeeded",
+      "target": "SignalSeverity",
+      "type": "call"
     },
     {
       "source": "TestPlanSegmentConstruction",

@@ -1,3 +1,6 @@
+# Personal Copilot instructions (developer-specific, not for the repo)
+.github/copilot-instructions.md
+
 # Environment
 .env
 
