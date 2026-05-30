@@ -81,6 +81,34 @@
       "exports": []
     },
     {
+      "name": "src.core.planning.reflection",
+      "path": "src/core/planning/reflection",
+      "imports": [
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionDriftReport",
+        "src.core.planning.reflection.reflection_types.PlanAdjustment",
+        "src.core.planning.reflection.reflection_types.TransitionRecord",
+        "src.core.planning.reflection.reflection_types.MemoryUpdateRecord",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop"
+      ],
+      "exports": [
+        "ProgressReport",
+        "ReflectionDriftReport",
+        "PlanAdjustment",
+        "TransitionRecord",
+        "MemoryUpdateRecord",
+        "ReflectionTrace",
+        "ReflectionOutcome",
+        "ReflectionState",
+        "evaluate_progress",
+        "ReflectionLoop"
+      ]
+    },
+    {
       "name": "src.core.planning.transitions",
       "path": "src/core/planning/transitions",
       "imports": [
@@ -346,6 +374,12 @@
     {
       "name": "tests.unit.core.planning.orchestration",
       "path": "tests/unit/core/planning/orchestration",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.reflection",
+      "path": "tests/unit/core/planning/reflection",
       "imports": [],
       "exports": []
     },
@@ -957,7 +991,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 45,
+      "fan_in": 67,
       "fan_out": 6,
       "dead_code_ignored": false
     },
@@ -996,7 +1030,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 91,
+      "fan_in": 98,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1071,7 +1105,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 29,
+      "fan_in": 51,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -1108,7 +1142,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 106,
+      "fan_in": 113,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1178,7 +1212,7 @@
         "Dict"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 29,
+      "fan_in": 51,
       "fan_out": 6,
       "dead_code_ignored": false
     },
@@ -1215,7 +1249,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 94,
+      "fan_in": 104,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1243,7 +1277,7 @@
         "SegmentMemoryRecord"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 25,
+      "fan_in": 33,
       "fan_out": 2,
       "dead_code_ignored": false
     },
@@ -1286,7 +1320,7 @@
         "SubgoalLifecycleState"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 22,
+      "fan_in": 44,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -1321,7 +1355,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 92,
+      "fan_in": 102,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1349,7 +1383,7 @@
         "SubgoalMemoryRecord"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 24,
+      "fan_in": 32,
       "fan_out": 2,
       "dead_code_ignored": false
     },
@@ -1611,7 +1645,7 @@
         "ValueError"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 15,
+      "fan_in": 17,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1680,7 +1714,7 @@
         "DriftEvent"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 11,
+      "fan_in": 20,
       "fan_out": 14,
       "dead_code_ignored": false
     },
@@ -1751,7 +1785,7 @@
         "SubgoalMemoryRecord"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 14,
+      "fan_in": 16,
       "fan_out": 21,
       "dead_code_ignored": false
     },
@@ -2080,7 +2114,7 @@
         "RepairAction"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 16,
+      "fan_in": 18,
       "fan_out": 5,
       "dead_code_ignored": false
     },
@@ -2573,7 +2607,7 @@
       ],
       "references": [],
       "inferred_stratum": "utility",
-      "fan_in": 13,
+      "fan_in": 31,
       "fan_out": 0,
       "dead_code_ignored": false
     },
@@ -2623,7 +2657,7 @@
         "PlanMemoryRecord"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 20,
+      "fan_in": 22,
       "fan_out": 9,
       "dead_code_ignored": false
     },
@@ -2855,7 +2889,7 @@
         "CRITICAL_DRIFT"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 19,
+      "fan_in": 20,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -2929,7 +2963,7 @@
         "DriftSignal"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 16,
+      "fan_in": 27,
       "fan_out": 2,
       "dead_code_ignored": false
     },
@@ -2966,7 +3000,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 15,
+      "fan_in": 24,
       "fan_out": 2,
       "dead_code_ignored": false
     },
@@ -3076,7 +3110,7 @@
         "DriftSignalClass"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 12,
+      "fan_in": 14,
       "fan_out": 18,
       "dead_code_ignored": false
     },
@@ -3233,7 +3267,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 46,
+      "fan_in": 55,
       "fan_out": 1,
       "dead_code_ignored": false
     },
@@ -3540,6 +3574,454 @@
       "inferred_stratum": "utility",
       "fan_in": 0,
       "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ReflectionLoop",
+      "file": "src/core/planning/reflection/reflection_loop.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "run_reflection_cycle"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.asdict",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.drift.drift_context.DriftContext",
+        "src.core.planning.drift.drift_types.DriftClassification",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.full_drift_detector.FullDriftDetector",
+        "src.core.planning.drift.full_drift_detector.classify_drift",
+        "src.core.planning.transitions.full_transition_rules.FullTransitionRules",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.validation.full_validation_engine.FullValidationEngine",
+        "src.core.planning.validation.validation_types.FullValidationResult",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_types.MemoryUpdateRecord",
+        "src.core.planning.reflection.reflection_types.PlanAdjustment",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionDriftReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace",
+        "src.core.planning.reflection.reflection_types.TransitionRecord"
+      ],
+      "references": [
+        "ReflectionOutcome",
+        "DriftConfirmation",
+        "Dict",
+        "FullTransitionRules",
+        "FullValidationEngine",
+        "PlanRepair",
+        "ReflectionState",
+        "List",
+        "TransitionRecord",
+        "MemoryUpdateRecord",
+        "Optional",
+        "RepairOutcome",
+        "Subgoal",
+        "DriftContext",
+        "ReflectionDriftReport",
+        "FullValidationResult",
+        "MemoryGovernance",
+        "PlanAdjustment",
+        "SubgoalEvent",
+        "SubgoalLifecycleState",
+        "FullDriftDetector",
+        "SubgoalMemoryRecord",
+        "SegmentMemoryRecord",
+        "MemoryGovernanceError",
+        "RUNNING",
+        "BLOCK",
+        "BLOCKED",
+        "Plan",
+        "UNBLOCK",
+        "READY",
+        "FAILED",
+        "RETRY",
+        "RETRYING"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 13,
+      "fan_out": 33,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ReflectionState",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "cycle",
+        "timestamp",
+        "subgoal_id",
+        "subgoal_memory",
+        "segment_memory",
+        "plan_memory",
+        "drift_memory",
+        "plan_id",
+        "repair_attempts",
+        "fallback_count",
+        "transition_failures",
+        "prior_progress"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "SubgoalMemory",
+        "SegmentMemory",
+        "PlanMemory",
+        "DriftMemory",
+        "Optional",
+        "List",
+        "TransitionFailureRecord"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 15,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ProgressReport",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "subgoals_complete",
+        "subgoals_total",
+        "segments_complete",
+        "segments_total",
+        "stalled",
+        "stalled_reasons",
+        "progress_rate"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "Tuple"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 11,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ReflectionDriftReport",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "confirmation",
+        "classification",
+        "confidence",
+        "trigger",
+        "drift_written_to_memory",
+        "drift_violations"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "DriftConfirmation",
+        "Optional",
+        "DriftTrigger",
+        "Tuple"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "PlanAdjustment",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "plan_id",
+        "repair_succeeded",
+        "persisted",
+        "actions_applied",
+        "segments_regenerated",
+        "requires_segment_regen",
+        "error"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "Tuple",
+        "Optional"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TransitionRecord",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "subgoal_id",
+        "from_state",
+        "event",
+        "to_state",
+        "success",
+        "reason"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "Optional"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "MemoryUpdateRecord",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "store",
+        "operation",
+        "record_id",
+        "details"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ReflectionTrace",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "cycle",
+        "timestamp",
+        "progress",
+        "drift",
+        "repairs",
+        "adjustments",
+        "transitions",
+        "memory_updates"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "Dict",
+        "Tuple",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 2,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ReflectionOutcome",
+      "file": "src/core/planning/reflection/reflection_types.py",
+      "package": "src.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "cycle",
+        "timestamp",
+        "progress",
+        "drift_report",
+        "validation_result",
+        "plan_adjustment",
+        "transitions_applied",
+        "memory_updates",
+        "trace",
+        "errors"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.planning.drift.drift_types.DriftConfirmation",
+        "src.core.planning.drift.drift_types.DriftTrigger",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord",
+        "src.core.planning.validation.validation_types.FullValidationResult"
+      ],
+      "references": [
+        "ProgressReport",
+        "ReflectionDriftReport",
+        "ReflectionTrace",
+        "Optional",
+        "FullValidationResult",
+        "PlanAdjustment",
+        "Tuple",
+        "TransitionRecord",
+        "MemoryUpdateRecord"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 2,
+      "fan_out": 9,
       "dead_code_ignored": false
     },
     {
@@ -4363,7 +4845,7 @@
         "RESUME"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 42,
+      "fan_in": 44,
       "fan_out": 11,
       "dead_code_ignored": false
     },
@@ -4479,7 +4961,7 @@
         "TransitionError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 16,
+      "fan_in": 18,
       "fan_out": 12,
       "dead_code_ignored": false
     },
@@ -4620,7 +5102,7 @@
         "SUBGOAL_EVENT_TRANSITIONS"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 14,
+      "fan_in": 16,
       "fan_out": 28,
       "dead_code_ignored": false
     },
@@ -4875,7 +5357,7 @@
         "ValidationIssue"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 17,
+      "fan_in": 28,
       "fan_out": 8,
       "dead_code_ignored": false
     },
@@ -5797,7 +6279,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 43,
+      "fan_in": 50,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -5918,7 +6400,7 @@
         "RETRYING"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 82,
+      "fan_in": 94,
       "fan_out": 15,
       "dead_code_ignored": false
     },
@@ -5964,7 +6446,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 49,
+      "fan_in": 61,
       "fan_out": 5,
       "dead_code_ignored": false
     },
@@ -11442,6 +11924,432 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestEvaluateProgress",
+      "file": "tests/unit/core/planning/reflection/test_reflection_loop.py",
+      "package": "tests.unit.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_stores_returns_zeros_and_no_subgoals_stall",
+        "test_single_pending_subgoal_not_stalled",
+        "test_complete_subgoal_counted",
+        "test_all_blocked_triggers_stall",
+        "test_mixed_states_not_all_problem",
+        "test_repair_loop_stall",
+        "test_repair_below_threshold_not_stalled",
+        "test_segments_complete_counts_by_subgoal_state",
+        "test_segments_of_incomplete_subgoal_not_complete",
+        "test_progress_rate_increasing_vs_prior",
+        "test_progress_rate_decreasing_vs_prior",
+        "test_unknown_state_string_does_not_crash",
+        "test_stall_overrides_progress_rate"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord"
+      ],
+      "references": [
+        "SubgoalMemoryRecord",
+        "NOW_MS",
+        "SegmentMemoryRecord",
+        "ProgressReport",
+        "SubgoalMemorySnapshot",
+        "NOW_ISO",
+        "SegmentMemorySnapshot"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestReflectionLoopBasicCycle",
+      "file": "tests/unit/core/planning/reflection/test_reflection_loop.py",
+      "package": "tests.unit.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_cycle_returns_outcome_with_correct_cycle_number",
+        "test_cycle_timestamp_is_iso_string",
+        "test_progress_included_in_outcome",
+        "test_no_drift_on_first_cycle_single_subgoal",
+        "test_trace_cycle_matches_outcome_cycle",
+        "test_trace_contains_progress_dict",
+        "test_trace_contains_drift_dict",
+        "test_validation_result_present_for_known_subgoal",
+        "test_validation_result_none_for_unknown_subgoal",
+        "test_no_plan_adjustment_without_plan_id",
+        "test_no_errors_on_clean_cycle"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord"
+      ],
+      "references": [
+        "ReflectionLoop",
+        "SubgoalMemory",
+        "ReflectionState",
+        "SUCCESS",
+        "NOW_MS",
+        "SubgoalLifecycleState",
+        "SegmentMemory",
+        "PlanMemory",
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 9,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestReflectionLoopDrift",
+      "file": "tests/unit/core/planning/reflection/test_reflection_loop.py",
+      "package": "tests.unit.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_drift_not_confirmed_after_one_cycle",
+        "test_drift_confirmed_after_n_cycles",
+        "test_drift_classification_is_string",
+        "test_drift_confidence_in_range",
+        "test_clean_cycle_has_no_trigger",
+        "test_per_subgoal_detector_isolation"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord"
+      ],
+      "references": [
+        "Subgoal",
+        "SubgoalMemory",
+        "ReflectionState",
+        "ReflectionLoop",
+        "TransitionFailureRecord",
+        "NOW_MS",
+        "SegmentMemory",
+        "PlanMemory",
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 9,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestReflectionLoopTransitions",
+      "file": "tests/unit/core/planning/reflection/test_reflection_loop.py",
+      "package": "tests.unit.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_no_transition_on_clean_cycle",
+        "test_block_transition_recorded_for_running_subgoal_with_severe_drift",
+        "test_unblock_transition_for_blocked_subgoal_with_no_drift",
+        "test_retry_transition_after_plan_repair"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord"
+      ],
+      "references": [
+        "Subgoal",
+        "SubgoalMemory",
+        "ReflectionLoop",
+        "SegmentMemory",
+        "PlanMemory",
+        "ReflectionState",
+        "TransitionFailureRecord",
+        "RUNNING",
+        "BLOCKED",
+        "FAILED",
+        "NOW_ISO",
+        "NOW_MS",
+        "SubgoalLifecycleState",
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 14,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestReflectionLoopPlanRepair",
+      "file": "tests/unit/core/planning/reflection/test_reflection_loop.py",
+      "package": "tests.unit.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_plan_adjustment_present_when_plan_id_provided",
+        "test_clean_plan_reports_repair_succeeded",
+        "test_clean_plan_is_persisted",
+        "test_no_segments_regenerated_for_clean_plan",
+        "test_missing_plan_id_yields_no_adjustment",
+        "test_nonexistent_plan_yields_no_adjustment",
+        "test_plan_with_missing_segment_not_persisted_without_regen"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord"
+      ],
+      "references": [
+        "ReflectionState",
+        "Subgoal",
+        "SubgoalMemory",
+        "SegmentMemory",
+        "PlanMemory",
+        "ReflectionLoop",
+        "NOW_ISO",
+        "NOW_MS",
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 9,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestReflectionLoopAuditTrail",
+      "file": "tests/unit/core/planning/reflection/test_reflection_loop.py",
+      "package": "tests.unit.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_memory_updates_are_tuple",
+        "test_memory_update_record_fields",
+        "test_trace_repairs_tuple",
+        "test_trace_transitions_tuple",
+        "test_trace_memory_updates_tuple",
+        "test_transitions_applied_is_tuple",
+        "test_errors_tuple"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord"
+      ],
+      "references": [
+        "ReflectionLoop",
+        "SubgoalMemory",
+        "SegmentMemory",
+        "PlanMemory",
+        "ReflectionState",
+        "NOW_ISO",
+        "NOW_MS",
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 8,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestReflectionLoopProgressRate",
+      "file": "tests/unit/core/planning/reflection/test_reflection_loop.py",
+      "package": "tests.unit.core.planning.reflection",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_steady_without_prior_progress",
+        "test_increasing_when_subgoals_complete_grows",
+        "test_stalled_when_no_subgoals"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.models.plan.Plan",
+        "src.core.planning.reflection.progress_evaluator.evaluate_progress",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.drift.drift_context.TransitionFailureRecord"
+      ],
+      "references": [
+        "ReflectionLoop",
+        "ProgressReport",
+        "ReflectionState",
+        "READY",
+        "SUCCESS",
+        "NOW_MS",
+        "SubgoalLifecycleState",
+        "SubgoalMemory",
+        "SegmentMemory",
+        "PlanMemory",
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 11,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestTransitionRules",
       "file": "tests/unit/core/planning/subgoals/test_transition_engine.py",
       "package": "tests.unit.core.planning.subgoals",
@@ -15362,6 +16270,631 @@
       "source": "LoopTerminationDecision",
       "target": "CognitiveStepOutcome",
       "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "DriftContext",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "DriftClassification",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullDriftDetector",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullTransitionRules",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "MemoryUpdateRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "PlanAdjustment",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ReflectionDriftReport",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "TransitionRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ReflectionOutcome",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "DriftConfirmation",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullTransitionRules",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullValidationEngine",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "PlanRepair",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "TransitionRecord",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "MemoryUpdateRecord",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "RepairOutcome",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "DriftContext",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "ReflectionDriftReport",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullValidationResult",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "MemoryGovernance",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "PlanAdjustment",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SubgoalEvent",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "FullDriftDetector",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "MemoryGovernanceError",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionLoop",
+      "target": "Plan",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionState",
+      "target": "TransitionFailureRecord",
+      "type": "call"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "ProgressReport",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "DriftConfirmation",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionDriftReport",
+      "target": "DriftTrigger",
+      "type": "call"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "PlanAdjustment",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TransitionRecord",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "MemoryUpdateRecord",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionTrace",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "DriftConfirmation",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "DriftTrigger",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "FullValidationResult",
+      "type": "import"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "ProgressReport",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "ReflectionDriftReport",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "ReflectionTrace",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "FullValidationResult",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "PlanAdjustment",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "TransitionRecord",
+      "type": "call"
+    },
+    {
+      "source": "ReflectionOutcome",
+      "target": "MemoryUpdateRecord",
+      "type": "call"
     },
     {
       "source": "LoopPolicyEnforcer",
@@ -21986,6 +23519,921 @@
     {
       "source": "TestSubgoalValidation",
       "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "ProgressReport",
+      "type": "call"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SubgoalMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "TestEvaluateProgress",
+      "target": "SegmentMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "ReflectionLoop",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopBasicCycle",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "ReflectionLoop",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "TransitionFailureRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopDrift",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "ReflectionLoop",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "TransitionFailureRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopTransitions",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "ReflectionLoop",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopPlanRepair",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "ReflectionLoop",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopAuditTrail",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "TransitionFailureRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "ReflectionLoop",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "ProgressReport",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestReflectionLoopProgressRate",
+      "target": "DriftMemory",
       "type": "call"
     },
     {
