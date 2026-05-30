@@ -341,7 +341,7 @@
 
 ✅ 2.4.6 - Summarisation rules  
 
-2.4.7 - Memory eviction rules
+✅ 2.4.7 - Memory eviction rules
 - LRU or LFU
 - Drift-triggered eviction
 - Subgoal completion eviction

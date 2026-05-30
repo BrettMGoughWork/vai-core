@@ -41,6 +41,12 @@
       "exports": []
     },
     {
+      "name": "src.core.memory.eviction",
+      "path": "src/core/memory/eviction",
+      "imports": [],
+      "exports": []
+    },
+    {
       "name": "src.core.memory.governance",
       "path": "src/core/memory/governance",
       "imports": [],
@@ -228,6 +234,12 @@
     {
       "name": "tests.unit.core.memory",
       "path": "tests/unit/core/memory",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.memory.eviction",
+      "path": "tests/unit/core/memory/eviction",
       "imports": [],
       "exports": []
     },
@@ -920,7 +932,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 34,
+      "fan_in": 45,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1032,7 +1044,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 35,
+      "fan_in": 46,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1139,7 +1151,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 36,
+      "fan_in": 47,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1245,7 +1257,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 34,
+      "fan_in": 45,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1274,6 +1286,212 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 9,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "EvictionRules",
+      "file": "src/core/memory/eviction/eviction_rules.py",
+      "package": "src.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "compute_segment_refs",
+        "compute_subgoal_refs",
+        "evict_lru",
+        "evict_lfu",
+        "evict_by_drift",
+        "evict_on_subgoal_completion",
+        "evict_by_summary_replacement"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "typing.Tuple",
+        "src.core.types.hashing.stable_hash",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summary_types.SummaryMetadata",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [
+        "EvictionReport",
+        "DriftEvictionReport",
+        "CompletionEvictionSummary",
+        "Set",
+        "Tuple",
+        "SummaryMetadata",
+        "List",
+        "SegmentMemoryRecord",
+        "PlanMemoryRecord",
+        "SubgoalMemoryRecord",
+        "Dict",
+        "DriftEvent",
+        "EvictionDecision",
+        "AccessRecord"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 9,
+      "fan_out": 14,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AccessRecord",
+      "file": "src/core/memory/eviction/eviction_types.py",
+      "package": "src.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "record_id",
+        "record_type",
+        "access_count",
+        "last_accessed_at"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [],
+      "inferred_stratum": "utility",
+      "fan_in": 11,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "EvictionDecision",
+      "file": "src/core/memory/eviction/eviction_types.py",
+      "package": "src.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "record_id",
+        "record_type",
+        "reason",
+        "evicted_at",
+        "details"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 14,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "EvictionReport",
+      "file": "src/core/memory/eviction/eviction_types.py",
+      "package": "src.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "decisions",
+        "eviction_count",
+        "generated_at",
+        "reason"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Tuple",
+        "EvictionDecision"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftEvictionReport",
+      "file": "src/core/memory/eviction/eviction_types.py",
+      "package": "src.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "evicted_drift_events",
+        "preserved_segment_id",
+        "generated_at"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Tuple",
+        "Optional",
+        "EvictionDecision"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "CompletionEvictionSummary",
+      "file": "src/core/memory/eviction/eviction_types.py",
+      "package": "src.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "subgoal_id",
+        "evicted_segments",
+        "evicted_drift_events",
+        "evicted_plans",
+        "generated_at"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Tuple",
+        "EvictionDecision"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
       "fan_out": 2,
       "dead_code_ignored": false
     },
@@ -1450,7 +1668,7 @@
         "DriftEvent"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 9,
+      "fan_in": 20,
       "fan_out": 13,
       "dead_code_ignored": false
     },
@@ -1475,7 +1693,7 @@
       ],
       "references": [],
       "inferred_stratum": "utility",
-      "fan_in": 16,
+      "fan_in": 18,
       "fan_out": 0,
       "dead_code_ignored": false
     },
@@ -6881,6 +7099,385 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestComputeSegmentRefs",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_no_refs",
+        "test_parent_id_protected",
+        "test_plan_segments_protected",
+        "test_combined_refs"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestComputeSubgoalRefs",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_no_refs",
+        "test_parent_protected"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestEvictLRU",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_log",
+        "test_n_zero_returns_empty",
+        "test_n_negative_returns_empty",
+        "test_evicts_least_recently_accessed",
+        "test_deterministic_sort_by_record_id_on_tie",
+        "test_protected_ids_excluded",
+        "test_n_larger_than_candidates",
+        "test_audit_fields_populated"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [
+        "NOW",
+        "EvictionReport"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestEvictLFU",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_log",
+        "test_n_zero_returns_empty",
+        "test_evicts_least_frequently_accessed",
+        "test_tie_broken_by_lru",
+        "test_full_tie_broken_by_record_id",
+        "test_protected_ids_excluded",
+        "test_audit_reason_is_lfu"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestEvictByDrift",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_events",
+        "test_single_event_never_evicted",
+        "test_count_threshold_evicts_oldest",
+        "test_last_event_always_preserved",
+        "test_age_threshold_evicts_old_events",
+        "test_signal_pattern_evicts_matching",
+        "test_preserved_segment_id_from_last_event",
+        "test_deterministic_across_calls",
+        "test_disabled_thresholds_no_eviction",
+        "test_audit_fields_populated"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [
+        "NOW",
+        "DriftEvictionReport"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestEvictOnSubgoalCompletion",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_basic_eviction",
+        "test_no_segments_for_subgoal",
+        "test_externally_referenced_segment_protected",
+        "test_ancestor_closure_protects_chain",
+        "test_plan_ref_protects_segment",
+        "test_drift_events_evicted_with_segments",
+        "test_drift_events_not_evicted_for_protected_segments",
+        "test_plan_evicted_when_all_segments_safe",
+        "test_plan_not_evicted_when_segment_retained",
+        "test_evict_plan_false_skips_plans",
+        "test_reason_is_subgoal_complete",
+        "test_deterministic"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [
+        "NOW",
+        "CompletionEvictionSummary"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestEvictBySummaryReplacement",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_fresh_summary_evicts_unprotected",
+        "test_stale_summary_evicts_nothing",
+        "test_stale_by_count_change",
+        "test_protected_ids_excluded",
+        "test_all_protected_evicts_nothing",
+        "test_audit_includes_fingerprint",
+        "test_reason_is_summary_replacement"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [
+        "SummarisationRules",
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestAncestorClosure",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_no_parents",
+        "test_single_parent",
+        "test_deep_chain",
+        "test_missing_parent_stops_traversal",
+        "test_empty_seed"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDriftEventId",
+      "file": "tests/unit/core/memory/eviction/test_eviction_rules.py",
+      "package": "tests.unit.core.memory.eviction",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_returns_string",
+        "test_different_ordinals_produce_different_ids",
+        "test_stable_across_calls",
+        "test_different_events_different_ids"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.summarisation.summarisation_rules.SummarisationRules",
+        "src.core.memory.summarisation.summarisation_rules._segment_list_fingerprint",
+        "src.core.memory.eviction.eviction_rules.EvictionRules",
+        "src.core.memory.eviction.eviction_rules._drift_event_id",
+        "src.core.memory.eviction.eviction_types.AccessRecord",
+        "src.core.memory.eviction.eviction_types.EvictionDecision",
+        "src.core.memory.eviction.eviction_types.EvictionReport",
+        "src.core.memory.eviction.eviction_types.DriftEvictionReport",
+        "src.core.memory.eviction.eviction_types.CompletionEvictionSummary"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestMemoryGovernanceErrors",
       "file": "tests/unit/core/memory/governance/test_memory_governance.py",
       "package": "tests.unit.core.memory.governance",
@@ -9120,6 +9717,126 @@
     {
       "source": "SubgoalMemorySnapshot",
       "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "SummaryMetadata",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "EvictionReport",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "DriftEvictionReport",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "CompletionEvictionSummary",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "SummaryMetadata",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "EvictionDecision",
+      "type": "call"
+    },
+    {
+      "source": "EvictionRules",
+      "target": "AccessRecord",
+      "type": "call"
+    },
+    {
+      "source": "EvictionReport",
+      "target": "EvictionDecision",
+      "type": "call"
+    },
+    {
+      "source": "DriftEvictionReport",
+      "target": "EvictionDecision",
+      "type": "call"
+    },
+    {
+      "source": "CompletionEvictionSummary",
+      "target": "EvictionDecision",
       "type": "call"
     },
     {
@@ -12446,6 +13163,521 @@
       "source": "TestSnapshot",
       "target": "SubgoalMemorySnapshot",
       "type": "call"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSegmentRefs",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestComputeSubgoalRefs",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLRU",
+      "target": "EvictionReport",
+      "type": "call"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictLFU",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictByDrift",
+      "target": "DriftEvictionReport",
+      "type": "call"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictOnSubgoalCompletion",
+      "target": "CompletionEvictionSummary",
+      "type": "call"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestEvictBySummaryReplacement",
+      "target": "SummarisationRules",
+      "type": "call"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestAncestorClosure",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "SummarisationRules",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "EvictionRules",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "AccessRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "EvictionDecision",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "EvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "DriftEvictionReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEventId",
+      "target": "CompletionEvictionSummary",
+      "type": "import"
     },
     {
       "source": "TestMemoryGovernanceErrors",
