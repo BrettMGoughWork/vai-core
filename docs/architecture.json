@@ -2518,6 +2518,38 @@
       "dead_code_ignored": false
     },
     {
+      "name": "ValidationEngine",
+      "file": "src/core/planning/subgoals/validation_engine.py",
+      "package": "src.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "validate",
+        "assert_valid"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "typing.List",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.planning.subgoals.validation_errors.ValidationError",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [
+        "List",
+        "ValidationError",
+        "Subgoal"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 7,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
       "name": "PlanSegmentValidator",
       "file": "src/core/planning/validators/plan_segment_validator.py",
       "package": "src.core.planning.validators",
@@ -3556,7 +3588,7 @@
         "RETRYING"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 14,
+      "fan_in": 22,
       "fan_out": 15,
       "dead_code_ignored": false
     },
@@ -3602,7 +3634,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 19,
+      "fan_in": 28,
       "fan_out": 5,
       "dead_code_ignored": false
     },
@@ -3892,7 +3924,7 @@
         "Exception"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 24,
+      "fan_in": 39,
       "fan_out": 2,
       "dead_code_ignored": false
     },
@@ -5802,6 +5834,240 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestValidateIdPresent",
+      "file": "tests/unit/core/planning/subgoals/test_validation_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_id_passes",
+        "test_empty_string_fails",
+        "test_whitespace_only_fails"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.subgoals.validation_engine.ValidationEngine",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [
+        "ValidationError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidateGoalPresent",
+      "file": "tests/unit/core/planning/subgoals/test_validation_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_goal_passes",
+        "test_empty_goal_fails",
+        "test_whitespace_only_goal_fails"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.subgoals.validation_engine.ValidationEngine",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [
+        "ValidationError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidateParentConsistency",
+      "file": "tests/unit/core/planning/subgoals/test_validation_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_no_parent_passes",
+        "test_different_parent_passes",
+        "test_self_referential_parent_fails"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.subgoals.validation_engine.ValidationEngine",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [
+        "ValidationError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidateStateAllowed",
+      "file": "tests/unit/core/planning/subgoals/test_validation_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_state_passes",
+        "test_invalid_state_fails"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.subgoals.validation_engine.ValidationEngine",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [
+        "SubgoalLifecycleState",
+        "ValidationError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidateMetadataJsonSafe",
+      "file": "tests/unit/core/planning/subgoals/test_validation_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_metadata_passes",
+        "test_empty_metadata_passes",
+        "test_nested_metadata_passes"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.subgoals.validation_engine.ValidationEngine",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidationEngine",
+      "file": "tests/unit/core/planning/subgoals/test_validation_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_subgoal_returns_empty_list",
+        "test_single_violation_returns_one_error",
+        "test_multiple_violations_all_returned",
+        "test_all_errors_are_validation_error_instances",
+        "test_deterministic_ordering",
+        "test_rules_run_in_fixed_order",
+        "test_self_referential_parent_detected"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.subgoals.validation_engine.ValidationEngine",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [
+        "ValidationError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestAssertValid",
+      "file": "tests/unit/core/planning/subgoals/test_validation_engine.py",
+      "package": "tests.unit.core.planning.subgoals",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_subgoal_does_not_raise",
+        "test_raises_on_first_error",
+        "test_raises_validation_error_type",
+        "test_stops_at_first_error"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.subgoals.validation_engine.ValidationEngine",
+        "src.core.planning.subgoals.validation_rules.validate_id_present",
+        "src.core.planning.subgoals.validation_rules.validate_goal_present",
+        "src.core.planning.subgoals.validation_rules.validate_parent_consistency",
+        "src.core.planning.subgoals.validation_rules.validate_state_allowed",
+        "src.core.planning.subgoals.validation_rules.validate_metadata_json_safe"
+      ],
+      "references": [
+        "ValidationError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestCognitiveStepOutcome",
       "file": "tests/unit/core/types/test_types.py",
       "package": "tests.unit.core.types",
@@ -7392,6 +7658,26 @@
       "type": "call"
     },
     {
+      "source": "ValidationEngine",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "ValidationEngine",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "ValidationEngine",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "ValidationEngine",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
       "source": "PlanSegmentValidator",
       "target": "ValidationError",
       "type": "import"
@@ -8975,6 +9261,181 @@
       "source": "TestStateTopology",
       "target": "IllegalSubgoalTransitionError",
       "type": "import"
+    },
+    {
+      "source": "TestValidateIdPresent",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateIdPresent",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateIdPresent",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateIdPresent",
+      "target": "ValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateIdPresent",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "TestValidateGoalPresent",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateGoalPresent",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateGoalPresent",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateGoalPresent",
+      "target": "ValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateGoalPresent",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "TestValidateParentConsistency",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateParentConsistency",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateParentConsistency",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateParentConsistency",
+      "target": "ValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateParentConsistency",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "TestValidateStateAllowed",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateStateAllowed",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateStateAllowed",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateStateAllowed",
+      "target": "ValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateStateAllowed",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestValidateStateAllowed",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "TestValidateMetadataJsonSafe",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateMetadataJsonSafe",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateMetadataJsonSafe",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateMetadataJsonSafe",
+      "target": "ValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestValidationEngine",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidationEngine",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidationEngine",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidationEngine",
+      "target": "ValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestValidationEngine",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "TestAssertValid",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertValid",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertValid",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertValid",
+      "target": "ValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "TestAssertValid",
+      "target": "ValidationError",
+      "type": "call"
     },
     {
       "source": "TestCognitiveStepOutcome",
