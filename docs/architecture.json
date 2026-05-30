@@ -822,6 +822,116 @@
       "dead_code_ignored": true
     },
     {
+      "name": "DriftMemory",
+      "file": "src/core/memory/drift_memory.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "record",
+        "recent",
+        "last",
+        "clear",
+        "filter_by_subgoal",
+        "filter_by_signal",
+        "count_recent",
+        "snapshot",
+        "load_snapshot",
+        "capacity"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "collections.deque",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.drift_memory_types.DriftMemorySnapshot"
+      ],
+      "references": [
+        "DEFAULT_CAPACITY",
+        "DriftMemorySnapshot",
+        "List",
+        "DriftEvent",
+        "Optional",
+        "ValueError"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 11,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftEvent",
+      "file": "src/core/memory/drift_memory_types.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "timestamp",
+        "subgoal_id",
+        "segment_id",
+        "step_id",
+        "signal_type",
+        "confidence",
+        "details"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "Optional",
+        "Dict",
+        "Any",
+        "ValueError"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 9,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftMemorySnapshot",
+      "file": "src/core/memory/drift_memory_types.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "events"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "Tuple",
+        "DriftEvent"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 9,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
       "name": "PlanMemory",
       "file": "src/core/memory/plan_memory.py",
       "package": "src.core.memory",
@@ -5593,6 +5703,198 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestDriftEvent",
+      "file": "tests/unit/core/memory/test_drift_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_event_constructs",
+        "test_negative_timestamp_raises",
+        "test_confidence_above_one_raises",
+        "test_confidence_below_zero_raises",
+        "test_confidence_boundary_values_accepted",
+        "test_empty_subgoal_id_raises",
+        "test_details_deep_copied_on_construction",
+        "test_event_is_frozen",
+        "test_optional_fields_can_be_none"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.drift_memory_types.DriftMemorySnapshot"
+      ],
+      "references": [
+        "ValueError",
+        "AttributeError",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRingBuffer",
+      "file": "tests/unit/core/memory/test_drift_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_capacity_zero_raises",
+        "test_negative_capacity_raises",
+        "test_events_within_capacity_all_retained",
+        "test_oldest_dropped_when_capacity_exceeded",
+        "test_default_capacity_is_20",
+        "test_ordering_is_oldest_first"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.drift_memory_types.DriftMemorySnapshot"
+      ],
+      "references": [
+        "DriftMemory",
+        "ValueError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRecordRecentLast",
+      "file": "tests/unit/core/memory/test_drift_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_record_and_recent_all",
+        "test_recent_n_returns_most_recent",
+        "test_recent_zero_returns_empty",
+        "test_recent_negative_returns_empty",
+        "test_recent_n_larger_than_buffer_returns_all",
+        "test_last_returns_most_recent_event",
+        "test_last_returns_none_when_empty",
+        "test_clear_empties_buffer"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.drift_memory_types.DriftMemorySnapshot"
+      ],
+      "references": [
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestFiltering",
+      "file": "tests/unit/core/memory/test_drift_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_filter_by_subgoal_returns_matching",
+        "test_filter_by_subgoal_empty_when_no_match",
+        "test_filter_by_signal_returns_matching",
+        "test_filter_by_signal_empty_when_no_match",
+        "test_filter_preserves_oldest_first_order",
+        "test_count_recent_counts_within_window",
+        "test_count_recent_window_zero_returns_zero",
+        "test_count_recent_negative_window_returns_zero",
+        "test_count_recent_window_larger_than_buffer"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.drift_memory_types.DriftMemorySnapshot"
+      ],
+      "references": [
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSnapshot",
+      "file": "tests/unit/core/memory/test_drift_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_snapshot_contains_all_events",
+        "test_load_snapshot_restores_events",
+        "test_load_snapshot_replaces_existing_buffer",
+        "test_load_snapshot_respects_capacity",
+        "test_snapshot_is_frozen",
+        "test_snapshot_ordering_is_oldest_first",
+        "test_empty_snapshot_round_trip"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.drift_memory_types.DriftMemorySnapshot"
+      ],
+      "references": [
+        "DriftMemory",
+        "DriftMemorySnapshot",
+        "AttributeError",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDeterministicOrdering",
+      "file": "tests/unit/core/memory/test_drift_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_recent_stable_across_calls",
+        "test_filter_stable_across_calls",
+        "test_ring_buffer_eviction_is_deterministic"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.drift_memory_types.DriftMemorySnapshot"
+      ],
+      "references": [
+        "DriftMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestCrud",
       "file": "tests/unit/core/memory/test_plan_memory.py",
       "package": "tests.unit.core.memory",
@@ -7323,6 +7625,31 @@
       "source": "QwenClient",
       "target": "ChatProvider",
       "type": "inheritance"
+    },
+    {
+      "source": "DriftMemory",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "DriftMemory",
+      "target": "DriftMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "DriftMemory",
+      "target": "DriftMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "DriftMemory",
+      "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "DriftMemorySnapshot",
+      "target": "DriftEvent",
+      "type": "call"
     },
     {
       "source": "PlanMemory",
@@ -9838,6 +10165,126 @@
       "source": "TestLLMFactory",
       "target": "OpenAIClient",
       "type": "import"
+    },
+    {
+      "source": "TestDriftEvent",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEvent",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDriftEvent",
+      "target": "DriftMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRingBuffer",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRingBuffer",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestRingBuffer",
+      "target": "DriftMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRingBuffer",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestRecordRecentLast",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordRecentLast",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordRecentLast",
+      "target": "DriftMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordRecentLast",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestFiltering",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestFiltering",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestFiltering",
+      "target": "DriftMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestFiltering",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "DriftMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "DriftMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "DriftMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "DriftMemory",
+      "type": "call"
     },
     {
       "source": "TestCrud",
