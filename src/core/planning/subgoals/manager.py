@@ -4,7 +4,7 @@ from typing import Optional, Dict, List
 
 from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
 from src.core.planning.validators.subgoal_validator import SubgoalValidator
-from .transitions import TransitionEngine
+from .transitions import LifecycleTransitionEngine
 from .state import SubgoalState
 from .errors import (
     SubgoalNotFoundError,
@@ -27,7 +27,7 @@ class SubgoalManager:
     def __init__(self, state: SubgoalState, validator: SubgoalValidator):
         self._state = state
         self._validator = validator
-        self._transitions = TransitionEngine()
+        self._transitions = LifecycleTransitionEngine()
 
     # ------------------------------------------------------------
     # Creation
