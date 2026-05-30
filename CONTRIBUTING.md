@@ -39,7 +39,7 @@ Use existing folders and keep scope narrow.
 - `src/skills/`: skill instruction sets (markdown)
 - `src/observability/`, `src/telemetry/`, `src/policy/`: logging, telemetry hooks, runtime policy hooks.
 - `tests/unit/`, `tests/integration/`: test suites.
-- `tools/code_analysers/`: local architecture and dead code checks.
+- `tools/architecture/`: architecture extraction, auditing, and CI checks.
 - `docs/architecture/`: architecture and roadmap docs.
 
 ## 3) Strata overview
