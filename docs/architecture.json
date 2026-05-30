@@ -53,6 +53,12 @@
       "exports": []
     },
     {
+      "name": "src.core.memory.repair",
+      "path": "src/core/memory/repair",
+      "imports": [],
+      "exports": []
+    },
+    {
       "name": "src.core.memory.summarisation",
       "path": "src/core/memory/summarisation",
       "imports": [],
@@ -246,6 +252,12 @@
     {
       "name": "tests.unit.core.memory.governance",
       "path": "tests/unit/core/memory/governance",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.memory.repair",
+      "path": "tests/unit/core/memory/repair",
       "imports": [],
       "exports": []
     },
@@ -932,7 +944,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 45,
+      "fan_in": 61,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1044,7 +1056,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 46,
+      "fan_in": 75,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1151,7 +1163,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 47,
+      "fan_in": 63,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1257,7 +1269,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 45,
+      "fan_in": 61,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1518,7 +1530,7 @@
         "Optional"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 15,
+      "fan_in": 28,
       "fan_out": 1,
       "dead_code_ignored": false
     },
@@ -1618,6 +1630,406 @@
       "inferred_stratum": "infrastructure",
       "fan_in": 11,
       "fan_out": 14,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "PlanRepair",
+      "file": "src/core/memory/repair/plan_repair.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "detect_breakages",
+        "build_repair_plan",
+        "regenerate_segment",
+        "repair"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "typing.Tuple",
+        "src.core.types.hashing.stable_hash",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.normalisation.try_normalise_iso_timestamp",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.repair.repair_types.BreakageError",
+        "src.core.memory.repair.repair_types.BreakageWarning",
+        "src.core.memory.repair.repair_types.InvalidLink",
+        "src.core.memory.repair.repair_types.DriftFlag",
+        "src.core.memory.repair.repair_types.TimestampIssue",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairAction",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.repair_types.RepairOutcome"
+      ],
+      "references": [
+        "PlanBreakageReport",
+        "RepairPlan",
+        "RepairedSegmentRecord",
+        "RepairOutcome",
+        "Tuple",
+        "PlanMemoryRecord",
+        "List",
+        "BreakageError",
+        "BreakageWarning",
+        "InvalidLink",
+        "DriftFlag",
+        "TimestampIssue",
+        "GovernanceViolation",
+        "RepairAction",
+        "Set",
+        "Dict",
+        "DriftEvent",
+        "Optional",
+        "ValueError",
+        "SegmentMemoryRecord",
+        "SubgoalMemoryRecord"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 14,
+      "fan_out": 21,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "BreakageError",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "error_type",
+        "record_id",
+        "details"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 18,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "BreakageWarning",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "warning_type",
+        "record_id",
+        "details"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "InvalidLink",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "from_id",
+        "to_id",
+        "link_type",
+        "reason"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "DriftFlag",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "segment_id",
+        "subgoal_id",
+        "signal_type",
+        "confidence"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TimestampIssue",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "record_id",
+        "record_type",
+        "issue"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "PlanBreakageReport",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "is_clean"
+      ],
+      "public_attributes": [
+        "plan_id",
+        "errors",
+        "warnings",
+        "missing_segments",
+        "invalid_links",
+        "drift_flags",
+        "timestamp_issues",
+        "governance_violations"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [
+        "Tuple",
+        "BreakageError",
+        "BreakageWarning",
+        "InvalidLink",
+        "DriftFlag",
+        "TimestampIssue",
+        "GovernanceViolation"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 17,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "RepairAction",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "action_type",
+        "target_id",
+        "details"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 4,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "RepairPlan",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "actions",
+        "requires_redecomposition",
+        "requires_segment_regeneration",
+        "requires_subgoal_repair"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [
+        "Tuple",
+        "RepairAction"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 16,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "RepairedSegmentRecord",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "segment_id",
+        "subgoal_id",
+        "parent_id",
+        "steps",
+        "state",
+        "metadata",
+        "created_at"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [
+        "Optional",
+        "Tuple",
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 18,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "RepairOutcome",
+      "file": "src/core/memory/repair/repair_types.py",
+      "package": "src.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "success",
+        "repaired_plan",
+        "regenerated_segments",
+        "repair_actions_applied",
+        "errors",
+        "attempts",
+        "budget_used"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord"
+      ],
+      "references": [
+        "Optional",
+        "PlanMemoryRecord",
+        "Tuple",
+        "RepairedSegmentRecord",
+        "RepairAction"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 16,
+      "fan_out": 5,
       "dead_code_ignored": false
     },
     {
@@ -8072,6 +8484,609 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestDetectClean",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_clean_plan_no_errors",
+        "test_clean_empty_segment_list",
+        "test_plan_id_in_report"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDetectMissingSubgoal",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_missing_subgoal_flagged",
+        "test_missing_subgoal_record_id"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDetectMissingSegments",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_missing_segment_flagged",
+        "test_regenerated_id_not_flagged_as_missing",
+        "test_invalid_link_added_for_missing_segment"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDetectBrokenParentLink",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_broken_parent_link_detected",
+        "test_valid_parent_not_flagged",
+        "test_regenerated_id_as_parent_not_flagged"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDetectSubgoalMismatch",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_subgoal_mismatch_detected",
+        "test_matching_subgoal_not_flagged"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDetectTimestampIssues",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_invalid_plan_timestamp_detected",
+        "test_valid_plan_timestamp_not_flagged",
+        "test_invalid_segment_timestamp_is_warning_not_error"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDetectDriftFlags",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_drift_event_for_plan_segment_flagged",
+        "test_drift_event_for_other_segment_not_flagged",
+        "test_drift_flags_do_not_make_plan_unclean"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestBuildRepairPlan",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_missing_segment_generates_regenerate_action",
+        "test_missing_subgoal_sets_requires_redecomposition",
+        "test_broken_parent_generates_reconstruct_chain",
+        "test_subgoal_mismatch_generates_quarantine",
+        "test_invalid_plan_timestamp_generates_rehydrate",
+        "test_actions_sorted_deterministically",
+        "test_clean_plan_produces_empty_repair_plan"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRegenerateSegment",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_returns_repaired_segment_record",
+        "test_steps_always_empty",
+        "test_state_always_pending",
+        "test_metadata_has_repaired_flag",
+        "test_segment_id_and_subgoal_preserved",
+        "test_created_at_is_valid_iso",
+        "test_deterministic_for_same_inputs"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW",
+        "RepairedSegmentRecord"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRepairSuccess",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_clean_plan_succeeds_immediately",
+        "test_missing_segment_regenerated",
+        "test_broken_parent_link_repaired",
+        "test_invalid_plan_timestamp_repaired",
+        "test_subgoal_mismatch_quarantined",
+        "test_repair_actions_audited",
+        "test_repaired_plan_returned_on_success"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW",
+        "PlanMemoryRecord"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRepairFailure",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_budget_exceeded_aborts",
+        "test_retry_limit_exhausted",
+        "test_no_actionable_repairs_aborts",
+        "test_circular_loop_detected",
+        "test_retry_limit_invalid_raises",
+        "test_budget_zero_raises",
+        "test_repaired_plan_none_on_failure",
+        "test_regenerated_segments_returned_even_on_failure"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW",
+        "PlanMemoryRecord",
+        "ValueError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRepairDeterminism",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_same_inputs_same_outcome"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "NOW"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestBreakageFingerpint",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_returns_string",
+        "test_stable_for_same_report",
+        "test_different_for_different_errors"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [
+        "PlanBreakageReport",
+        "BreakageError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestMsToIso",
+      "file": "tests/unit/core/memory/repair/test_plan_repair.py",
+      "package": "tests.unit.core.memory.repair",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_returns_timezone_aware_string",
+        "test_zero_ms"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Set",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.repair.repair_types.PlanBreakageReport",
+        "src.core.memory.repair.repair_types.RepairPlan",
+        "src.core.memory.repair.repair_types.RepairOutcome",
+        "src.core.memory.repair.repair_types.RepairedSegmentRecord",
+        "src.core.memory.repair.plan_repair.PlanRepair",
+        "src.core.memory.repair.plan_repair._breakage_fingerprint",
+        "src.core.memory.repair.plan_repair._ms_to_iso",
+        "datetime.datetime",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.repair.repair_types.BreakageError"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestSummariseSegmentList",
       "file": "tests/unit/core/memory/summarisation/test_summarisation_rules.py",
       "package": "tests.unit.core.memory.summarisation",
@@ -9972,6 +10987,306 @@
     {
       "source": "MemoryGovernance",
       "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "BreakageWarning",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "InvalidLink",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "DriftFlag",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "TimestampIssue",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairAction",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "PlanBreakageReport",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairPlan",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairedSegmentRecord",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairOutcome",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "BreakageError",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "BreakageWarning",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "InvalidLink",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "DriftFlag",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "TimestampIssue",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "GovernanceViolation",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "RepairAction",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "PlanRepair",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "BreakageError",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "BreakageError",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "BreakageWarning",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "BreakageWarning",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "InvalidLink",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "InvalidLink",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "DriftFlag",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "DriftFlag",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TimestampIssue",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TimestampIssue",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "BreakageError",
+      "type": "call"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "BreakageWarning",
+      "type": "call"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "InvalidLink",
+      "type": "call"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "DriftFlag",
+      "type": "call"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "TimestampIssue",
+      "type": "call"
+    },
+    {
+      "source": "PlanBreakageReport",
+      "target": "GovernanceViolation",
+      "type": "call"
+    },
+    {
+      "source": "RepairAction",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "RepairAction",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "RepairPlan",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "RepairPlan",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "RepairPlan",
+      "target": "RepairAction",
+      "type": "call"
+    },
+    {
+      "source": "RepairedSegmentRecord",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "RepairedSegmentRecord",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "RepairOutcome",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "RepairOutcome",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "RepairOutcome",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "RepairOutcome",
+      "target": "RepairedSegmentRecord",
+      "type": "call"
+    },
+    {
+      "source": "RepairOutcome",
+      "target": "RepairAction",
       "type": "call"
     },
     {
@@ -14542,6 +15857,731 @@
     {
       "source": "TestCheckConsistency",
       "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectClean",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSubgoal",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectMissingSegments",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectBrokenParentLink",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectSubgoalMismatch",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectTimestampIssues",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestDetectDriftFlags",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestBuildRepairPlan",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestRegenerateSegment",
+      "target": "RepairedSegmentRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairSuccess",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairFailure",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestRepairDeterminism",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "BreakageError",
+      "type": "import"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "PlanBreakageReport",
+      "type": "call"
+    },
+    {
+      "source": "TestBreakageFingerpint",
+      "target": "BreakageError",
+      "type": "call"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "PlanBreakageReport",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "RepairPlan",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "RepairOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "RepairedSegmentRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "PlanRepair",
+      "type": "import"
+    },
+    {
+      "source": "TestMsToIso",
+      "target": "BreakageError",
       "type": "import"
     },
     {
