@@ -822,6 +822,112 @@
       "dead_code_ignored": true
     },
     {
+      "name": "SegmentMemory",
+      "file": "src/core/memory/segment_memory.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "put",
+        "get",
+        "exists",
+        "list_all",
+        "get_chain",
+        "get_children",
+        "get_by_subgoal",
+        "snapshot",
+        "load_snapshot"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot"
+      ],
+      "references": [
+        "SegmentMemorySnapshot",
+        "PlanSegment",
+        "Optional",
+        "List",
+        "SegmentMemoryRecord",
+        "Dict"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 14,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SegmentMemoryRecord",
+      "file": "src/core/memory/segment_memory_types.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "segment_id",
+        "parent_id",
+        "subgoal_id",
+        "state",
+        "content",
+        "created_at",
+        "context",
+        "metadata"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Optional",
+        "List",
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 12,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SegmentMemorySnapshot",
+      "file": "src/core/memory/segment_memory_types.py",
+      "package": "src.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "records"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple"
+      ],
+      "references": [
+        "Tuple",
+        "SegmentMemoryRecord"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 10,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
       "name": "SubgoalMemory",
       "file": "src/core/memory/subgoal_memory.py",
       "package": "src.core.memory",
@@ -3584,7 +3690,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 21,
+      "fan_in": 30,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -5378,6 +5484,222 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestCrud",
+      "file": "tests/unit/core/memory/test_segment_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_put_and_get_returns_equivalent_segment",
+        "test_get_unknown_returns_none",
+        "test_exists_true_after_put",
+        "test_exists_false_before_put",
+        "test_put_overwrites_existing_entry",
+        "test_put_with_parent_id_stored",
+        "test_put_without_parent_id_defaults_to_none"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.types.plan_segment.PlanSegment"
+      ],
+      "references": [
+        "SegmentMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRecordSerialisation",
+      "file": "tests/unit/core/memory/test_segment_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_record_fields_match_segment",
+        "test_record_is_frozen_dataclass",
+        "test_round_trip_segment_id_matches",
+        "test_round_trip_canonical_hash_matches",
+        "test_external_mutation_of_original_steps_does_not_affect_record",
+        "test_returned_segment_is_independent_of_store"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.types.plan_segment.PlanSegment"
+      ],
+      "references": [
+        "SegmentMemory",
+        "SegmentMemoryRecord",
+        "AttributeError",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestGetChain",
+      "file": "tests/unit/core/memory/test_segment_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_single_segment_chain",
+        "test_chain_walks_root_to_leaf",
+        "test_chain_returns_empty_for_unknown_segment",
+        "test_chain_truncates_on_missing_parent",
+        "test_chain_is_cycle_safe"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.types.plan_segment.PlanSegment"
+      ],
+      "references": [
+        "SegmentMemory",
+        "SegmentMemoryRecord"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestGetChildren",
+      "file": "tests/unit/core/memory/test_segment_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_returns_children_of_parent",
+        "test_returns_empty_when_no_children",
+        "test_children_sorted_by_created_at_then_segment_id"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.types.plan_segment.PlanSegment"
+      ],
+      "references": [
+        "SegmentMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestGetBySubgoal",
+      "file": "tests/unit/core/memory/test_segment_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_returns_all_segments_for_subgoal",
+        "test_returns_empty_for_unknown_subgoal",
+        "test_subgoal_results_sorted_deterministically"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.types.plan_segment.PlanSegment"
+      ],
+      "references": [
+        "SegmentMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSnapshot",
+      "file": "tests/unit/core/memory/test_segment_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_snapshot_contains_all_records",
+        "test_load_snapshot_restores_state",
+        "test_load_snapshot_replaces_existing_state",
+        "test_snapshot_is_frozen_dataclass",
+        "test_snapshot_round_trip_preserves_parent_id"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.types.plan_segment.PlanSegment"
+      ],
+      "references": [
+        "SegmentMemory",
+        "SegmentMemorySnapshot",
+        "AttributeError",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestDeterministicOrdering",
+      "file": "tests/unit/core/memory/test_segment_memory.py",
+      "package": "tests.unit.core.memory",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_list_all_sorted_by_created_at_then_segment_id",
+        "test_list_all_stable_across_calls",
+        "test_snapshot_records_sorted_deterministically",
+        "test_empty_store_list_all_returns_empty",
+        "test_empty_store_snapshot_has_no_records"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemorySnapshot",
+        "src.core.types.plan_segment.PlanSegment"
+      ],
+      "references": [
+        "SegmentMemory"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestPutGetExists",
       "file": "tests/unit/core/memory/test_subgoal_memory.py",
       "package": "tests.unit.core.memory",
@@ -6677,6 +6999,41 @@
       "source": "QwenClient",
       "target": "ChatProvider",
       "type": "inheritance"
+    },
+    {
+      "source": "SegmentMemory",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "SegmentMemory",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SegmentMemory",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "SegmentMemory",
+      "target": "SegmentMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "SegmentMemory",
+      "target": "PlanSegment",
+      "type": "call"
+    },
+    {
+      "source": "SegmentMemory",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "SegmentMemorySnapshot",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
     },
     {
       "source": "SubgoalMemory",
@@ -9122,6 +9479,196 @@
       "source": "TestLLMFactory",
       "target": "OpenAIClient",
       "type": "import"
+    },
+    {
+      "source": "TestCrud",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestCrud",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestCrud",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestCrud",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestCrud",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestRecordSerialisation",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestGetChain",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestGetChildren",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestGetBySubgoal",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGetBySubgoal",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGetBySubgoal",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestGetBySubgoal",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestGetBySubgoal",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "TestSnapshot",
+      "target": "SegmentMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "SegmentMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestDeterministicOrdering",
+      "target": "SegmentMemory",
+      "type": "call"
     },
     {
       "source": "TestPutGetExists",
