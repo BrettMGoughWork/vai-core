@@ -18,6 +18,7 @@ class StepOutcome(str, Enum):
     RECOVERABLE = "recoverable"
     FATAL = "fatal"
     NOOP = "noop"
+    FAILURE = "failure"
 
 
 def classify_step(result: CoreResult) -> StepOutcome:

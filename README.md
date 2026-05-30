@@ -1,90 +1,20 @@
-# Read this first
-vai-core is undergoing structural work:
- - Stratum 2: foundational
- - Stratum 3: Changing terminology: "skills" will be markdown rather than primitive python code, "primitives" will replace the original concept of skills.
- 
-## Planned folder structure changes:
- - /src/capabilities will be changed to /src/primitives/runtime
- - /src/skills/standard will be changed to /src/primitives/standard
- - /src/skills/custom will be changed to /src/primitives/custom
- - re-use of /src/skills folder will now house markdown instruction-sets
- - ARCHITECTURE.md has been updated to reflect this change
+`vai-core` is a clean, deterministic agent runtime built for clarity and long-term maintainability.
 
-# vai-core
+It’s built around a small set of stable concepts — models, capabilities, skills, and a safety substrate — that keep the system predictable even as you extend it.
 
-`vai-core` is a lightweight, layered Python agent runtime focused on clear boundaries, explicit contracts, and testable execution.
+The core idea is simple: give LLMs structured jobs, not free rein. The runtime forces clean JSON output, mediates all external calls through a strict capability system, and bakes in safety, observability, and self-healing by default.
+Core Concepts
 
-This is a "lessons-learned" project from a previous agent runtime that evolved naturally, and hit a complexity ceiling. This is an attempt to create a plan with invariants, and to ensure a more modular approach to reach a greater outcome.
+Models — pure data shapes. Everything the system moves around is strongly typed.
+Capabilities — declare what the agent can do (read files, make requests, etc), without giving it direct access.
+Skills — small, focused behaviours that combine prompts, guardrails, and logic on top of capabilities.
+Safety Substrate — the runtime’s guardrails. It controls execution, handles panics, manages degraded modes, and keeps things stable.
 
-Community contribution very welcome.
+Repository Layout
 
-## Quick start
+src/core/ — core types and contracts
+src/primitives/ — reusable building blocks
+src/skills/ — reusable agent behaviours
+src/runtime/ — the execution engine
+docs/architecture/ — deep technical docs
 
-```bash
-# 1) Create and activate a virtual environment
-python -m venv .venv
-.venv\Scripts\activate
-
-# 2) Install dependencies
-pip install -r requirements.txt
-
-# 3) Run the CLI runtime
-python main.py
-
-# 4) Run tests
-uv run --with pytest --with python-dotenv pytest -q
-```
-
-Create a `.env` file in the repo root:
-
-```env
-DEEPSEEK_API_KEY=sk-...
-GEMINI_API_KEY=AI...
-```
-(*Note* deepseek and gemini selected because they have been tested)
-
-## Design principles and Philosophy
-Resilient Hierarchical Execution: Abandoned brittle linear planning in favor of a stratified subgoal architecture. Features independent *Subplan Managers* that allow local recovery, dynamic task slotting, and minimized cognitive/computational load during complex multi-step operations.
-
-## Runtime flow (current)
-
-`main.py` builds an `AgentRuntime` with:
-1. LLM alias resolution from `config/llms.yaml`
-2. `DeepSeekClient` + `LLMTransport`
-3. `AgentConfig` with allowed tools/categories/side effects
-
-`AgentRuntime.run()` executes a bounded multi-step loop:
-1. Build prompt from `ConversationState`
-2. Call LLM through transport
-3. Select/govern tool
-4. Execute tool
-5. Classify outcome (`SUCCESS`, `RECOVERABLE`, `NOOP`, `FATAL`)
-6. Stop on success/fatal/step limit/timeouts
-
-## Recent updates
-
-- Added loop policy controls in `LoopPolicy`: `max_steps`, `max_wall_time`, `max_errors`, `max_fatals`, `per_step_timeout`.
-- Added per-step timeout and wall-time protection in `AgentRuntime`.
-- Added step trace capture (`StepTrace`) to record each loop step summary/outcome/error.
-- Added executor contract and single-skill executor (`ExecutionResult`, `SingleSkillExecutor`).
-- Added/expanded structured logging with `Logger`, `StdoutLogger`, and `StructuredLogger`.
-- Added integration coverage for the CoreStep pipeline and expanded unit tests across runtime, planning, execution, and config.
-- Updated LLM aliases to include `deepseek-chat` and `deepseek-reasoner` in `config/llms.yaml`.
-
-## Repository layout
-
--- see /docs/architecture/ARCHITECTURE.md
-
-## Roadmap
-
--- see /docs/architecture/ROADMAP.md
-
-## Testing
-
-`pytest.ini` scopes discovery to `tests/`.
-
-Run all tests:
-
-```bash
-uv run --with pytest --with python-dotenv pytest -q
-```

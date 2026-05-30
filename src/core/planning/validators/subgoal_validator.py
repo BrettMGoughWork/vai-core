@@ -6,31 +6,27 @@ from src.core.types.json_pure import ensure_json_pure
 
 class SubgoalValidator:
     """
-    Core structural validator for Subgoal.
+    Thin wrapper around the core SubgoalValidator defined in 2.3.1.
 
     Responsibilities:
-    - Enforce JSON-pure context/metadata
-    - Ensure required fields are present
-    - Sanity-check canonical hash determinism
-    - No lifecycle or planner semantics
+    - Provide a stable, minimal interface for SubgoalManager
+    - Ensure validator returns a deterministic boolean
+    - Prevent accidental leakage of exceptions or non-boolean values
     """
 
+    def __init__(self):
+        self._validator = _CoreSubgoalValidator()
+
     def validate(self, subgoal: Subgoal) -> bool:
+        """
+        Returns True if the subgoal is structurally valid.
+        Returns False if validation fails.
+
+        The manager decides how to handle failures.
+        """
         try:
-            # JSON purity
-            ensure_json_pure(subgoal.context)
-            ensure_json_pure(subgoal.metadata)
-
-            # Required fields
-            if not subgoal.subgoal_id:
-                return False
-            if not subgoal.goal:
-                return False
-
-            # Canonical hash must be non-empty
-            if not subgoal.canonical_hash:
-                return False
-
-            return True
+            result = self._validator.validate(subgoal)
+            return bool(result)
         except Exception:
+            # Manager will raise InvalidSubgoalError
             return False

@@ -62,6 +62,7 @@ def _config(max_steps=4):
         allowed_categories=[SkillCategory.GENERAL],
         allowed_side_effects=[SideEffect.NONE],
         max_steps=max_steps,
+        loop_policy=LoopPolicyConfig(max_steps=max_steps),
     )
 
 

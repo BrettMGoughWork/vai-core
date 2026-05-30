@@ -6,9 +6,10 @@ from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.core.planning.safety.purity_validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.errors.AgentError import ConfidenceError
+from src.core.state.step_outcome import StepOutcome
 
-
-# Deterministic priority order for ambiguous or missing labels
+# Canonical Stratum‑2 priority order
+# Highest → lowest
 OUTCOME_PRIORITY = [
     CognitiveStepOutcome.FAILURE,
     CognitiveStepOutcome.TOOL_NEEDED,
@@ -24,7 +25,7 @@ class OutcomeClassifier:
     """
 
     def classify(self, state, raw: Dict[str, Any]) -> StepResult:
-        # D2: purity
+        # D2: purity validation
         try:
             validate_pure_structure(raw)
         except Exception as e:
@@ -41,12 +42,12 @@ class OutcomeClassifier:
         reason = raw.get("reason") or "No reason provided by classifier"
         metadata = raw.get("metadata") or {}
 
-        # Canonicalise label
+        # Normalise label
         label = None
         if isinstance(label_raw, str):
             label = label_raw.strip().lower()
 
-        # Deterministic mapping
+        # Stratum‑1 → Stratum‑2 mapping
         mapping = {
             "success": CognitiveStepOutcome.SUCCESS,
             "failure": CognitiveStepOutcome.FAILURE,
@@ -67,7 +68,7 @@ class OutcomeClassifier:
                 },
             )
             return StepResult(
-                outcome=OUTCOME_PRIORITY[0], # FAILURE
+                outcome=OUTCOME_PRIORITY[0], # FATAL
                 reason=err.message,
                 payload={"error": err.to_dict()},
                 trace={},

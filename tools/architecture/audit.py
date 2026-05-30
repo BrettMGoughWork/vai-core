@@ -414,10 +414,10 @@ def main() -> None:
 
     # Return non-zero if any critical or high issues exist (CI gate)
     if counts["critical"] > 0 or counts["high"] > 0:
-        print(f"\n❌ FAILED: {counts['critical']} critical, {counts['high']} high issues found.")
+        print(f"\n[FAIL] {counts['critical']} critical, {counts['high']} high issues found.")
         return 1
 
-    print("\n✅ PASSED: No critical or high issues.")
+    print("\n[PASS] No critical or high issues.")
     return 0
 
 

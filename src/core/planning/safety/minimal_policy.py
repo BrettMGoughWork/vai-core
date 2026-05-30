@@ -1,13 +1,16 @@
 class MinimalSafetyPolicy:
     """
-    No-ope safety policy for testing and development.
-    Always returns safe for any tool and does not trigger self-healing.
+    Minimal safety policy compatible with the new SafeStepDispatcher API.
     """
 
-    def pre_step(self, state, step):
-        # Allow all steps
+    def pre_execute(self, ctx):
+        # old method name compatibility
+        if hasattr(self, "check_pre"):
+            return self.check_pre(ctx)
         return None
-    
-    def post_step(self, state, result):
-        # Allow all results
+
+    def post_execute(self, ctx, result):
+        # old method name compatibility
+        if hasattr(self, "check_post"):
+            return self.check_post(ctx, result)
         return None

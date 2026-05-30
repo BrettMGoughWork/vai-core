@@ -1,9 +1,9 @@
 from src.core.state.step_outcome import StepOutcome
 from src.core.state.state import ConversationState
-from src.core.state.config import AgentConfig
+from src.core.config.loader import AgentConfig
 
 
-def isdone(state: ConversationState, outcome: StepOutcome, config: AgentConfig) -> bool:
+def isdone(state: ConversationState, outcome: StepOutcome, agent_config: AgentConfig) -> bool:
     """
     Determine if the agent should stop running.
 
@@ -20,6 +20,6 @@ def isdone(state: ConversationState, outcome: StepOutcome, config: AgentConfig) 
     if not isinstance(meta_count, int):
         meta_count = 0
     step_count = max(attr_count, meta_count)
-    if step_count >= config.max_steps:
+    if step_count >= agent_config.loop_policy.max_steps:
         return True
     return False

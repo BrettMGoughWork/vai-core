@@ -13,7 +13,7 @@ class LoopPolicy:
 
     max_steps: int = 50
     max_retries: int = 3
-    max_duration: Optional[int] = None # logical ticks, not real time
+    max_duration: Optional[int] = None  # logical ticks, not real time
 
     def allows_step(self, step_count: int) -> bool:
         return step_count < self.max_steps
@@ -26,10 +26,5 @@ class LoopPolicy:
             return True
         return duration < self.max_duration
 
-    def allows_continue(
-        self,
-        state,
-        result,
-        step_count: int,
-    ) -> bool:
+    def allows_continue(self, state, result, step_count: int) -> bool:
         return self.allows_step(step_count)
