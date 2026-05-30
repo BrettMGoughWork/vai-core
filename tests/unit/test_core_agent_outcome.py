@@ -1,4 +1,4 @@
-from src.core.state.outcome import StepOutcome, classify_step
+from src.core.state.step_outcome import StepOutcome, classify_step
 from src.core.types.result import CoreResult
 
 

@@ -1,18 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Dict
 
+from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.core.types.validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.hashing import stable_hash
-
-
-class StepOutcome(Enum):
-    SUCCESS = "success"
-    FAILURE = "failure"
-    TOOL_NEEDED = "tool_needed"
-    CONTINUE = "continue"
 
 
 @dataclass(frozen=True)
@@ -20,7 +13,7 @@ class StepResult:
     @staticmethod
     def failure(reason: str, payload: dict | None = None, trace: list | None = None) -> 'StepResult':
         return StepResult(
-            outcome=StepOutcome.FAILURE,
+            outcome=CognitiveStepOutcome.FAILURE,
             reason=reason,
             payload=payload if payload is not None else {},
             trace=trace if trace is not None else [],
@@ -31,7 +24,7 @@ class StepResult:
     Stratum‑2 invariant: immutable, deterministic, serialisable.
     """
 
-    outcome: StepOutcome
+    outcome: CognitiveStepOutcome
     reason: str
     payload: Dict[str, Any] = field(default_factory=dict)
     trace: Dict[str, Any] = field(default_factory=dict)
@@ -42,7 +35,7 @@ class StepResult:
     def __post_init__(self):
         # Determinism invariants
         assert isinstance(self.reason, str), "reason must be deterministic text"
-        assert self.outcome in StepOutcome, "invalid outcome enum"
+        assert self.outcome in CognitiveStepOutcome, "invalid outcome enum"
 
         # Purity
         try:

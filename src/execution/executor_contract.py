@@ -14,7 +14,8 @@ class ExecutionResult:
     raw_response: Any | None
 
 
-class Executor(ABC):
+class ExecutorContract(ABC):
+    """Abstract contract for plan-based executors. Will be revisited in Stratum 3."""
     @abstractmethod
     def execute(self, plan: Plan) -> ExecutionResult:
         pass

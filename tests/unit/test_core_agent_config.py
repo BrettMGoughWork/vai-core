@@ -1,10 +1,10 @@
-from src.core.state.config import AgentConfig, LoopPolicy
+from src.core.state.config import AgentConfig, LoopPolicyConfig
 from src.primitives.runtime.categories import SkillCategory
 from src.primitives.runtime.side_effects import SideEffect
 
 
 def test_loop_policy_defaults():
-    policy = LoopPolicy()
+    policy = LoopPolicyConfig()
     assert policy.max_steps == 5
     assert policy.max_wall_time is None
     assert policy.max_errors == 1
@@ -13,7 +13,7 @@ def test_loop_policy_defaults():
 
 
 def test_loop_policy_custom_values():
-    policy = LoopPolicy(max_steps=10, max_wall_time=60.0, max_errors=3, max_fatals=2, per_step_timeout=5.0)
+    policy = LoopPolicyConfig(max_steps=10, max_wall_time=60.0, max_errors=3, max_fatals=2, per_step_timeout=5.0)
     assert policy.max_steps == 10
     assert policy.max_wall_time == 60.0
     assert policy.max_errors == 3
@@ -28,7 +28,7 @@ def test_agent_config_has_default_loop_policy():
         allowed_categories=[SkillCategory.GENERAL],
         allowed_side_effects=[SideEffect.NONE],
     )
-    assert isinstance(config.loop_policy, LoopPolicy)
+    assert isinstance(config.loop_policy, LoopPolicyConfig)
     assert config.loop_policy.max_steps == 5
 
 

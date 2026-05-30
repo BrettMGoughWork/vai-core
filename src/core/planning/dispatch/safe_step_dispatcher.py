@@ -2,35 +2,45 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-        from src.core.planning.dispatch.step_dispatcher import StepDispatcher
+    from src.agent.dispatcher import AgentDispatcher
+    from src.core.state.state import ConversationState
 
-from src.core.planning.models.step_state import StepState
-from src.core.planning.models.plan_state import PlanState
-from src.core.types.step_result import StepResult
 from src.core.planning.safety.safety_policies import SafetyContext, SafetyPolicy
-from src.core.planning.models.plan import Plan
+
 
 class SafeStepDispatcher:
     """
-    Wraps StepDispatcher with safety checks.
+    Wraps a modern StepDispatcher (e.g., AgentDispatcher) with safety checks.
+    Compatible with the new dispatcher API: dispatch(state) -> step.
     """
 
-    def __init__(self, dispatcher: "StepDispatcher", safety_policies: list[SafetyPolicy]):
+    def __init__(self, dispatcher: "AgentDispatcher", policies: list[SafetyPolicy]):
         self.dispatcher = dispatcher
-        self.safety_policies = safety_policies
+        self.safety_policies = policies
 
-    def dispatch(self, plan: Plan, plan_state: PlanState | None = None) -> tuple[StepState, StepResult]:
-        capability = self.dispatcher.core_step.capabilities.get(plan.targetskillid, {})
-        ctx = SafetyContext(plan=plan, capability=capability, plan_state=plan_state)
+    def dispatch(self, state: "ConversationState"):
+        """
+        New API:
+            - dispatcher.dispatch(state) -> step
+            - safety policies run pre/post around the step
+        """
+
+        # Build a minimal safety context for the new architecture
+        ctx = SafetyContext(
+            plan=None, # old plan model removed
+            capability=None, # no capability map in new dispatcher
+            plan_state=None # no plan state in new architecture
+        )
 
         # pre-execution safety
         for policy in self.safety_policies:
             policy.pre_execute(ctx)
 
-        state, result = self.dispatcher.dispatch(plan)
+        # delegate to underlying dispatcher
+        step = self.dispatcher.dispatch(state)
 
         # post-execution safety
         for policy in self.safety_policies:
-            policy.post_execute(ctx, result)
+            policy.post_execute(ctx, step)
 
-        return state, result
+        return step

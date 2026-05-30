@@ -1,8 +1,9 @@
 from src.core.planning.orchestration.loop_orchestrator import LoopOrchestrator
-from src.core.planning.orchestration.loop_controller import LoopPolicy
+from src.core.planning.safety.loop_policy import LoopPolicy
 from src.core.planning.models.step_state import StepState, StepStatus
-from src.core.types.step_result import StepOutcome, StepResult
-from src.core.planning.core_step import CoreStep
+from src.core.types.step_result import StepResult
+from src.core.types.cognitive_step_outcome import CognitiveStepOutcome as StepOutcome
+from src.core.planning.step_processor import StepProcessor
 
 from src.core.planning.generator.plan_generator import PlanGenerator
 
@@ -69,13 +70,13 @@ def test_loop_orchestrator_basic():
         canonical_hash="x",
     )
 
-    # Wrap FakeCoreStep inside a CoreStepV2 so the orchestrator can use it
+    # Wrap FakeCoreStep inside a StepProcessor so the orchestrator can use it
     from src.core.planning.validators.plan_validator import PlanValidator
-    core_step = CoreStep(
+    core_step = StepProcessor(
         classifier=FakeCoreStep(),          # <-- this is the fake step logic
-        capabilities=FAKE_CAPABILITIES,     # <-- required by new CoreStepV2
+        capabilities=FAKE_CAPABILITIES,     # <-- required by StepProcessor
         plan_generator=PlanGenerator(FAKE_CAPABILITIES),
-        plan_validator=PlanValidator(FAKE_CAPABILITIES), # <-- new required argument (note typo in param)
+        plan_validator=PlanValidator(FAKE_CAPABILITIES),
     )
 
     orchestrator = LoopOrchestrator(
