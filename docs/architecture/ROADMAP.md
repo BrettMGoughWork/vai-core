@@ -309,7 +309,7 @@
 - Define transition rules  
 - Implement transition engine  
 
-2.3.8 — Drift Detection (Refined)
+✅ 2.3.8 — Drift Detection (Refined)
 - Implement multi‑signal drift detection using governed signals  
 - Add drift recovery hooks  
 - Add drift confidence scoring  
