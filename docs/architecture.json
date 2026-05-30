@@ -41,6 +41,12 @@
       "exports": []
     },
     {
+      "name": "src.core.memory.governance",
+      "path": "src/core/memory/governance",
+      "imports": [],
+      "exports": []
+    },
+    {
       "name": "src.core.planning",
       "path": "src/core/planning",
       "imports": [
@@ -216,6 +222,12 @@
     {
       "name": "tests.unit.core.memory",
       "path": "tests/unit/core/memory",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.memory.governance",
+      "path": "tests/unit/core/memory/governance",
       "imports": [],
       "exports": []
     },
@@ -857,7 +869,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 11,
+      "fan_in": 24,
       "fan_out": 6,
       "dead_code_ignored": false
     },
@@ -896,7 +908,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 9,
+      "fan_in": 23,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -971,7 +983,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 14,
+      "fan_in": 27,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -1008,7 +1020,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 11,
+      "fan_in": 24,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1049,6 +1061,7 @@
       "public_methods": [
         "put",
         "get",
+        "get_record",
         "exists",
         "list_all",
         "get_chain",
@@ -1072,12 +1085,12 @@
         "SegmentMemorySnapshot",
         "PlanSegment",
         "Optional",
-        "List",
         "SegmentMemoryRecord",
+        "List",
         "Dict"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 14,
+      "fan_in": 27,
       "fan_out": 6,
       "dead_code_ignored": false
     },
@@ -1114,7 +1127,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 12,
+      "fan_in": 25,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1155,6 +1168,7 @@
       "public_methods": [
         "put",
         "get",
+        "get_record",
         "exists",
         "list_all",
         "get_chain",
@@ -1178,13 +1192,13 @@
         "SubgoalMemorySnapshot",
         "Subgoal",
         "Optional",
-        "List",
         "SubgoalMemoryRecord",
+        "List",
         "Dict",
         "SubgoalLifecycleState"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 7,
+      "fan_in": 20,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -1219,7 +1233,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 9,
+      "fan_in": 23,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1249,6 +1263,131 @@
       "inferred_stratum": "utility",
       "fan_in": 9,
       "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "GovernanceViolation",
+      "file": "src/core/memory/governance/governance_errors.py",
+      "package": "src.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "rule",
+        "field",
+        "message",
+        "record_id"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.List",
+        "typing.Optional"
+      ],
+      "references": [
+        "Optional"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 15,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "MemoryGovernanceError",
+      "file": "src/core/memory/governance/governance_errors.py",
+      "package": "src.core.memory.governance",
+      "inherits": [
+        "Exception"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "violations"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.List",
+        "typing.Optional"
+      ],
+      "references": [
+        "Exception",
+        "List",
+        "GovernanceViolation",
+        "ValueError"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 15,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "MemoryGovernance",
+      "file": "src/core/memory/governance/memory_governance.py",
+      "package": "src.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "put_subgoal",
+        "put_segment",
+        "put_plan",
+        "record_drift",
+        "get_subgoal",
+        "get_segment",
+        "get_plan",
+        "check_consistency",
+        "is_subgoal_write_allowed"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "typing.List",
+        "typing.Optional",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.normalisation.try_normalise_iso_timestamp",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.planning.models.plan.Plan"
+      ],
+      "references": [
+        "Optional",
+        "Subgoal",
+        "PlanSegment",
+        "Plan",
+        "List",
+        "GovernanceViolation",
+        "SubgoalMemory",
+        "SegmentMemory",
+        "PlanMemory",
+        "DriftMemory",
+        "SubgoalMemoryRecord",
+        "SegmentMemoryRecord",
+        "PlanMemoryRecord",
+        "DriftEvent"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 11,
+      "fan_out": 14,
       "dead_code_ignored": false
     },
     {
@@ -1792,7 +1931,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 33,
+      "fan_in": 46,
       "fan_out": 1,
       "dead_code_ignored": false
     },
@@ -3909,7 +4048,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 30,
+      "fan_in": 43,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -4030,7 +4169,7 @@
         "RETRYING"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 32,
+      "fan_in": 46,
       "fan_out": 15,
       "dead_code_ignored": false
     },
@@ -4076,7 +4215,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 36,
+      "fan_in": 49,
       "fan_out": 5,
       "dead_code_ignored": false
     },
@@ -6510,6 +6649,600 @@
       "dead_code_ignored": false
     },
     {
+      "name": "TestMemoryGovernanceErrors",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_violation_is_frozen",
+        "test_governance_error_stores_violations",
+        "test_governance_error_requires_violations",
+        "test_governance_error_str_contains_rule"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [
+        "GovernanceViolation",
+        "MemoryGovernanceError",
+        "ValueError",
+        "AttributeError",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidateSubgoalRecord",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_record_has_no_violations",
+        "test_empty_subgoal_id_is_violation",
+        "test_empty_goal_is_violation",
+        "test_negative_created_at_is_violation",
+        "test_invalid_state_string_is_violation",
+        "test_self_parent_is_violation",
+        "test_all_valid_lifecycle_states_pass"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidateSegmentRecord",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_record_has_no_violations",
+        "test_empty_segment_id_is_violation",
+        "test_empty_subgoal_id_is_violation",
+        "test_empty_content_is_violation",
+        "test_non_string_content_is_violation",
+        "test_invalid_iso_timestamp_is_violation",
+        "test_self_parent_is_violation"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidatePlanRecord",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_record_has_no_violations",
+        "test_empty_plan_id_is_violation",
+        "test_empty_subgoal_id_is_violation",
+        "test_empty_intent_is_violation",
+        "test_invalid_iso_timestamp_is_violation",
+        "test_non_string_segments_is_violation"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestValidateDriftEvent",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_valid_event_has_no_violations",
+        "test_negative_timestamp_is_violation",
+        "test_confidence_out_of_range_caught_by_event",
+        "test_empty_signal_type_is_violation"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [
+        "ValueError",
+        "DriftEvent"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestConsistencyChecks",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_segment_consistency_pass",
+        "test_segment_consistency_unknown_subgoal",
+        "test_plan_consistency_pass",
+        "test_plan_consistency_unknown_subgoal",
+        "test_plan_consistency_unknown_segment",
+        "test_drift_consistency_pass",
+        "test_drift_consistency_unknown_subgoal",
+        "test_drift_consistency_unknown_segment",
+        "test_drift_consistency_none_segment_id_always_passes"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestNormalisation",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_canonical_iso_unchanged",
+        "test_naive_timestamp_treated_as_utc",
+        "test_z_suffix_normalised",
+        "test_invalid_timestamp_raises",
+        "test_idempotent_normalisation",
+        "test_normalise_plan_record_canonicalises_created_at",
+        "test_normalise_plan_record_idempotent"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [
+        "ValueError",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestIsSubgoalWriteAllowed",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_new_write_always_allowed",
+        "test_same_state_always_allowed",
+        "test_valid_high_level_transition_allowed",
+        "test_valid_execution_transition_allowed",
+        "test_disallowed_transition_rejected",
+        "test_invalid_state_value_rejected"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestGovernedWrites",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_put_subgoal_valid",
+        "test_put_subgoal_invalid_state_raises",
+        "test_put_subgoal_disallowed_transition_raises",
+        "test_put_segment_valid",
+        "test_put_segment_unknown_subgoal_raises",
+        "test_put_plan_valid",
+        "test_put_plan_unknown_subgoal_raises",
+        "test_put_plan_unknown_segment_raises",
+        "test_put_plan_normalises_timestamp",
+        "test_record_drift_valid",
+        "test_record_drift_unknown_subgoal_raises",
+        "test_record_drift_unknown_segment_raises",
+        "test_record_drift_none_segment_id_passes"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [
+        "PENDING",
+        "CLOSED",
+        "MemoryGovernanceError",
+        "AttributeError",
+        "TypeError",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestGovernedReads",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_get_subgoal_returns_valid",
+        "test_get_subgoal_returns_none_for_missing",
+        "test_get_subgoal_raises_on_corrupted_record",
+        "test_get_segment_returns_valid",
+        "test_get_segment_returns_none_for_missing",
+        "test_get_plan_returns_valid",
+        "test_get_plan_returns_none_for_missing"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [
+        "SubgoalMemoryRecord",
+        "MemoryGovernanceError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestCheckConsistency",
+      "file": "tests/unit/core/memory/governance/test_memory_governance.py",
+      "package": "tests.unit.core.memory.governance",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_stores_are_consistent",
+        "test_consistent_stores_have_no_violations",
+        "test_orphaned_segment_detected",
+        "test_orphaned_plan_segment_ref_detected",
+        "test_check_consistency_is_deterministic"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "pytest",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.governance.governance_errors.GovernanceViolation",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.normalisation.normalise_iso_timestamp",
+        "src.core.memory.governance.normalisation.normalise_plan_record",
+        "src.core.memory.governance.validation.check_drift_consistency",
+        "src.core.memory.governance.validation.check_plan_consistency",
+        "src.core.memory.governance.validation.check_segment_consistency",
+        "src.core.memory.governance.validation.is_subgoal_write_allowed",
+        "src.core.memory.governance.validation.validate_drift_event",
+        "src.core.memory.governance.validation.validate_plan_record",
+        "src.core.memory.governance.validation.validate_segment_record",
+        "src.core.memory.governance.validation.validate_subgoal_record",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "copy"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
       "name": "TestComputeConfidence",
       "file": "tests/unit/core/planning/drift/test_drift_detector.py",
       "package": "tests.unit.core.planning.drift",
@@ -7764,6 +8497,141 @@
     {
       "source": "SubgoalMemorySnapshot",
       "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernanceError",
+      "target": "GovernanceViolation",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "PlanSegment",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "Plan",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "GovernanceViolation",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "MemoryGovernance",
+      "target": "DriftEvent",
       "type": "call"
     },
     {
@@ -10830,6 +11698,871 @@
       "source": "TestSnapshot",
       "target": "SubgoalMemorySnapshot",
       "type": "call"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "GovernanceViolation",
+      "type": "call"
+    },
+    {
+      "source": "TestMemoryGovernanceErrors",
+      "target": "MemoryGovernanceError",
+      "type": "call"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSubgoalRecord",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateSegmentRecord",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidatePlanRecord",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestValidateDriftEvent",
+      "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestConsistencyChecks",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestNormalisation",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestIsSubgoalWriteAllowed",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "MemoryGovernanceError",
+      "type": "call"
+    },
+    {
+      "source": "TestGovernedWrites",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestGovernedReads",
+      "target": "MemoryGovernanceError",
+      "type": "call"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "GovernanceViolation",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestCheckConsistency",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
     },
     {
       "source": "TestComputeConfidence",

@@ -60,6 +60,10 @@ class SegmentMemory:
             return None
         return self._record_to_segment(record)
 
+    def get_record(self, segment_id: str) -> Optional[SegmentMemoryRecord]:
+        """Return the raw SegmentMemoryRecord for segment_id, or None."""
+        return self._store.get(segment_id)
+
     def exists(self, segment_id: str) -> bool:
         return segment_id in self._store
 
