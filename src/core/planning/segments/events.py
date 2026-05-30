@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-from src.core.planning.models.plan_segment import PlanSegment
+from src.core.types.plan_segment import PlanSegment
 
 
 class SegmentCreatedEvent:

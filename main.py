@@ -7,7 +7,13 @@ from src.core.config.loader import Config
 from src.core.llm.builder import create_llm_transport
 
 def main():
-    config = Config()
+    print("Starting agent loop...")
+    dispatcher = AgentDispatcher()
+    safety_policies = [
+        MinimalSafetyPolicy(),
+    ]
+    safe_dispatcher = SafeStepDispatcher(dispatcher, safety_policies)
+    executor = MinimalCoreStepExecutor()
 
     # Load full config (not just llm/default)
     llm_config = config.get("llm")

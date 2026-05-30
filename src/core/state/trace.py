@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from src.core.types.step_outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 
 
 @dataclass

@@ -65,6 +65,7 @@
         "LLMError.LLMError",
         "SystemError.SystemError",
         "ToolError.ToolError",
+        "ValidationError.ValidationError",
         "recovery.RecoveryAction",
         "recovery.map_error_to_recovery"
       ],
@@ -165,6 +166,156 @@
       "exports": []
     },
     {
+      "name": "tests.integration",
+      "path": "tests/integration",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit",
+      "path": "tests/unit",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.agent",
+      "path": "tests/unit/agent",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core",
+      "path": "tests/unit/core",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.config",
+      "path": "tests/unit/core/config",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.llm",
+      "path": "tests/unit/core/llm",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning",
+      "path": "tests/unit/core/planning",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.dispatch",
+      "path": "tests/unit/core/planning/dispatch",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.events",
+      "path": "tests/unit/core/planning/events",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.generator",
+      "path": "tests/unit/core/planning/generator",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.models",
+      "path": "tests/unit/core/planning/models",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.orchestration",
+      "path": "tests/unit/core/planning/orchestration",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.safety",
+      "path": "tests/unit/core/planning/safety",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.segments",
+      "path": "tests/unit/core/planning/segments",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.subgoals",
+      "path": "tests/unit/core/planning/subgoals",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.validators",
+      "path": "tests/unit/core/planning/validators",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.signals",
+      "path": "tests/unit/core/signals",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.state",
+      "path": "tests/unit/core/state",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.types",
+      "path": "tests/unit/core/types",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.execution",
+      "path": "tests/unit/execution",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.execution.retry",
+      "path": "tests/unit/execution/retry",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.governance",
+      "path": "tests/unit/governance",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.observability",
+      "path": "tests/unit/observability",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.primitives",
+      "path": "tests/unit/primitives",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.primitives.runtime",
+      "path": "tests/unit/primitives/runtime",
+      "imports": [],
+      "exports": []
+    },
+    {
       "name": "tools.code_analysers.shared",
       "path": "tools/code_analysers/shared",
       "imports": [],
@@ -203,11 +354,18 @@
         "dispatch"
       ],
       "public_attributes": [],
-      "imports": [],
+      "imports": [
+        "__future__.annotations",
+        "src.core.types.core_step.CoreStep",
+        "src.core.signals.model.GovernedSignal",
+        "src.core.signals.model.SignalSeverity",
+        "src.core.state.state.ConversationState"
+      ],
       "references": [],
       "inferred_stratum": "adapter",
-      "fan_in": 1,
-      "fan_out": 0
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "Config",
@@ -222,10 +380,10 @@
       "imports": [
         "yaml",
         "pathlib.Path",
-        "model.LoopPolicyConfig",
-        "model.AgentConfig",
-        "model.CoreConfig",
-        "model.LLMConfig",
+        "src.core.state.config.LoopPolicyConfig",
+        "src.core.state.config.AgentConfig",
+        "src.core.state.config.CoreConfig",
+        "src.core.state.config.LLMConfig",
         "llm.builder.create_llm_transport"
       ],
       "references": [
@@ -237,94 +395,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 5
-    },
-    {
-      "name": "LLMConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "provider",
-        "model",
-        "temperature",
-        "max_tokens"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [],
-      "inferred_stratum": "utility",
-      "fan_in": 3,
-      "fan_out": 0
-    },
-    {
-      "name": "LoopPolicyConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "max_steps",
-        "per_step_timeout",
-        "max_wall_time"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [],
-      "inferred_stratum": "utility",
-      "fan_in": 3,
-      "fan_out": 0
-    },
-    {
-      "name": "AgentConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "loop_policy"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [
-        "LoopPolicyConfig"
-      ],
-      "inferred_stratum": "utility",
-      "fan_in": 10,
-      "fan_out": 1
-    },
-    {
-      "name": "CoreConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "llm",
-        "agent"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [
-        "LLMConfig",
-        "AgentConfig"
-      ],
-      "inferred_stratum": "utility",
-      "fan_in": 5,
-      "fan_out": 2
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "LLMTransport",
@@ -360,8 +432,41 @@
         "List"
       ],
       "inferred_stratum": "infrastructure",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "LLMCallable",
+      "file": "src/core/llm/types.py",
+      "package": "src.core.llm",
+      "inherits": [],
+      "implements": [
+        "Protocol"
+      ],
+      "public_methods": [
+        "call"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Protocol",
+        "typing.runtime_checkable"
+      ],
+      "references": [
+        "Protocol",
+        "List",
+        "Any"
+      ],
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 5
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "CoreLLMResponse",
@@ -376,10 +481,14 @@
         "tool_args"
       ],
       "imports": [
+        "__future__.annotations",
         "dataclasses.dataclass",
         "typing.Any",
         "typing.Dict",
-        "typing.Optional"
+        "typing.List",
+        "typing.Optional",
+        "typing.Protocol",
+        "typing.runtime_checkable"
       ],
       "references": [
         "Optional",
@@ -388,7 +497,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "ChatProvider",
@@ -420,7 +530,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 13,
-      "fan_out": 5
+      "fan_out": 5,
+      "dead_code_ignored": true
     },
     {
       "name": "AnthropicClient",
@@ -469,8 +580,9 @@
         "RuntimeError"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 0,
-      "fan_out": 11
+      "fan_in": 5,
+      "fan_out": 11,
+      "dead_code_ignored": true
     },
     {
       "name": "DeepSeekClient",
@@ -512,7 +624,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 7
+      "fan_out": 7,
+      "dead_code_ignored": true
     },
     {
       "name": "GeminiClient",
@@ -562,7 +675,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 11
+      "fan_out": 11,
+      "dead_code_ignored": true
     },
     {
       "name": "MistralClient",
@@ -609,7 +723,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 11
+      "fan_out": 11,
+      "dead_code_ignored": true
     },
     {
       "name": "OpenAIClient",
@@ -657,8 +772,9 @@
         "RuntimeError"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 0,
-      "fan_out": 11
+      "fan_in": 5,
+      "fan_out": 11,
+      "dead_code_ignored": true
     },
     {
       "name": "QwenClient",
@@ -705,11 +821,12 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 11
+      "fan_out": 11,
+      "dead_code_ignored": true
     },
     {
-      "name": "CoreStep",
-      "file": "src/core/planning/core_step.py",
+      "name": "StepProcessor",
+      "file": "src/core/planning/step_processor.py",
       "package": "src.core.planning",
       "inherits": [],
       "implements": [],
@@ -733,12 +850,13 @@
         "src.core.planning.models.step_state.StepState",
         "src.core.planning.models.step_state.StepStatus",
         "src.core.types.step_result.StepResult",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
         "src.core.planning.models.cognitive_contract.validate_cognitive_input",
         "src.core.planning.events.trace_event.TraceEventBuilder",
         "src.core.planning.safety.purity_enforcer.enforce_cognitive_purity",
         "src.core.planning.generator.plan_generator.PlanGenerator",
         "src.core.planning.generator.plan_generator.PlanPrompt",
-        "src.core.types.step_outcome.StepOutcome"
+        "src.core.state.step_outcome.StepOutcome"
       ],
       "references": [
         "OutcomeClassifier",
@@ -754,15 +872,16 @@
         "Exception",
         "ValueError",
         "RUNNING",
-        "StepOutcome",
+        "CognitiveStepOutcome",
         "StepStatus",
         "TRACE_BUILDER",
         "SUCCESS",
         "Plan"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 4,
-      "fan_out": 18
+      "fan_in": 5,
+      "fan_out": 18,
+      "dead_code_ignored": false
     },
     {
       "name": "OutcomeClassifier",
@@ -779,28 +898,30 @@
         "typing.Any",
         "typing.Dict",
         "src.core.types.step_result.StepResult",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
         "src.core.planning.safety.purity_validation.validate_pure_structure",
         "src.core.types.errors.ValidationError",
         "src.core.types.errors.AgentError.ConfidenceError",
-        "src.core.types.step_outcome.StepOutcome"
+        "src.core.state.step_outcome.StepOutcome"
       ],
       "references": [
         "StepResult",
         "Exception",
         "SUCCESS",
-        "FATAL",
-        "RECOVERABLE",
-        "NOOP",
+        "FAILURE",
+        "TOOL_NEEDED",
+        "CONTINUE",
         "Dict",
-        "StepOutcome",
+        "CognitiveStepOutcome",
         "ConfidenceError",
         "Any",
         "ValidationError",
         "OUTCOME_PRIORITY"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 12
+      "fan_out": 12,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanExecutorMetrics",
@@ -822,16 +943,17 @@
         "src.core.types.errors.plan_errors.PlanExecutionError",
         "src.core.planning.models.step_state.StepState",
         "src.core.types.step_result.StepResult",
-        "src.core.types.step_outcome.StepOutcome",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
         "src.core.planning.models.plan.Plan",
         "src.core.planning.safety.purity_enforcer.enforce_cognitive_purity",
         "src.core.planning.models.plan_state.PlanStatus",
         "traceback"
       ],
       "references": [],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 1,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanExecutor",
@@ -854,7 +976,7 @@
         "src.core.types.errors.plan_errors.PlanExecutionError",
         "src.core.planning.models.step_state.StepState",
         "src.core.types.step_result.StepResult",
-        "src.core.types.step_outcome.StepOutcome",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
         "src.core.planning.models.plan.Plan",
         "src.core.planning.safety.purity_enforcer.enforce_cognitive_purity",
         "src.core.planning.models.plan_state.PlanStatus",
@@ -872,16 +994,17 @@
         "FAILURE",
         "PlanDispatchError",
         "PlanState",
-        "StepOutcome",
+        "CognitiveStepOutcome",
         "COMPLETED",
         "PlanExecutionError",
         "CONTINUE",
         "TOOL_NEEDED",
         "PlanStatus"
       ],
-      "inferred_stratum": "utility",
-      "fan_in": 0,
-      "fan_out": 17
+      "inferred_stratum": "infrastructure",
+      "fan_in": 1,
+      "fan_out": 17,
+      "dead_code_ignored": false
     },
     {
       "name": "SafeStepDispatcher",
@@ -900,17 +1023,16 @@
         "__future__.annotations",
         "typing.TYPE_CHECKING",
         "src.core.planning.safety.safety_policies.SafetyContext",
-        "src.core.planning.safety.safety_policies.SafetyPolicy",
-        "src.agent.dispatcher.AgentDispatcher",
-        "src.core.state.state.ConversationState"
+        "src.core.planning.safety.safety_policies.SafetyPolicy"
       ],
       "references": [
         "SafetyContext",
         "SafetyPolicy"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 3,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "StepDispatcher",
@@ -929,19 +1051,20 @@
         "src.core.planning.models.step_state.StepStatus",
         "src.core.types.step_result.StepResult",
         "src.core.planning.models.plan.Plan",
-        "src.core.planning.core_step.CoreStep"
+        "src.core.planning.step_processor.StepProcessor"
       ],
       "references": [
-        "CoreStep",
+        "StepProcessor",
         "Plan",
         "StepState",
         "StepResult",
         "PENDING",
         "StepStatus"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 1,
-      "fan_out": 6
+      "fan_out": 6,
+      "dead_code_ignored": false
     },
     {
       "name": "TraceEventBuilder",
@@ -978,7 +1101,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 1,
-      "fan_out": 7
+      "fan_out": 7,
+      "dead_code_ignored": false
     },
     {
       "name": "LocalPlanner",
@@ -1002,7 +1126,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanPrompt",
@@ -1033,7 +1158,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 3,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanGenerator",
@@ -1066,8 +1192,9 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 2,
-      "fan_out": 4
+      "fan_in": 4,
+      "fan_out": 4,
+      "dead_code_ignored": false
     },
     {
       "name": "Plan",
@@ -1092,46 +1219,9 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 20,
-      "fan_out": 1
-    },
-    {
-      "name": "PlanSegment",
-      "file": "src/core/planning/models/plan_segment.py",
-      "package": "src.core.planning.models",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [
-        "id"
-      ],
-      "public_attributes": [
-        "subgoal_id",
-        "steps",
-        "context",
-        "metadata",
-        "created_at",
-        "segment_id",
-        "canonical_hash"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass",
-        "dataclasses.field",
-        "datetime.datetime",
-        "typing.Dict",
-        "typing.List",
-        "typing.Any",
-        "src.core.types.hashing.stable_hash",
-        "src.core.types.json_pure.ensure_json_pure"
-      ],
-      "references": [
-        "List",
-        "Dict",
-        "Any"
-      ],
-      "inferred_stratum": "domain",
-      "fan_in": 14,
-      "fan_out": 3
+      "fan_in": 24,
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanStatus",
@@ -1162,7 +1252,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 10,
-      "fan_out": 6
+      "fan_out": 6,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanState",
@@ -1201,8 +1292,9 @@
         "PENDING"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 9,
-      "fan_out": 6
+      "fan_in": 10,
+      "fan_out": 6,
+      "dead_code_ignored": false
     },
     {
       "name": "StepStatus",
@@ -1236,8 +1328,9 @@
         "ERROR"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 5,
-      "fan_out": 5
+      "fan_in": 9,
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "StepState",
@@ -1284,91 +1377,9 @@
         "ValidationError"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 16,
-      "fan_out": 8
-    },
-    {
-      "name": "SubgoalLifecycleState",
-      "file": "src/core/planning/models/subgoal.py",
-      "package": "src.core.planning.models",
-      "inherits": [
-        "str",
-        "Enum"
-      ],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass",
-        "dataclasses.field",
-        "dataclasses.replace",
-        "enum.Enum",
-        "typing.Dict",
-        "typing.Any",
-        "typing.Optional",
-        "time",
-        "src.core.types.hashing.stable_hash",
-        "src.core.types.json_pure.ensure_json_pure"
-      ],
-      "references": [
-        "str",
-        "Enum",
-        "PENDING",
-        "ACTIVE",
-        "SATISFIED",
-        "FAILED",
-        "ABANDONED",
-        "CLOSED"
-      ],
-      "inferred_stratum": "domain",
-      "fan_in": 5,
-      "fan_out": 8
-    },
-    {
-      "name": "Subgoal",
-      "file": "src/core/planning/models/subgoal.py",
-      "package": "src.core.planning.models",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [
-        "new",
-        "with_state",
-        "id"
-      ],
-      "public_attributes": [
-        "subgoal_id",
-        "goal",
-        "context",
-        "metadata",
-        "parent_id",
-        "state",
-        "created_at",
-        "canonical_hash"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass",
-        "dataclasses.field",
-        "dataclasses.replace",
-        "enum.Enum",
-        "typing.Dict",
-        "typing.Any",
-        "typing.Optional",
-        "time",
-        "src.core.types.hashing.stable_hash",
-        "src.core.types.json_pure.ensure_json_pure"
-      ],
-      "references": [
-        "SubgoalLifecycleState",
-        "PENDING",
-        "Dict",
-        "Optional",
-        "Any"
-      ],
-      "inferred_stratum": "domain",
-      "fan_in": 11,
-      "fan_out": 5
+      "fan_in": 20,
+      "fan_out": 8,
+      "dead_code_ignored": false
     },
     {
       "name": "LoopController",
@@ -1393,7 +1404,10 @@
         "src.core.planning.safety.loop_policy.LoopPolicy",
         "src.core.planning.models.step_state.StepState",
         "src.core.types.step_result.StepResult",
-        "core_step.CoreStep",
+        "safety.loop_policy.LoopPolicy",
+        "step_processor.StepProcessor",
+        "models.step_state.StepState",
+        "types.step_result.StepResult",
         "loop_metrics.LoopMetrics",
         "loop_termination.decide_termination",
         "src.core.types.hashing.stable_hash"
@@ -1409,7 +1423,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 7
+      "fan_out": 7,
+      "dead_code_ignored": false
     },
     {
       "name": "LoopMetrics",
@@ -1443,7 +1458,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 4,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "LoopOrchestrator",
@@ -1468,7 +1484,7 @@
         "models.step_state.StepState",
         "types.step_result.StepResult",
         "loop_controller.LoopController",
-        "loop_controller.LoopPolicy",
+        "safety.loop_policy.LoopPolicy",
         "loop_metrics.LoopMetrics"
       ],
       "references": [
@@ -1481,8 +1497,9 @@
         "LoopMetrics"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 0,
-      "fan_out": 7
+      "fan_in": 2,
+      "fan_out": 7,
+      "dead_code_ignored": false
     },
     {
       "name": "LoopTerminationDecision",
@@ -1501,23 +1518,22 @@
         "typing.Literal",
         "typing.Optional",
         "types.step_result.StepResult",
-        "types.step_result.StepOutcome"
+        "types.cognitive_step_outcome.CognitiveStepOutcome"
       ],
       "references": [
         "TerminationReason"
       ],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "LoopPolicy",
       "file": "src/core/planning/safety/loop_policy.py",
       "package": "src.core.planning.safety",
       "inherits": [],
-      "implements": [
-        "Protocol"
-      ],
+      "implements": [],
       "public_methods": [
         "allows_step",
         "allows_retry",
@@ -1532,20 +1548,43 @@
       "imports": [
         "__future__.annotations",
         "dataclasses.dataclass",
-        "typing.Optional",
-        "typing.Protocol",
-        "models.step_state.StepState",
-        "types.step_result.StepResult"
+        "typing.Optional"
       ],
       "references": [
-        "Protocol",
-        "Optional",
-        "StepState",
-        "StepResult"
+        "Optional"
       ],
-      "inferred_stratum": "utility",
-      "fan_in": 4,
-      "fan_out": 4
+      "inferred_stratum": "infrastructure",
+      "fan_in": 12,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "LoopPolicyEnforcer",
+      "file": "src/core/planning/safety/loop_policy_enforcer.py",
+      "package": "src.core.planning.safety",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "check_step_limit",
+        "check_retry_limit",
+        "check_duration_limit"
+      ],
+      "public_attributes": [
+        "policy"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "src.core.planning.safety.loop_policy.LoopPolicy",
+        "src.core.types.errors.ValidationError"
+      ],
+      "references": [
+        "LoopPolicy",
+        "ValidationError"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "MinimalSafetyPolicy",
@@ -1560,9 +1599,10 @@
       "public_attributes": [],
       "imports": [],
       "references": [],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "Policy",
@@ -1590,9 +1630,40 @@
         "ALLOW_TOOLS",
         "ValueError"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 4
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "EnforcedLoopPolicy",
+      "file": "src/core/planning/safety/policy_adapter.py",
+      "package": "src.core.planning.safety",
+      "inherits": [
+        "LoopPolicy"
+      ],
+      "implements": [],
+      "public_methods": [
+        "allows_continue"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "loop_policy.LoopPolicy",
+        "models.step_state.StepState",
+        "types.step_result.StepResult",
+        "loop_policy_enforcer.LoopPolicyEnforcer"
+      ],
+      "references": [
+        "LoopPolicy",
+        "LoopPolicyEnforcer",
+        "StepState",
+        "StepResult"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
     },
     {
       "name": "SafetyContext",
@@ -1617,7 +1688,7 @@
         "src.core.planning.models.plan_state.PlanStatus",
         "src.core.types.errors.plan_errors.PlanSafetyPolicyError",
         "src.core.types.errors.plan_errors.PlanTransitionSafetyError",
-        "src.core.planning.core_step.StepResult"
+        "src.core.planning.step_processor.StepResult"
       ],
       "references": [
         "Plan",
@@ -1626,9 +1697,10 @@
         "PlanState",
         "Any"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 5,
-      "fan_out": 5
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "SafetyPolicy",
@@ -1654,16 +1726,17 @@
         "src.core.planning.models.plan_state.PlanStatus",
         "src.core.types.errors.plan_errors.PlanSafetyPolicyError",
         "src.core.types.errors.plan_errors.PlanTransitionSafetyError",
-        "src.core.planning.core_step.StepResult"
+        "src.core.planning.step_processor.StepResult"
       ],
       "references": [
         "Protocol",
         "SafetyContext",
         "StepResult"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "ForbiddenCapabilityPolicy",
@@ -1689,16 +1762,17 @@
         "src.core.planning.models.plan_state.PlanStatus",
         "src.core.types.errors.plan_errors.PlanSafetyPolicyError",
         "src.core.types.errors.plan_errors.PlanTransitionSafetyError",
-        "src.core.planning.core_step.StepResult"
+        "src.core.planning.step_processor.StepResult"
       ],
       "references": [
         "SafetyContext",
         "StepResult",
         "PlanSafetyPolicyError"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanTransitionPolicy",
@@ -1722,7 +1796,7 @@
         "src.core.planning.models.plan_state.PlanStatus",
         "src.core.types.errors.plan_errors.PlanSafetyPolicyError",
         "src.core.types.errors.plan_errors.PlanTransitionSafetyError",
-        "src.core.planning.core_step.StepResult"
+        "src.core.planning.step_processor.StepResult"
       ],
       "references": [
         "SafetyContext",
@@ -1732,9 +1806,10 @@
         "PlanTransitionSafetyError",
         "PlanStatus"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 6
+      "fan_out": 6,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentError",
@@ -1752,7 +1827,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 3,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentNotFoundError",
@@ -1772,7 +1848,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentValidationError",
@@ -1790,7 +1867,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentStitchingError",
@@ -1808,7 +1886,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 4,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentCreatedEvent",
@@ -1824,7 +1903,7 @@
         "__future__.annotations",
         "typing.Dict",
         "typing.Any",
-        "src.core.planning.models.plan_segment.PlanSegment"
+        "src.core.types.plan_segment.PlanSegment"
       ],
       "references": [
         "Dict",
@@ -1833,7 +1912,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentStitchedEvent",
@@ -1849,7 +1929,7 @@
         "__future__.annotations",
         "typing.Dict",
         "typing.Any",
-        "src.core.planning.models.plan_segment.PlanSegment"
+        "src.core.types.plan_segment.PlanSegment"
       ],
       "references": [
         "Dict",
@@ -1858,7 +1938,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanSegmentManager",
@@ -1876,9 +1957,9 @@
         "__future__.annotations",
         "typing.List",
         "typing.Optional",
-        "src.core.planning.models.plan_segment.PlanSegment",
+        "src.core.types.plan_segment.PlanSegment",
         "src.core.planning.segments.state.SegmentState",
-        "src.core.planning.segments.validator.SegmentValidator",
+        "src.core.planning.validators.plan_segment_validator.PlanSegmentValidator",
         "src.core.planning.segments.stitcher.SegmentStitcher",
         "src.core.planning.segments.events.SegmentCreatedEvent",
         "src.core.planning.segments.events.SegmentStitchedEvent",
@@ -1900,7 +1981,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 11
+      "fan_out": 11,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentState",
@@ -1924,7 +2006,7 @@
         "typing.List",
         "typing.Optional",
         "src.core.planning.segments.errors.SegmentNotFoundError",
-        "src.core.planning.models.plan_segment.PlanSegment"
+        "src.core.types.plan_segment.PlanSegment"
       ],
       "references": [
         "Optional",
@@ -1935,7 +2017,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 5
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentStitcher",
@@ -1950,7 +2033,7 @@
       "imports": [
         "__future__.annotations",
         "typing.List",
-        "src.core.planning.models.plan_segment.PlanSegment",
+        "src.core.types.plan_segment.PlanSegment",
         "src.core.planning.segments.errors.SegmentStitchingError"
       ],
       "references": [
@@ -1961,30 +2044,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 4
-    },
-    {
-      "name": "SegmentValidator",
-      "file": "src/core/planning/segments/validator.py",
-      "package": "src.core.planning.segments",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [
-        "validate"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "__future__.annotations",
-        "src.core.planning.models.plan_segment.PlanSegment",
-        "src.core.planning.validators.plan_segment_validator.PlanSegmentValidator"
-      ],
-      "references": [
-        "PlanSegment",
-        "Exception"
-      ],
-      "inferred_stratum": "utility",
-      "fan_in": 2,
-      "fan_out": 2
+      "fan_out": 4,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalError",
@@ -2002,7 +2063,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 4,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalNotFoundError",
@@ -2022,7 +2084,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 4,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "InvalidSubgoalError",
@@ -2040,7 +2103,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "IllegalSubgoalTransitionError",
@@ -2058,7 +2122,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalHierarchyError",
@@ -2076,7 +2141,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalCreatedEvent",
@@ -2092,7 +2158,7 @@
         "__future__.annotations",
         "typing.Dict",
         "typing.Any",
-        "models.subgoal.Subgoal"
+        "src.core.types.subgoal.Subgoal"
       ],
       "references": [
         "Dict",
@@ -2101,7 +2167,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalTransitionEvent",
@@ -2117,7 +2184,7 @@
         "__future__.annotations",
         "typing.Dict",
         "typing.Any",
-        "models.subgoal.Subgoal"
+        "src.core.types.subgoal.Subgoal"
       ],
       "references": [
         "Dict",
@@ -2126,7 +2193,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalManager",
@@ -2148,9 +2216,9 @@
         "typing.Optional",
         "typing.Dict",
         "typing.List",
-        "models.subgoal.Subgoal",
-        "models.subgoal.SubgoalLifecycleState",
-        "validator.SubgoalValidator",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.validators.subgoal_validator.SubgoalValidator",
         "transitions.TransitionEngine",
         "state.SubgoalState",
         "errors.SubgoalNotFoundError",
@@ -2178,7 +2246,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 14
+      "fan_out": 14,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalState",
@@ -2201,7 +2270,7 @@
         "typing.Dict",
         "typing.List",
         "typing.Optional",
-        "models.subgoal.Subgoal",
+        "src.core.types.subgoal.Subgoal",
         "errors.SubgoalNotFoundError"
       ],
       "references": [
@@ -2213,7 +2282,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 5
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "TransitionEngine",
@@ -2230,7 +2300,7 @@
         "__future__.annotations",
         "typing.Dict",
         "typing.Set",
-        "models.subgoal.SubgoalLifecycleState"
+        "src.core.types.subgoal.SubgoalLifecycleState"
       ],
       "references": [
         "Dict",
@@ -2245,30 +2315,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 9
-    },
-    {
-      "name": "SubgoalValidator",
-      "file": "src/core/planning/subgoals/validator.py",
-      "package": "src.core.planning.subgoals",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [
-        "validate"
-      ],
-      "public_attributes": [],
-      "imports": [
-        "__future__.annotations",
-        "models.subgoal.Subgoal",
-        "src.core.planning.validators.subgoal_validator.SubgoalValidator"
-      ],
-      "references": [
-        "Subgoal",
-        "Exception"
-      ],
-      "inferred_stratum": "utility",
-      "fan_in": 2,
-      "fan_out": 2
+      "fan_out": 9,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanSegmentValidator",
@@ -2284,15 +2332,17 @@
         "src.core.types.errors.ValidationError",
         "src.core.types.json_pure.ensure_json_pure",
         "src.core.types.hashing.stable_hash",
-        "src.core.planning.models.plan_segment.PlanSegment"
+        "src.core.types.plan_segment.PlanSegment"
       ],
       "references": [
         "PlanSegment",
+        "Exception",
         "ValidationError"
       ],
       "inferred_stratum": "utility",
       "fan_in": 1,
-      "fan_out": 2
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanStateValidationError",
@@ -2313,7 +2363,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanValidationResult",
@@ -2336,7 +2387,8 @@
       "references": [],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "CapabilityRegistry",
@@ -2363,7 +2415,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanValidator",
@@ -2382,6 +2435,7 @@
         "__future__.annotations",
         "src.core.planning.models.plan.Plan",
         "src.core.types.errors.ValidationError",
+        "src.primitives.runtime.validator.validate_structural",
         "src.core.planning.safety.purity_enforcer.enforce_cognitive_purity",
         "src.core.types.errors.plan_errors.PlanStructureError",
         "src.core.types.errors.plan_errors.UnknownCapabilityError",
@@ -2402,8 +2456,9 @@
         "PlanPurityError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 2,
-      "fan_out": 9
+      "fan_in": 5,
+      "fan_out": 9,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalValidator",
@@ -2417,7 +2472,7 @@
       "public_attributes": [],
       "imports": [
         "__future__.annotations",
-        "src.core.planning.models.subgoal.Subgoal",
+        "src.core.types.subgoal.Subgoal",
         "src.core.types.json_pure.ensure_json_pure"
       ],
       "references": [
@@ -2426,7 +2481,8 @@
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "SignalType",
@@ -2458,7 +2514,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 1,
-      "fan_out": 5
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "SignalSeverity",
@@ -2489,8 +2546,9 @@
         "CRITICAL"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 1,
-      "fan_out": 5
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "GovernedSignal",
@@ -2524,8 +2582,140 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 0,
-      "fan_out": 4
+      "fan_in": 1,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "LLMConfig",
+      "file": "src/core/state/config.py",
+      "package": "src.core.state",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "provider",
+        "model",
+        "temperature",
+        "max_tokens"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.List",
+        "typing.Optional",
+        "typing.Any",
+        "typing.Dict",
+        "src.primitives.runtime.categories.SkillCategory",
+        "src.primitives.runtime.side_effects.SideEffect"
+      ],
+      "references": [],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "LoopPolicyConfig",
+      "file": "src/core/state/config.py",
+      "package": "src.core.state",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "max_steps",
+        "max_wall_time",
+        "max_errors",
+        "max_fatals",
+        "per_step_timeout"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.List",
+        "typing.Optional",
+        "typing.Any",
+        "typing.Dict",
+        "src.primitives.runtime.categories.SkillCategory",
+        "src.primitives.runtime.side_effects.SideEffect"
+      ],
+      "references": [
+        "Optional"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AgentConfig",
+      "file": "src/core/state/config.py",
+      "package": "src.core.state",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "from_yaml"
+      ],
+      "public_attributes": [
+        "model",
+        "allowed_tools",
+        "allowed_categories",
+        "allowed_side_effects",
+        "max_steps",
+        "loop_policy"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.List",
+        "typing.Optional",
+        "typing.Any",
+        "typing.Dict",
+        "src.primitives.runtime.categories.SkillCategory",
+        "src.primitives.runtime.side_effects.SideEffect"
+      ],
+      "references": [
+        "LoopPolicyConfig",
+        "List",
+        "SkillCategory",
+        "SideEffect",
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 10,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "CoreConfig",
+      "file": "src/core/state/config.py",
+      "package": "src.core.state",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "llm",
+        "agent"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.List",
+        "typing.Optional",
+        "typing.Any",
+        "typing.Dict",
+        "src.primitives.runtime.categories.SkillCategory",
+        "src.primitives.runtime.side_effects.SideEffect"
+      ],
+      "references": [
+        "LLMConfig",
+        "AgentConfig"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 5,
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "CoreStepExecutor",
@@ -2548,13 +2738,13 @@
         "typing.Tuple",
         "typing.Union",
         "src.core.state.state.ConversationState",
-        "src.core.llm.transport.LLMTransport",
+        "src.core.llm.types.LLMCallable",
+        "src.core.state.config.AgentConfig",
         "src.primitives.runtime.registry.SkillRegistry",
         "src.governance.tool_selection.select_tool",
         "src.core.types.result.CoreResult",
-        "src.core.types.step_outcome.classify_step",
-        "src.core.types.step_outcome.StepOutcome",
-        "src.core.config.model.AgentConfig",
+        "src.core.state.step_outcome.classify_step",
+        "src.core.state.step_outcome.StepOutcome",
         "src.execution.panic_guard.with_panic_guard",
         "src.execution.self_healing.perform_self_heal",
         "src.execution.self_healing.SelfHealingController",
@@ -2569,7 +2759,7 @@
       ],
       "references": [
         "Tuple",
-        "LLMTransport",
+        "LLMCallable",
         "AgentConfig",
         "ConversationState",
         "Exception",
@@ -2585,9 +2775,10 @@
         "SafeFailure",
         "SkillRegistry"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 16
+      "fan_out": 16,
+      "dead_code_ignored": false
     },
     {
       "name": "StepExecutor",
@@ -2610,13 +2801,14 @@
         "concurrent.futures.ThreadPoolExecutor",
         "concurrent.futures.TimeoutError",
         "src.core.state.state.ConversationState",
-        "src.core.types.step_outcome.StepOutcome",
+        "src.core.state.core_step_executor.core_step",
+        "src.core.state.step_outcome.StepOutcome",
+        "src.core.state.config.AgentConfig",
         "src.core.state.isdone.isdone",
         "src.core.state.trace.StepTrace",
         "src.core.types.result.CoreResult",
         "src.execution.safe_failure.SafeFailure",
-        "src.core.config.model.CoreConfig",
-        "src.core.config.model.AgentConfig"
+        "src.core.state.config.CoreConfig"
       ],
       "references": [
         "Protocol",
@@ -2628,9 +2820,10 @@
         "CoreResult",
         "SafeFailure"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 1,
-      "fan_out": 8
+      "fan_out": 8,
+      "dead_code_ignored": false
     },
     {
       "name": "AgentRuntime",
@@ -2656,13 +2849,14 @@
         "concurrent.futures.ThreadPoolExecutor",
         "concurrent.futures.TimeoutError",
         "src.core.state.state.ConversationState",
-        "src.core.types.step_outcome.StepOutcome",
+        "src.core.state.core_step_executor.core_step",
+        "src.core.state.step_outcome.StepOutcome",
+        "src.core.state.config.AgentConfig",
         "src.core.state.isdone.isdone",
         "src.core.state.trace.StepTrace",
         "src.core.types.result.CoreResult",
         "src.execution.safe_failure.SafeFailure",
-        "src.core.config.model.CoreConfig",
-        "src.core.config.model.AgentConfig"
+        "src.core.state.config.CoreConfig"
       ],
       "references": [
         "CoreResult",
@@ -2680,9 +2874,10 @@
         "ThreadPoolExecutor",
         "TimeoutError"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 14
+      "fan_out": 14,
+      "dead_code_ignored": false
     },
     {
       "name": "SubgoalSubstrateState",
@@ -2710,9 +2905,10 @@
         "List",
         "Any"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 1,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "SegmentSubstrateState",
@@ -2746,9 +2942,10 @@
         "Any",
         "Optional"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 1,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "ConversationState",
@@ -2799,9 +2996,39 @@
         "Any",
         "Exception"
       ],
-      "inferred_stratum": "utility",
-      "fan_in": 9,
-      "fan_out": 7
+      "inferred_stratum": "infrastructure",
+      "fan_in": 8,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "StepOutcome",
+      "file": "src/core/state/step_outcome.py",
+      "package": "src.core.state",
+      "inherits": [
+        "str",
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "enum.Enum",
+        "src.core.types.result.CoreResult"
+      ],
+      "references": [
+        "str",
+        "Enum",
+        "SUCCESS",
+        "RECOVERABLE",
+        "FATAL",
+        "NOOP",
+        "FAILURE"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 12,
+      "fan_out": 7,
+      "dead_code_ignored": false
     },
     {
       "name": "StepTrace",
@@ -2819,15 +3046,16 @@
       "imports": [
         "dataclasses.dataclass",
         "typing.Optional",
-        "src.core.types.step_outcome.StepOutcome"
+        "src.core.state.step_outcome.StepOutcome"
       ],
       "references": [
         "StepOutcome",
         "Optional"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 3,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "ToolPromptBuilder",
@@ -2843,7 +3071,8 @@
       "references": [],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "ToolSchemaGenerator",
@@ -2863,7 +3092,8 @@
       "references": [],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "ToolValidator",
@@ -2883,7 +3113,97 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "CognitiveStepOutcome",
+      "file": "src/core/types/cognitive_step_outcome.py",
+      "package": "src.core.types",
+      "inherits": [
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "enum.Enum"
+      ],
+      "references": [
+        "Enum",
+        "SUCCESS",
+        "FAILURE",
+        "TOOL_NEEDED",
+        "CONTINUE"
+      ],
+      "inferred_stratum": "domain",
+      "fan_in": 23,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "CoreStep",
+      "file": "src/core/types/core_step.py",
+      "package": "src.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "step_type",
+        "payload"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "typing.Dict",
+        "typing.Any"
+      ],
+      "references": [
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "domain",
+      "fan_in": 3,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "PlanSegment",
+      "file": "src/core/types/plan_segment.py",
+      "package": "src.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "id"
+      ],
+      "public_attributes": [
+        "subgoal_id",
+        "steps",
+        "context",
+        "metadata",
+        "created_at",
+        "segment_id",
+        "canonical_hash"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "datetime.datetime",
+        "typing.Dict",
+        "typing.List",
+        "typing.Any",
+        "src.core.types.hashing.stable_hash",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "List",
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "domain",
+      "fan_in": 21,
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "CoreResult",
@@ -2917,35 +3237,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 13,
-      "fan_out": 3
-    },
-    {
-      "name": "StepOutcome",
-      "file": "src/core/types/step_outcome.py",
-      "package": "src.core.types",
-      "inherits": [
-        "str",
-        "Enum"
-      ],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [],
-      "imports": [
-        "enum.Enum",
-        "src.core.types.result.CoreResult"
-      ],
-      "references": [
-        "str",
-        "Enum",
-        "SUCCESS",
-        "RECOVERABLE",
-        "FATAL",
-        "NOOP",
-        "FAILURE"
-      ],
-      "inferred_stratum": "domain",
-      "fan_in": 19,
-      "fan_out": 7
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "StepResult",
@@ -2967,15 +3260,15 @@
         "__future__.annotations",
         "dataclasses.dataclass",
         "dataclasses.field",
-        "enum.Enum",
         "typing.Any",
         "typing.Dict",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
         "src.core.types.validation.validate_pure_structure",
         "src.core.types.errors.ValidationError",
         "src.core.types.hashing.stable_hash"
       ],
       "references": [
-        "StepOutcome",
+        "CognitiveStepOutcome",
         "Dict",
         "Any",
         "Exception",
@@ -2983,8 +3276,94 @@
         "ValidationError"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 23,
-      "fan_out": 6
+      "fan_in": 37,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SubgoalLifecycleState",
+      "file": "src/core/types/subgoal.py",
+      "package": "src.core.types",
+      "inherits": [
+        "str",
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "dataclasses.replace",
+        "enum.Enum",
+        "typing.Dict",
+        "typing.Any",
+        "typing.Optional",
+        "time",
+        "src.core.types.hashing.stable_hash",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "str",
+        "Enum",
+        "PENDING",
+        "ACTIVE",
+        "SATISFIED",
+        "FAILED",
+        "ABANDONED",
+        "CLOSED"
+      ],
+      "inferred_stratum": "domain",
+      "fan_in": 5,
+      "fan_out": 8,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "Subgoal",
+      "file": "src/core/types/subgoal.py",
+      "package": "src.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "new",
+        "with_state",
+        "id"
+      ],
+      "public_attributes": [
+        "subgoal_id",
+        "goal",
+        "context",
+        "metadata",
+        "parent_id",
+        "state",
+        "created_at",
+        "canonical_hash"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "dataclasses.replace",
+        "enum.Enum",
+        "typing.Dict",
+        "typing.Any",
+        "typing.Optional",
+        "time",
+        "src.core.types.hashing.stable_hash",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "SubgoalLifecycleState",
+        "PENDING",
+        "Dict",
+        "Optional",
+        "Any"
+      ],
+      "inferred_stratum": "domain",
+      "fan_in": 19,
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "AgentError",
@@ -2992,7 +3371,9 @@
       "package": "src.core.types.errors",
       "inherits": [],
       "implements": [],
-      "public_methods": [],
+      "public_methods": [
+        "to_dict"
+      ],
       "public_attributes": [
         "type",
         "message",
@@ -3010,7 +3391,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 16,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanningError",
@@ -3033,7 +3415,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "MappingError",
@@ -3056,7 +3439,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "ExecutionError",
@@ -3079,7 +3463,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "StateError",
@@ -3102,14 +3487,16 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "GovernanceError",
       "file": "src/core/types/errors/AgentError.py",
       "package": "src.core.types.errors",
       "inherits": [
-        "AgentError"
+        "AgentError",
+        "Exception"
       ],
       "implements": [],
       "public_methods": [],
@@ -3121,11 +3508,13 @@
       ],
       "references": [
         "AgentError",
+        "Exception",
         "Any"
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "ConfidenceError",
@@ -3148,7 +3537,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 2,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "SemanticError",
@@ -3171,7 +3561,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "LLMError",
@@ -3191,7 +3582,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SystemError",
@@ -3211,7 +3603,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "ToolError",
@@ -3231,7 +3624,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "ValidationError",
@@ -3257,8 +3651,9 @@
         "Exception"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 14,
-      "fan_out": 2
+      "fan_in": 24,
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanValidationError",
@@ -3276,7 +3671,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 13,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanStructureError",
@@ -3293,8 +3689,9 @@
         "PlanValidationError"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 2,
-      "fan_out": 1
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "UnknownCapabilityError",
@@ -3312,7 +3709,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "ForbiddenCapabilityError",
@@ -3329,8 +3727,9 @@
         "PlanValidationError"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 2,
-      "fan_out": 1
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "CapabilitySchemaError",
@@ -3348,7 +3747,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanPurityError",
@@ -3366,7 +3766,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanSafetyError",
@@ -3383,8 +3784,9 @@
         "PlanValidationError"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 2,
-      "fan_out": 1
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanExecutionError",
@@ -3402,7 +3804,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 3,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanDispatchError",
@@ -3420,7 +3823,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 3,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanSafetyPolicyError",
@@ -3438,7 +3842,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 5,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "PlanTransitionSafetyError",
@@ -3456,7 +3861,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 5,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "RecoveryAction",
@@ -3482,7 +3888,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 6
+      "fan_out": 6,
+      "dead_code_ignored": false
     },
     {
       "name": "DeadCodeIgnore",
@@ -3506,7 +3913,8 @@
       "references": [],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "DegradedModeController",
@@ -3526,9 +3934,10 @@
       ],
       "imports": [],
       "references": [],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "ToolExecutionError",
@@ -3544,35 +3953,10 @@
       "references": [
         "Exception"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 1
-    },
-    {
-      "name": "ExecutionResult",
-      "file": "src/execution/executor.py",
-      "package": "src.execution",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "status",
-        "output",
-        "error",
-        "skill_id",
-        "raw_response"
-      ],
-      "imports": [
-        "typing.Any",
-        "typing.Dict",
-        "pydantic.dataclasses.dataclass"
-      ],
-      "references": [
-        "Any"
-      ],
-      "inferred_stratum": "utility",
-      "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "Executor",
@@ -3589,16 +3973,75 @@
       "imports": [
         "typing.Any",
         "typing.Dict",
-        "pydantic.dataclasses.dataclass"
+        "src.execution.executor_contract.ExecutionResult"
       ],
       "references": [
         "Dict",
         "Any",
         "ValueError"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ExecutionResult",
+      "file": "src/execution/executor_contract.py",
+      "package": "src.execution",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "status",
+        "output",
+        "error",
+        "skill_id",
+        "raw_response"
+      ],
+      "imports": [
+        "abc.ABC",
+        "abc.abstractmethod",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "src.core.planning.models.plan.Plan"
+      ],
+      "references": [
+        "Any"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 4,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "ExecutorContract",
+      "file": "src/execution/executor_contract.py",
+      "package": "src.execution",
+      "inherits": [],
+      "implements": [
+        "ABC"
+      ],
+      "public_methods": [
+        "execute"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "abc.ABC",
+        "abc.abstractmethod",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "src.core.planning.models.plan.Plan"
+      ],
+      "references": [
+        "ABC",
+        "ExecutionResult",
+        "Plan"
+      ],
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "MinimalCoreStepExecutor",
@@ -3613,11 +4056,10 @@
         "llm"
       ],
       "imports": [
-        "src.core.state.state.ConversationState",
-        "src.core.types.step_outcome.StepOutcome",
+        "src.core.types.core_step.CoreStep",
         "src.core.types.result.CoreResult",
         "src.execution.safe_failure.SafeFailure",
-        "src.core.config.model.AgentConfig"
+        "src.core.state.config.AgentConfig"
       ],
       "references": [
         "ConversationState",
@@ -3629,9 +4071,10 @@
         "CoreResult",
         "SafeFailure"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 8
+      "fan_out": 8,
+      "dead_code_ignored": false
     },
     {
       "name": "PoisonJobDetector",
@@ -3651,9 +4094,10 @@
       ],
       "imports": [],
       "references": [],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "SafeFailure",
@@ -3667,17 +4111,24 @@
       ],
       "public_attributes": [
         "error_type",
-        "message"
+        "message",
+        "metadata"
       ],
       "imports": [
-        "dataclasses.dataclass"
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Dict"
       ],
       "references": [
+        "Dict",
+        "Any",
         "Exception"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 8,
-      "fan_out": 1
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "SelfHealingController",
@@ -3698,16 +4149,17 @@
         "src.execution.safe_failure.make_safe_failure"
       ],
       "references": [],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "SingleSkillExecutor",
       "file": "src/execution/singleskillexecutor.py",
       "package": "src.execution",
       "inherits": [
-        "Executor"
+        "ExecutorContract"
       ],
       "implements": [],
       "public_methods": [
@@ -3721,11 +4173,11 @@
         "src.primitives.runtime.registry.SkillRegistry",
         "src.primitives.runtime.skill.Skill",
         "src.primitives.runtime.validator",
-        "src.execution.executor_interface.ExecutionResult",
-        "src.execution.executor_interface.Executor"
+        "src.execution.executor_contract.ExecutionResult",
+        "src.execution.executor_contract.ExecutorContract"
       ],
       "references": [
-        "Executor",
+        "ExecutorContract",
         "ExecutionResult",
         "Plan",
         "Any",
@@ -3735,9 +4187,10 @@
         "ValidationError",
         "TypeError"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 9
+      "fan_out": 9,
+      "dead_code_ignored": false
     },
     {
       "name": "CircuitBreaker",
@@ -3761,9 +4214,10 @@
         "time"
       ],
       "references": [],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "RetryStrategy",
@@ -3783,9 +4237,10 @@
         "typing.Any"
       ],
       "references": [],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 1,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "RetryPolicy",
@@ -3806,9 +4261,10 @@
         "Any",
         "ValueError"
       ],
-      "inferred_stratum": "utility",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "Governance",
@@ -3828,9 +4284,10 @@
         "REQUIRED_KEYS",
         "ValueError"
       ],
-      "inferred_stratum": "adapter",
+      "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 2
+      "fan_out": 2,
+      "dead_code_ignored": false
     },
     {
       "name": "Logger",
@@ -3857,7 +4314,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "StdoutLogger",
@@ -3884,7 +4342,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 1,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "StructuredLogger",
@@ -3919,7 +4378,8 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "BaseSkill",
@@ -3969,7 +4429,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 10
+      "fan_out": 10,
+      "dead_code_ignored": false
     },
     {
       "name": "SkillCategory",
@@ -3999,8 +4460,9 @@
         "DANGEROUS"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 4,
-      "fan_out": 11
+      "fan_in": 9,
+      "fan_out": 11,
+      "dead_code_ignored": false
     },
     {
       "name": "SkillRegistry",
@@ -4037,7 +4499,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 6,
-      "fan_out": 6
+      "fan_out": 6,
+      "dead_code_ignored": false
     },
     {
       "name": "SemanticValidationError",
@@ -4059,7 +4522,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SideEffect",
@@ -4087,8 +4551,9 @@
         "DANGEROUS"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 4,
-      "fan_out": 9
+      "fan_in": 9,
+      "fan_out": 9,
+      "dead_code_ignored": false
     },
     {
       "name": "Skill",
@@ -4111,7 +4576,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 2,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SkillFilter",
@@ -4132,7 +4598,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SkillRanker",
@@ -4153,7 +4620,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "SkillMetadata",
@@ -4176,7 +4644,8 @@
       "references": [],
       "inferred_stratum": "domain",
       "fan_in": 2,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "ToolSpec",
@@ -4218,7 +4687,8 @@
       ],
       "inferred_stratum": "domain",
       "fan_in": 6,
-      "fan_out": 7
+      "fan_out": 7,
+      "dead_code_ignored": false
     },
     {
       "name": "Telemetry",
@@ -4244,42 +4714,613 @@
       ],
       "inferred_stratum": "infrastructure",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
-      "name": "SmartDeadCodeVisitor",
-      "file": "tools/code_analysers/deadcode/analyser.py",
-      "package": "tools.code_analysers.deadcode",
-      "inherits": [
-        "NodeVisitor"
-      ],
+      "name": "FakeCoreStep",
+      "file": "tests/unit/test_loop_orchestrator.py",
+      "package": "tests.unit",
+      "inherits": [],
       "implements": [],
       "public_methods": [
-        "visit_FunctionDef",
-        "visit_ClassDef",
-        "visit_Name"
+        "run"
       ],
       "public_attributes": [
-        "defined",
-        "referenced",
-        "ignored"
+        "counter"
       ],
       "imports": [
-        "ast",
-        "pathlib.Path",
-        "collections.defaultdict"
+        "src.core.planning.orchestration.loop_orchestrator.LoopOrchestrator",
+        "src.core.planning.safety.loop_policy.LoopPolicy",
+        "src.core.planning.models.step_state.StepState",
+        "src.core.planning.models.step_state.StepStatus",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.planning.step_processor.StepProcessor",
+        "src.core.planning.generator.plan_generator.PlanGenerator",
+        "src.core.planning.validators.plan_validator.PlanValidator"
       ],
       "references": [
-        "NodeVisitor",
-        "Call",
-        "Load",
-        "Del",
-        "Name",
-        "Attribute"
+        "CONTINUE",
+        "SUCCESS",
+        "StepResult",
+        "StepOutcome",
+        "RUNNING",
+        "StepStatus"
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 6
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AlwaysAllowPolicy",
+      "file": "tests/unit/test_loop_orchestrator.py",
+      "package": "tests.unit",
+      "inherits": [
+        "LoopPolicy"
+      ],
+      "implements": [],
+      "public_methods": [
+        "allows_continue"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "src.core.planning.orchestration.loop_orchestrator.LoopOrchestrator",
+        "src.core.planning.safety.loop_policy.LoopPolicy",
+        "src.core.planning.models.step_state.StepState",
+        "src.core.planning.models.step_state.StepStatus",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.planning.step_processor.StepProcessor",
+        "src.core.planning.generator.plan_generator.PlanGenerator",
+        "src.core.planning.validators.plan_validator.PlanValidator"
+      ],
+      "references": [
+        "LoopPolicy"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "PlanTestDouble",
+      "file": "tests/unit/test_plan_validator.py",
+      "package": "tests.unit",
+      "inherits": [
+        "RealPlan"
+      ],
+      "implements": [],
+      "public_methods": [
+        "to_dict"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "src.core.types.errors.ValidationError",
+        "src.core.planning.models.plan.Plan",
+        "src.core.types.errors.plan_errors.PlanStructureError",
+        "src.core.types.errors.plan_errors.ForbiddenCapabilityError",
+        "src.core.types.errors.plan_errors.PlanSafetyError",
+        "src.core.planning.validators.plan_validator.PlanValidator",
+        "src.core.planning.dispatch.plan_executor.PlanExecutor",
+        "src.core.types.errors.ValidationError.ValidationError",
+        "src.core.planning.models.plan_state.PlanState",
+        "src.core.planning.models.step_state.StepState",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.planning.models.step_state.StepStatus"
+      ],
+      "references": [
+        "RealPlan"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestToClaudeMessages",
+      "file": "tests/unit/core/llm/test_providers.py",
+      "package": "tests.unit.core.llm",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_system_message_extracted_to_system_prompt",
+        "test_multiple_system_messages_joined_with_double_newline",
+        "test_user_message_preserved",
+        "test_assistant_message_preserved",
+        "test_unknown_role_ignored",
+        "test_empty_system_message_not_added_to_system_prompt",
+        "test_no_system_messages_returns_empty_system",
+        "test_non_string_content_passed_through",
+        "test_message_order_preserved"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "json",
+        "os",
+        "io.BytesIO",
+        "unittest.mock.patch",
+        "unittest.mock.MagicMock",
+        "urllib.error",
+        "pytest",
+        "src.core.llm.providers.anthropic.AnthropicClient",
+        "src.core.llm.providers.anthropic._to_claude_messages",
+        "src.core.llm.providers.openai.OpenAIClient",
+        "src.core.llm.llm_factory.create"
+      ],
+      "references": [],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestAnthropicClientChat",
+      "file": "tests/unit/core/llm/test_providers.py",
+      "package": "tests.unit.core.llm",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "client",
+        "test_posts_to_anthropic_messages_endpoint",
+        "test_uses_post_method",
+        "test_includes_api_key_header",
+        "test_payload_contains_model",
+        "test_payload_always_includes_max_tokens",
+        "test_system_prompt_extracted_from_messages",
+        "test_tools_included_when_provided",
+        "test_http_error_raises_runtime_error",
+        "test_url_error_raises_runtime_error",
+        "test_missing_api_key_raises_value_error"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "json",
+        "os",
+        "io.BytesIO",
+        "unittest.mock.patch",
+        "unittest.mock.MagicMock",
+        "urllib.error",
+        "pytest",
+        "src.core.llm.providers.anthropic.AnthropicClient",
+        "src.core.llm.providers.anthropic._to_claude_messages",
+        "src.core.llm.providers.openai.OpenAIClient",
+        "src.core.llm.llm_factory.create"
+      ],
+      "references": [
+        "HTTPError",
+        "URLError",
+        "AnthropicClient",
+        "BytesIO",
+        "RuntimeError",
+        "ValueError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestOpenAIClientChat",
+      "file": "tests/unit/core/llm/test_providers.py",
+      "package": "tests.unit.core.llm",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "client",
+        "test_posts_to_chat_completions_endpoint",
+        "test_uses_post_method",
+        "test_authorization_header_uses_bearer_token",
+        "test_payload_contains_model_and_messages",
+        "test_max_tokens_included_when_provided",
+        "test_max_tokens_absent_when_not_provided",
+        "test_tools_included_when_provided",
+        "test_http_error_raises_runtime_error",
+        "test_missing_api_key_raises_value_error"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "json",
+        "os",
+        "io.BytesIO",
+        "unittest.mock.patch",
+        "unittest.mock.MagicMock",
+        "urllib.error",
+        "pytest",
+        "src.core.llm.providers.anthropic.AnthropicClient",
+        "src.core.llm.providers.anthropic._to_claude_messages",
+        "src.core.llm.providers.openai.OpenAIClient",
+        "src.core.llm.llm_factory.create"
+      ],
+      "references": [
+        "HTTPError",
+        "OpenAIClient",
+        "BytesIO",
+        "RuntimeError",
+        "ValueError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestLLMFactory",
+      "file": "tests/unit/core/llm/test_providers.py",
+      "package": "tests.unit.core.llm",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_known_provider_returns_client_instance",
+        "test_provider_name_is_case_insensitive",
+        "test_unknown_provider_raises_value_error",
+        "test_extra_kwargs_not_accepted_by_client_are_filtered",
+        "test_model_passed_when_accepted_by_client",
+        "test_accepted_kwargs_forwarded_to_client"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "json",
+        "os",
+        "io.BytesIO",
+        "unittest.mock.patch",
+        "unittest.mock.MagicMock",
+        "urllib.error",
+        "pytest",
+        "src.core.llm.providers.anthropic.AnthropicClient",
+        "src.core.llm.providers.anthropic._to_claude_messages",
+        "src.core.llm.providers.openai.OpenAIClient",
+        "src.core.llm.llm_factory.create"
+      ],
+      "references": [
+        "FakeClient",
+        "StrictClient",
+        "ValueError",
+        "ModelAwareClient",
+        "ConfigurableClient"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestPlanSegmentConstruction",
+      "file": "tests/unit/core/planning/models/test_models.py",
+      "package": "tests.unit.core.planning.models",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_minimal_construction",
+        "test_segment_id_computed_on_construction",
+        "test_empty_steps_accepted",
+        "test_context_and_metadata_stored",
+        "test_created_at_is_string",
+        "test_is_frozen",
+        "test_canonical_hash_present_after_construction"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal"
+      ],
+      "references": [
+        "PlanSegment",
+        "FrozenInstanceError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestPlanSegmentCanonicalHash",
+      "file": "tests/unit/core/planning/models/test_models.py",
+      "package": "tests.unit.core.planning.models",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_hash_is_stable_for_same_inputs",
+        "test_hash_differs_on_subgoal_id_change",
+        "test_hash_differs_on_steps_change",
+        "test_hash_differs_on_context_change"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal"
+      ],
+      "references": [
+        "PlanSegment"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestPlanSegmentValidation",
+      "file": "tests/unit/core/planning/models/test_models.py",
+      "package": "tests.unit.core.planning.models",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_non_json_context_raises",
+        "test_non_json_metadata_raises",
+        "test_nested_json_context_accepted"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal"
+      ],
+      "references": [
+        "PlanSegment",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSubgoalConstruction",
+      "file": "tests/unit/core/planning/models/test_models.py",
+      "package": "tests.unit.core.planning.models",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_minimal_construction",
+        "test_parent_id_defaults_to_none",
+        "test_explicit_parent_id",
+        "test_context_and_metadata_stored",
+        "test_created_at_is_positive_int",
+        "test_is_frozen",
+        "test_canonical_hash_present_after_construction"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal"
+      ],
+      "references": [
+        "Subgoal",
+        "FrozenInstanceError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSubgoalCanonicalHash",
+      "file": "tests/unit/core/planning/models/test_models.py",
+      "package": "tests.unit.core.planning.models",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_hash_is_stable_for_same_inputs",
+        "test_hash_differs_on_goal_change",
+        "test_hash_differs_on_subgoal_id_change",
+        "test_hash_differs_on_parent_id_change",
+        "test_hash_differs_on_context_change",
+        "test_hash_differs_on_metadata_change"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal"
+      ],
+      "references": [
+        "Subgoal"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSubgoalValidation",
+      "file": "tests/unit/core/planning/models/test_models.py",
+      "package": "tests.unit.core.planning.models",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_non_json_context_raises",
+        "test_non_json_metadata_raises",
+        "test_nested_json_structure_accepted"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.plan_segment.PlanSegment",
+        "src.core.types.subgoal.Subgoal"
+      ],
+      "references": [
+        "Subgoal",
+        "TypeError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestCognitiveStepOutcome",
+      "file": "tests/unit/core/types/test_types.py",
+      "package": "tests.unit.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_all_variants_exist",
+        "test_enum_values_are_strings",
+        "test_variants_are_distinct",
+        "test_lookup_by_value"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.errors.ValidationError.ValidationError"
+      ],
+      "references": [
+        "SUCCESS",
+        "FAILURE",
+        "TOOL_NEEDED",
+        "CONTINUE",
+        "CognitiveStepOutcome"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestStepResultConstruction",
+      "file": "tests/unit/core/types/test_types.py",
+      "package": "tests.unit.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_minimal_construction",
+        "test_payload_defaults_to_empty_dict",
+        "test_trace_defaults_to_empty_dict",
+        "test_explicit_payload_stored",
+        "test_all_four_outcomes_construct",
+        "test_is_frozen",
+        "test_canonical_hash_present_after_construction"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.errors.ValidationError.ValidationError"
+      ],
+      "references": [
+        "CognitiveStepOutcome",
+        "StepResult",
+        "SUCCESS",
+        "FrozenInstanceError"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestStepResultFailureFactory",
+      "file": "tests/unit/core/types/test_types.py",
+      "package": "tests.unit.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_outcome_is_failure",
+        "test_reason_is_set",
+        "test_payload_defaults_to_empty_dict",
+        "test_trace_defaults_to_empty_list",
+        "test_explicit_payload_stored",
+        "test_explicit_trace_stored"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.errors.ValidationError.ValidationError"
+      ],
+      "references": [
+        "FAILURE",
+        "StepResult",
+        "CognitiveStepOutcome"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestStepResultCanonicalHash",
+      "file": "tests/unit/core/types/test_types.py",
+      "package": "tests.unit.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_hash_is_stable_for_same_inputs",
+        "test_hash_differs_when_outcome_changes",
+        "test_hash_differs_when_reason_changes",
+        "test_hash_differs_when_payload_changes",
+        "test_hash_is_stable_across_trace_change"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.errors.ValidationError.ValidationError"
+      ],
+      "references": [
+        "StepResult",
+        "SUCCESS",
+        "FAILURE",
+        "CognitiveStepOutcome"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestStepResultValidation",
+      "file": "tests/unit/core/types/test_types.py",
+      "package": "tests.unit.core.types",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_non_string_reason_raises",
+        "test_impure_payload_object_raises",
+        "test_tuple_value_in_payload_raises",
+        "test_nested_impure_payload_raises",
+        "test_pure_nested_payload_is_accepted"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "pytest",
+        "dataclasses.FrozenInstanceError",
+        "src.core.types.cognitive_step_outcome.CognitiveStepOutcome",
+        "src.core.types.step_result.StepResult",
+        "src.core.types.errors.ValidationError.ValidationError"
+      ],
+      "references": [
+        "StepResult",
+        "AssertionError",
+        "ValidationError",
+        "SUCCESS",
+        "CognitiveStepOutcome"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "CheckerContext",
@@ -4302,7 +5343,8 @@
       "references": [],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "Reporter",
@@ -4326,7 +5368,8 @@
       "references": [],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "Violation",
@@ -4348,7 +5391,8 @@
       "references": [],
       "inferred_stratum": "test",
       "fan_in": 8,
-      "fan_out": 0
+      "fan_out": 0,
+      "dead_code_ignored": false
     },
     {
       "name": "Rule",
@@ -4371,7 +5415,8 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 12,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "CoreStepPurityRule",
@@ -4399,7 +5444,8 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 4
+      "fan_out": 4,
+      "dead_code_ignored": false
     },
     {
       "name": "EventEnvelopeRule",
@@ -4428,7 +5474,8 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 5
+      "fan_out": 5,
+      "dead_code_ignored": false
     },
     {
       "name": "FolderBoundariesRule",
@@ -4454,7 +5501,8 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "NoLLMRule",
@@ -4480,7 +5528,8 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 3
+      "fan_out": 3,
+      "dead_code_ignored": false
     },
     {
       "name": "SubstratePurityRule",
@@ -4502,7 +5551,8 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     },
     {
       "name": "TypeInvariantsRule",
@@ -4524,11 +5574,32 @@
       ],
       "inferred_stratum": "test",
       "fan_in": 0,
-      "fan_out": 1
+      "fan_out": 1,
+      "dead_code_ignored": false
     }
   ],
   "references": [
     {
+      "source": "AgentDispatcher",
+      "target": "CoreStep",
+      "type": "import"
+    },
+    {
+      "source": "AgentDispatcher",
+      "target": "GovernedSignal",
+      "type": "import"
+    },
+    {
+      "source": "AgentDispatcher",
+      "target": "SignalSeverity",
+      "type": "import"
+    },
+    {
+      "source": "AgentDispatcher",
+      "target": "ConversationState",
+      "type": "import"
+    },
+    {
       "source": "Config",
       "target": "LoopPolicyConfig",
       "type": "import"
@@ -4566,21 +5637,6 @@
     {
       "source": "Config",
       "target": "CoreConfig",
-      "type": "call"
-    },
-    {
-      "source": "AgentConfig",
-      "target": "LoopPolicyConfig",
-      "type": "call"
-    },
-    {
-      "source": "CoreConfig",
-      "target": "LLMConfig",
-      "type": "call"
-    },
-    {
-      "source": "CoreConfig",
-      "target": "AgentConfig",
       "type": "call"
     },
     {
@@ -4669,103 +5725,113 @@
       "type": "inheritance"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "PlanValidator",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "Plan",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "OutcomeClassifier",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "StepState",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "StepStatus",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "StepResult",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "StepProcessor",
       "target": "TraceEventBuilder",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "PlanGenerator",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "PlanPrompt",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "StepOutcome",
       "type": "import"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "OutcomeClassifier",
       "type": "call"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "PlanGenerator",
       "type": "call"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "StepState",
       "type": "call"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "StepResult",
       "type": "call"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "PlanValidator",
       "type": "call"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "PlanPrompt",
       "type": "call"
     },
     {
-      "source": "CoreStep",
-      "target": "StepOutcome",
+      "source": "StepProcessor",
+      "target": "CognitiveStepOutcome",
       "type": "call"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "StepStatus",
       "type": "call"
     },
     {
-      "source": "CoreStep",
+      "source": "StepProcessor",
       "target": "Plan",
       "type": "call"
     },
     {
       "source": "OutcomeClassifier",
       "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "OutcomeClassifier",
+      "target": "CognitiveStepOutcome",
       "type": "import"
     },
     {
@@ -4790,7 +5856,7 @@
     },
     {
       "source": "OutcomeClassifier",
-      "target": "StepOutcome",
+      "target": "CognitiveStepOutcome",
       "type": "call"
     },
     {
@@ -4840,7 +5906,7 @@
     },
     {
       "source": "PlanExecutorMetrics",
-      "target": "StepOutcome",
+      "target": "CognitiveStepOutcome",
       "type": "import"
     },
     {
@@ -4890,7 +5956,7 @@
     },
     {
       "source": "PlanExecutor",
-      "target": "StepOutcome",
+      "target": "CognitiveStepOutcome",
       "type": "import"
     },
     {
@@ -4945,7 +6011,7 @@
     },
     {
       "source": "PlanExecutor",
-      "target": "StepOutcome",
+      "target": "CognitiveStepOutcome",
       "type": "call"
     },
     {
@@ -4966,16 +6032,6 @@
     {
       "source": "SafeStepDispatcher",
       "target": "SafetyPolicy",
-      "type": "import"
-    },
-    {
-      "source": "SafeStepDispatcher",
-      "target": "AgentDispatcher",
-      "type": "import"
-    },
-    {
-      "source": "SafeStepDispatcher",
-      "target": "ConversationState",
       "type": "import"
     },
     {
@@ -5010,12 +6066,12 @@
     },
     {
       "source": "StepDispatcher",
-      "target": "CoreStep",
+      "target": "StepProcessor",
       "type": "import"
     },
     {
       "source": "StepDispatcher",
-      "target": "CoreStep",
+      "target": "StepProcessor",
       "type": "call"
     },
     {
@@ -5114,11 +6170,6 @@
       "type": "call"
     },
     {
-      "source": "Subgoal",
-      "target": "SubgoalLifecycleState",
-      "type": "call"
-    },
-    {
       "source": "LoopController",
       "target": "LoopPolicy",
       "type": "import"
@@ -5135,7 +6186,22 @@
     },
     {
       "source": "LoopController",
-      "target": "CoreStep",
+      "target": "LoopPolicy",
+      "type": "import"
+    },
+    {
+      "source": "LoopController",
+      "target": "StepProcessor",
+      "type": "import"
+    },
+    {
+      "source": "LoopController",
+      "target": "StepState",
+      "type": "import"
+    },
+    {
+      "source": "LoopController",
+      "target": "StepResult",
       "type": "import"
     },
     {
@@ -5225,26 +6291,66 @@
     },
     {
       "source": "LoopTerminationDecision",
-      "target": "StepOutcome",
+      "target": "CognitiveStepOutcome",
       "type": "import"
     },
     {
-      "source": "LoopPolicy",
+      "source": "LoopPolicyEnforcer",
+      "target": "LoopPolicy",
+      "type": "import"
+    },
+    {
+      "source": "LoopPolicyEnforcer",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "LoopPolicyEnforcer",
+      "target": "LoopPolicy",
+      "type": "call"
+    },
+    {
+      "source": "LoopPolicyEnforcer",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "EnforcedLoopPolicy",
+      "target": "LoopPolicy",
+      "type": "import"
+    },
+    {
+      "source": "EnforcedLoopPolicy",
       "target": "StepState",
       "type": "import"
     },
     {
-      "source": "LoopPolicy",
+      "source": "EnforcedLoopPolicy",
       "target": "StepResult",
       "type": "import"
     },
     {
-      "source": "LoopPolicy",
+      "source": "EnforcedLoopPolicy",
+      "target": "LoopPolicyEnforcer",
+      "type": "import"
+    },
+    {
+      "source": "EnforcedLoopPolicy",
+      "target": "LoopPolicy",
+      "type": "inheritance"
+    },
+    {
+      "source": "EnforcedLoopPolicy",
+      "target": "LoopPolicyEnforcer",
+      "type": "call"
+    },
+    {
+      "source": "EnforcedLoopPolicy",
       "target": "StepState",
       "type": "call"
     },
     {
-      "source": "LoopPolicy",
+      "source": "EnforcedLoopPolicy",
       "target": "StepResult",
       "type": "call"
     },
@@ -5470,7 +6576,7 @@
     },
     {
       "source": "PlanSegmentManager",
-      "target": "SegmentValidator",
+      "target": "PlanSegmentValidator",
       "type": "import"
     },
     {
@@ -5515,11 +6621,6 @@
     },
     {
       "source": "PlanSegmentManager",
-      "target": "SegmentValidator",
-      "type": "call"
-    },
-    {
-      "source": "PlanSegmentManager",
       "target": "SegmentStitcher",
       "type": "call"
     },
@@ -5576,21 +6677,6 @@
     {
       "source": "SegmentStitcher",
       "target": "SegmentStitchingError",
-      "type": "call"
-    },
-    {
-      "source": "SegmentValidator",
-      "target": "PlanSegment",
-      "type": "import"
-    },
-    {
-      "source": "SegmentValidator",
-      "target": "PlanSegmentValidator",
-      "type": "import"
-    },
-    {
-      "source": "SegmentValidator",
-      "target": "PlanSegment",
       "type": "call"
     },
     {
@@ -5774,16 +6860,6 @@
       "type": "call"
     },
     {
-      "source": "SubgoalValidator",
-      "target": "Subgoal",
-      "type": "import"
-    },
-    {
-      "source": "SubgoalValidator",
-      "target": "Subgoal",
-      "type": "call"
-    },
-    {
       "source": "PlanSegmentValidator",
       "target": "ValidationError",
       "type": "import"
@@ -5899,6 +6975,11 @@
       "type": "import"
     },
     {
+      "source": "SubgoalValidator",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
       "source": "GovernedSignal",
       "target": "SignalType",
       "type": "call"
@@ -5909,13 +6990,83 @@
       "type": "call"
     },
     {
+      "source": "LLMConfig",
+      "target": "SkillCategory",
+      "type": "import"
+    },
+    {
+      "source": "LLMConfig",
+      "target": "SideEffect",
+      "type": "import"
+    },
+    {
+      "source": "LoopPolicyConfig",
+      "target": "SkillCategory",
+      "type": "import"
+    },
+    {
+      "source": "LoopPolicyConfig",
+      "target": "SideEffect",
+      "type": "import"
+    },
+    {
+      "source": "AgentConfig",
+      "target": "SkillCategory",
+      "type": "import"
+    },
+    {
+      "source": "AgentConfig",
+      "target": "SideEffect",
+      "type": "import"
+    },
+    {
+      "source": "AgentConfig",
+      "target": "LoopPolicyConfig",
+      "type": "call"
+    },
+    {
+      "source": "AgentConfig",
+      "target": "SkillCategory",
+      "type": "call"
+    },
+    {
+      "source": "AgentConfig",
+      "target": "SideEffect",
+      "type": "call"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "SkillCategory",
+      "type": "import"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "SideEffect",
+      "type": "import"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "LLMConfig",
+      "type": "call"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "AgentConfig",
+      "type": "call"
+    },
+    {
       "source": "CoreStepExecutor",
       "target": "ConversationState",
       "type": "import"
     },
     {
       "source": "CoreStepExecutor",
-      "target": "LLMTransport",
+      "target": "LLMCallable",
+      "type": "import"
+    },
+    {
+      "source": "CoreStepExecutor",
+      "target": "AgentConfig",
       "type": "import"
     },
     {
@@ -5931,11 +7082,6 @@
     {
       "source": "CoreStepExecutor",
       "target": "StepOutcome",
-      "type": "import"
-    },
-    {
-      "source": "CoreStepExecutor",
-      "target": "AgentConfig",
       "type": "import"
     },
     {
@@ -5970,7 +7116,7 @@
     },
     {
       "source": "CoreStepExecutor",
-      "target": "LLMTransport",
+      "target": "LLMCallable",
       "type": "call"
     },
     {
@@ -6040,6 +7186,11 @@
     },
     {
       "source": "StepExecutor",
+      "target": "AgentConfig",
+      "type": "import"
+    },
+    {
+      "source": "StepExecutor",
       "target": "StepTrace",
       "type": "import"
     },
@@ -6056,11 +7207,6 @@
     {
       "source": "StepExecutor",
       "target": "CoreConfig",
-      "type": "import"
-    },
-    {
-      "source": "StepExecutor",
-      "target": "AgentConfig",
       "type": "import"
     },
     {
@@ -6100,6 +7246,11 @@
     },
     {
       "source": "AgentRuntime",
+      "target": "AgentConfig",
+      "type": "import"
+    },
+    {
+      "source": "AgentRuntime",
       "target": "StepTrace",
       "type": "import"
     },
@@ -6116,11 +7267,6 @@
     {
       "source": "AgentRuntime",
       "target": "CoreConfig",
-      "type": "import"
-    },
-    {
-      "source": "AgentRuntime",
-      "target": "AgentConfig",
       "type": "import"
     },
     {
@@ -6194,33 +7340,43 @@
       "type": "call"
     },
     {
-      "source": "StepTrace",
-      "target": "StepOutcome",
-      "type": "import"
-    },
-    {
-      "source": "StepTrace",
-      "target": "StepOutcome",
-      "type": "call"
-    },
-    {
       "source": "StepOutcome",
       "target": "CoreResult",
       "type": "import"
     },
     {
+      "source": "StepTrace",
+      "target": "StepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "StepTrace",
+      "target": "StepOutcome",
+      "type": "call"
+    },
+    {
+      "source": "StepResult",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
       "source": "StepResult",
       "target": "ValidationError",
       "type": "import"
     },
     {
       "source": "StepResult",
-      "target": "StepOutcome",
+      "target": "CognitiveStepOutcome",
       "type": "call"
     },
     {
       "source": "StepResult",
       "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "Subgoal",
+      "target": "SubgoalLifecycleState",
       "type": "call"
     },
     {
@@ -6354,13 +7510,33 @@
       "type": "import"
     },
     {
-      "source": "MinimalCoreStepExecutor",
-      "target": "ConversationState",
+      "source": "Executor",
+      "target": "ExecutionResult",
       "type": "import"
     },
     {
+      "source": "ExecutionResult",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "ExecutorContract",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "ExecutorContract",
+      "target": "ExecutionResult",
+      "type": "call"
+    },
+    {
+      "source": "ExecutorContract",
+      "target": "Plan",
+      "type": "call"
+    },
+    {
       "source": "MinimalCoreStepExecutor",
-      "target": "StepOutcome",
+      "target": "CoreStep",
       "type": "import"
     },
     {
@@ -6425,12 +7601,12 @@
     },
     {
       "source": "SingleSkillExecutor",
-      "target": "Executor",
+      "target": "ExecutorContract",
       "type": "import"
     },
     {
       "source": "SingleSkillExecutor",
-      "target": "Executor",
+      "target": "ExecutorContract",
       "type": "inheritance"
     },
     {
@@ -6556,6 +7732,446 @@
     {
       "source": "ToolSpec",
       "target": "SideEffect",
+      "type": "call"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "LoopOrchestrator",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "LoopPolicy",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "StepState",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "StepStatus",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "StepProcessor",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "PlanGenerator",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "PlanValidator",
+      "type": "import"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "StepResult",
+      "type": "call"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "StepOutcome",
+      "type": "call"
+    },
+    {
+      "source": "FakeCoreStep",
+      "target": "StepStatus",
+      "type": "call"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "LoopOrchestrator",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "LoopPolicy",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "StepState",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "StepStatus",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "StepProcessor",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "PlanGenerator",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "PlanValidator",
+      "type": "import"
+    },
+    {
+      "source": "AlwaysAllowPolicy",
+      "target": "LoopPolicy",
+      "type": "inheritance"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "Plan",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "PlanStructureError",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "ForbiddenCapabilityError",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "PlanSafetyError",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "PlanValidator",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "PlanExecutor",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "PlanState",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "StepState",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "PlanTestDouble",
+      "target": "StepStatus",
+      "type": "import"
+    },
+    {
+      "source": "TestToClaudeMessages",
+      "target": "AnthropicClient",
+      "type": "import"
+    },
+    {
+      "source": "TestToClaudeMessages",
+      "target": "OpenAIClient",
+      "type": "import"
+    },
+    {
+      "source": "TestAnthropicClientChat",
+      "target": "AnthropicClient",
+      "type": "import"
+    },
+    {
+      "source": "TestAnthropicClientChat",
+      "target": "OpenAIClient",
+      "type": "import"
+    },
+    {
+      "source": "TestAnthropicClientChat",
+      "target": "AnthropicClient",
+      "type": "call"
+    },
+    {
+      "source": "TestOpenAIClientChat",
+      "target": "AnthropicClient",
+      "type": "import"
+    },
+    {
+      "source": "TestOpenAIClientChat",
+      "target": "OpenAIClient",
+      "type": "import"
+    },
+    {
+      "source": "TestOpenAIClientChat",
+      "target": "OpenAIClient",
+      "type": "call"
+    },
+    {
+      "source": "TestLLMFactory",
+      "target": "AnthropicClient",
+      "type": "import"
+    },
+    {
+      "source": "TestLLMFactory",
+      "target": "OpenAIClient",
+      "type": "import"
+    },
+    {
+      "source": "TestPlanSegmentConstruction",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestPlanSegmentConstruction",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestPlanSegmentConstruction",
+      "target": "PlanSegment",
+      "type": "call"
+    },
+    {
+      "source": "TestPlanSegmentCanonicalHash",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestPlanSegmentCanonicalHash",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestPlanSegmentCanonicalHash",
+      "target": "PlanSegment",
+      "type": "call"
+    },
+    {
+      "source": "TestPlanSegmentValidation",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestPlanSegmentValidation",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestPlanSegmentValidation",
+      "target": "PlanSegment",
+      "type": "call"
+    },
+    {
+      "source": "TestSubgoalConstruction",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestSubgoalConstruction",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestSubgoalConstruction",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "TestSubgoalCanonicalHash",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestSubgoalCanonicalHash",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestSubgoalCanonicalHash",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "TestSubgoalValidation",
+      "target": "PlanSegment",
+      "type": "import"
+    },
+    {
+      "source": "TestSubgoalValidation",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestSubgoalValidation",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "TestCognitiveStepOutcome",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestCognitiveStepOutcome",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "TestCognitiveStepOutcome",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestCognitiveStepOutcome",
+      "target": "CognitiveStepOutcome",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultConstruction",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultConstruction",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultConstruction",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultConstruction",
+      "target": "CognitiveStepOutcome",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultConstruction",
+      "target": "StepResult",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultFailureFactory",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultFailureFactory",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultFailureFactory",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultFailureFactory",
+      "target": "StepResult",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultFailureFactory",
+      "target": "CognitiveStepOutcome",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultCanonicalHash",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultCanonicalHash",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultCanonicalHash",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultCanonicalHash",
+      "target": "StepResult",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultCanonicalHash",
+      "target": "CognitiveStepOutcome",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultValidation",
+      "target": "CognitiveStepOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultValidation",
+      "target": "StepResult",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultValidation",
+      "target": "ValidationError",
+      "type": "import"
+    },
+    {
+      "source": "TestStepResultValidation",
+      "target": "StepResult",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultValidation",
+      "target": "ValidationError",
+      "type": "call"
+    },
+    {
+      "source": "TestStepResultValidation",
+      "target": "CognitiveStepOutcome",
       "type": "call"
     },
     {

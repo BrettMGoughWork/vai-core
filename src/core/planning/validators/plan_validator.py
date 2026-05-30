@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.core.planning.models.plan import Plan
 from src.core.types.errors import ValidationError
+from src.primitives.runtime.validator import validate_structural
 from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity
 
 from src.core.types.errors.plan_errors import (

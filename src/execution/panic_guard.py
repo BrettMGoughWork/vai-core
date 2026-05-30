@@ -3,7 +3,7 @@
 from functools import wraps
 
 from src.execution.safe_failure import make_safe_failure
-from src.core.types.step_outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 
 def with_panic_guard(fn):
     """Decorator that guards against unexpected exceptions.

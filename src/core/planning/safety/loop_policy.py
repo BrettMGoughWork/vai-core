@@ -1,11 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional, Protocol
-from ..models.step_state import StepState
-from ...types.step_result import StepResult
+from typing import Optional
+
 
 @dataclass(frozen=True)
-class LoopPolicy(Protocol):
+class LoopPolicy:
     """
     Pure deterministic loop policy for Stratum 2 cognitive loops.
 
@@ -14,7 +13,7 @@ class LoopPolicy(Protocol):
 
     max_steps: int = 50
     max_retries: int = 3
-    max_duration: Optional[int] = None # logical ticks, not real time
+    max_duration: Optional[int] = None  # logical ticks, not real time
 
     def allows_step(self, step_count: int) -> bool:
         return step_count < self.max_steps
@@ -26,11 +25,6 @@ class LoopPolicy(Protocol):
         if self.max_duration is None:
             return True
         return duration < self.max_duration
-    
-    def allows_continue(
-        self,
-        state: StepState,
-        result: StepResult,
-        step_count: int,
-    ) -> bool:
+
+    def allows_continue(self, state, result, step_count: int) -> bool:
         return self.allows_step(step_count)

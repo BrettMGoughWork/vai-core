@@ -2,18 +2,19 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from src.core.types.step_result import StepResult
+from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.core.planning.safety.purity_validation import validate_pure_structure
 from src.core.types.errors import ValidationError
 from src.core.types.errors.AgentError import ConfidenceError
-from src.core.types.step_outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 
 # Canonical Stratum‑2 priority order
 # Highest → lowest
 OUTCOME_PRIORITY = [
-    StepOutcome.FATAL, # unrecoverable
-    StepOutcome.RECOVERABLE, # tool_needed / retryable
-    StepOutcome.SUCCESS, # terminal success
-    StepOutcome.NOOP, # continue reasoning
+    CognitiveStepOutcome.FAILURE,
+    CognitiveStepOutcome.TOOL_NEEDED,
+    CognitiveStepOutcome.SUCCESS,
+    CognitiveStepOutcome.CONTINUE,
 ]
 
 
@@ -30,7 +31,7 @@ class OutcomeClassifier:
         except Exception as e:
             err = ValidationError(f"Classifier output not pure: {e}")
             return StepResult(
-                outcome=StepOutcome.FATAL,
+                outcome=CognitiveStepOutcome.FAILURE,
                 reason=str(err),
                 payload={"error": err.__dict__},
                 trace={},
@@ -48,10 +49,10 @@ class OutcomeClassifier:
 
         # Stratum‑1 → Stratum‑2 mapping
         mapping = {
-            "success": StepOutcome.SUCCESS,
-            "failure": StepOutcome.FATAL,
-            "tool_needed": StepOutcome.RECOVERABLE,
-            "continue": StepOutcome.NOOP,
+            "success": CognitiveStepOutcome.SUCCESS,
+            "failure": CognitiveStepOutcome.FAILURE,
+            "tool_needed": CognitiveStepOutcome.TOOL_NEEDED,
+            "continue": CognitiveStepOutcome.CONTINUE,
         }
 
         outcome = mapping.get(label)

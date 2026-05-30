@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from typing import Protocol, runtime_checkable
 
-from src.primitives.runtime.toolspec import ToolSpec
-
 
 @runtime_checkable
 class LLMCallable(Protocol):
@@ -14,7 +12,7 @@ class LLMCallable(Protocol):
     def call(
         self,
         prompt: str,
-        tools: List[ToolSpec],
+        tools: List[Any],
         model: str,
         temperature: float = 0.2,
     ) -> "CoreLLMResponse": ...

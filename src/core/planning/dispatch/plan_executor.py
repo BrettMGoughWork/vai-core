@@ -5,7 +5,7 @@ from src.core.planning.models.plan_state import PlanState
 from src.core.types.errors.plan_errors import PlanDispatchError, PlanValidationError, PlanExecutionError
 from src.core.planning.models.step_state import StepState
 from src.core.types.step_result import StepResult
-from src.core.types.step_outcome import StepOutcome
+from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.core.planning.models.plan import Plan
 from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity
 
@@ -57,7 +57,7 @@ class PlanExecutor:
             return state, result, metrics
 
         # Map unexpected outcomes to plan-level errors
-        if result.outcome != StepOutcome.SUCCESS:
+        if result.outcome != CognitiveStepOutcome.SUCCESS:
             error = self._map_step_error(result)
             failure_result = StepResult.failure(
                 reason=str(error),
@@ -93,10 +93,10 @@ class PlanExecutor:
         return completed_state, result, metrics
 
     def _map_step_error(self, result: StepResult) -> PlanValidationError:
-        if result.outcome == StepOutcome.FAILURE:
+        if result.outcome == CognitiveStepOutcome.FAILURE:
             return PlanExecutionError(result.reason)
 
-        if result.outcome in (StepOutcome.CONTINUE, StepOutcome.TOOL_NEEDED):
+        if result.outcome in (CognitiveStepOutcome.CONTINUE, CognitiveStepOutcome.TOOL_NEEDED):
             return PlanDispatchError(
                 f"Unexpected step outcome during plan execution: {result.outcome}"
             )

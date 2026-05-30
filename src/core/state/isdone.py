@@ -1,4 +1,4 @@
-from src.core.types.step_outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 from src.core.state.state import ConversationState
 from src.core.config.loader import AgentConfig
 

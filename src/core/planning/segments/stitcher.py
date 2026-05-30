@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from src.core.planning.models.plan_segment import PlanSegment
+from src.core.types.plan_segment import PlanSegment
 from src.core.planning.segments.errors import SegmentStitchingError
 
 
@@ -31,11 +31,9 @@ class SegmentStitcher:
                 f"Segments belong to multiple subgoals: {subgoal_ids}"
             )
 
-        # 2. Deterministic ordering: created_at, then canonical_hash
-        ordered = sorted(
-            segments,
-            key=lambda s: (s.created_at, s.canonical_hash),
-        )
+        # 2. Deterministic ordering: sort by the numeric value of the first step ID.
+        #    This is the canonical ordering for a continuous step chain.
+        ordered = sorted(segments, key=lambda s: self._to_int(s.steps[0]))
 
         # 3. Validate continuous numeric step chain
         self._validate_step_chain(ordered)

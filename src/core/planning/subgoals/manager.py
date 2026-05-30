@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Optional, Dict, List
 
-from ..models.subgoal import Subgoal, SubgoalLifecycleState
-from ..validators.subgoal_validator import SubgoalValidator
+from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.core.planning.validators.subgoal_validator import SubgoalValidator
 from .transitions import TransitionEngine
 from .state import SubgoalState
 from .errors import (

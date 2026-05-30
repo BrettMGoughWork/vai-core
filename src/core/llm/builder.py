@@ -4,7 +4,7 @@ from typing import Any
 from .transport import LLMTransport
 from .llm_factory import factory
 
-from src.core.config.model import LLMConfig
+from src.core.state.config import LLMConfig
 
 def create_llm_transport(llm_config: LLMConfig) -> LLMTransport:
     """

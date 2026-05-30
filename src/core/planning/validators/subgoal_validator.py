@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ..models.subgoal import Subgoal
-from src.core.planning.validators.subgoal_validator import SubgoalValidator as _CoreSubgoalValidator
+from src.core.types.subgoal import Subgoal
+from src.core.types.json_pure import ensure_json_pure
 
 
 class SubgoalValidator:

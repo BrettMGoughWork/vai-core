@@ -2,7 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from ...types.step_result import StepResult, StepOutcome
+from ...types.step_result import StepResult
+from ...types.cognitive_step_outcome import CognitiveStepOutcome
 
 TerminationReason = Literal[
     "success",
@@ -30,13 +31,13 @@ def decide_termination(
     policy_allows_continue: bool,
 ) -> LoopTerminationDecision:
     # Terminal outcomes
-    if result.outcome == StepOutcome.SUCCESS:
+    if result.outcome == CognitiveStepOutcome.SUCCESS:
         return LoopTerminationDecision(True, "success")
 
-    if result.outcome == StepOutcome.FAILURE:
+    if result.outcome == CognitiveStepOutcome.FAILURE:
         return LoopTerminationDecision(True, "failure")
 
-    if result.outcome == StepOutcome.TOOL_NEEDED:
+    if result.outcome == CognitiveStepOutcome.TOOL_NEEDED:
         return LoopTerminationDecision(True, "tool_needed")
 
     # Outcome == CONTINUE: check budgets + policy

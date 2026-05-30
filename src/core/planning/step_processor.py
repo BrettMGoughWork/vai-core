@@ -10,17 +10,18 @@ from src.core.planning.models.plan import Plan
 from .dispatch.outcome_classifier import OutcomeClassifier
 from src.core.planning.models.step_state import StepState, StepStatus
 from src.core.types.step_result import StepResult
+from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.core.planning.models.cognitive_contract import validate_cognitive_input
 from src.core.planning.events.trace_event import TraceEventBuilder
 from src.core.planning.safety.purity_enforcer import enforce_cognitive_purity
 from src.core.planning.generator.plan_generator import PlanGenerator, PlanPrompt
-from src.core.types.step_outcome import StepOutcome
+from src.core.state.step_outcome import StepOutcome
 
 # In practice, you’d inject this or construct it at a higher level.
 TRACE_BUILDER = TraceEventBuilder()
 
 @dataclass(frozen=True)
-class CoreStep:
+class StepProcessor:
     """
     Pure cognitive step executor (Stratum 2).
     """
@@ -103,7 +104,7 @@ class CoreStep:
 
     def _apply_outcome(self, state: StepState, result: StepResult) -> StepState:
         # For now, keep it simple: DONE on success/continue/tool, ERROR on failure.
-        if result.outcome == StepOutcome.FAILURE:
+        if result.outcome == CognitiveStepOutcome.FAILURE:
             new_status = StepStatus.ERROR
         else:
             new_status = StepStatus.DONE
@@ -128,7 +129,7 @@ class CoreStep:
         plan_prompt: PlanPrompt = self.plan_generator.generate(state)
 
         result = StepResult(
-            outcome=StepOutcome.SUCCESS,
+            outcome=CognitiveStepOutcome.SUCCESS,
             reason="plan_generated",
             cognitive_output={
                 "kind": "plan_prompt",

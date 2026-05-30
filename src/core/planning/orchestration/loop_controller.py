@@ -5,12 +5,13 @@ from src.core.planning.safety.loop_policy import LoopPolicy
 from src.core.planning.models.step_state import StepState
 from src.core.types.step_result import StepResult   
 
-from ..core_step import CoreStep
-
+from ..safety.loop_policy import LoopPolicy
+from ..step_processor import StepProcessor as CoreStep
+from ..models.step_state import StepState
+from ...types.step_result import StepResult
 from .loop_metrics import LoopMetrics
 from .loop_termination import decide_termination
 from src.core.types.hashing import stable_hash
-
 
 @dataclass(frozen=True)
 class LoopController:
