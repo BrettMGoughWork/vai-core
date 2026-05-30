@@ -13,14 +13,28 @@ class SubgoalLifecycleState(str, Enum):
     """
     Lifecycle states for subgoals.
     These states are governed by TransitionEngine and mutated only by SubgoalManager.
+
+    High-level lifecycle: PENDING → ACTIVE → SATISFIED / FAILED / ABANDONED → CLOSED
+    Execution lifecycle:  CREATED → VALIDATED → READY → RUNNING → SUCCESS / FAILED / BLOCKED
+                          BLOCKED → READY; FAILED → RETRYING → RUNNING
     """
 
+    # High-level lifecycle states
     PENDING = "pending"
     ACTIVE = "active"
     SATISFIED = "satisfied"
-    FAILED = "failed"
     ABANDONED = "abandoned"
     CLOSED = "closed"
+
+    # Execution lifecycle states (2.3.7)
+    CREATED = "created"
+    VALIDATED = "validated"
+    READY = "ready"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+    BLOCKED = "blocked"
+    RETRYING = "retrying"
 
 
 @dataclass(frozen=True)
