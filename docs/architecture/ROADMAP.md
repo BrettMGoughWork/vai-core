@@ -329,7 +329,7 @@
 - Implement SegmentMemory store  
 - Add SegmentMemory retrieval  
 
-2.4.3 — Plan Memory
+✅ 2.4.3 — Plan Memory
 - Implement PlanMemory store  
 - Add PlanMemory retrieval  
 
