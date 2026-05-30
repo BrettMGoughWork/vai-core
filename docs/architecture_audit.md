@@ -1,8 +1,8 @@
 # Architecture Audit Report
 
-> **architecture.json snapshot**: `2026-05-30 11:28:14 UTC`  
-> **Audit generated**: `2026-05-30 11:28:14 UTC`  
-> **Classes analysed**: 225 | **References**: 827
+> **architecture.json snapshot**: `2026-05-30 11:48:24 UTC`  
+> **Audit generated**: `2026-05-30 11:48:24 UTC`  
+> **Classes analysed**: 239 | **References**: 1027
 
 ## Summary
 
@@ -74,13 +74,13 @@ Defined in 3 files: `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/co
 
 Defined in 4 files: `tests/unit/core/memory/test_drift_memory.py`, `tests/unit/core/memory/test_plan_memory.py`, `tests/unit/core/memory/test_segment_memory.py`, `tests/unit/core/memory/test_subgoal_memory.py`
 
-### 🟡 Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 89%)
+### 🟡 Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 90%)
 
 **Severity**: `medium`  
 **Category**: `near-duplicate`  
-**fan_in**: 14 | **fan_out**: 7
+**fan_in**: 27 | **fan_out**: 7
 
-`SegmentMemory` in `src/core/memory/segment_memory.py` (utility), `SubgoalMemory` in `src/core/memory/subgoal_memory.py` (utility). Shared methods: ['exists', 'get', 'get_chain', 'get_children', 'list_all', 'load_snapshot', 'put', 'snapshot']
+`SegmentMemory` in `src/core/memory/segment_memory.py` (utility), `SubgoalMemory` in `src/core/memory/subgoal_memory.py` (utility). Shared methods: ['exists', 'get', 'get_chain', 'get_children', 'get_record', 'list_all', 'load_snapshot', 'put', 'snapshot']
 
 ---
 
@@ -96,7 +96,7 @@ _No issues found._
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 14 | **fan_out**: 7
+**fan_in**: 27 | **fan_out**: 7
 
 `PlanMemory` in `src/core/memory/plan_memory.py`. Stratum 1 must be reactive and deterministic. Reasoning/planning logic belongs in Stratum 2 (domain).
 
@@ -104,7 +104,7 @@ _No issues found._
 
 **Severity**: `medium`  
 **Category**: `invariant`  
-**fan_in**: 11 | **fan_out**: 3
+**fan_in**: 24 | **fan_out**: 3
 
 `PlanMemoryRecord` in `src/core/memory/plan_memory_types.py`. Stratum 1 must be reactive and deterministic. Reasoning/planning logic belongs in Stratum 2 (domain).
 
@@ -551,7 +551,7 @@ _No issues found._
 | # | Sev | Category | Title |
 |---|-----|----------|-------|
 | 1 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanMemory` has reasoning keyword `plan` in name |
-| 2 | 🟡 `medium` | `near-duplicate` | Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 89%) |
+| 2 | 🟡 `medium` | `near-duplicate` | Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 90%) |
 | 3 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanMemoryRecord` has reasoning keyword `plan` in name |
 | 4 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanMemorySnapshot` has reasoning keyword `plan` in name |
 | 5 | 🟡 `medium` | `invariant` | I5 — Utility class `DriftDetector` has excessive fan_out (18) |

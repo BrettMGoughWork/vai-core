@@ -42,6 +42,10 @@ class SubgoalMemory:
             return None
         return self._record_to_subgoal(record)
 
+    def get_record(self, subgoal_id: str) -> Optional[SubgoalMemoryRecord]:
+        """Return the raw SubgoalMemoryRecord for subgoal_id, or None."""
+        return self._store.get(subgoal_id)
+
     def exists(self, subgoal_id: str) -> bool:
         return subgoal_id in self._store
 

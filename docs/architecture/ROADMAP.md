@@ -337,7 +337,7 @@
 - Implement DriftMemory store  
 - Add DriftMemory retrieval
 
-2.4.5 - Memory governance  
+✅ 2.4.5 - Memory governance  
 
 2.4.6 - Summarisation rules  
 
