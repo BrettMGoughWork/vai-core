@@ -363,7 +363,7 @@
       ],
       "references": [],
       "inferred_stratum": "adapter",
-      "fan_in": 1,
+      "fan_in": 0,
       "fan_out": 0,
       "dead_code_ignored": false
     },
@@ -380,10 +380,10 @@
       "imports": [
         "yaml",
         "pathlib.Path",
-        "model.LoopPolicyConfig",
-        "model.AgentConfig",
-        "model.CoreConfig",
-        "model.LLMConfig",
+        "src.core.state.config.LoopPolicyConfig",
+        "src.core.state.config.AgentConfig",
+        "src.core.state.config.CoreConfig",
+        "src.core.state.config.LLMConfig",
         "llm.builder.create_llm_transport"
       ],
       "references": [
@@ -396,97 +396,6 @@
       "inferred_stratum": "utility",
       "fan_in": 0,
       "fan_out": 5,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "LLMConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "provider",
-        "model",
-        "temperature",
-        "max_tokens"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [],
-      "inferred_stratum": "utility",
-      "fan_in": 3,
-      "fan_out": 0,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "LoopPolicyConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "max_steps",
-        "per_step_timeout",
-        "max_wall_time"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [],
-      "inferred_stratum": "utility",
-      "fan_in": 3,
-      "fan_out": 0,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "AgentConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "loop_policy"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [
-        "LoopPolicyConfig"
-      ],
-      "inferred_stratum": "utility",
-      "fan_in": 12,
-      "fan_out": 1,
-      "dead_code_ignored": false
-    },
-    {
-      "name": "CoreConfig",
-      "file": "src/core/config/model.py",
-      "package": "src.core.config",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "llm",
-        "agent"
-      ],
-      "imports": [
-        "__future__.annotations",
-        "dataclasses.dataclass"
-      ],
-      "references": [
-        "LLMConfig",
-        "AgentConfig"
-      ],
-      "inferred_stratum": "utility",
-      "fan_in": 5,
-      "fan_out": 2,
       "dead_code_ignored": false
     },
     {
@@ -1114,9 +1023,7 @@
         "__future__.annotations",
         "typing.TYPE_CHECKING",
         "src.core.planning.safety.safety_policies.SafetyContext",
-        "src.core.planning.safety.safety_policies.SafetyPolicy",
-        "src.agent.dispatcher.AgentDispatcher",
-        "src.core.state.state.ConversationState"
+        "src.core.planning.safety.safety_policies.SafetyPolicy"
       ],
       "references": [
         "SafetyContext",
@@ -2680,6 +2587,35 @@
       "dead_code_ignored": false
     },
     {
+      "name": "LLMConfig",
+      "file": "src/core/state/config.py",
+      "package": "src.core.state",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "provider",
+        "model",
+        "temperature",
+        "max_tokens"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.List",
+        "typing.Optional",
+        "typing.Any",
+        "typing.Dict",
+        "src.primitives.runtime.categories.SkillCategory",
+        "src.primitives.runtime.side_effects.SideEffect"
+      ],
+      "references": [],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
       "name": "LoopPolicyConfig",
       "file": "src/core/state/config.py",
       "package": "src.core.state",
@@ -2747,8 +2683,38 @@
         "Any"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 12,
+      "fan_in": 10,
       "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "CoreConfig",
+      "file": "src/core/state/config.py",
+      "package": "src.core.state",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "llm",
+        "agent"
+      ],
+      "imports": [
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.List",
+        "typing.Optional",
+        "typing.Any",
+        "typing.Dict",
+        "src.primitives.runtime.categories.SkillCategory",
+        "src.primitives.runtime.side_effects.SideEffect"
+      ],
+      "references": [
+        "LLMConfig",
+        "AgentConfig"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 5,
+      "fan_out": 2,
       "dead_code_ignored": false
     },
     {
@@ -2842,8 +2808,7 @@
         "src.core.state.trace.StepTrace",
         "src.core.types.result.CoreResult",
         "src.execution.safe_failure.SafeFailure",
-        "src.core.config.model.CoreConfig",
-        "src.core.config.model.AgentConfig"
+        "src.core.state.config.CoreConfig"
       ],
       "references": [
         "Protocol",
@@ -2891,8 +2856,7 @@
         "src.core.state.trace.StepTrace",
         "src.core.types.result.CoreResult",
         "src.execution.safe_failure.SafeFailure",
-        "src.core.config.model.CoreConfig",
-        "src.core.config.model.AgentConfig"
+        "src.core.state.config.CoreConfig"
       ],
       "references": [
         "CoreResult",
@@ -3033,7 +2997,7 @@
         "Exception"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 9,
+      "fan_in": 8,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -3995,33 +3959,6 @@
       "dead_code_ignored": false
     },
     {
-      "name": "ExecutionResult",
-      "file": "src/execution/executor.py",
-      "package": "src.execution",
-      "inherits": [],
-      "implements": [],
-      "public_methods": [],
-      "public_attributes": [
-        "status",
-        "output",
-        "error",
-        "skill_id",
-        "raw_response"
-      ],
-      "imports": [
-        "typing.Any",
-        "typing.Dict",
-        "pydantic.dataclasses.dataclass"
-      ],
-      "references": [
-        "Any"
-      ],
-      "inferred_stratum": "infrastructure",
-      "fan_in": 3,
-      "fan_out": 1,
-      "dead_code_ignored": false
-    },
-    {
       "name": "Executor",
       "file": "src/execution/executor.py",
       "package": "src.execution",
@@ -4036,7 +3973,7 @@
       "imports": [
         "typing.Any",
         "typing.Dict",
-        "pydantic.dataclasses.dataclass"
+        "src.execution.executor_contract.ExecutionResult"
       ],
       "references": [
         "Dict",
@@ -4073,7 +4010,7 @@
         "Any"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 3,
+      "fan_in": 4,
       "fan_out": 1,
       "dead_code_ignored": false
     },
@@ -4122,7 +4059,7 @@
         "src.core.types.core_step.CoreStep",
         "src.core.types.result.CoreResult",
         "src.execution.safe_failure.SafeFailure",
-        "src.core.config.model.AgentConfig"
+        "src.core.state.config.AgentConfig"
       ],
       "references": [
         "ConversationState",
@@ -4523,7 +4460,7 @@
         "DANGEROUS"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 7,
+      "fan_in": 9,
       "fan_out": 11,
       "dead_code_ignored": false
     },
@@ -4614,7 +4551,7 @@
         "DANGEROUS"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 7,
+      "fan_in": 9,
       "fan_out": 9,
       "dead_code_ignored": false
     },
@@ -5703,21 +5640,6 @@
       "type": "call"
     },
     {
-      "source": "AgentConfig",
-      "target": "LoopPolicyConfig",
-      "type": "call"
-    },
-    {
-      "source": "CoreConfig",
-      "target": "LLMConfig",
-      "type": "call"
-    },
-    {
-      "source": "CoreConfig",
-      "target": "AgentConfig",
-      "type": "call"
-    },
-    {
       "source": "LLMTransport",
       "target": "CoreLLMResponse",
       "type": "import"
@@ -6110,16 +6032,6 @@
     {
       "source": "SafeStepDispatcher",
       "target": "SafetyPolicy",
-      "type": "import"
-    },
-    {
-      "source": "SafeStepDispatcher",
-      "target": "AgentDispatcher",
-      "type": "import"
-    },
-    {
-      "source": "SafeStepDispatcher",
-      "target": "ConversationState",
       "type": "import"
     },
     {
@@ -7078,6 +6990,16 @@
       "type": "call"
     },
     {
+      "source": "LLMConfig",
+      "target": "SkillCategory",
+      "type": "import"
+    },
+    {
+      "source": "LLMConfig",
+      "target": "SideEffect",
+      "type": "import"
+    },
+    {
       "source": "LoopPolicyConfig",
       "target": "SkillCategory",
       "type": "import"
@@ -7096,6 +7018,11 @@
       "source": "AgentConfig",
       "target": "SideEffect",
       "type": "import"
+    },
+    {
+      "source": "AgentConfig",
+      "target": "LoopPolicyConfig",
+      "type": "call"
     },
     {
       "source": "AgentConfig",
@@ -7105,6 +7032,26 @@
     {
       "source": "AgentConfig",
       "target": "SideEffect",
+      "type": "call"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "SkillCategory",
+      "type": "import"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "SideEffect",
+      "type": "import"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "LLMConfig",
+      "type": "call"
+    },
+    {
+      "source": "CoreConfig",
+      "target": "AgentConfig",
       "type": "call"
     },
     {
@@ -7264,11 +7211,6 @@
     },
     {
       "source": "StepExecutor",
-      "target": "AgentConfig",
-      "type": "import"
-    },
-    {
-      "source": "StepExecutor",
       "target": "ConversationState",
       "type": "call"
     },
@@ -7325,11 +7267,6 @@
     {
       "source": "AgentRuntime",
       "target": "CoreConfig",
-      "type": "import"
-    },
-    {
-      "source": "AgentRuntime",
-      "target": "AgentConfig",
       "type": "import"
     },
     {
@@ -7570,6 +7507,11 @@
     {
       "source": "RecoveryAction",
       "target": "AgentError",
+      "type": "import"
+    },
+    {
+      "source": "Executor",
+      "target": "ExecutionResult",
       "type": "import"
     },
     {

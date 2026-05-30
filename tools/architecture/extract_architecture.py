@@ -109,9 +109,22 @@ def collect_py_files(root: Path) -> list[Path]:
 
 
 def parse_imports(tree: ast.Module) -> list[str]:
-    """Return all import strings found at module level."""
+    """Return all import strings found at module level, excluding TYPE_CHECKING blocks."""
+    # Collect nodes inside TYPE_CHECKING guards so we can skip them
+    type_checking_nodes: set[int] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "TYPE_CHECKING"
+        ):
+            for child in ast.walk(node):
+                type_checking_nodes.add(id(child))
+
     imports = []
     for node in ast.walk(tree):
+        if id(node) in type_checking_nodes:
+            continue
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imports.append(alias.name)

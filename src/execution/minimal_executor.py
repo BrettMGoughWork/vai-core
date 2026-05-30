@@ -1,7 +1,7 @@
 from src.core.types.core_step import CoreStep
 from src.core.types.result import CoreResult
 from src.execution.safe_failure import SafeFailure
-from src.core.config.model import AgentConfig
+from src.core.state.config import AgentConfig
 
 
 class MinimalCoreStepExecutor:

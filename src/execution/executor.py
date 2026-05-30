@@ -1,14 +1,7 @@
 from typing import Any, Dict
 
-from pydantic.dataclasses import dataclass
+from src.execution.executor_contract import ExecutionResult
 
-@dataclass
-class ExecutionResult:
-    status: str
-    output: Any | None
-    error: Any | None
-    skill_id: str
-    raw_response: Any | None
 
 class Executor:
     """

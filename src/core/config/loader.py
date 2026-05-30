@@ -1,6 +1,6 @@
 import yaml
 from pathlib import Path
-from .model import LoopPolicyConfig, AgentConfig, CoreConfig, LLMConfig
+from src.core.state.config import LoopPolicyConfig, AgentConfig, CoreConfig, LLMConfig
 from ..llm.builder import create_llm_transport
 
 class Config:

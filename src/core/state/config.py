@@ -4,6 +4,15 @@ from typing import List, Optional, Any, Dict
 from src.primitives.runtime.categories import SkillCategory
 from src.primitives.runtime.side_effects import SideEffect
 
+
+@dataclass
+class LLMConfig:
+    provider: str
+    model: str
+    temperature: float = 0.0
+    max_tokens: int = 4096
+
+
 @dataclass
 class LoopPolicyConfig:
     max_steps: int = 5
@@ -35,3 +44,9 @@ class AgentConfig:
             **data,
             loop_policy=loop_policy,
         )
+
+
+@dataclass
+class CoreConfig:
+    llm: LLMConfig
+    agent: AgentConfig
