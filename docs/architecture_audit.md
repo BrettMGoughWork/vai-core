@@ -1,8 +1,8 @@
 # Architecture Audit Report
 
-> **architecture.json snapshot**: `2026-05-30 10:08:56 UTC`  
-> **Audit generated**: `2026-05-30 10:08:56 UTC`  
-> **Classes analysed**: 187 | **References**: 666
+> **architecture.json snapshot**: `2026-05-30 10:31:05 UTC`  
+> **Audit generated**: `2026-05-30 10:31:05 UTC`  
+> **Classes analysed**: 196 | **References**: 709
 
 ## Summary
 
