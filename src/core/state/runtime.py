@@ -15,11 +15,6 @@ from src.execution.safe_failure import SafeFailure
 from src.core.config.model import CoreConfig, AgentConfig
 
 
-class StepDispatcher(Protocol):
-    def dispatch(self, state: ConversationState) -> object:
-        ...
-
-
 class StepExecutor(Protocol):
     def execute(
         self,
