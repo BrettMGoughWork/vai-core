@@ -351,12 +351,12 @@
 *Depends On*: PHASE 2.4  
 *Note*: builds on skeleton iterations above to complete Stratum 2
 
-2.5.1 — Plan Repair
+✅ 2.5.1 — Plan Repair
 - Implement full repair logic: detect broken plans, identify minimal fixes, regenerate segments, or re‑decompose subgoals  
 - Integrate memory, governed signals, and validation rules  
 - Add repair budget + retry limits
 
-2.5.2 - Full transition rules
+✅ 2.5.2 - Full transition rules
 - Expand the skeleton rules into a complete transition graph covering all subgoal and segment states
 - Add edge cases, fallback paths, and error transitions
 
