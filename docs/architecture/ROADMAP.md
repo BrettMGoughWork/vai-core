@@ -339,7 +339,7 @@
 
 ✅ 2.4.5 - Memory governance  
 
-2.4.6 - Summarisation rules  
+✅ 2.4.6 - Summarisation rules  
 
 2.4.7 - Memory eviction rules
 - LRU or LFU
