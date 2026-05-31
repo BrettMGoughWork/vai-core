@@ -1,0 +1,124 @@
+{
+  "cycle": 1,
+  "errors": [],
+  "memory_snapshot": {
+    "drift_events": [],
+    "plans": [],
+    "segments": [],
+    "snapshot_timestamp": "2026-05-31T03:36:38.632000+00:00",
+    "subgoals": [
+      {
+        "context": {
+          "run": "smoke-test",
+          "source": "main.py"
+        },
+        "created_at": 1780198598631,
+        "goal": "Verify Stratum-2 AgentLoopV2 architecture",
+        "metadata": {
+          "phase": "2.5.6"
+        },
+        "parent_id": null,
+        "state": "created",
+        "subgoal_id": "0838943cad83bda19e4d8423728e7a31eb7f9d795cb9b7014f9f03962e315517"
+      }
+    ]
+  },
+  "subgoal_results": [
+    {
+      "closed": false,
+      "reflection_outcome": {
+        "cycle": 1,
+        "drift_report": {
+          "classification": "no_drift",
+          "confidence": 0.0,
+          "confirmation": {
+            "confidence": 0.0,
+            "confirmed": false,
+            "cycles_observed": 0,
+            "history": [],
+            "signals": []
+          },
+          "drift_violations": [],
+          "drift_written_to_memory": false,
+          "trigger": null
+        },
+        "errors": [],
+        "memory_updates": [],
+        "plan_adjustment": null,
+        "progress": {
+          "progress_rate": "steady",
+          "segments_complete": 0,
+          "segments_total": 0,
+          "stalled": false,
+          "stalled_reasons": [],
+          "subgoals_complete": 0,
+          "subgoals_total": 1
+        },
+        "timestamp": "2026-05-31T03:36:38.632000+00:00",
+        "trace": {
+          "adjustments": [],
+          "cycle": 1,
+          "drift": {
+            "classification": "no_drift",
+            "confidence": 0.0,
+            "confirmed": false,
+            "cycles_observed": 0,
+            "drift_violations": [],
+            "drift_written_to_memory": false,
+            "trigger": null
+          },
+          "memory_updates": [],
+          "progress": {
+            "progress_rate": "steady",
+            "segments_complete": 0,
+            "segments_total": 0,
+            "stalled": false,
+            "stalled_reasons": [],
+            "subgoals_complete": 0,
+            "subgoals_total": 1
+          },
+          "repairs": [],
+          "timestamp": "2026-05-31T03:36:38.632000+00:00",
+          "transitions": []
+        },
+        "transitions_applied": [],
+        "validation_result": {
+          "errors": [],
+          "memory": null,
+          "plan": null,
+          "safety": {
+            "drift_blocked": false,
+            "errors": [],
+            "forbidden_state": false,
+            "forbidden_transition": false,
+            "governance_blocked": false,
+            "repair_blocked": false,
+            "valid": true,
+            "warnings": []
+          },
+          "segment": null,
+          "subgoal": {
+            "drift_affected": false,
+            "errors": [],
+            "metadata_ok": true,
+            "repair_affected": false,
+            "state": "created",
+            "valid": true,
+            "warnings": []
+          },
+          "valid": true,
+          "warnings": []
+        }
+      },
+      "retry_applied": false,
+      "safety_blocked": false,
+      "safety_errors": [],
+      "skip_reason": null,
+      "skipped": false,
+      "subgoal_id": "0838943cad83bda19e4d8423728e7a31eb7f9d795cb9b7014f9f03962e315517"
+    }
+  ],
+  "terminal": false,
+  "termination_reason": null,
+  "timestamp": "2026-05-31T03:36:38.632000+00:00"
+}

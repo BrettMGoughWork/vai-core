@@ -377,6 +377,9 @@
 - Add full error handling, fallback strategies, and trace generation  
 - Final wiring of all substrate + safety + memory components 
 
+✅ 2.5.7 - inspection dashboard
+- TUI-bsaed dashboard for inspecting agent planning behaviour
+
 ---
 🚀 Release 1 — "Hierarchical Reasoner"
 ---
