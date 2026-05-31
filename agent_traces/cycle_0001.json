@@ -1,0 +1,100 @@
+{
+  "cycle": 1,
+  "timestamp": "2026-05-31T03:00:00+00:00",
+  "subgoal_results": [
+    {
+      "subgoal_id": "sg-001-plan-decompose",
+      "reflection_outcome": {
+        "cycle": 1,
+        "timestamp": "2026-05-31T03:00:00+00:00",
+        "progress": {
+          "subgoals_complete": 0,
+          "subgoals_total": 2,
+          "segments_complete": 0,
+          "segments_total": 4,
+          "stalled": false,
+          "stalled_reasons": [],
+          "progress_rate": "steady"
+        },
+        "drift_report": {
+          "confirmation": {
+            "confirmed": false,
+            "confidence": 0.1,
+            "cycles_observed": 1,
+            "signals": [],
+            "history": []
+          },
+          "classification": "no_drift",
+          "confidence": 0.1,
+          "trigger": null,
+          "drift_written_to_memory": false,
+          "drift_violations": []
+        },
+        "validation_result": null,
+        "plan_adjustment": null,
+        "transitions_applied": [
+          {
+            "subgoal_id": "sg-001-plan-decompose",
+            "from_state": "created",
+            "event": "validate",
+            "to_state": "validated",
+            "success": true,
+            "reason": "structural validation passed"
+          }
+        ],
+        "memory_updates": [
+          {
+            "store": "subgoal",
+            "operation": "write",
+            "record_id": "sg-001-plan-decompose",
+            "details": {}
+          }
+        ],
+        "trace": {
+          "cycle": 1,
+          "timestamp": "2026-05-31T03:00:00+00:00",
+          "progress": {
+            "subgoals_complete": 0,
+            "subgoals_total": 2,
+            "segments_complete": 0,
+            "segments_total": 4,
+            "stalled": false,
+            "stalled_reasons": [],
+            "progress_rate": "steady"
+          },
+          "drift": {
+            "classification": "no_drift",
+            "confidence": 0.1
+          },
+          "repairs": [],
+          "adjustments": [],
+          "transitions": [],
+          "memory_updates": []
+        },
+        "errors": []
+      },
+      "skipped": false,
+      "skip_reason": null,
+      "safety_blocked": false,
+      "safety_errors": [],
+      "closed": false,
+      "retry_applied": false
+    }
+  ],
+  "memory_snapshot": {
+    "subgoals": [
+      {
+        "subgoal_id": "sg-001",
+        "state": "validated",
+        "created_at": 1748656800000
+      }
+    ],
+    "segments": [],
+    "plans": [],
+    "drift_events": [],
+    "snapshot_timestamp": "2026-05-31T03:00:00+00:00"
+  },
+  "errors": [],
+  "terminal": false,
+  "termination_reason": null
+}
