@@ -75,6 +75,34 @@
       ]
     },
     {
+      "name": "src.core.planning.agent_loop",
+      "path": "src/core/planning/agent_loop",
+      "imports": [
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.MemorySnapshot",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2"
+      ],
+      "exports": [
+        "AgentLoopConfig",
+        "AgentCycleOutcome",
+        "AgentLoopError",
+        "AgentLoopV2",
+        "AgentRunTrace",
+        "AgentState",
+        "MemorySnapshot",
+        "SubgoalCycleResult",
+        "SubgoalRuntimeState",
+        "TerminationReason"
+      ]
+    },
+    {
       "name": "src.core.planning.drift",
       "path": "src/core/planning/drift",
       "imports": [],
@@ -338,6 +366,12 @@
     {
       "name": "tests.unit.core.planning",
       "path": "tests/unit/core/planning",
+      "imports": [],
+      "exports": []
+    },
+    {
+      "name": "tests.unit.core.planning.agent_loop",
+      "path": "tests/unit/core/planning/agent_loop",
       "imports": [],
       "exports": []
     },
@@ -991,7 +1025,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 67,
+      "fan_in": 88,
       "fan_out": 6,
       "dead_code_ignored": false
     },
@@ -1030,7 +1064,7 @@
         "ValueError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 98,
+      "fan_in": 108,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1105,7 +1139,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 51,
+      "fan_in": 72,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -1142,7 +1176,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 113,
+      "fan_in": 123,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1212,7 +1246,7 @@
         "Dict"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 51,
+      "fan_in": 72,
       "fan_out": 6,
       "dead_code_ignored": false
     },
@@ -1249,7 +1283,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 104,
+      "fan_in": 114,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1320,7 +1354,7 @@
         "SubgoalLifecycleState"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 44,
+      "fan_in": 65,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -1355,7 +1389,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 102,
+      "fan_in": 127,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -1383,7 +1417,7 @@
         "SubgoalMemoryRecord"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 32,
+      "fan_in": 44,
       "fan_out": 2,
       "dead_code_ignored": false
     },
@@ -1645,7 +1679,7 @@
         "ValueError"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 17,
+      "fan_in": 19,
       "fan_out": 4,
       "dead_code_ignored": false
     },
@@ -1714,7 +1748,7 @@
         "DriftEvent"
       ],
       "inferred_stratum": "infrastructure",
-      "fan_in": 20,
+      "fan_in": 33,
       "fan_out": 14,
       "dead_code_ignored": false
     },
@@ -2395,6 +2429,514 @@
       "inferred_stratum": "utility",
       "fan_in": 5,
       "fan_out": 18,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TerminationReason",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [
+        "str",
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [
+        "str",
+        "Enum",
+        "TERMINAL",
+        "ERROR",
+        "SAFETY",
+        "BUDGET"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 23,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AgentLoopConfig",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "repair_budget",
+        "repair_retry_limit",
+        "confirmation_cycles",
+        "cooldown_cycles",
+        "stall_repair_threshold",
+        "max_errors_before_abort"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [],
+      "inferred_stratum": "utility",
+      "fan_in": 19,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SubgoalRuntimeState",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "repair_attempts",
+        "fallback_count",
+        "failed_consecutive"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [],
+      "inferred_stratum": "utility",
+      "fan_in": 16,
+      "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AgentLoopError",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "cycle",
+        "error_type",
+        "message",
+        "subgoal_id"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [
+        "Optional"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 16,
+      "fan_out": 1,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "MemorySnapshot",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "subgoals",
+        "segments",
+        "plans",
+        "drift_events",
+        "snapshot_timestamp"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [
+        "Tuple",
+        "SubgoalMemoryRecord",
+        "SegmentMemoryRecord",
+        "PlanMemoryRecord",
+        "DriftEvent"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AgentState",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "to_snapshot"
+      ],
+      "public_attributes": [
+        "subgoal_memory",
+        "segment_memory",
+        "plan_memory",
+        "drift_memory",
+        "cycle",
+        "config",
+        "subgoal_runtime",
+        "last_cycle_progress",
+        "last_reflection_trace",
+        "last_error",
+        "accumulated_errors"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [
+        "SubgoalMemory",
+        "SegmentMemory",
+        "PlanMemory",
+        "DriftMemory",
+        "AgentLoopConfig",
+        "MemorySnapshot",
+        "Dict",
+        "Optional",
+        "ProgressReport",
+        "ReflectionTrace",
+        "AgentLoopError",
+        "List",
+        "SubgoalRuntimeState"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 14,
+      "fan_out": 13,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "SubgoalCycleResult",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "subgoal_id",
+        "reflection_outcome",
+        "skipped",
+        "skip_reason",
+        "safety_blocked",
+        "safety_errors",
+        "closed",
+        "retry_applied"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [
+        "Optional",
+        "ReflectionOutcome",
+        "Tuple"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 14,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AgentCycleOutcome",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "cycle",
+        "timestamp",
+        "subgoal_results",
+        "memory_snapshot",
+        "errors",
+        "terminal",
+        "termination_reason"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [
+        "MemorySnapshot",
+        "Tuple",
+        "Optional",
+        "SubgoalCycleResult",
+        "AgentLoopError"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 15,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AgentRunTrace",
+      "file": "src/core/planning/agent_loop/agent_loop_types.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "cycles",
+        "terminated",
+        "termination_reason",
+        "total_cycles",
+        "total_errors"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.segment_memory_types.SegmentMemoryRecord",
+        "src.core.memory.plan_memory_types.PlanMemoryRecord",
+        "src.core.memory.drift_memory_types.DriftEvent",
+        "src.core.planning.reflection.reflection_types.ProgressReport",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionTrace"
+      ],
+      "references": [
+        "Tuple",
+        "AgentCycleOutcome"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 14,
+      "fan_out": 2,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "AgentLoopV2",
+      "file": "src/core/planning/agent_loop/agent_loop_v2.py",
+      "package": "src.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "run_agent_cycle",
+        "run_agent_loop"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.Dict",
+        "typing.List",
+        "typing.Optional",
+        "typing.Tuple",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.memory.governance.governance_errors.MemoryGovernanceError",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.planning.reflection.reflection_loop.ReflectionLoop",
+        "src.core.planning.reflection.reflection_types.ReflectionOutcome",
+        "src.core.planning.reflection.reflection_types.ReflectionState",
+        "src.core.planning.subgoals.transition_rules.SubgoalEvent",
+        "src.core.planning.transitions.full_transition_rules.FullTransitionRules",
+        "src.core.planning.validation.full_validation_engine.FullValidationEngine",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "agent_loop_types.AgentLoopConfig",
+        "agent_loop_types.AgentCycleOutcome",
+        "agent_loop_types.AgentLoopError",
+        "agent_loop_types.AgentRunTrace",
+        "agent_loop_types.AgentState",
+        "agent_loop_types.SubgoalCycleResult",
+        "agent_loop_types.SubgoalRuntimeState",
+        "agent_loop_types.TerminationReason"
+      ],
+      "references": [
+        "AgentCycleOutcome",
+        "AgentRunTrace",
+        "SubgoalRuntimeState",
+        "AgentLoopConfig",
+        "ReflectionLoop",
+        "FullTransitionRules",
+        "FullValidationEngine",
+        "AgentState",
+        "List",
+        "SubgoalCycleResult",
+        "AgentLoopError",
+        "Optional",
+        "MemoryGovernance",
+        "SubgoalMemoryRecord",
+        "BUDGET",
+        "Subgoal",
+        "CLOSED",
+        "MemoryGovernanceError",
+        "RETRY",
+        "RETRYING",
+        "RESUME",
+        "RUNNING",
+        "ValueError",
+        "ReflectionState",
+        "ReflectionOutcome",
+        "Exception",
+        "Tuple",
+        "ERROR",
+        "TerminationReason",
+        "SubgoalLifecycleState",
+        "SubgoalEvent",
+        "SAFETY",
+        "TERMINAL"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 20,
+      "fan_out": 33,
       "dead_code_ignored": false
     },
     {
@@ -3659,7 +4201,7 @@
         "RETRYING"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 13,
+      "fan_in": 15,
       "fan_out": 33,
       "dead_code_ignored": false
     },
@@ -3712,7 +4254,7 @@
         "TransitionFailureRecord"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 15,
+      "fan_in": 17,
       "fan_out": 7,
       "dead_code_ignored": false
     },
@@ -3754,7 +4296,7 @@
         "Tuple"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 11,
+      "fan_in": 21,
       "fan_out": 1,
       "dead_code_ignored": false
     },
@@ -3967,7 +4509,7 @@
         "Any"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 2,
+      "fan_in": 12,
       "fan_out": 3,
       "dead_code_ignored": false
     },
@@ -4020,7 +4562,7 @@
         "MemoryUpdateRecord"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 2,
+      "fan_in": 14,
       "fan_out": 9,
       "dead_code_ignored": false
     },
@@ -4845,7 +5387,7 @@
         "RESUME"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 44,
+      "fan_in": 46,
       "fan_out": 11,
       "dead_code_ignored": false
     },
@@ -4961,7 +5503,7 @@
         "TransitionError"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 18,
+      "fan_in": 20,
       "fan_out": 12,
       "dead_code_ignored": false
     },
@@ -5102,7 +5644,7 @@
         "SUBGOAL_EVENT_TRANSITIONS"
       ],
       "inferred_stratum": "utility",
-      "fan_in": 16,
+      "fan_in": 18,
       "fan_out": 28,
       "dead_code_ignored": false
     },
@@ -6400,7 +6942,7 @@
         "RETRYING"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 94,
+      "fan_in": 116,
       "fan_out": 15,
       "dead_code_ignored": false
     },
@@ -6446,7 +6988,7 @@
         "Any"
       ],
       "inferred_stratum": "domain",
-      "fan_in": 61,
+      "fan_in": 74,
       "fan_out": 5,
       "dead_code_ignored": false
     },
@@ -10844,6 +11386,649 @@
       "inferred_stratum": "test",
       "fan_in": 0,
       "fan_out": 0,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestClassifyTermination",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_records_is_terminal",
+        "test_active_subgoal_returns_none",
+        "test_done_states_return_terminal",
+        "test_failed_with_budget_returns_none",
+        "test_failed_budget_exhausted_returns_error",
+        "test_mixed_done_and_failed_exhausted_returns_error",
+        "test_failed_with_no_runtime_entry_has_zero_attempts"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "SubgoalMemoryRecord",
+        "TERMINAL",
+        "AgentLoopConfig",
+        "ERROR",
+        "NOW_MS",
+        "TerminationReason",
+        "SubgoalRuntimeState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestAgentCycleStructure",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_empty_subgoals_is_terminal",
+        "test_cycle_counter_increments",
+        "test_memory_snapshot_captured",
+        "test_timestamp_is_iso_string"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopV2",
+        "TERMINAL",
+        "SUCCESS",
+        "TerminationReason",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSuccessSubgoal",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_success_subgoal_is_terminal",
+        "test_success_subgoal_not_closed",
+        "test_multiple_success_subgoals_terminal"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopV2",
+        "SUCCESS",
+        "TERMINAL",
+        "SubgoalLifecycleState",
+        "TerminationReason"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestEventTerminalClosure",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_satisfied_abandoned_closed_in_cycle",
+        "test_closure_recorded_in_result",
+        "test_closed_subgoal_stays_closed"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopV2",
+        "CLOSED",
+        "SATISFIED",
+        "ABANDONED",
+        "TERMINAL",
+        "SubgoalLifecycleState",
+        "TerminationReason"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestFailedSubgoal",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_failed_with_budget_retried_to_running",
+        "test_failed_with_budget_does_not_terminate",
+        "test_failed_budget_exhausted_closed",
+        "test_failed_budget_exhausted_result_has_closed_true",
+        "test_repair_attempts_counter_increments_on_retry"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopConfig",
+        "AgentLoopV2",
+        "RUNNING",
+        "SubgoalRuntimeState",
+        "CLOSED",
+        "SubgoalLifecycleState",
+        "ERROR",
+        "TerminationReason",
+        "FAILED"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 9,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRunningSubgoal",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_running_subgoal_triggers_reflection",
+        "test_running_subgoal_cycle_not_terminal",
+        "test_running_subgoal_reflection_has_progress",
+        "test_prior_progress_updated_after_cycle",
+        "test_created_subgoal_triggers_reflection"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopV2",
+        "RUNNING",
+        "CREATED",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestSafetyUnrecognisedState",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_unrecognised_state_triggers_safety_termination",
+        "test_unrecognised_state_produces_safety_blocked_result"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "SubgoalMemoryRecord",
+        "AgentState",
+        "AgentLoopV2",
+        "NOW_MS",
+        "SAFETY",
+        "SubgoalMemorySnapshot",
+        "TerminationReason"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestErrorBudget",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_error_budget_abort_on_accumulated_errors",
+        "test_below_error_budget_does_not_abort"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopConfig",
+        "AgentLoopV2",
+        "AgentLoopError",
+        "ERROR",
+        "TerminationReason",
+        "RUNNING",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestMultiSubgoal",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_mixed_success_and_satisfied_all_close",
+        "test_one_active_prevents_terminal",
+        "test_all_closed_is_terminal",
+        "test_subgoal_results_one_per_subgoal",
+        "test_per_subgoal_runtime_state_isolated"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopV2",
+        "CLOSED",
+        "AgentLoopConfig",
+        "TERMINAL",
+        "SubgoalLifecycleState",
+        "TerminationReason",
+        "SUCCESS",
+        "SATISFIED",
+        "RUNNING",
+        "FAILED"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 10,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestRunAgentLoop",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_max_cycles_respected",
+        "test_natural_terminal_stops_early",
+        "test_satisfied_closed_and_terminal",
+        "test_run_trace_structure",
+        "test_zero_max_cycles_returns_empty_trace",
+        "test_failed_exhausted_terminates_with_error",
+        "test_total_errors_accumulates_across_cycles",
+        "test_detector_state_persists_across_cycles"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "AgentLoopV2",
+        "CLOSED",
+        "AgentRunTrace",
+        "AgentLoopConfig",
+        "BUDGET",
+        "TERMINAL",
+        "SubgoalLifecycleState",
+        "ERROR",
+        "TerminationReason",
+        "AgentCycleOutcome",
+        "RUNNING",
+        "SUCCESS",
+        "SATISFIED",
+        "FAILED"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 14,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "TestAgentState",
+      "file": "tests/unit/core/planning/agent_loop/test_agent_loop_v2.py",
+      "package": "tests.unit.core.planning.agent_loop",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [
+        "test_to_snapshot_contains_all_stores",
+        "test_initial_cycle_is_zero",
+        "test_subgoal_runtime_starts_empty",
+        "test_accumulated_errors_starts_empty"
+      ],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "time",
+        "datetime.datetime",
+        "datetime.timezone",
+        "typing.List",
+        "typing.Optional",
+        "pytest",
+        "src.core.memory.subgoal_memory.SubgoalMemory",
+        "src.core.memory.segment_memory.SegmentMemory",
+        "src.core.memory.plan_memory.PlanMemory",
+        "src.core.memory.drift_memory.DriftMemory",
+        "src.core.memory.subgoal_memory_types.SubgoalMemoryRecord",
+        "src.core.memory.governance.memory_governance.MemoryGovernance",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopConfig",
+        "src.core.planning.agent_loop.agent_loop_types.AgentCycleOutcome",
+        "src.core.planning.agent_loop.agent_loop_types.AgentLoopError",
+        "src.core.planning.agent_loop.agent_loop_types.AgentRunTrace",
+        "src.core.planning.agent_loop.agent_loop_types.AgentState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalCycleResult",
+        "src.core.planning.agent_loop.agent_loop_types.TerminationReason",
+        "src.core.planning.agent_loop.agent_loop_v2.AgentLoopV2",
+        "src.core.planning.agent_loop.agent_loop_v2._classify_termination",
+        "src.core.planning.agent_loop.agent_loop_v2._ACTIVE_STATES",
+        "src.core.planning.agent_loop.agent_loop_v2._DONE_FOR_LOOP",
+        "src.core.planning.agent_loop.agent_loop_v2._NEEDS_CLOSURE_STATES",
+        "src.core.types.subgoal.Subgoal",
+        "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.agent_loop.agent_loop_types.SubgoalRuntimeState",
+        "src.core.memory.subgoal_memory_types.SubgoalMemorySnapshot"
+      ],
+      "references": [
+        "NOW_ISO",
+        "RUNNING",
+        "SubgoalLifecycleState"
+      ],
+      "inferred_stratum": "test",
+      "fan_in": 0,
+      "fan_out": 3,
       "dead_code_ignored": false
     },
     {
@@ -15402,6 +16587,786 @@
       "type": "call"
     },
     {
+      "source": "TerminationReason",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TerminationReason",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopConfig",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalRuntimeState",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopError",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "SegmentMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "PlanMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "MemorySnapshot",
+      "target": "DriftEvent",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "AgentState",
+      "target": "SubgoalMemory",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "SegmentMemory",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "PlanMemory",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "DriftMemory",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "AgentLoopConfig",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "MemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "ProgressReport",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "ReflectionTrace",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "AgentLoopError",
+      "type": "call"
+    },
+    {
+      "source": "AgentState",
+      "target": "SubgoalRuntimeState",
+      "type": "call"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "SubgoalCycleResult",
+      "target": "ReflectionOutcome",
+      "type": "call"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "MemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "SubgoalCycleResult",
+      "type": "call"
+    },
+    {
+      "source": "AgentCycleOutcome",
+      "target": "AgentLoopError",
+      "type": "call"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "SegmentMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "PlanMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "DriftEvent",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "ProgressReport",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "ReflectionTrace",
+      "type": "import"
+    },
+    {
+      "source": "AgentRunTrace",
+      "target": "AgentCycleOutcome",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "MemoryGovernanceError",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "ReflectionLoop",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "ReflectionOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "ReflectionState",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalEvent",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "FullTransitionRules",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "FullValidationEngine",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentCycleOutcome",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentRunTrace",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalRuntimeState",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentLoopConfig",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "ReflectionLoop",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "FullTransitionRules",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "FullValidationEngine",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentState",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalCycleResult",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "AgentLoopError",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "MemoryGovernance",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "Subgoal",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "MemoryGovernanceError",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "ReflectionState",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "ReflectionOutcome",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "AgentLoopV2",
+      "target": "SubgoalEvent",
+      "type": "call"
+    },
+    {
       "source": "OutcomeClassifier",
       "target": "StepResult",
       "type": "import"
@@ -16270,6 +18235,11 @@
       "source": "LoopTerminationDecision",
       "target": "CognitiveStepOutcome",
       "type": "import"
+    },
+    {
+      "source": "LoopTerminationDecision",
+      "target": "TerminationReason",
+      "type": "call"
     },
     {
       "source": "ReflectionLoop",
@@ -22210,6 +24180,1201 @@
       "source": "TestFingerprintHelpers",
       "target": "DriftSummary",
       "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "AgentLoopConfig",
+      "type": "call"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestClassifyTermination",
+      "target": "SubgoalRuntimeState",
+      "type": "call"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestAgentCycleStructure",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestSuccessSubgoal",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestEventTerminalClosure",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentLoopConfig",
+      "type": "call"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalRuntimeState",
+      "type": "call"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestFailedSubgoal",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestRunningSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalMemoryRecord",
+      "type": "call"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentState",
+      "type": "call"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "SubgoalMemorySnapshot",
+      "type": "call"
+    },
+    {
+      "source": "TestSafetyUnrecognisedState",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentLoopConfig",
+      "type": "call"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "AgentLoopError",
+      "type": "call"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestErrorBudget",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "AgentLoopConfig",
+      "type": "call"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestMultiSubgoal",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentLoopV2",
+      "type": "call"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentRunTrace",
+      "type": "call"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentLoopConfig",
+      "type": "call"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "TerminationReason",
+      "type": "call"
+    },
+    {
+      "source": "TestRunAgentLoop",
+      "target": "AgentCycleOutcome",
+      "type": "call"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SubgoalMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SegmentMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "PlanMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "DriftMemory",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SubgoalMemoryRecord",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "MemoryGovernance",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "AgentLoopConfig",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "AgentCycleOutcome",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "AgentLoopError",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "AgentRunTrace",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "AgentState",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SubgoalCycleResult",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "TerminationReason",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "AgentLoopV2",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "Subgoal",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SubgoalLifecycleState",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SubgoalRuntimeState",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SubgoalMemorySnapshot",
+      "type": "import"
+    },
+    {
+      "source": "TestAgentState",
+      "target": "SubgoalLifecycleState",
+      "type": "call"
     },
     {
       "source": "TestComputeConfidence",
