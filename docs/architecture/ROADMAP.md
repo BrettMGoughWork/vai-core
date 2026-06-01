@@ -342,7 +342,7 @@
 - Add capability metadata: purity, determinism, expected shape  
 - Add execution‑shape validator (expected vs actual)
 
-2.6.2 — Behavioural Observation Layer
+✅ 2.6.2 — Behavioural Observation Layer
 - Capture executor outputs into SegmentState  
 - Add behavioural deltas (prevoutput → newoutput)  
 - Add behavioural anomaly detector (wrong shape, wrong type)
