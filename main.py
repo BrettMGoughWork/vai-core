@@ -11,7 +11,11 @@ runs exactly ONE agent cycle via AgentLoopV2, then prints three artefacts:
 All output is stable JSON (indent=2, sort_keys=True).
 The cycle outcome is also written to agent_traces/ for TUI inspection.
 
-No REPL. No LLM calls. No stdin. No global state.
+The MockLLM is injected via SubgoalPlanner so that the planning pipeline
+(plan hydration, segment decomposition) runs end-to-end.  Replace MockLLM
+with any ChatProvider to switch to a live LLM.
+
+No REPL. No stdin. No global state.
 Exits cleanly with code 0 on success, 1 on unexpected error.
 """
 from __future__ import annotations
@@ -29,6 +33,8 @@ from src.core.memory.segment_memory import SegmentMemory
 from src.core.memory.subgoal_memory import SubgoalMemory
 from src.core.planning.agent_loop.agent_loop_types import AgentLoopConfig, AgentState
 from src.core.planning.agent_loop.agent_loop_v2 import AgentLoopV2
+from src.core.planning.generator.subgoal_planner import SubgoalPlanner
+from src.core.llm.mock_llm import MockLLM
 from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
 
 
@@ -88,7 +94,8 @@ def main() -> None:
     )
 
     # ── 2. Run exactly one agent cycle ──────────────────────────────────────
-    loop = AgentLoopV2()
+    planner = SubgoalPlanner(llm=MockLLM())
+    loop = AgentLoopV2(planner=planner)
     trace = loop.run_agent_loop(state, max_cycles=1)
 
     if not trace.cycles:

@@ -22,7 +22,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "architecture.json"
 
-EXCLUDE_DIRS = {".venv", ".git", "__pycache__", "node_modules"}
+EXCLUDE_DIRS = {".venv", ".git", "__pycache__", "node_modules", "tests"}
 
 # Map directory path fragments → inferred_stratum
 STRATUM_RULES: list[tuple[str, str]] = [

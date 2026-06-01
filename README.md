@@ -18,3 +18,12 @@ src/skills/ — reusable agent behaviours
 src/runtime/ — the execution engine
 docs/architecture/ — deep technical docs
 
+Inspector Dashboard
+-------------------
+The Stratum-2 Inspection Dashboard is a read-only, developer-facing TUI for visualizing agent cycle traces and memory substrate state in real time. It provides a safe, side-effect-free way to inspect agent activity and health.
+
+Usage:
+    python -m tools.inspector.dashboard
+
+Optional arguments allow you to specify a trace directory or enable live watching.
+

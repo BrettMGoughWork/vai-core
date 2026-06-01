@@ -802,3 +802,80 @@ class TestAgentState:
     def test_accumulated_errors_starts_empty(self):
         state = make_state()
         assert state.accumulated_errors == []
+
+
+# ---------------------------------------------------------------------------
+# SubgoalPlanner injection (step 4.5)
+# ---------------------------------------------------------------------------
+
+class TestSubgoalPlannerInjection:
+
+    def _make_created_state(self, sg_id: str = "sg-planner") -> AgentState:
+        return make_state(subgoals=[make_subgoal(sg_id, SubgoalLifecycleState.CREATED)])
+
+    def _make_planner(self) -> "SubgoalPlanner":
+        from src.core.llm.mock_llm import MockLLM
+        from src.core.planning.generator.subgoal_planner import SubgoalPlanner
+        return SubgoalPlanner(llm=MockLLM())
+
+    def test_planner_seeds_plan_for_active_subgoal(self):
+        """An active subgoal with no plan should have a plan after one cycle."""
+        state = self._make_created_state()
+        loop = AgentLoopV2(planner=self._make_planner())
+        loop.run_agent_cycle(state)
+        record = state.plan_memory.get_latest_for_subgoal("sg-planner")
+        assert record is not None
+
+    def test_planner_seeds_segments_for_active_subgoal(self):
+        """Segments should be written to SegmentMemory during plan seeding."""
+        state = self._make_created_state()
+        loop = AgentLoopV2(planner=self._make_planner())
+        loop.run_agent_cycle(state)
+        snap = state.segment_memory.snapshot()
+        # All LLM steps are grouped into one PlanSegment
+        assert len(snap.records) == 1
+
+    def test_plan_content_matches_mock_response(self):
+        """Golden plan path: plan content must match MOCK_PLAN_RESPONSE."""
+        from src.core.llm.mock_llm import MOCK_PLAN_RESPONSE
+        state = self._make_created_state()
+        loop = AgentLoopV2(planner=self._make_planner())
+        loop.run_agent_cycle(state)
+        record = state.plan_memory.get_latest_for_subgoal("sg-planner")
+        assert record.intent == MOCK_PLAN_RESPONSE["plan"]["subgoal"]
+        assert record.targetskillid == MOCK_PLAN_RESPONSE["plan"]["steps"][0]["capability"]
+
+    def test_planner_not_called_when_plan_already_exists(self):
+        """If a plan already exists for the subgoal, the planner must not re-seed."""
+        state = self._make_created_state()
+        loop = AgentLoopV2(planner=self._make_planner())
+        loop.run_agent_cycle(state)
+        # Capture segment count after first cycle.
+        count_after_first = len(state.segment_memory.snapshot().records)
+        # Second cycle: plan already exists — planner must not add more segments.
+        loop.run_agent_cycle(state)
+        count_after_second = len(state.segment_memory.snapshot().records)
+        assert count_after_first == count_after_second
+
+    def test_loop_without_planner_leaves_plan_memory_empty(self):
+        """AgentLoopV2() with no planner must not write any plans (backward-compat)."""
+        state = self._make_created_state()
+        loop = AgentLoopV2()
+        loop.run_agent_cycle(state)
+        snap = state.plan_memory.snapshot()
+        assert len(snap.records) == 0
+
+    def test_agentloopv2_constructor_backward_compatible(self):
+        """AgentLoopV2() and AgentLoopV2(config) must still work without planner arg."""
+        loop1 = AgentLoopV2()
+        loop2 = AgentLoopV2(AgentLoopConfig())
+        assert loop1 is not None
+        assert loop2 is not None
+
+    def test_plan_appears_in_cycle_outcome_memory_snapshot(self):
+        """The memory snapshot inside AgentCycleOutcome must include the seeded plan."""
+        state = self._make_created_state()
+        loop = AgentLoopV2(planner=self._make_planner())
+        outcome = loop.run_agent_cycle(state)
+        plan_ids = {p.plan_id for p in outcome.memory_snapshot.plans}
+        assert len(plan_ids) >= 1
