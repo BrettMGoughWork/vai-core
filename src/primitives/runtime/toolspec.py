@@ -1,5 +1,7 @@
-from dataclasses import dataclass
-from typing import Any, Callable, Dict
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Optional, Callable
 
 from .categories import SkillCategory
 from .side_effects import SideEffect
@@ -39,6 +41,16 @@ class ToolSpec:
 
     # Optional: whether retries may assume the tool is idempotent
     is_idempotent: bool = True
+
+    # --- 2.6.1: capability execution model metadata ---
+    # Is this capability expected to be deterministic (same input -> same output)?
+    deterministic: bool = True
+
+    # Is this capability pure from S2's perspective (no side effects, no external state, no randomness)?
+    pure: bool = True
+
+    # Expected output shape for validation and test generation (JSON schema or example)
+    output_schema: Optional[Dict[str, Any]] = field(default=None)
 
     def run(self, **kwargs) -> Any:
         """

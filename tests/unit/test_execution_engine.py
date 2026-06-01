@@ -12,7 +12,7 @@ def test_execute_tool_returns_core_result_on_success():
     mock_skill.name = "test_skill"
     mock_skill.run.return_value = 42
 
-    result = execute_tool(mock_skill, {"a": 1, "b": 2})
+    result = execute_tool(mock_skill, {"a": 1, "b": 2}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.tool_name == "test_skill"
@@ -28,7 +28,7 @@ def test_execute_tool_calls_skill_run_with_args():
     mock_skill.name = "add"
     mock_skill.run.return_value = 100
 
-    execute_tool(mock_skill, {"a": 50, "b": 50})
+    execute_tool(mock_skill, {"a": 50, "b": 50}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     mock_skill.run.assert_called_once_with(a=50, b=50)
 
@@ -39,7 +39,7 @@ def test_execute_tool_returns_error_result_on_exception():
     mock_skill.name = "failing_skill"
     mock_skill.run.side_effect = ValueError("Invalid input")
 
-    result = execute_tool(mock_skill, {"x": "bad"})
+    result = execute_tool(mock_skill, {"x": "bad"}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.is_error is True
@@ -55,7 +55,7 @@ def test_execute_tool_error_includes_skill_name():
     mock_skill.name = "my_special_skill"
     mock_skill.run.side_effect = RuntimeError("Something broke")
 
-    result = execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert "my_special_skill" in result.error
 
@@ -67,7 +67,7 @@ def test_execute_tool_preserves_handler_result_type():
     expected_output = {"sum": 42, "count": 2}
     mock_skill.run.return_value = expected_output
 
-    result = execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert result.tool_output == expected_output
     assert result.tool_output is expected_output
@@ -79,7 +79,7 @@ def test_execute_tool_with_empty_args():
     mock_skill.name = "no_args"
     mock_skill.run.return_value = "done"
 
-    result = execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.tool_name == "no_args"
@@ -93,7 +93,7 @@ def test_execute_tool_with_multiple_args():
     mock_skill.name = "multi"
     mock_skill.run.return_value = "result"
 
-    result = execute_tool(mock_skill, {"a": 1, "b": "text", "c": [1, 2, 3]})
+    result = execute_tool(mock_skill, {"a": 1, "b": "text", "c": [1, 2, 3]}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert result.tool_output == "result"
     mock_skill.run.assert_called_once_with(a=1, b="text", c=[1, 2, 3])
@@ -107,7 +107,7 @@ def test_execute_tool_handles_validation_errors():
     mock_skill.name = "validate_skill"
     mock_skill.run.side_effect = ValidationError("Missing required field: x")
 
-    result = execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.is_error is True
@@ -120,7 +120,7 @@ def test_execute_tool_handles_canonicalisation_errors():
     mock_skill.name = "canon_skill"
     mock_skill.run.side_effect = TypeError("Cannot coerce value to int")
 
-    result = execute_tool(mock_skill, {"x": "not_a_number"})
+    result = execute_tool(mock_skill, {"x": "not_a_number"}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.is_error is True
@@ -133,7 +133,7 @@ def test_execute_tool_handles_generic_exceptions():
     mock_skill.name = "error_skill"
     mock_skill.run.side_effect = Exception("Something unexpected")
 
-    result = execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.is_error is True
@@ -147,7 +147,7 @@ def test_execute_tool_returns_none_output_safely():
     mock_skill.name = "void_skill"
     mock_skill.run.return_value = None
 
-    result = execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.tool_name == "void_skill"
@@ -163,7 +163,7 @@ def test_execute_tool_result_is_always_core_result():
     mock_skill.run.side_effect = Exception("Catastrophic failure")
 
     # This should never raise—should return CoreResult with error
-    result = execute_tool(mock_skill, {})
+    result = execute_tool(mock_skill, {}, drift_memory=MagicMock(), subgoal_id="sg1", segment_id="seg1", step_id="step1")
 
     assert isinstance(result, CoreResult)
     assert result.is_error is True
