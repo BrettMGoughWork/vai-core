@@ -11,12 +11,15 @@ Lifecycle within a single cycle:
   3. Handle FAILED subgoals — retry (FAILED → RETRYING → RUNNING) or close if budget
      is exhausted.
   4. Refresh memory snapshot — pick up state changes from steps 2-3.
+  4.5 Seed plans — if a SubgoalPlanner is injected, call it for any active subgoal
+     that has no plan in PlanMemory.  Errors are captured but do not abort the cycle.
   5. Run one ReflectionLoop cycle per active subgoal (sorted deterministically).
   6. Post-reflection safety gate — check SafetyValidationResult from each outcome.
   7. Classify termination — detect when all work is done.
 
 All orchestration is deterministic and table-driven.
-No LLM calls, no inference, no side effects beyond governed memory writes.
+No LLM calls in the base loop.  The optional SubgoalPlanner extension point
+allows injectable plan generation (e.g. MockLLM for testing, live provider for production).
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ from typing import Dict, List, Optional, Tuple
 from src.core.memory.governance.memory_governance import MemoryGovernance
 from src.core.memory.governance.governance_errors import MemoryGovernanceError
 from src.core.memory.subgoal_memory_types import SubgoalMemoryRecord
+from src.core.planning.generator.subgoal_planner import SubgoalPlanner
 from src.core.planning.reflection.reflection_loop import ReflectionLoop
 from src.core.planning.reflection.reflection_types import (
     ReflectionOutcome,
@@ -120,10 +124,14 @@ class AgentLoopV2:
       - FullTransitionRules (2.5.2):  lifecycle transition table
       - FullValidationEngine (2.5.4): safety gate
       - MemoryGovernance (2.4.5):     all governed writes
+      - SubgoalPlanner (optional):    plan generation via injectable ChatProvider
+                                      (pass planner=SubgoalPlanner(llm=MockLLM()) for tests;
+                                       replace MockLLM with any ChatProvider for production)
     """
 
-    def __init__(self, config: AgentLoopConfig = AgentLoopConfig()) -> None:
+    def __init__(self, config: AgentLoopConfig = AgentLoopConfig(), *, planner: Optional[SubgoalPlanner] = None) -> None:
         self._config = config
+        self._planner = planner
         self._reflection_loop = ReflectionLoop(
             confirmation_cycles=config.confirmation_cycles,
             cooldown_cycles=config.cooldown_cycles,
@@ -302,6 +310,30 @@ class AgentLoopV2:
             key=lambda r: (r.created_at, r.subgoal_id),
         )
         active_records = [r for r in refreshed_records if r.state in _ACTIVE_STATES]
+
+        # ── 4.5. Seed plans for active subgoals that have no plan ────────────
+        if self._planner is not None:
+            for record in active_records:
+                sg_id = record.subgoal_id
+                if state.plan_memory.get_latest_for_subgoal(sg_id) is not None:
+                    continue  # plan already exists — skip
+                try:
+                    self._planner.plan_for_subgoal(
+                        subgoal_id=sg_id,
+                        goal=record.goal,
+                        governance=governance,
+                        timestamp=now_iso,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    err = AgentLoopError(
+                        cycle=state.cycle,
+                        error_type="planning",
+                        message=f"Plan seeding failed for {sg_id!r}: {exc}",
+                        subgoal_id=sg_id,
+                    )
+                    cycle_errors.append(err)
+                    state.accumulated_errors.append(err)
+                    state.last_error = err
 
         # ── 5. Run ReflectionLoop for each active subgoal ───────────────────
         handled_ids = {r.subgoal_id for r in subgoal_results}

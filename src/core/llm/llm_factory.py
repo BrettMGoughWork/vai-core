@@ -1,6 +1,7 @@
 from .providers import (
     OpenAIClient, AnthropicClient, GeminiClient, MistralClient, QwenClient, DeepSeekClient
 )
+from .mock_llm import MockLLM
 
 PROVIDER_CLIENTS = {
     "openai": OpenAIClient,
@@ -9,6 +10,7 @@ PROVIDER_CLIENTS = {
     "mistral": MistralClient,
     "qwen": QwenClient,
     "deepseek": DeepSeekClient,
+    "mock": MockLLM,
 }
 
 from types import SimpleNamespace

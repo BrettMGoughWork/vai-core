@@ -109,57 +109,6 @@
 ## STRATUM 2 - Hierarchical Intelligence
 *Invariant*: Stratum 2 must be pure: no side effects, no tool calls, no LLM calls. It only produces subgoals and plan segments for Stratum 1 to execute.  
 
----
-
-*Note*: Stratum 2 operates as a hierarchy of deterministic state machines:
-
-*Layer 1 — Step Machine*  
-- *Processes a single cognitive step*  
-- *Input: StepState*  
-- *Output: StepResult*  
-
-*Layer 2 — Plan Machine*  
-- *Processes a sequence of steps (flat plan)*  
-- *Input: PlanState*  
-- *Output: Updated PlanState*  
-
-*Layer 3 — Hierarchical Agent Machine*  
-- *Manages subgoals and plan segments*  
-- *Input: AgentState (ConversationState + Subgoals + Memory)*  
-- *Output: Updated AgentState*  
-
-*Each layer*:  
-- *Is pure (no side effects)*  
-- *Is deterministic*  
-- *Operates only on structured inputs*  
-- *Produces structured outputs*  
-
-*S1 executes actions*  
-*S2 decides what should happen next*  
-
----
-
-#### Core Abstractions
-*Hierarchy*:
-
-*Step → atomic cognitive decision*  
-*Plan → ordered list of Steps*  
-*Segment → coherent subset of a Plan*  
-*Subgoal → objective satisfied by one or more Segments*
-
----
-
-*Subgoal*  
-*contains → Segments*
-
-*Segment*  
-*contains → Plan*  
-
-*Plan*  
-*contains → Steps*
-
---- 
-
 ### PHASE 2.1 - Multi-Step Loop Foundation
 *Depends on*: PHASE 1.4  
 
@@ -379,6 +328,265 @@
 
 ✅ 2.5.7 - inspection dashboard
 - TUI-bsaed dashboard for inspecting agent planning behaviour
+
+✅ 2.5.8 - Mock LLM
+- Bridge end-to-end planning pipeline
+- Attach a Mock LLM to create scenarios for testing
+
+
+## PHASE 2.6 — Stratum‑2 Behavioural Engine (Executor‑Aware Reasoner)
+*Depends On*: PHASE 2.5  
+*Goal*: Give Stratum‑2 the ability to observe, interpret, and reason about actual execution behaviour.
+
+2.6.1 — Capability Execution Model
+- Define deterministic capability outputs for S2 observation  
+- Add capability metadata: purity, determinism, expected shape  
+- Add execution‑shape validator (expected vs actual)
+
+2.6.2 — Behavioural Observation Layer
+- Capture executor outputs into SegmentState  
+- Add behavioural deltas (prevoutput → newoutput)  
+- Add behavioural anomaly detector (wrong shape, wrong type)
+
+2.6.3 — Behavioural Drift Signals
+- Emit signals for:  
+  - wrong capability  
+  - wrong output shape  
+  - wrong output semantics  
+  - unexpected side‑effects (detected via metadata)
+
+2.6.4 — Behavioural Drift Classifier
+- Map signals → drift classification  
+- Add confidence scoring  
+- Add multi‑cycle confirmation
+
+2.6.5 — Behavioural Repair Actions
+- Fix wrong capability  
+- Fix malformed step  
+- Regenerate segment  
+- Regenerate plan (if needed)
+
+2.6.6 — Behavioural Trace
+- Add behavioural deltas to trace  
+- Add drift signals to trace  
+- Add repair actions to trace
+
+## PHASE 2.7 — Temporal Reasoner (Progress, Stalls, Recovery)
+*Depends On*: PHASE 2.6  
+*Goal*: Give Stratum‑2 a sense of time, progress, and stagnation.
+
+2.7.1 — Progress Detector
+- Compare segment outputs across cycles  
+- Detect: steady, stalled, regressed  
+- Add progress confidence scoring
+
+2.7.2 — Temporal Drift Signals
+- Emit signals for:  
+  - no progress  
+  - repeated identical outputs  
+  - oscillation  
+  - regressions
+
+2.7.3 — Temporal Drift Classifier
+- Multi‑cycle stall detection  
+- Oscillation detection  
+- Regressed‑state detection
+
+2.7.4 — Temporal Repair Actions
+- Regenerate segment  
+- Regenerate plan  
+- Re‑decompose subgoal  
+- Reset segment state
+
+2.7.5 — Temporal Trace
+- Add progress deltas  
+- Add stall reasons  
+- Add oscillation markers
+
+## PHASE 2.8 — Semantic Reasoner (Meaning, Intent, Goal Alignment)
+*Depends On*: PHASE 2.7  
+*Goal*: Give Stratum‑2 the ability to detect when behaviour contradicts the plan or subgoal.
+
+2.8.1 — Semantic Validator
+- Validate output against step description  
+- Validate output against plan intent  
+- Validate output against subgoal goal  
+- Validate output against memory context
+
+2.8.2 — Semantic Drift Signals
+- Emit signals for:  
+  - contradicting plan  
+  - contradicting subgoal  
+  - contradicting memory  
+  - contradicting prior behaviour
+
+2.8.3 — Semantic Drift Classifier
+- Multi‑signal semantic drift detection  
+- Confidence scoring  
+- Confirmation logic
+
+2.8.4 — Semantic Repair Actions
+- Rewrite step  
+- Rewrite segment  
+- Rewrite plan  
+- Rewrite subgoal
+
+2.8.5 — Semantic Trace
+- Add semantic mismatch details  
+- Add semantic repair actions  
+- Add semantic drift history
+
+## PHASE 2.9 — Full Drift Engine (Unified Drift System)
+*Depends On*: PHASE 2.8  
+*Goal*: Combine behavioural, temporal, and semantic drift into a unified, governed system.
+
+2.9.1 — Unified Drift Signal Model
+- Merge structural, behavioural, temporal, semantic signals  
+- Add signal weighting  
+- Add signal decay rules
+
+2.9.2 — Unified Drift Classifier
+- Multi‑signal classification  
+- Confidence scoring  
+- Drift severity levels  
+- Drift categories: minor, major, catastrophic
+
+2.9.3 — Drift Confirmation Engine
+- Multi‑cycle confirmation  
+- Confidence accumulation  
+- Drift hysteresis (avoid oscillation)
+
+2.9.4 — Drift Recovery Engine
+- Choose repair vs replan  
+- Choose segment regen vs plan regen  
+- Choose subgoal regen vs full reset
+
+2.9.5 — Drift Trace
+- Add unified drift history  
+- Add drift confidence evolution  
+- Add drift recovery decisions
+
+## PHASE 2.10 — Full Repair Engine (Beyond Normalisation)
+*Depends On*: PHASE 2.9  
+*Goal*: Implement real repair actions, not just structural fixes.
+
+2.10.1 — Repair Action Library
+- Fix malformed steps  
+- Fix malformed segments  
+- Fix malformed plans  
+- Fix malformed subgoals  
+- Fix drift‑induced inconsistencies
+
+2.10.2 — Repair Budget
+- Per‑cycle budget  
+- Per‑subgoal budget  
+- Per‑plan budget  
+- Global budget
+
+2.10.3 — Repair Arbitration
+- Decide between:  
+  - repair  
+  - replan  
+  - regenerate segment  
+  - regenerate subgoal  
+  - escalate to catastrophic drift
+
+2.10.4 — Repair Trace
+- Add repair attempts  
+- Add repair failures  
+- Add repair successes  
+- Add repair budget usage
+
+## PHASE 2.11 — Multi‑Segment Reasoner
+*Depends On*: PHASE 2.10  
+*Goal*: Execute multi‑segment plans with drift/repair/reflection per segment.
+
+2.11.1 — Segment Transition Rules
+- pending → active  
+- active → complete  
+- complete → next segment  
+- complete → subgoal complete
+
+2.11.2 — Segment Reflection
+- Evaluate progress  
+- Evaluate drift  
+- Evaluate repair  
+- Evaluate completion
+
+2.11.3 — Segment‑Level Drift
+- Drift per segment  
+- Repair per segment  
+- Replan per segment
+
+2.11.4 — Segment Trace
+- Add segment transitions  
+- Add segment drift  
+- Add segment repair  
+- Add segment reflection
+
+## PHASE 2.12 — Multi‑Subgoal Reasoner
+*Depends On*: PHASE 2.11  
+*Goal*: Execute hierarchical plans with multiple subgoals.
+
+2.12.1 — Subgoal Transition Rules
+- pending → active  
+- active → complete  
+- complete → next subgoal  
+- complete → agent complete
+
+2.12.2 — Subgoal Reflection
+- Evaluate subgoal progress  
+- Evaluate subgoal drift  
+- Evaluate subgoal repair  
+- Evaluate subgoal completion
+
+2.12.3 — Subgoal‑Level Drift
+- Drift per subgoal  
+- Repair per subgoal  
+- Replan per subgoal
+
+2.12.4 — Subgoal Trace
+- Add subgoal transitions  
+- Add subgoal drift  
+- Add subgoal repair  
+- Add subgoal reflection
+
+## PHASE 2.13 — Full Agent‑Level Loop v3 (Release‑Ready)
+*Depends On*: PHASE 2.12  
+*Goal*: The complete hierarchical reasoner required for Stratum‑3.
+
+2.13.1 — Full Agent Loop
+- Multi‑subgoal  
+- Multi‑segment  
+- Multi‑cycle  
+- Drift‑aware  
+- Repair‑aware  
+- Reflection‑aware  
+- Memory‑aware
+
+2.13.2 — Full Error Handling
+- catastrophic drift  
+- catastrophic repair failure  
+- invalid memory state  
+- invalid subgoal state  
+- invalid segment state
+
+2.13.3 — Full Trace
+- agent trace  
+- subgoal trace  
+- segment trace  
+- drift trace  
+- repair trace  
+- reflection trace  
+- memory trace
+
+2.13.4 — Release 1 Validation
+- determinism tests  
+- drift tests  
+- repair tests  
+- multi‑segment tests  
+- multi‑subgoal tests  
+- long‑horizon tests 
 
 ---
 🚀 Release 1 — "Hierarchical Reasoner"
