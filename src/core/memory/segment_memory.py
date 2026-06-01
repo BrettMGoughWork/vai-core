@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import asdict
 from typing import Dict, List, Optional
 
 from src.core.types.plan_segment import PlanSegment
@@ -42,8 +43,18 @@ class SegmentMemory:
             created_at=segment.created_at,
         )
 
-        self._store[normalised.segment_id] = SegmentMemoryRecord(
-            segment_id=normalised.segment_id,
+        segment_id = normalised.segment_id
+
+        # --- Preserve behavioural-observation fields if overwriting an existing record ---
+        prev_record = self._store.get(segment_id)
+
+        previous_output = prev_record.previous_output if prev_record else None
+        last_output = prev_record.last_output if prev_record else None
+        behavioural_delta = prev_record.behavioural_delta if prev_record else None
+
+        # --- Construct new record including behavioural fields ---
+        self._store[segment_id] = SegmentMemoryRecord(
+            segment_id=segment_id,
             parent_id=parent_id,
             subgoal_id=normalised.subgoal_id,
             state=None,
@@ -51,6 +62,11 @@ class SegmentMemory:
             created_at=normalised.created_at,
             context=copy.deepcopy(dict(normalised.context)),
             metadata=copy.deepcopy(dict(normalised.metadata)),
+        
+            # --- 2.6.2 behavioural-observation fields ---
+            previous_output=previous_output,
+            last_output=last_output,
+            behavioural_delta=behavioural_delta,
         )
 
     def get(self, segment_id: str) -> Optional[PlanSegment]:
@@ -122,10 +138,17 @@ class SegmentMemory:
 
     def snapshot(self) -> SegmentMemorySnapshot:
         """Return an immutable snapshot of the current store, sorted deterministically."""
-        records = tuple(
-            sorted(self._store.values(), key=lambda r: (r.created_at, r.segment_id))
+        
+        sorted_records = sorted(
+            self._store.values(),
+            key=lambda r: (r.created_at, r.segment_id),
         )
-        return SegmentMemorySnapshot(records=records)
+        
+        snapshot_records = tuple(
+            SegmentMemoryRecord(**asdict(rec))
+            for rec in sorted_records
+        )
+        return SegmentMemorySnapshot(records=snapshot_records)
 
     def load_snapshot(self, snapshot: SegmentMemorySnapshot) -> None:
         """Replace the current store with the contents of a snapshot."""

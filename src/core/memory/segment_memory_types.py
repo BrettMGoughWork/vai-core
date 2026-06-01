@@ -23,6 +23,15 @@ class SegmentMemoryRecord:
     context: Dict[str, Any]
     metadata: Dict[str, Any]
 
+    # --- 2.6.2 Behavioural Observation Layer ---
+    # Last executor output (JSON-pure)
+    last_output: Optional[Any] = None
+
+    # Previous executor output (JSON-pure)
+    previous_output: Optional[Any] = None
+
+    # Structural diff between previous and last output (JSON-pure)
+    behavioural_delta: Optional[Dict[str, Any]] = None
 
 @dataclass(frozen=True)
 class SegmentMemorySnapshot:

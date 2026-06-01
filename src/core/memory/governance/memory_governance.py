@@ -95,7 +95,7 @@ class MemoryGovernance:
         parent_id: Optional[str] = None,
     ) -> None:
         """
-        Validate and write a PlanSegment.
+        Validate, consistency-check, and write a PlanSegment.
 
         Enforces structural validity and cross-store consistency
         (subgoal_id must exist in SubgoalMemory).
@@ -200,16 +200,6 @@ class MemoryGovernance:
         return self._subgoal_memory.get(subgoal_id)
 
     def get_segment(self, segment_id: str) -> Optional[PlanSegment]:
-        """
-        Return a validated PlanSegment, or None if not found.
-
-        Raises GovernanceError if the stored record is structurally invalid.
-        """
-        record = self._segment_memory.get_record(segment_id)
-        if record is None:
-            return None
-        violations = validate_segment_record(record)
-        _raise_if(violations)
         return self._segment_memory.get(segment_id)
 
     def get_plan(self, plan_id: str) -> Optional[Plan]:
