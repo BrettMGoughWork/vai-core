@@ -31,24 +31,6 @@ MOCK_PLAN_RESPONSE: Dict[str, Any] = {
     }
 }
 
-MOCK_PLAN_RESPONSE_DRIFT: Dict[str, Any] = {
-    "plan": {
-        "subgoal": "verify-architecture",
-        "steps": [
-            {
-                "id": "s1",
-                "description": "Validate architecture.json",
-                "capability": "echo"
-            },
-            {
-                "id": "s2",
-                "description": "Verify loop termination conditions",
-                "capability": "math.add"
-            },
-        ]
-    }
-}
-
 # Deterministic broken plan for testing validation-failure paths.
 # Missing "subgoal" causes KeyError in SubgoalPlanner, exercising the failure branch.
 _HALLUCINATION_RESPONSE: Dict[str, Any] = {
@@ -83,7 +65,7 @@ class MockLLM:
         max_tokens: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Return a deterministic OpenAI-shaped chat completion response."""
-        payload = _HALLUCINATION_RESPONSE if self._simulate_hallucination else MOCK_PLAN_RESPONSE_DRIFT
+        payload = _HALLUCINATION_RESPONSE if self._simulate_hallucination else MOCK_PLAN_RESPONSE
         return {
             "choices": [
                 {

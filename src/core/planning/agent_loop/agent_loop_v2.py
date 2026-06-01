@@ -40,6 +40,7 @@ from src.core.planning.subgoals.transition_rules import SubgoalEvent
 from src.core.planning.transitions.full_transition_rules import FullTransitionRules
 from src.core.planning.validation.full_validation_engine import FullValidationEngine
 from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.core.planning.drift.behavioural_drift import evaluate_behavioural_drift
 
 from .agent_loop_types import (
     AgentLoopConfig,
@@ -106,7 +107,6 @@ def _classify_termination(
         # _DONE_FOR_LOOP states contribute to termination
 
     return TerminationReason.ERROR if has_failed_exhausted else TerminationReason.TERMINAL
-
 
 # ---------------------------------------------------------------------------
 # AgentLoopV2
@@ -542,6 +542,29 @@ class AgentLoopV2:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _observe_executor_output(
+        self,
+        *,
+        state: AgentState,
+        subgoal_id: str,
+        segment_id: str,
+        step_id: str,
+        tool_spec,
+        output,
+    ):
+        """
+        2.6.x — Behavioural observation hook.
+        Called by ReflectionLoop after a capability executes.
+        """
+        evaluate_behavioural_drift(
+            drift_memory=state.drift_memory,
+            subgoal_id=subgoal_id,
+            segment_id=segment_id,
+            step_id=step_id,
+            expected_schema=getattr(tool_spec, "expected_output_schema", None),
+            actual_output=output,
+        )
 
     def _get_subgoal_runtime(
         self, state: AgentState, subgoal_id: str

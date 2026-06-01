@@ -333,12 +333,11 @@
 - Bridge end-to-end planning pipeline
 - Attach a Mock LLM to create scenarios for testing
 
-
 ## PHASE 2.6 — Stratum‑2 Behavioural Engine (Executor‑Aware Reasoner)
 *Depends On*: PHASE 2.5  
 *Goal*: Give Stratum‑2 the ability to observe, interpret, and reason about actual execution behaviour.
 
-2.6.1 — Capability Execution Model
+✅ 2.6.1 — Capability Execution Model
 - Define deterministic capability outputs for S2 observation  
 - Add capability metadata: purity, determinism, expected shape  
 - Add execution‑shape validator (expected vs actual)
