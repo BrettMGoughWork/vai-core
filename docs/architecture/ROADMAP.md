@@ -391,7 +391,7 @@
 - Oscillation detection  
 - Regressed‑state detection
 
-2.7.4 — Temporal Repair Actions
+✅ 2.7.4 — Temporal Repair Actions
 - Regenerate segment  
 - Regenerate plan  
 - Re‑decompose subgoal  
