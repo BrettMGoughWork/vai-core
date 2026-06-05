@@ -10,6 +10,9 @@ such as no progress, repetition, oscillation, or regression.
 
 ``TemporalDriftClassification`` (2.7.3) represents the classified temporal
 health of a segment, with categories, confidence, and streak tracking.
+
+``TemporalRepairPlan`` (2.7.4) represents the repair actions S2 should
+take in response to multi‑cycle temporal drift.
 """
 from __future__ import annotations
 
@@ -154,3 +157,66 @@ class TemporalDriftClassification:
         # Defensive copy of mutable containers
         object.__setattr__(self, "categories", list(self.categories))
         object.__setattr__(self, "reasons", list(self.reasons))
+
+
+# ── 2.7.4 — TemporalRepairPlan ───────────────────────────────────────────────
+
+
+_CATEGORY_REPAIR_ACTION: Dict[str, str] = {
+    "stall": "regenerate segment",
+    "repetition": "reset segment state",
+    "oscillation": "re-decompose subgoal",
+    "regression": "regenerate plan",
+}
+
+
+@dataclass(frozen=True)
+class TemporalRepairPlan:
+    """
+    Phase 2.7.4 — Repair plan produced from a temporal drift classification.
+
+    Describes how Stratum‑2 should respond to multi‑cycle temporal drift.
+    Pure, deterministic, JSON‑safe — not an actual code execution.
+
+    ``needs_repair``
+        ``True`` when ``classification.status == "temporal_drift"``.
+    ``repair_actions``
+        Sorted list of human‑readable, JSON‑safe action strings derived from
+        categories (e.g. ``"regenerate segment"``).
+    ``confidence``
+        Copied from the classification (0.0–1.0).
+    ``categories``
+        Defensive copy of the classification's categories.
+    ``streak``
+        Copied from the classification.
+    """
+
+    needs_repair: bool
+    repair_actions: List[str]
+    confidence: float
+    categories: List[str]
+    streak: int
+
+    def __post_init__(self) -> None:
+        if self.confidence < 0.0 or self.confidence > 1.0:
+            raise ValueError(
+                f"confidence must be 0.0–1.0, got {self.confidence}"
+            )
+        if self.streak < 0:
+            raise ValueError(
+                f"streak must be >= 0, got {self.streak}"
+            )
+        for cat in self.categories:
+            if cat not in _TEMPORAL_CATEGORY_MAP.values():
+                raise ValueError(
+                    f"unknown category {cat!r}; must be one of "
+                    f"{sorted(_TEMPORAL_CATEGORY_MAP.values())}"
+                )
+        for action in self.repair_actions:
+            if not isinstance(action, str):
+                raise ValueError(
+                    f"repair action must be a string, got {type(action)}"
+                )
+        # Defensive copy of mutable containers
+        object.__setattr__(self, "categories", list(self.categories))
+        object.__setattr__(self, "repair_actions", list(self.repair_actions))
