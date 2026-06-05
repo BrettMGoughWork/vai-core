@@ -71,3 +71,51 @@ class BehaviouralDriftClassification:
             )
         # Shallow copy of reasons list (signals themselves are frozen)
         object.__setattr__(self, "reasons", list(self.reasons))
+
+
+# ── Phase 2.6.5 repair actions per signal type ────────────────────────
+_SIGNAL_REPAIR_ACTION: dict[BehaviouralSignalType, str] = {
+    BehaviouralSignalType.WRONG_CAPABILITY: (
+        "verify declared vs executed capability"
+    ),
+    BehaviouralSignalType.WRONG_OUTPUT_SHAPE: (
+        "validate output shape against declared schema"
+    ),
+    BehaviouralSignalType.WRONG_OUTPUT_SEMANTICS: (
+        "inspect semantic fields for correctness"
+    ),
+    BehaviouralSignalType.UNEXPECTED_SIDE_EFFECT: (
+        "audit side-effect declarations vs execution"
+    ),
+}
+
+
+@dataclass(frozen=True)
+class BehaviouralDriftRepair:
+    """
+    Phase 2.6.5 — Repair plan produced from a behavioural drift classification.
+
+    Describes how Stratum‑2 interprets and responds to drift.
+    Pure, deterministic, JSON‑safe — not an actual code fix.
+
+    needs_repair:    ``True`` when drift is present.
+    repair_actions:  human‑readable, JSON‑safe strings describing corrective
+                     actions.  Order is deterministic (sorted by signal type).
+    confidence:      copied from the classification (0.0–1.0).
+    reasons:         the BehaviouralSignals that triggered the repair
+                     (defensive copy).
+    """
+
+    needs_repair: bool
+    repair_actions: List[str]
+    confidence: float
+    reasons: List[BehaviouralSignal]
+
+    def __post_init__(self) -> None:
+        if self.confidence < 0.0 or self.confidence > 1.0:
+            raise ValueError(
+                f"confidence must be 0.0–1.0, got {self.confidence}"
+            )
+        # Defensive copy of mutable containers
+        object.__setattr__(self, "repair_actions", list(self.repair_actions))
+        object.__setattr__(self, "reasons", list(self.reasons))
