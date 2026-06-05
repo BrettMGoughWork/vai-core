@@ -504,24 +504,24 @@
 *Depends On*: PHASE 2.10  
 *Goal*: Execute multi‑segment plans with drift/repair/reflection per segment.
 
-2.11.1 — Segment Transition Rules
+✅ 2.11.1 — Segment Transition Rules
 - pending → active  
 - active → complete  
 - complete → next segment  
 - complete → subgoal complete
 
-2.11.2 — Segment Reflection
+✅ 2.11.2 — Segment Reflection
 - Evaluate progress  
 - Evaluate drift  
 - Evaluate repair  
 - Evaluate completion
 
-2.11.3 — Segment‑Level Drift
+✅ 2.11.3 — Segment‑Level Drift
 - Drift per segment  
 - Repair per segment  
 - Replan per segment
 
-2.11.4 — Segment Trace
+✅ 2.11.4 — Segment Trace
 - Add segment transitions  
 - Add segment drift  
 - Add segment repair  
