@@ -1,8 +1,8 @@
 # Architecture Audit Report
 
-> **architecture.json snapshot**: `2026-06-01 09:15:03 UTC`  
-> **Audit generated**: `2026-06-01 09:15:03 UTC`  
-> **Classes analysed**: 238 | **References**: 1049
+> **architecture.json snapshot**: `2026-06-05 00:04:47 UTC`  
+> **Audit generated**: `2026-06-05 00:04:47 UTC`  
+> **Classes analysed**: 241 | **References**: 1053
 
 ## Summary
 
@@ -10,15 +10,15 @@
 |----------|-------|
 | 🔴 Critical | 0 |
 | 🟠 High     | 0 |
-| 🟡 Medium   | 69 |
+| 🟡 Medium   | 70 |
 | 🔵 Low      | 13 |
-| **Total**   | **82** |
+| **Total**   | **83** |
 
 ---
 
 ## 1. Duplicate Classes (1 found)
 
-### 🟡 Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 90%)
+### 🟡 Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 82%)
 
 **Severity**: `medium`  
 **Category**: `near-duplicate`  
@@ -302,7 +302,7 @@ _No issues found._
 
 ---
 
-## 4. Dead Code (fan_in = 0) (48 found)
+## 4. Dead Code (fan_in = 0) (49 found)
 
 ### 🟡 Unreferenced class: `AgentDispatcher` (adapter)
 
@@ -464,6 +464,14 @@ _No issues found._
 
 `ValidationEngine` in `src/core/planning/subgoals/validation_engine.py` has fan_in=0 — no other class imports or references it. Has 2 public methods.
 
+### 🟡 Unreferenced class: `ShapeValidationResult` (infrastructure)
+
+**Severity**: `medium`  
+**Category**: `dead-code`  
+**fan_in**: 0 | **fan_out**: 3
+
+`ShapeValidationResult` in `src/core/planning/validation/execution_shape_validation.py` has fan_in=0 — no other class imports or references it. No public methods (possible stub).
+
 ### 🔵 Unreferenced class: `PlanStateValidationError` (utility)
 
 **Severity**: `low`  
@@ -492,7 +500,7 @@ _No issues found._
 
 **Severity**: `low`  
 **Category**: `dead-code`  
-**fan_in**: 0 | **fan_out**: 7
+**fan_in**: 0 | **fan_out**: 10
 
 `SignalSource` in `src/core/signals/model.py` has fan_in=0 — no other class imports or references it. No public methods (possible stub).
 
@@ -696,7 +704,7 @@ _No issues found._
 |---|-----|----------|-------|
 | 1 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanMemoryRecord` has reasoning keyword `plan` in name |
 | 2 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanMemory` has reasoning keyword `plan` in name |
-| 3 | 🟡 `medium` | `near-duplicate` | Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 90%) |
+| 3 | 🟡 `medium` | `near-duplicate` | Near-duplicate classes: `SegmentMemory` ↔ `SubgoalMemory` (similarity 82%) |
 | 4 | 🟡 `medium` | `invariant` | I5 — Utility class `FullValidationEngine` has excessive fan_out (28) |
 | 5 | 🟡 `medium` | `invariant` | I5 — Utility class `StepProcessor` has excessive fan_out (18) |
 | 6 | 🟡 `medium` | `invariant` | I3 — Utility class `TerminationReason` has reasoning keyword `reason` in name |
@@ -746,33 +754,34 @@ _No issues found._
 | 50 | 🟡 `medium` | `dead-code` | Unreferenced class: `ForbiddenCapabilityPolicy` (infrastructure) |
 | 51 | 🟡 `medium` | `dead-code` | Unreferenced class: `LocalPlanner` (utility) |
 | 52 | 🟡 `medium` | `dead-code` | Unreferenced class: `RetryPolicy` (infrastructure) |
-| 53 | 🟡 `medium` | `dead-code` | Unreferenced class: `StructuredLogger` (infrastructure) |
-| 54 | 🟡 `medium` | `dead-code` | Unreferenced class: `ValidationEngine` (utility) |
-| 55 | 🟡 `medium` | `dead-code` | Unreferenced class: `CapabilityRegistry` (utility) |
-| 56 | 🟡 `medium` | `dead-code` | Unreferenced class: `Governance` (infrastructure) |
-| 57 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanStateValidationError` has reasoning keyword `plan` in name |
-| 58 | 🟡 `medium` | `invariant` | I6 — Test class `ToolValidator` is inside `src/` |
-| 59 | 🟡 `medium` | `dead-code` | Unreferenced class: `LoopTerminationDecision` (utility) |
-| 60 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillFilter` (domain) |
-| 61 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillRanker` (domain) |
-| 62 | 🟡 `medium` | `dead-code` | Unreferenced class: `Telemetry` (infrastructure) |
-| 63 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanValidationResult` has reasoning keyword `plan` in name |
-| 64 | 🟡 `medium` | `invariant` | I6 — Test class `ToolPromptBuilder` is inside `src/` |
-| 65 | 🟡 `medium` | `invariant` | I6 — Test class `ToolSchemaGenerator` is inside `src/` |
-| 66 | 🟡 `medium` | `dead-code` | Unreferenced class: `AgentDispatcher` (adapter) |
-| 67 | 🟡 `medium` | `dead-code` | Unreferenced class: `DeadCodeIgnore` (domain) |
-| 68 | 🟡 `medium` | `dead-code` | Unreferenced class: `MinimalSafetyPolicy` (infrastructure) |
-| 69 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanValidationResult` (utility) |
-| 70 | 🔵 `low` | `dead-code` | Unreferenced class: `SignalSource` (domain) |
-| 71 | 🔵 `low` | `dead-code` | Unreferenced class: `RecoveryAction` (domain) |
-| 72 | 🔵 `low` | `dead-code` | Unreferenced class: `GovernanceError` (domain) |
-| 73 | 🔵 `low` | `dead-code` | Unreferenced class: `ExecutionError` (domain) |
-| 74 | 🔵 `low` | `dead-code` | Unreferenced class: `MappingError` (domain) |
-| 75 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanningError` (domain) |
-| 76 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticError` (domain) |
-| 77 | 🔵 `low` | `dead-code` | Unreferenced class: `StateError` (domain) |
-| 78 | 🔵 `low` | `dead-code` | Unreferenced class: `LLMError` (domain) |
-| 79 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanStateValidationError` (utility) |
-| 80 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticValidationError` (domain) |
-| 81 | 🔵 `low` | `dead-code` | Unreferenced class: `SystemError` (domain) |
-| 82 | 🔵 `low` | `dead-code` | Unreferenced class: `ToolExecutionError` (infrastructure) |
+| 53 | 🟡 `medium` | `dead-code` | Unreferenced class: `ShapeValidationResult` (infrastructure) |
+| 54 | 🟡 `medium` | `dead-code` | Unreferenced class: `StructuredLogger` (infrastructure) |
+| 55 | 🟡 `medium` | `dead-code` | Unreferenced class: `ValidationEngine` (utility) |
+| 56 | 🟡 `medium` | `dead-code` | Unreferenced class: `CapabilityRegistry` (utility) |
+| 57 | 🟡 `medium` | `dead-code` | Unreferenced class: `Governance` (infrastructure) |
+| 58 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanStateValidationError` has reasoning keyword `plan` in name |
+| 59 | 🟡 `medium` | `invariant` | I6 — Test class `ToolValidator` is inside `src/` |
+| 60 | 🟡 `medium` | `dead-code` | Unreferenced class: `LoopTerminationDecision` (utility) |
+| 61 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillFilter` (domain) |
+| 62 | 🟡 `medium` | `dead-code` | Unreferenced class: `SkillRanker` (domain) |
+| 63 | 🟡 `medium` | `dead-code` | Unreferenced class: `Telemetry` (infrastructure) |
+| 64 | 🟡 `medium` | `invariant` | I3 — Utility class `PlanValidationResult` has reasoning keyword `plan` in name |
+| 65 | 🟡 `medium` | `invariant` | I6 — Test class `ToolPromptBuilder` is inside `src/` |
+| 66 | 🟡 `medium` | `invariant` | I6 — Test class `ToolSchemaGenerator` is inside `src/` |
+| 67 | 🟡 `medium` | `dead-code` | Unreferenced class: `AgentDispatcher` (adapter) |
+| 68 | 🟡 `medium` | `dead-code` | Unreferenced class: `DeadCodeIgnore` (domain) |
+| 69 | 🟡 `medium` | `dead-code` | Unreferenced class: `MinimalSafetyPolicy` (infrastructure) |
+| 70 | 🟡 `medium` | `dead-code` | Unreferenced class: `PlanValidationResult` (utility) |
+| 71 | 🔵 `low` | `dead-code` | Unreferenced class: `SignalSource` (domain) |
+| 72 | 🔵 `low` | `dead-code` | Unreferenced class: `RecoveryAction` (domain) |
+| 73 | 🔵 `low` | `dead-code` | Unreferenced class: `GovernanceError` (domain) |
+| 74 | 🔵 `low` | `dead-code` | Unreferenced class: `ExecutionError` (domain) |
+| 75 | 🔵 `low` | `dead-code` | Unreferenced class: `MappingError` (domain) |
+| 76 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanningError` (domain) |
+| 77 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticError` (domain) |
+| 78 | 🔵 `low` | `dead-code` | Unreferenced class: `StateError` (domain) |
+| 79 | 🔵 `low` | `dead-code` | Unreferenced class: `LLMError` (domain) |
+| 80 | 🔵 `low` | `dead-code` | Unreferenced class: `PlanStateValidationError` (utility) |
+| 81 | 🔵 `low` | `dead-code` | Unreferenced class: `SemanticValidationError` (domain) |
+| 82 | 🔵 `low` | `dead-code` | Unreferenced class: `SystemError` (domain) |
+| 83 | 🔵 `low` | `dead-code` | Unreferenced class: `ToolExecutionError` (infrastructure) |

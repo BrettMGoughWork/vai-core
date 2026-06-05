@@ -21,7 +21,11 @@ build/
 # Agent traces
 agent_traces/
 
+# Custom tools
+tools/custom/
+
 # IDE
 .vscode/
 .idea/
 *.swp
+.aider*

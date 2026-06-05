@@ -51,6 +51,7 @@ class SegmentMemory:
         previous_output = prev_record.previous_output if prev_record else None
         last_output = prev_record.last_output if prev_record else None
         behavioural_delta = prev_record.behavioural_delta if prev_record else None
+        behavioural_signals = list(prev_record.behavioural_signals) if prev_record else []
 
         # --- Construct new record including behavioural fields ---
         self._store[segment_id] = SegmentMemoryRecord(
@@ -67,6 +68,9 @@ class SegmentMemory:
             previous_output=previous_output,
             last_output=last_output,
             behavioural_delta=behavioural_delta,
+
+            # --- 2.6.3 behavioural drift signals ---
+            behavioural_signals=behavioural_signals,
         )
 
     def get(self, segment_id: str) -> Optional[PlanSegment]:
@@ -153,6 +157,38 @@ class SegmentMemory:
     def load_snapshot(self, snapshot: SegmentMemorySnapshot) -> None:
         """Replace the current store with the contents of a snapshot."""
         self._store = {r.segment_id: r for r in snapshot.records}
+
+    # ------------------------------------------------------------------
+    # 2.6.3 Behavioural signal management
+    # ------------------------------------------------------------------
+
+    def update_behavioural_signals(
+        self, segment_id: str, signals: List["BehaviouralSignal"]
+    ) -> None:
+        """
+        Replace the behavioural_signals on a segment record.
+
+        If the segment does not exist this is a no-op.
+        The signals list is copied to prevent external mutation.
+        """
+        record = self._store.get(segment_id)
+        if record is None:
+            return
+
+        self._store[segment_id] = SegmentMemoryRecord(
+            segment_id=record.segment_id,
+            parent_id=record.parent_id,
+            subgoal_id=record.subgoal_id,
+            state=record.state,
+            content=list(record.content),
+            created_at=record.created_at,
+            context=copy.deepcopy(record.context),
+            metadata=copy.deepcopy(record.metadata),
+            previous_output=record.previous_output,
+            last_output=record.last_output,
+            behavioural_delta=record.behavioural_delta,
+            behavioural_signals=list(signals),
+        )
 
     # ------------------------------------------------------------------
     # Private helpers
