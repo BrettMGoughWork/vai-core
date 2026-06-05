@@ -531,28 +531,28 @@
 *Depends On*: PHASE 2.11  
 *Goal*: Execute hierarchical plans with multiple subgoals.
 
-2.12.1 — Subgoal Transition Rules
+✅ 2.12.1 — Subgoal Transition Rules
 - pending → active  
 - active → complete  
 - complete → next subgoal  
 - complete → agent complete
 
-2.12.2 — Subgoal Reflection
+✅ 2.12.2 — Subgoal Reflection
 - Evaluate subgoal progress  
 - Evaluate subgoal drift  
 - Evaluate subgoal repair  
 - Evaluate subgoal completion
 
-2.12.3 — Subgoal‑Level Drift
+✅ 2.12.3 — Subgoal‑Level Drift
 - Drift per subgoal  
 - Repair per subgoal  
 - Replan per subgoal
 
-2.12.4 — Subgoal Trace
-- Add subgoal transitions  
-- Add subgoal drift  
-- Add subgoal repair  
-- Add subgoal reflection
+✅ 2.12.4 — Subgoal Trace
+- ✅ Add subgoal transitions  
+- ✅ Add subgoal drift  
+- ✅ Add subgoal repair  
+- ✅ Add subgoal reflection
 
 ## PHASE 2.13 — Full Agent‑Level Loop v3 (Release‑Ready)
 *Depends On*: PHASE 2.12  
