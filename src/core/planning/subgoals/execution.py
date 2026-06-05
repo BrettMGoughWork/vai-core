@@ -156,7 +156,15 @@ def update_subgoal_execution_state(
     new_index = exec_state.index
     # Only advance index when the state actually transitions to COMPLETE
     if not was_complete and new_state == SubgoalExecutionPhase.COMPLETE:
-        new_index = advance_subgoal_index(exec_state.index, total_subgoals)
+        advanced = advance_subgoal_index(exec_state.index, total_subgoals)
+        # When the final subgoal completes, advance the index *past* the
+        # last valid position so the caller can distinguish "final subgoal
+        # actually completed" from "previous subgoal advanced to the final
+        # index and awaits execution".
+        if advanced == exec_state.index and total_subgoals > 0:
+            new_index = total_subgoals
+        else:
+            new_index = advanced
     return SubgoalExecutionState(index=new_index, state=new_state)
 
 

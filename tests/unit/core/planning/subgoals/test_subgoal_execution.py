@@ -170,11 +170,13 @@ class TestUpdateSubgoalExecutionState:
         assert result.index == 1  # no further advancement
 
     def test_final_subgoal_no_advancement(self):
-        """Completing the final subgoal: index stays at last subgoal."""
+        """Completing the final subgoal: index advances past total_subgoals
+        so the caller can distinguish 'final subgoal actually completed'
+        from 'previous subgoal advanced to the final index'."""
         state = SubgoalExecutionState(index=2, state="active")
         result = update_subgoal_execution_state(state, is_complete=True, total_subgoals=3)
         assert result.state == "complete"
-        assert result.index == 2
+        assert result.index == 3  # past-the-end sentinel
 
     def test_returns_new_instance(self):
         """Must return a new SubgoalExecutionState, not mutate input."""
@@ -350,5 +352,5 @@ class TestEdgeCases:
         # Step 4: Subgoal 1 completes (final) — agent complete
         state = update_subgoal_execution_state(state, is_complete=True, total_subgoals=2)
         assert state.state == "complete"
-        assert state.index == 1  # no further advancement
+        assert state.index == 2  # past-the-end sentinel when final subgoal completes
         assert is_agent_complete(state, 2) is True
