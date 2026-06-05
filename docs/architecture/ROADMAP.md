@@ -386,7 +386,7 @@
   - oscillation  
   - regressions
 
-2.7.3 — Temporal Drift Classifier
+✅ 2.7.3 — Temporal Drift Classifier
 - Multi‑cycle stall detection  
 - Oscillation detection  
 - Regressed‑state detection
