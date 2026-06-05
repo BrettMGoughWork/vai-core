@@ -424,13 +424,13 @@
 - Confidence scoring  
 - Confirmation logic
 
-2.8.4 — Semantic Repair Actions ✅
+✅ 2.8.4 — Semantic Repair Actions 
 - Rewrite step  
 - Rewrite segment  
 - Rewrite plan  
 - Rewrite subgoal
 
-2.8.5 — Semantic Trace
+✅ 2.8.5 — Semantic Trace
 - Add semantic mismatch details  
 - Add semantic repair actions  
 - Add semantic drift history
@@ -439,28 +439,28 @@
 *Depends On*: PHASE 2.8  
 *Goal*: Combine behavioural, temporal, and semantic drift into a unified, governed system.
 
-2.9.1 — Unified Drift Signal Model
+✅ 2.9.1 — Unified Drift Signal Model
 - Merge structural, behavioural, temporal, semantic signals  
 - Add signal weighting  
 - Add signal decay rules
 
-2.9.2 — Unified Drift Classifier
+✅ 2.9.2 — Unified Drift Classifier
 - Multi‑signal classification  
 - Confidence scoring  
 - Drift severity levels  
 - Drift categories: minor, major, catastrophic
 
-2.9.3 — Drift Confirmation Engine
+✅ 2.9.3 — Drift Confirmation Engine
 - Multi‑cycle confirmation  
 - Confidence accumulation  
 - Drift hysteresis (avoid oscillation)
 
-2.9.4 — Drift Recovery Engine
+✅ 2.9.4 — Drift Recovery Engine
 - Choose repair vs replan  
 - Choose segment regen vs plan regen  
 - Choose subgoal regen vs full reset
 
-2.9.5 — Drift Trace
+✅ 2.9.5 — Drift Trace
 - Add unified drift history  
 - Add drift confidence evolution  
 - Add drift recovery decisions
