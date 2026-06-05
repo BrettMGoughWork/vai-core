@@ -1,6 +1,6 @@
 """
-Phase 2.10.x — Stratum‑2 Manual Testing Harness
-================================================
+Phase 2.10.x — Stratum‑2 Signal Harness
+===========================================
 
 Deterministic, stdin‑driven CLI tool for end‑to‑end validation of the
 full drift‑to‑repair pipeline before moving to Stratum‑3.

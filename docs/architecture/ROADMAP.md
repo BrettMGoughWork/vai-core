@@ -491,6 +491,8 @@
   - escalate to catastrophic drift
 
 ✅ 2.10.3b - Testing harness
+ ✅ signal_harness (tools/testing_harness/signal_harness.py)
+ ✅ plan_repair_harness (tools/testing_harness/plan_repair_harness.py)
 
 2.10.4 — Repair Trace
 - Add repair attempts  

@@ -1,6 +1,6 @@
 """
-Tests for the Stratum‑2 Manual Testing Harness (Phase 2.10.x).
-==============================================================
+Tests for the Stratum‑2 Signal Harness (Phase 2.10.x).
+======================================================
 
 Covers:
 
@@ -34,7 +34,7 @@ from src.core.planning.models.plan import Plan
 from src.core.types.plan_segment import PlanSegment
 from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
 
-from tools.testing_harness.manual_test_harness import (
+from tools.testing_harness.signal_harness import (
     run_pipeline,
     _build_signals,
     _build_classification,
