@@ -347,7 +347,7 @@
 - Add behavioural deltas (prevoutput → newoutput)  
 - Add behavioural anomaly detector (wrong shape, wrong type)
 
-2.6.3 — Behavioural Drift Signals
+✅ 2.6.3 — Behavioural Drift Signals
 - Emit signals for:  
   - wrong capability  
   - wrong output shape  

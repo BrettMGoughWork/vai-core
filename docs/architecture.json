@@ -162,7 +162,9 @@
         "src.core.planning.validation.validation_types.SafetyValidationResult",
         "src.core.planning.validation.validation_types.TransitionValidationError",
         "src.core.planning.validation.validation_types.FullValidationResult",
-        "src.core.planning.validation.full_validation_engine.FullValidationEngine"
+        "src.core.planning.validation.full_validation_engine.FullValidationEngine",
+        "src.core.planning.validation.execution_shape_validation.ShapeValidationResult",
+        "src.core.planning.validation.execution_shape_validation.validate_execution_shape"
       ],
       "exports": [
         "ValidationIssue",
@@ -173,7 +175,9 @@
         "SafetyValidationResult",
         "TransitionValidationError",
         "FullValidationResult",
-        "FullValidationEngine"
+        "FullValidationEngine",
+        "ShapeValidationResult",
+        "validate_execution_shape"
       ]
     },
     {
@@ -1056,12 +1060,14 @@
         "get_children",
         "get_by_subgoal",
         "snapshot",
-        "load_snapshot"
+        "load_snapshot",
+        "update_behavioural_signals"
       ],
       "public_attributes": [],
       "imports": [
         "__future__.annotations",
         "copy",
+        "dataclasses.asdict",
         "typing.Dict",
         "typing.List",
         "typing.Optional",
@@ -1097,26 +1103,33 @@
         "content",
         "created_at",
         "context",
-        "metadata"
+        "metadata",
+        "last_output",
+        "previous_output",
+        "behavioural_delta",
+        "behavioural_signals"
       ],
       "imports": [
         "__future__.annotations",
         "dataclasses.dataclass",
+        "dataclasses.field",
         "typing.Any",
         "typing.Dict",
         "typing.List",
         "typing.Optional",
-        "typing.Tuple"
+        "typing.Tuple",
+        "src.core.planning.drift.behavioural_signal_types.BehaviouralSignal"
       ],
       "references": [
         "Optional",
         "List",
         "Dict",
-        "Any"
+        "Any",
+        "BehaviouralSignal"
       ],
       "inferred_stratum": "utility",
       "fan_in": 28,
-      "fan_out": 4,
+      "fan_out": 5,
       "dead_code_ignored": false
     },
     {
@@ -1132,11 +1145,13 @@
       "imports": [
         "__future__.annotations",
         "dataclasses.dataclass",
+        "dataclasses.field",
         "typing.Any",
         "typing.Dict",
         "typing.List",
         "typing.Optional",
-        "typing.Tuple"
+        "typing.Tuple",
+        "src.core.planning.drift.behavioural_signal_types.BehaviouralSignal"
       ],
       "references": [
         "Tuple",
@@ -2723,6 +2738,7 @@
         "src.core.planning.validation.full_validation_engine.FullValidationEngine",
         "src.core.types.subgoal.Subgoal",
         "src.core.types.subgoal.SubgoalLifecycleState",
+        "src.core.planning.drift.behavioural_drift.evaluate_behavioural_drift",
         "agent_loop_types.AgentLoopConfig",
         "agent_loop_types.AgentCycleOutcome",
         "agent_loop_types.AgentLoopError",
@@ -2954,6 +2970,72 @@
       "inferred_stratum": "infrastructure",
       "fan_in": 1,
       "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "BehaviouralSignalType",
+      "file": "src/core/planning/drift/behavioural_signal_types.py",
+      "package": "src.core.planning.drift",
+      "inherits": [
+        "str",
+        "Enum"
+      ],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "str",
+        "Enum",
+        "WRONG_CAPABILITY",
+        "WRONG_OUTPUT_SHAPE",
+        "WRONG_OUTPUT_SEMANTICS",
+        "UNEXPECTED_SIDE_EFFECT"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 1,
+      "fan_out": 6,
+      "dead_code_ignored": false
+    },
+    {
+      "name": "BehaviouralSignal",
+      "file": "src/core/planning/drift/behavioural_signal_types.py",
+      "package": "src.core.planning.drift",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "signal_type",
+        "segment_id",
+        "subgoal_id",
+        "details",
+        "timestamp"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "copy",
+        "dataclasses.dataclass",
+        "enum.Enum",
+        "typing.Any",
+        "typing.Dict",
+        "src.core.types.json_pure.ensure_json_pure"
+      ],
+      "references": [
+        "BehaviouralSignalType",
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "utility",
+      "fan_in": 3,
+      "fan_out": 3,
       "dead_code_ignored": false
     },
     {
@@ -3647,9 +3729,9 @@
         "MemoryGovernance",
         "Dict",
         "List",
+        "PlanSegment",
         "Plan",
-        "Any",
-        "PlanSegment"
+        "Any"
       ],
       "inferred_stratum": "utility",
       "fan_in": 2,
@@ -5429,6 +5511,36 @@
       "dead_code_ignored": false
     },
     {
+      "name": "ShapeValidationResult",
+      "file": "src/core/planning/validation/execution_shape_validation.py",
+      "package": "src.core.planning.validation",
+      "inherits": [],
+      "implements": [],
+      "public_methods": [],
+      "public_attributes": [
+        "ok",
+        "message",
+        "details"
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "typing.Any",
+        "typing.Dict",
+        "typing.Optional",
+        "src.core.types.validation.validate_structural"
+      ],
+      "references": [
+        "Optional",
+        "Dict",
+        "Any"
+      ],
+      "inferred_stratum": "infrastructure",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ignored": false
+    },
+    {
       "name": "FullValidationEngine",
       "file": "src/core/planning/validation/full_validation_engine.py",
       "package": "src.core.planning.validation",
@@ -6033,11 +6145,14 @@
         "LOOP_ANOMALY",
         "SUBGOAL_STALL",
         "COGNITIVE_DISSONANCE",
-        "EXECUTION_MISMATCH"
+        "EXECUTION_MISMATCH",
+        "BEHAVIOURAL_SHAPE_MISMATCH",
+        "BEHAVIOURAL_TYPE_MISMATCH",
+        "BEHAVIOURAL_UNEXPECTED"
       ],
       "inferred_stratum": "domain",
       "fan_in": 0,
-      "fan_out": 7,
+      "fan_out": 10,
       "dead_code_ignored": false
     },
     {
@@ -8163,13 +8278,19 @@
         "enabled",
         "hidden",
         "dev_only",
-        "is_idempotent"
+        "is_idempotent",
+        "deterministic",
+        "pure",
+        "output_schema"
       ],
       "imports": [
+        "__future__.annotations",
         "dataclasses.dataclass",
+        "dataclasses.field",
         "typing.Any",
         "typing.Callable",
         "typing.Dict",
+        "typing.Optional",
         "categories.SkillCategory",
         "side_effects.SideEffect"
       ],
@@ -8180,11 +8301,12 @@
         "NONE",
         "Any",
         "Dict",
-        "Callable"
+        "Callable",
+        "Optional"
       ],
       "inferred_stratum": "domain",
       "fan_in": 6,
-      "fan_out": 7,
+      "fan_out": 8,
       "dead_code_ignored": false
     },
     {
@@ -8702,6 +8824,21 @@
       "source": "SegmentMemory",
       "target": "SegmentMemoryRecord",
       "type": "call"
+    },
+    {
+      "source": "SegmentMemoryRecord",
+      "target": "BehaviouralSignal",
+      "type": "import"
+    },
+    {
+      "source": "SegmentMemoryRecord",
+      "target": "BehaviouralSignal",
+      "type": "call"
+    },
+    {
+      "source": "SegmentMemorySnapshot",
+      "target": "BehaviouralSignal",
+      "type": "import"
     },
     {
       "source": "SegmentMemorySnapshot",
@@ -10594,6 +10731,11 @@
       "type": "call"
     },
     {
+      "source": "BehaviouralSignal",
+      "target": "BehaviouralSignalType",
+      "type": "call"
+    },
+    {
       "source": "TransitionFailureRecord",
       "target": "DriftMemory",
       "type": "import"
@@ -11065,12 +11207,12 @@
     },
     {
       "source": "SubgoalPlanner",
-      "target": "Plan",
+      "target": "PlanSegment",
       "type": "call"
     },
     {
       "source": "SubgoalPlanner",
-      "target": "PlanSegment",
+      "target": "Plan",
       "type": "call"
     },
     {
