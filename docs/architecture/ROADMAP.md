@@ -469,26 +469,30 @@
 *Depends On*: PHASE 2.9  
 *Goal*: Implement real repair actions, not just structural fixes.
 
-2.10.1 — Repair Action Library
+✅ 2.10.1 — Repair Action Library
 - Fix malformed steps  
 - Fix malformed segments  
 - Fix malformed plans  
 - Fix malformed subgoals  
 - Fix drift‑induced inconsistencies
 
-2.10.2 — Repair Budget
+✅ 2.10.2 — Repair Budget
 - Per‑cycle budget  
 - Per‑subgoal budget  
 - Per‑plan budget  
 - Global budget
 
-2.10.3 — Repair Arbitration
+✅ 2.10.3a — Repair Arbitration
 - Decide between:  
   - repair  
   - replan  
   - regenerate segment  
   - regenerate subgoal  
   - escalate to catastrophic drift
+
+✅ 2.10.3b - Testing harness
+ ✅ signal_harness (tools/testing_harness/signal_harness.py)
+ ✅ plan_repair_harness (tools/testing_harness/plan_repair_harness.py)
 
 2.10.4 — Repair Trace
 - Add repair attempts  
