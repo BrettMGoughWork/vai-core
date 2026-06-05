@@ -73,6 +73,34 @@ SemanticTrace
         ``status``, ``categories``, ``confidence``, and ``streak`` derived
         from a ``SemanticDriftClassification``.  The current classification
         is appended to the previous trace's history.
+
+Phase 2.9.5 — Drift Trace Types
+===============================
+
+``DriftTrace`` is a frozen, JSON‑safe dataclass that persists per‑segment
+unified‑drift information across cycles.
+
+It is constructed **after** unified drift signals (2.9.1), classification
+(2.9.2), confirmation (2.9.3), and recovery (2.9.4).
+
+Fields
+------
+DriftTrace
+    unified_drift_history
+        JSON‑safe list of ``UnifiedDriftClassification`` summary dicts.
+        Each dict contains ``status``, ``severity``, ``categories``,
+        ``confidence``, and ``streak``.  The current classification is
+        appended to the previous trace's history.
+
+    drift_confidence_evolution
+        JSON‑safe list of accumulated confidence values (floats) from
+        ``DriftConfirmationState.confidence`` across cycles.
+
+    drift_recovery_decisions
+        JSON‑safe list of ``DriftRecoveryDecision`` summary dicts.
+        Each dict contains ``action``, ``severity``, ``confidence``,
+        ``streak``, and ``hysteresis``.  The current recovery decision
+        is appended to the previous trace's history.
 """
 from __future__ import annotations
 
@@ -176,4 +204,41 @@ class SemanticTrace:
         object.__setattr__(
             self, "semantic_drift_history",
             [copy.deepcopy(item) for item in self.semantic_drift_history],
+        )
+
+
+# ── 2.9.5 — DriftTrace ───────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class DriftTrace:
+    """
+    Per‑segment unified drift trace persisted across cycles.
+
+    Constructed after unified drift signals (2.9.1), classification (2.9.2),
+    confirmation (2.9.3), and recovery (2.9.4).
+
+    All fields are JSON‑safe.  Defensive copies prevent external mutation.
+    """
+
+    unified_drift_history: List[Dict[str, Any]]
+    drift_confidence_evolution: List[float]
+    drift_recovery_decisions: List[Dict[str, Any]]
+
+    def __post_init__(self) -> None:
+        for item in self.unified_drift_history:
+            ensure_json_pure(item)
+        for item in self.drift_recovery_decisions:
+            ensure_json_pure(item)
+        object.__setattr__(
+            self, "unified_drift_history",
+            [copy.deepcopy(item) for item in self.unified_drift_history],
+        )
+        object.__setattr__(
+            self, "drift_confidence_evolution",
+            list(self.drift_confidence_evolution),
+        )
+        object.__setattr__(
+            self, "drift_recovery_decisions",
+            [copy.deepcopy(item) for item in self.drift_recovery_decisions],
         )

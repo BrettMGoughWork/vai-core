@@ -11,6 +11,16 @@ Phase 2.9.2 — ``UnifiedDriftClassification``
     A deterministic classification produced from a list of unified drift
     signals, with severity levels and multi‑cycle streak tracking.
 
+Phase 2.9.3 — ``DriftConfirmationState``
+    A frozen, JSON‑safe state produced by the drift confirmation engine,
+    with multi‑cycle confirmation, confidence accumulation, hysteresis,
+    and history tracking.
+
+Phase 2.9.4 — ``DriftRecoveryDecision``
+    A frozen, JSON‑safe decision produced by the drift recovery engine,
+    choosing between repair, replan, regeneration, and full reset based
+    on confirmed drift severity, confidence, and streak.
+
 All dataclasses are frozen, JSON‑safe, and pure.
 """
 from __future__ import annotations
@@ -150,4 +160,153 @@ class UnifiedDriftClassification:
             )
         # Defensive copy of mutable containers
         object.__setattr__(self, "categories", list(self.categories))
+        object.__setattr__(self, "reasons", list(self.reasons))
+
+
+# ── 2.9.3 — DriftConfirmationState ────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class DriftConfirmationState:
+    """
+    Phase 2.9.3 — Stabilised drift decision after multi‑cycle confirmation.
+
+    Produced by the drift confirmation engine (``confirm_drift()``) to
+    prevent oscillation and accumulate confidence across cycles.
+
+    Pure, deterministic, JSON‑safe — never mutates inputs.
+
+    ``confirmed``
+        ``True`` when drift has survived the confirmation thresholds:
+        streak ≥ 2 for minor/major, streak ≥ 1 for catastrophic.
+    ``severity``
+        The current severity if confirmed, else ``"minor"``.
+    ``confidence``
+        Accumulated confidence: ``min(1.0, current + previous × 0.5)``.
+    ``streak``
+        How many consecutive cycles the same drift status has been observed.
+    ``hysteresis``
+        Value in [0.0, 1.0] that prevents rapid flip‑flopping.  Rises when
+        drift is confirmed (+0.2) and decays otherwise (−0.1).  When
+        ``current.confidence < hysteresis``, drift is suppressed.
+    ``history``
+        Appended copy of the current ``UnifiedDriftClassification`` across
+        cycles.  Defensively copied at construction.
+    """
+
+    confirmed: bool
+    severity: Literal["minor", "major", "catastrophic"]
+    confidence: float
+    streak: int
+    hysteresis: float
+    history: List[UnifiedDriftClassification]
+
+    def __post_init__(self) -> None:
+        if self.confidence < 0.0 or self.confidence > 1.0:
+            raise ValueError(
+                f"confidence must be in [0.0, 1.0], got {self.confidence}"
+            )
+        if self.hysteresis < 0.0 or self.hysteresis > 1.0:
+            raise ValueError(
+                f"hysteresis must be in [0.0, 1.0], got {self.hysteresis}"
+            )
+        if self.severity not in _VALID_UNIFIED_SEVERITIES:
+            raise ValueError(
+                f"severity must be one of {sorted(_VALID_UNIFIED_SEVERITIES)}, "
+                f"got {self.severity!r}"
+            )
+        if self.streak < 0:
+            raise ValueError(
+                f"streak must be >= 0, got {self.streak}"
+            )
+        # Defensive copy of mutable history list
+        object.__setattr__(self, "history", list(self.history))
+
+
+# ── 2.9.4 — DriftRecoveryDecision ────────────────────────────────────────────
+
+_VALID_RECOVERY_ACTIONS = frozenset({
+    "none",
+    "repair",
+    "replan",
+    "regen_segment",
+    "regen_plan",
+    "regen_subgoal",
+    "full_reset",
+})
+
+
+@dataclass(frozen=True)
+class DriftRecoveryDecision:
+    """
+    Phase 2.9.4 — Deterministic recovery decision from confirmed drift.
+
+    Produced by the drift recovery engine (``recover_from_drift()``) to
+    choose the appropriate recovery path: repair, replan, or escalate to
+    regeneration / full reset for catastrophic drift.
+
+    Pure, deterministic, JSON‑safe — never mutates inputs.
+
+    ``action``
+        The recovery action to take.  One of ``"none"``, ``"repair"``,
+        ``"replan"``, ``"regen_segment"``, ``"regen_plan"``,
+        ``"regen_subgoal"``, or ``"full_reset"``.
+
+    ``severity``
+        The confirmed drift severity: ``"minor"``, ``"major"``, or
+        ``"catastrophic"``.
+
+    ``confidence``
+        Accumulated confidence from the confirmation state, in [0.0, 1.0].
+
+    ``streak``
+        Consecutive cycles of confirmed drift.
+
+    ``hysteresis``
+        Hysteresis value from the confirmation state, in [0.0, 1.0].
+
+    ``reasons``
+        Deterministic list of JSON‑safe reason strings explaining the
+        decision.  Defensively copied at construction.
+    """
+
+    action: Literal[
+        "none",
+        "repair",
+        "replan",
+        "regen_segment",
+        "regen_plan",
+        "regen_subgoal",
+        "full_reset",
+    ]
+    severity: Literal["minor", "major", "catastrophic"]
+    confidence: float
+    streak: int
+    hysteresis: float
+    reasons: List[str]
+
+    def __post_init__(self) -> None:
+        if self.action not in _VALID_RECOVERY_ACTIONS:
+            raise ValueError(
+                f"action must be one of {sorted(_VALID_RECOVERY_ACTIONS)}, "
+                f"got {self.action!r}"
+            )
+        if self.severity not in _VALID_UNIFIED_SEVERITIES:
+            raise ValueError(
+                f"severity must be one of {sorted(_VALID_UNIFIED_SEVERITIES)}, "
+                f"got {self.severity!r}"
+            )
+        if self.confidence < 0.0 or self.confidence > 1.0:
+            raise ValueError(
+                f"confidence must be in [0.0, 1.0], got {self.confidence}"
+            )
+        if self.hysteresis < 0.0 or self.hysteresis > 1.0:
+            raise ValueError(
+                f"hysteresis must be in [0.0, 1.0], got {self.hysteresis}"
+            )
+        if self.streak < 0:
+            raise ValueError(
+                f"streak must be >= 0, got {self.streak}"
+            )
+        # Defensive copy of reasons list
         object.__setattr__(self, "reasons", list(self.reasons))
