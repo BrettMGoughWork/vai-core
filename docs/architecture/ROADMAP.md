@@ -354,7 +354,7 @@
   - wrong output semantics  
   - unexpected side‑effects (detected via metadata)
 
-2.6.4 — Behavioural Drift Classifier
+✅ 2.6.4 — Behavioural Drift Classifier
 - Map signals → drift classification  
 - Add confidence scoring  
 - Add multi‑cycle confirmation
