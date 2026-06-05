@@ -27,7 +27,7 @@ No LLM calls, no tool calls, no I/O.
 from __future__ import annotations
 
 import copy
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List
 
 from src.core.planning.models.plan import Plan
@@ -35,6 +35,25 @@ from src.core.planning.models.plan_state import PlanState, PlanStatus
 from src.core.types.core_step import CoreStep
 from src.core.types.plan_segment import PlanSegment
 from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+
+
+# ---------------------------------------------------------------------------
+# RepairTrace — Phase 2.10.4
+# ---------------------------------------------------------------------------
+
+@dataclass
+class RepairTrace:
+    """Deterministic, pure trace of a repair cycle.
+
+    Captures every repair attempt, success, failure, and budget delta
+    incurred during arbitration and repair execution.
+
+    All fields are JSON‑serializable.
+    """
+    attempts: list[dict] = field(default_factory=list)
+    successes: list[dict] = field(default_factory=list)
+    failures: list[dict] = field(default_factory=list)
+    budget_usage: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
