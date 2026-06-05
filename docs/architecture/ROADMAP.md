@@ -397,10 +397,10 @@
 - Re‑decompose subgoal  
 - Reset segment state
 
-2.7.5 — Temporal Trace
-- Add progress deltas  
-- Add stall reasons  
-- Add oscillation markers
+✅ 2.7.5 — Temporal Trace
+- ✅ Add progress deltas  
+- ✅ Add stall reasons  
+- ✅ Add oscillation markers
 
 ## PHASE 2.8 — Semantic Reasoner (Meaning, Intent, Goal Alignment)
 *Depends On*: PHASE 2.7  
