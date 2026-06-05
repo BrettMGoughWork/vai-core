@@ -427,7 +427,7 @@ class TestJSONSafe:
         trace = run_pipeline(copy.deepcopy(VALID_PLAN_INPUT))
         from tools.testing_harness.plan_repair_harness import _to_json
         for section in ["INPUT", "DRIFT_CLASSIFICATION", "ARBITRATION_DECISION",
-                        "ACTION_OUTPUT", "UPDATED_BUDGET"]:
+                        "ACTION_OUTPUT", "UPDATED_BUDGET", "REPAIR_TRACE"]:
             value = _to_json(trace.get(section, {}))
             json.dumps(value, default=str)  # should not raise
 
@@ -441,7 +441,7 @@ class TestJSONSafe:
         trace = run_pipeline(inp)
         from tools.testing_harness.plan_repair_harness import _to_json
         for section in ["INPUT", "DRIFT_CLASSIFICATION", "ARBITRATION_DECISION",
-                        "ACTION_OUTPUT", "UPDATED_BUDGET"]:
+                        "ACTION_OUTPUT", "UPDATED_BUDGET", "REPAIR_TRACE"]:
             value = _to_json(trace.get(section, {}))
             json.dumps(value, default=str)  # should not raise
 
@@ -478,3 +478,188 @@ class TestInspectStructure:
     def test_valid_segment_no_signals(self):
         signals = _inspect_structure("segment", VALID_SEGMENT_INPUT["segment"])
         assert len(signals) == 0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Tests: repair trace — Phase 2.10.4
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _trace(trace_dict):
+    """Extract RepairTrace from trace dict."""
+    return trace_dict["REPAIR_TRACE"]
+
+
+class TestRepairTrace:
+    """Every repair cycle must produce a complete, deterministic trace."""
+
+    def test_no_drift_produces_empty_trace(self):
+        """No drift → no repair action → empty trace."""
+        t = run_pipeline(copy.deepcopy(VALID_PLAN_INPUT))
+        rt = _trace(t)
+        assert rt.attempts == []
+        assert rt.successes == []
+        assert rt.failures == []
+        assert rt.budget_usage["cycle"] == 0
+        assert rt.budget_usage["plan"] == 0
+        assert rt.budget_usage["global"] == 0
+
+    def test_repair_plan_produces_attempt_entry(self):
+        """Repairing a malformed plan must log an attempt."""
+        inp = {
+            "plan": {
+                "intent": "",
+                "targetskillid": "",
+                "arguments": "not_a_dict",
+            }
+        }
+        t = run_pipeline(inp)
+        rt = _trace(t)
+        assert len(rt.attempts) >= 1
+        attempt = rt.attempts[0]
+        assert attempt["action"] == "repair_plan"
+        assert "input_summary" in attempt
+        assert attempt["input_summary"]["type"] == "plan"
+
+    def test_repair_segment_produces_attempt_entry(self):
+        """Repairing a malformed segment must log an attempt."""
+        inp = {
+            "segment": {
+                "subgoal_id": "",
+                "steps": [None, 123],
+            }
+        }
+        t = run_pipeline(inp)
+        rt = _trace(t)
+        if _decision_action(t) == "repair":
+            assert len(rt.attempts) >= 1
+            assert rt.attempts[0]["action"] == "repair_segment"
+
+    def test_repair_subgoal_produces_attempt_entry(self):
+        """Repairing a malformed subgoal must log an attempt."""
+        inp = {
+            "subgoal": {
+                "subgoal_id": "",
+                "goal": "",
+            }
+        }
+        t = run_pipeline(inp)
+        rt = _trace(t)
+        if _decision_action(t) == "repair":
+            assert len(rt.attempts) >= 1
+            assert rt.attempts[0]["action"] == "repair_subgoal"
+
+    def test_successful_repair_produces_success_entry(self):
+        """A successful repair must log a success with output summary."""
+        inp = {
+            "plan": {
+                "intent": "",
+                "targetskillid": "",
+                "arguments": "not_a_dict",
+            }
+        }
+        t = run_pipeline(inp)
+        rt = _trace(t)
+        if _decision_action(t) == "repair":
+            assert len(rt.successes) >= 1
+            success = rt.successes[0]
+            assert "output_summary" in success
+            assert success["output_summary"]["type"] == "plan"
+
+    def test_budget_deltas_reflect_usage(self):
+        """Post‑action budget deltas must reflect actual charges."""
+        inp = {
+            "plan": {
+                "intent": "",
+                "targetskillid": "",
+                "arguments": {},
+            }
+        }
+        t = run_pipeline(inp)
+        rt = _trace(t)
+        b = rt.budget_usage
+        assert isinstance(b["cycle"], int)
+        assert isinstance(b["plan"], int)
+        assert isinstance(b["global"], int)
+        if _decision_action(t) == "repair":
+            # repair charges cycle + plan + global
+            assert b["cycle"] == 1
+            assert b["plan"] == 1
+            assert b["global"] == 1
+
+    def test_trace_is_deterministic(self):
+        """Identical malformed inputs must produce identical traces."""
+        inp = {
+            "plan": {
+                "intent": "",
+                "targetskillid": "",
+                "arguments": "bad",
+            }
+        }
+        t1 = run_pipeline(copy.deepcopy(inp))
+        t2 = run_pipeline(copy.deepcopy(inp))
+        assert t1["REPAIR_TRACE"] == t2["REPAIR_TRACE"]
+
+    def test_trace_is_json_safe(self):
+        """RepairTrace must be JSON‑serialisable."""
+        inp = {
+            "segment": {
+                "subgoal_id": None,
+                "steps": [],
+            }
+        }
+        t = run_pipeline(inp)
+        from tools.testing_harness.plan_repair_harness import _to_json
+        value = _to_json(t.get("REPAIR_TRACE", {}))
+        json.dumps(value, default=str)  # should not raise
+
+    def test_non_repair_action_has_empty_trace(self):
+        """Replan/catastrophic actions should produce empty repair traces."""
+        inp = {
+            "plan": {
+                "intent": None,
+                "targetskillid": None,
+                "arguments": None,
+                "reasoning_summary": None,
+            }
+        }
+        t = run_pipeline(inp)
+        rt = _trace(t)
+        action = _decision_action(t)
+        if action in ("catastrophic", "replan", "regen_segment", "regen_subgoal"):
+            # Non‑repair actions don't call repair_* functions
+            assert len(rt.attempts) == 0
+            assert len(rt.successes) == 0
+
+    def test_structural_summary_includes_missing_fields(self):
+        """Input structural summary must list missing required fields."""
+        inp = {
+            "plan": {
+                "intent": "",
+                "targetskillid": "",
+                "arguments": "not a dict",
+            }
+        }
+        t = run_pipeline(inp)
+        summary = t["INPUT"]["raw_summary"]
+        assert "missing_fields" in summary
+        assert "intent" in summary["missing_fields"]
+        assert "targetskillid" in summary["missing_fields"]
+        assert "arguments" in summary["missing_fields"]
+
+    def test_structural_summary_counts_segments_and_steps(self):
+        """Structural summary must count segments and steps."""
+        inp = {
+            "plan": {
+                "intent": "multi",
+                "targetskillid": "skill.multi",
+                "arguments": {},
+                "segments": [
+                    {"steps": [{"action": "noop"}, {"action": "parse"}]},
+                    {"steps": [{"action": "write"}]},
+                ],
+            }
+        }
+        t = run_pipeline(inp)
+        summary = t["INPUT"]["raw_summary"]
+        assert summary.get("segments") == 2
+        assert summary.get("steps") == 3

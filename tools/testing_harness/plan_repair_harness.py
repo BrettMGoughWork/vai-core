@@ -30,6 +30,7 @@ from src.core.planning.drift.repair_arbitration import (
     decide_arbitration_action,
 )
 from src.core.planning.drift.repair_action_library import (
+    RepairTrace,
     repair_plan,
     repair_segment,
     repair_subgoal,
@@ -388,6 +389,66 @@ def _construct_subgoal(raw: Dict[str, Any]) -> Subgoal:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Structural summary (for trace entries and input summary)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _structural_summary(input_type: str, raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a minimal structural summary for trace entries.
+
+    Returns ``type``, ``segments`` (if plan), ``steps``, ``missing_fields``.
+    """
+    # Unwrap the nested container (e.g., {"plan": {...}} → {...})
+    inner = raw.get(input_type, raw) if isinstance(raw.get(input_type), dict) else raw
+    missing: List[str] = []
+    segments_count = None
+    steps_count = None
+
+    if input_type == "plan":
+        if not inner.get("intent") or not isinstance(inner.get("intent"), str) or not inner["intent"].strip():
+            missing.append("intent")
+        if not inner.get("targetskillid") or not isinstance(inner.get("targetskillid"), str) or not inner["targetskillid"].strip():
+            missing.append("targetskillid")
+        if not isinstance(inner.get("arguments"), dict):
+            missing.append("arguments")
+        segs = inner.get("segments")
+        if isinstance(segs, list):
+            segments_count = len(segs)
+            total_steps = 0
+            for seg in segs:
+                if isinstance(seg, dict):
+                    s = seg.get("steps")
+                    if isinstance(s, list):
+                        total_steps += len(s)
+            steps_count = total_steps
+        else:
+            missing.append("segments")
+
+    elif input_type == "segment":
+        steps = inner.get("steps")
+        if isinstance(steps, list):
+            steps_count = len(steps)
+        else:
+            missing.append("steps")
+
+    elif input_type == "subgoal":
+        goal = inner.get("goal")
+        if not goal or not isinstance(goal, str) or not goal.strip():
+            missing.append("goal")
+        sid = inner.get("subgoal_id")
+        if not sid or not isinstance(sid, str) or not sid.strip():
+            missing.append("subgoal_id")
+
+    summary: Dict[str, Any] = {"type": input_type}
+    if segments_count is not None:
+        summary["segments"] = segments_count
+    if steps_count is not None:
+        summary["steps"] = steps_count
+    if missing:
+        summary["missing_fields"] = missing
+    return summary
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Action execution
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -397,20 +458,58 @@ def _execute_action(
     segment: PlanSegment,
     subgoal: Subgoal,
     input_type: str,
+    trace: RepairTrace,
+    input_raw: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
-    """Execute the arbitration decision and return a JSON‑safe result dict."""
+    """Execute the arbitration decision and return a JSON‑safe result dict.
+
+    Populates *trace* with attempt, success, and failure entries.
+    """
     if action == "none":
         return {"action": "none"}
     elif action == "repair":
         if input_type == "plan":
-            repaired = repair_plan(plan)
-            return {"action": "repair", "result": _plan_to_safe(repaired)}
+            summary = _structural_summary("plan", input_raw)
+            trace.attempts.append({"action": "repair_plan", "input_summary": summary})
+            try:
+                repaired = repair_plan(plan)
+                if repaired is None:
+                    trace.failures.append({"action": "repair_plan", "reason": "returned None"})
+                    return {"action": "repair", "result": {}}
+                result = _plan_to_safe(repaired)
+                trace.successes.append({"action": "repair_plan", "output_summary": _structural_summary("plan", {"plan": result})})
+                return {"action": "repair", "result": result}
+            except Exception as exc:
+                trace.failures.append({"action": "repair_plan", "reason": str(exc)})
+                return {"action": "repair", "result": {}}
         elif input_type == "segment":
-            repaired = repair_segment(segment)
-            return {"action": "repair", "result": _segment_to_safe(repaired)}
+            summary = _structural_summary("segment", input_raw)
+            trace.attempts.append({"action": "repair_segment", "input_summary": summary})
+            try:
+                repaired = repair_segment(segment)
+                if repaired is None:
+                    trace.failures.append({"action": "repair_segment", "reason": "returned None"})
+                    return {"action": "repair", "result": {}}
+                result = _segment_to_safe(repaired)
+                trace.successes.append({"action": "repair_segment", "output_summary": _structural_summary("segment", {"segment": result})})
+                return {"action": "repair", "result": result}
+            except Exception as exc:
+                trace.failures.append({"action": "repair_segment", "reason": str(exc)})
+                return {"action": "repair", "result": {}}
         elif input_type == "subgoal":
-            repaired = repair_subgoal(subgoal)
-            return {"action": "repair", "result": _subgoal_to_safe(repaired)}
+            summary = _structural_summary("subgoal", input_raw)
+            trace.attempts.append({"action": "repair_subgoal", "input_summary": summary})
+            try:
+                repaired = repair_subgoal(subgoal)
+                if repaired is None:
+                    trace.failures.append({"action": "repair_subgoal", "reason": "returned None"})
+                    return {"action": "repair", "result": {}}
+                result = _subgoal_to_safe(repaired)
+                trace.successes.append({"action": "repair_subgoal", "output_summary": _structural_summary("subgoal", {"subgoal": result})})
+                return {"action": "repair", "result": result}
+            except Exception as exc:
+                trace.failures.append({"action": "repair_subgoal", "reason": str(exc)})
+                return {"action": "repair", "result": {}}
         else:
             return {"action": "repair", "result": {}}
     elif action == "replan":
@@ -492,7 +591,8 @@ def run_pipeline(raw_input: Dict[str, Any]) -> Dict[str, Any]:
     """Run the full drift‑to‑repair pipeline on raw JSON input.
 
     Returns a dict keyed by section name, with values being dataclass
-    instances or JSON‑safe dicts.
+    instances or JSON‑safe dicts. Includes a ``REPAIR_TRACE`` section
+    capturing every repair attempt, success, failure, and budget delta.
     """
     # ── 0. Detect input type ──
     input_type = None
@@ -536,14 +636,40 @@ def run_pipeline(raw_input: Dict[str, Any]) -> Dict[str, Any]:
         classification, budgets, plan_state, subgoal, segment,
     )
 
-    # ── 5. Execute action ──
-    action_output = _execute_action(decision.action, plan, segment, subgoal, input_type)
+    # ── 4a. Capture pre‑action budget snapshot ──
+    pre_budgets = {
+        "cycle": budgets.usage_cycle,
+        "subgoal": budgets.usage_subgoal,
+        "plan": budgets.usage_plan,
+        "global": budgets.usage_global,
+    }
+
+    # ── 5. Execute action (populates trace) ──
+    repair_trace = RepairTrace()
+    action_output = _execute_action(
+        decision.action, plan, segment, subgoal, input_type,
+        repair_trace, input_raw=input_value,
+    )
 
     # ── 6. Update budgets ──
     if decision.action == "none":
         updated_budgets = budgets
     else:
         updated_budgets = _update_budgets(budgets, decision.action)
+
+    # ── 6a. Compute budget deltas ──
+    post_budgets = {
+        "cycle": updated_budgets.usage_cycle,
+        "subgoal": updated_budgets.usage_subgoal,
+        "plan": updated_budgets.usage_plan,
+        "global": updated_budgets.usage_global,
+    }
+    repair_trace.budget_usage = {
+        "cycle": post_budgets["cycle"] - pre_budgets["cycle"],
+        "subgoal": post_budgets["subgoal"] - pre_budgets["subgoal"],
+        "plan": post_budgets["plan"] - pre_budgets["plan"],
+        "global": post_budgets["global"] - pre_budgets["global"],
+    }
 
     # ── 7. Input snapshot ──
     input_snapshot = {"type": input_type, "raw_summary": _summarise_raw(input_type, input_value)}
@@ -554,29 +680,13 @@ def run_pipeline(raw_input: Dict[str, Any]) -> Dict[str, Any]:
         "ARBITRATION_DECISION": decision,
         "ACTION_OUTPUT": action_output,
         "UPDATED_BUDGET": updated_budgets,
+        "REPAIR_TRACE": repair_trace,
     }
 
 
 def _summarise_raw(input_type: str, raw: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a minimal, JSON‑safe summary of the raw input."""
-    if input_type == "plan":
-        return {
-            "has_intent": bool(raw.get("intent")),
-            "has_targetskillid": bool(raw.get("targetskillid")),
-            "arguments_type": type(raw.get("arguments")).__name__,
-        }
-    elif input_type == "segment":
-        steps = raw.get("steps")
-        return {
-            "has_subgoal_id": bool(raw.get("subgoal_id")),
-            "steps_count": len(steps) if isinstance(steps, list) else 0,
-            "steps_type": type(steps).__name__,
-        }
-    else:  # subgoal
-        return {
-            "has_subgoal_id": bool(raw.get("subgoal_id")),
-            "has_goal": bool(raw.get("goal")),
-        }
+    """Create a minimal, JSON‑safe structural summary of the raw input."""
+    return _structural_summary(input_type, raw)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -591,13 +701,14 @@ def _to_json(obj: Any) -> Any:
 
 
 def print_trace(trace: Dict[str, Any]) -> None:
-    """Print the pipeline trace in 5‑section format."""
+    """Print the pipeline trace in 6‑section format."""
     section_order = [
         "INPUT",
         "DRIFT_CLASSIFICATION",
         "ARBITRATION_DECISION",
         "ACTION_OUTPUT",
         "UPDATED_BUDGET",
+        "REPAIR_TRACE",
     ]
     for section in section_order:
         print(f"=== {section} ===")
