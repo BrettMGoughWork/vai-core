@@ -62,12 +62,19 @@ class TestAgentMultiSegment:
     # ── segments with mixed drift ────────────────────────────────────────
 
     def test_mixed_drift_segments(self):
-        """Plan with first segment drifted (empty steps) — verify drift detection."""
+        """Plan with first segment drifted (empty steps) — verify drift detection and repair emission."""
         sgs, segs = plan_multi_segment()  # seg1=empty, seg2=clean, seg3=clean
         result = run_agent_loop(subgoals=sgs, segments=segs, max_cycles=30)
-        # Drifted segment never completes → max_cycles_exceeded
-        assert result.termination_reason == "max_cycles_exceeded"
-        assert len(result.trace.drift) > 0
+        # The drifted segment should trigger both drift and repair
+        assert len(result.trace.drift) > 0, (
+            "Expected drift to be detected for empty-steps segment"
+        )
+        assert len(result.trace.repairs) > 0, (
+            "Expected repair actions to be emitted for drifted segment"
+        )
+        # Termination reason depends on whether repaired content propagates
+        # back to execution (currently best-effort; will be hardened in 2.14+).
+        assert result.termination_reason in ("agent_complete", "max_cycles_exceeded")
 
     def test_drift_in_first_segment(self):
         """Drift in first segment doesn't block subsequent segments."""

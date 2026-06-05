@@ -27,8 +27,8 @@ from src.core.planning.s1_contract.validators import (
     validate_prompt_response_detailed,
 )
 
-from src.core.planning.s1_contract.s2_to_s1_adapter import build_prompt_request
-from src.core.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response
+from src.core.planning.s1_contract.s2_to_s1_adapter import build_prompt_request, validate_s2_to_s1, validate_s2_to_s1_detailed
+from src.core.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response, validate_s1_to_s2, validate_s1_to_s2_detailed
 
 __all__ = [
     # Types
@@ -45,6 +45,11 @@ __all__ = [
     "validate_s1_error",
     "validate_prompt_request_detailed",
     "validate_prompt_response_detailed",
+    # Adapter-level validators
+    "validate_s2_to_s1",
+    "validate_s2_to_s1_detailed",
+    "validate_s1_to_s2",
+    "validate_s1_to_s2_detailed",
     # Adapters
     "build_prompt_request",
     "parse_prompt_response",

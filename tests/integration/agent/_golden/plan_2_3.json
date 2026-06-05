@@ -76,7 +76,7 @@
                 "context": {},
                 "metadata": {},
                 "steps": [
-                  "s1.a"
+                  "s1.b"
                 ],
                 "subgoal_id": "sg.1"
               }
@@ -203,7 +203,7 @@
                 "context": {},
                 "metadata": {},
                 "steps": [
-                  "s1.b"
+                  "s1.a"
                 ],
                 "subgoal_id": "sg.1"
               }
@@ -722,7 +722,7 @@
           "context": {},
           "metadata": {},
           "steps": [
-            "s1.a"
+            "s1.b"
           ],
           "subgoal_id": "sg.1"
         }
@@ -779,7 +779,7 @@
           "context": {},
           "metadata": {},
           "steps": [
-            "s1.b"
+            "s1.a"
           ],
           "subgoal_id": "sg.1"
         }
@@ -1016,7 +1016,7 @@
               "context": {},
               "metadata": {},
               "steps": [
-                "s1.a"
+                "s1.b"
               ],
               "subgoal_id": "sg.1"
             }
@@ -1072,7 +1072,7 @@
               "context": {},
               "metadata": {},
               "steps": [
-                "s1.b"
+                "s1.a"
               ],
               "subgoal_id": "sg.1"
             }

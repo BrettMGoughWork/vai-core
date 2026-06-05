@@ -150,3 +150,88 @@ def parse_prompt_response(response: PromptResponse) -> Dict[str, Any]:
         "output_raw": output,
         "errors": errors,
     }
+
+
+def validate_s1_to_s2(response: PromptResponse) -> bool:
+    """Validate that a PromptResponse is safe for S2 consumption.
+
+    Rules (adapter-level, beyond basic type validation):
+    - output is a non-empty dict
+    - tool_calls list elements have required keys (name, arguments)
+    - errors list elements have required keys (type, message)
+    - No raw LLM text fields (output must be structured)
+    - All nested structures are JSON-safe
+
+    Returns True if the response is safe to parse into S2 updates.
+    """
+    if response is None:
+        return False
+
+    # output must be a non-empty dict
+    if not isinstance(response.output, dict) or not response.output:
+        return False
+
+    # tool_calls: each entry must be a dict with 'name' key
+    for tc in response.tool_calls:
+        if not isinstance(tc, dict):
+            return False
+        if "name" not in tc:
+            return False
+
+    # errors: each entry must be a dict with 'type' and 'message'
+    for err in response.errors:
+        if not isinstance(err, dict):
+            return False
+        if "type" not in err or "message" not in err:
+            return False
+
+    # No raw text fields — output must be structured (enforce no 'raw_text' field)
+    if "raw_text" in response.output and isinstance(response.output["raw_text"], str) and len(response.output) == 1:
+        return False
+
+    # Verify JSON-safety
+    import json
+    try:
+        json.dumps(response.to_dict())
+    except (TypeError, OverflowError):
+        return False
+
+    return True
+
+
+def validate_s1_to_s2_detailed(response: PromptResponse) -> dict:
+    """Detailed variant: returns {"valid": bool, "errors": [str]}."""
+    errors = []
+
+    if response is None:
+        return {"valid": False, "errors": ["PromptResponse is None"]}
+
+    if not isinstance(response.output, dict) or not response.output:
+        errors.append("output is missing or empty")
+
+    for i, tc in enumerate(response.tool_calls):
+        if not isinstance(tc, dict):
+            errors.append(f"tool_calls[{i}] is not a dict")
+        elif "name" not in tc:
+            errors.append(f"tool_calls[{i}] missing 'name'")
+
+    for i, err in enumerate(response.errors):
+        if not isinstance(err, dict):
+            errors.append(f"errors[{i}] is not a dict")
+        else:
+            if "type" not in err:
+                errors.append(f"errors[{i}] missing 'type'")
+            if "message" not in err:
+                errors.append(f"errors[{i}] missing 'message'")
+
+    if isinstance(response.output, dict):
+        if "raw_text" in response.output and isinstance(response.output["raw_text"], str) and len(response.output) == 1:
+            errors.append("output contains only raw_text (must be structured)")
+
+    import json
+    try:
+        json.dumps(response.to_dict())
+    except (TypeError, OverflowError) as e:
+        errors.append(f"response is not JSON-safe: {e}")
+
+    return {"valid": len(errors) == 0, "errors": errors}
