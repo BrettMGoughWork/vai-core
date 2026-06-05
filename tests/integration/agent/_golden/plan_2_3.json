@@ -1,0 +1,1447 @@
+{
+  "agent": [
+    {
+      "cycle": 0,
+      "is_complete": false,
+      "segment_index": 1,
+      "segment_state": "complete",
+      "subgoal_index": 0,
+      "subgoal_state": "active"
+    },
+    {
+      "cycle": 1,
+      "is_complete": false,
+      "segment_index": 0,
+      "segment_state": "pending",
+      "subgoal_index": 1,
+      "subgoal_state": "pending"
+    },
+    {
+      "cycle": 2,
+      "is_complete": false,
+      "segment_index": 0,
+      "segment_state": "complete",
+      "subgoal_index": 1,
+      "subgoal_state": "active"
+    },
+    {
+      "cycle": 3,
+      "is_complete": true,
+      "segment_index": 0,
+      "segment_state": "complete",
+      "subgoal_index": 2,
+      "subgoal_state": "complete"
+    }
+  ],
+  "cycles": [
+    {
+      "cycle": 0,
+      "is_complete": false,
+      "segment_state": {
+        "index": 1,
+        "state": "complete"
+      },
+      "segment_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "step_count": 1
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {},
+                "metadata": {},
+                "steps": [
+                  "s1.b"
+                ],
+                "subgoal_id": "sg.1"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "active",
+            "index_after": 1,
+            "index_before": 0,
+            "to_state": "complete"
+          }
+        ]
+      },
+      "subgoal_state": {
+        "index": 0,
+        "state": "active"
+      },
+      "subgoal_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "completed_segments": 0,
+              "segment_count": 0
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {
+                  "key": "value"
+                },
+                "goal": "First subgoal",
+                "metadata": {},
+                "parent_id": null,
+                "state": "active",
+                "subgoal_id": "sg.1"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "pending",
+            "index_after": 0,
+            "index_before": 0,
+            "to_state": "active"
+          }
+        ]
+      }
+    },
+    {
+      "cycle": 1,
+      "is_complete": false,
+      "segment_state": {
+        "index": 0,
+        "state": "pending"
+      },
+      "segment_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "step_count": 1
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {},
+                "metadata": {},
+                "steps": [
+                  "s1.a"
+                ],
+                "subgoal_id": "sg.1"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "complete",
+            "index_after": 1,
+            "index_before": 1,
+            "to_state": "complete"
+          }
+        ]
+      },
+      "subgoal_state": {
+        "index": 1,
+        "state": "pending"
+      },
+      "subgoal_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "completed_segments": 0,
+              "segment_count": 0
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {
+                  "key": "value"
+                },
+                "goal": "First subgoal",
+                "metadata": {},
+                "parent_id": null,
+                "state": "active",
+                "subgoal_id": "sg.1"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "active",
+            "index_after": 1,
+            "index_before": 0,
+            "to_state": "complete"
+          }
+        ]
+      }
+    },
+    {
+      "cycle": 2,
+      "is_complete": false,
+      "segment_state": {
+        "index": 0,
+        "state": "complete"
+      },
+      "segment_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "step_count": 1
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {},
+                "metadata": {},
+                "steps": [
+                  "s2.a"
+                ],
+                "subgoal_id": "sg.2"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "active",
+            "index_after": 0,
+            "index_before": 0,
+            "to_state": "complete"
+          }
+        ]
+      },
+      "subgoal_state": {
+        "index": 1,
+        "state": "active"
+      },
+      "subgoal_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "completed_segments": 0,
+              "segment_count": 0
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {
+                  "key": "value"
+                },
+                "goal": "Second subgoal",
+                "metadata": {},
+                "parent_id": null,
+                "state": "active",
+                "subgoal_id": "sg.2"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "pending",
+            "index_after": 1,
+            "index_before": 1,
+            "to_state": "active"
+          }
+        ]
+      }
+    },
+    {
+      "cycle": 3,
+      "is_complete": true,
+      "segment_state": {
+        "index": 0,
+        "state": "complete"
+      },
+      "segment_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "step_count": 1
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {},
+                "metadata": {},
+                "steps": [
+                  "s2.a"
+                ],
+                "subgoal_id": "sg.2"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "complete",
+            "index_after": 0,
+            "index_before": 0,
+            "to_state": "complete"
+          }
+        ]
+      },
+      "subgoal_state": {
+        "index": 2,
+        "state": "complete"
+      },
+      "subgoal_trace": {
+        "drift": [
+          {
+            "action": "none",
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "requires_replan": false
+          }
+        ],
+        "reflections": [
+          {
+            "drift": {
+              "categories": [],
+              "confidence": 0.0,
+              "severity": "minor",
+              "signal_count": 0,
+              "status": "no_drift",
+              "streak": 0
+            },
+            "is_complete": true,
+            "progress": {
+              "completed_segments": 0,
+              "segment_count": 0
+            },
+            "repair": {
+              "action": "none",
+              "repaired": {
+                "context": {
+                  "key": "value"
+                },
+                "goal": "Second subgoal",
+                "metadata": {},
+                "parent_id": null,
+                "state": "active",
+                "subgoal_id": "sg.2"
+              }
+            }
+          }
+        ],
+        "repairs": [
+          {
+            "action": "none"
+          }
+        ],
+        "transitions": [
+          {
+            "from_state": "active",
+            "index_after": 2,
+            "index_before": 1,
+            "to_state": "complete"
+          }
+        ]
+      }
+    }
+  ],
+  "drift": [
+    {
+      "action": "none",
+      "cycle": 0,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 1,
+      "level": "segment",
+      "requires_replan": false
+    },
+    {
+      "action": "none",
+      "cycle": 0,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 0,
+      "level": "subgoal",
+      "requires_replan": false
+    },
+    {
+      "action": "none",
+      "cycle": 1,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 0,
+      "level": "segment",
+      "requires_replan": false
+    },
+    {
+      "action": "none",
+      "cycle": 1,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 1,
+      "level": "subgoal",
+      "requires_replan": false
+    },
+    {
+      "action": "none",
+      "cycle": 2,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 0,
+      "level": "segment",
+      "requires_replan": false
+    },
+    {
+      "action": "none",
+      "cycle": 2,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 1,
+      "level": "subgoal",
+      "requires_replan": false
+    },
+    {
+      "action": "none",
+      "cycle": 3,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 0,
+      "level": "segment",
+      "requires_replan": false
+    },
+    {
+      "action": "none",
+      "cycle": 3,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "index": 2,
+      "level": "subgoal",
+      "requires_replan": false
+    }
+  ],
+  "errors": [],
+  "memory": [
+    {
+      "cycle": 0,
+      "memory_snapshot": {
+        "drift_memory": {},
+        "reflection_memory": {},
+        "repair_memory": {}
+      }
+    },
+    {
+      "cycle": 1,
+      "memory_snapshot": {
+        "drift_memory": {},
+        "reflection_memory": {},
+        "repair_memory": {}
+      }
+    },
+    {
+      "cycle": 2,
+      "memory_snapshot": {
+        "drift_memory": {},
+        "reflection_memory": {},
+        "repair_memory": {}
+      }
+    },
+    {
+      "cycle": 3,
+      "memory_snapshot": {
+        "drift_memory": {},
+        "reflection_memory": {},
+        "repair_memory": {}
+      }
+    }
+  ],
+  "reflections": [
+    {
+      "cycle": 0,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "segment",
+      "progress": {
+        "step_count": 1
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {},
+          "metadata": {},
+          "steps": [
+            "s1.b"
+          ],
+          "subgoal_id": "sg.1"
+        }
+      }
+    },
+    {
+      "cycle": 0,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "subgoal",
+      "progress": {
+        "completed_segments": 0,
+        "segment_count": 0
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {
+            "key": "value"
+          },
+          "goal": "First subgoal",
+          "metadata": {},
+          "parent_id": null,
+          "state": "active",
+          "subgoal_id": "sg.1"
+        }
+      }
+    },
+    {
+      "cycle": 1,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "segment",
+      "progress": {
+        "step_count": 1
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {},
+          "metadata": {},
+          "steps": [
+            "s1.a"
+          ],
+          "subgoal_id": "sg.1"
+        }
+      }
+    },
+    {
+      "cycle": 1,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "subgoal",
+      "progress": {
+        "completed_segments": 0,
+        "segment_count": 0
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {
+            "key": "value"
+          },
+          "goal": "First subgoal",
+          "metadata": {},
+          "parent_id": null,
+          "state": "active",
+          "subgoal_id": "sg.1"
+        }
+      }
+    },
+    {
+      "cycle": 2,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "segment",
+      "progress": {
+        "step_count": 1
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {},
+          "metadata": {},
+          "steps": [
+            "s2.a"
+          ],
+          "subgoal_id": "sg.2"
+        }
+      }
+    },
+    {
+      "cycle": 2,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "subgoal",
+      "progress": {
+        "completed_segments": 0,
+        "segment_count": 0
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {
+            "key": "value"
+          },
+          "goal": "Second subgoal",
+          "metadata": {},
+          "parent_id": null,
+          "state": "active",
+          "subgoal_id": "sg.2"
+        }
+      }
+    },
+    {
+      "cycle": 3,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "segment",
+      "progress": {
+        "step_count": 1
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {},
+          "metadata": {},
+          "steps": [
+            "s2.a"
+          ],
+          "subgoal_id": "sg.2"
+        }
+      }
+    },
+    {
+      "cycle": 3,
+      "drift": {
+        "categories": [],
+        "confidence": 0.0,
+        "severity": "minor",
+        "signal_count": 0,
+        "status": "no_drift",
+        "streak": 0
+      },
+      "is_complete": true,
+      "level": "subgoal",
+      "progress": {
+        "completed_segments": 0,
+        "segment_count": 0
+      },
+      "repair": {
+        "action": "none",
+        "repaired": {
+          "context": {
+            "key": "value"
+          },
+          "goal": "Second subgoal",
+          "metadata": {},
+          "parent_id": null,
+          "state": "active",
+          "subgoal_id": "sg.2"
+        }
+      }
+    }
+  ],
+  "repairs": [
+    {
+      "action": "none",
+      "cycle": 0,
+      "level": "segment",
+      "repaired": null
+    },
+    {
+      "action": "none",
+      "cycle": 0,
+      "level": "subgoal",
+      "repaired": null
+    },
+    {
+      "action": "none",
+      "cycle": 1,
+      "level": "segment",
+      "repaired": null
+    },
+    {
+      "action": "none",
+      "cycle": 1,
+      "level": "subgoal",
+      "repaired": null
+    },
+    {
+      "action": "none",
+      "cycle": 2,
+      "level": "segment",
+      "repaired": null
+    },
+    {
+      "action": "none",
+      "cycle": 2,
+      "level": "subgoal",
+      "repaired": null
+    },
+    {
+      "action": "none",
+      "cycle": 3,
+      "level": "segment",
+      "repaired": null
+    },
+    {
+      "action": "none",
+      "cycle": 3,
+      "level": "subgoal",
+      "repaired": null
+    }
+  ],
+  "segments": [
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "step_count": 1
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {},
+              "metadata": {},
+              "steps": [
+                "s1.b"
+              ],
+              "subgoal_id": "sg.1"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "active",
+          "index_after": 1,
+          "index_before": 0,
+          "to_state": "complete"
+        }
+      ]
+    },
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "step_count": 1
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {},
+              "metadata": {},
+              "steps": [
+                "s1.a"
+              ],
+              "subgoal_id": "sg.1"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "complete",
+          "index_after": 1,
+          "index_before": 1,
+          "to_state": "complete"
+        }
+      ]
+    },
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "step_count": 1
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {},
+              "metadata": {},
+              "steps": [
+                "s2.a"
+              ],
+              "subgoal_id": "sg.2"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "active",
+          "index_after": 0,
+          "index_before": 0,
+          "to_state": "complete"
+        }
+      ]
+    },
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "step_count": 1
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {},
+              "metadata": {},
+              "steps": [
+                "s2.a"
+              ],
+              "subgoal_id": "sg.2"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "complete",
+          "index_after": 0,
+          "index_before": 0,
+          "to_state": "complete"
+        }
+      ]
+    }
+  ],
+  "subgoals": [
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "completed_segments": 0,
+            "segment_count": 0
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {
+                "key": "value"
+              },
+              "goal": "First subgoal",
+              "metadata": {},
+              "parent_id": null,
+              "state": "active",
+              "subgoal_id": "sg.1"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "pending",
+          "index_after": 0,
+          "index_before": 0,
+          "to_state": "active"
+        }
+      ]
+    },
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "completed_segments": 0,
+            "segment_count": 0
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {
+                "key": "value"
+              },
+              "goal": "First subgoal",
+              "metadata": {},
+              "parent_id": null,
+              "state": "active",
+              "subgoal_id": "sg.1"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "active",
+          "index_after": 1,
+          "index_before": 0,
+          "to_state": "complete"
+        }
+      ]
+    },
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "completed_segments": 0,
+            "segment_count": 0
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {
+                "key": "value"
+              },
+              "goal": "Second subgoal",
+              "metadata": {},
+              "parent_id": null,
+              "state": "active",
+              "subgoal_id": "sg.2"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "pending",
+          "index_after": 1,
+          "index_before": 1,
+          "to_state": "active"
+        }
+      ]
+    },
+    {
+      "drift": [
+        {
+          "action": "none",
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "requires_replan": false
+        }
+      ],
+      "reflections": [
+        {
+          "drift": {
+            "categories": [],
+            "confidence": 0.0,
+            "severity": "minor",
+            "signal_count": 0,
+            "status": "no_drift",
+            "streak": 0
+          },
+          "is_complete": true,
+          "progress": {
+            "completed_segments": 0,
+            "segment_count": 0
+          },
+          "repair": {
+            "action": "none",
+            "repaired": {
+              "context": {
+                "key": "value"
+              },
+              "goal": "Second subgoal",
+              "metadata": {},
+              "parent_id": null,
+              "state": "active",
+              "subgoal_id": "sg.2"
+            }
+          }
+        }
+      ],
+      "repairs": [
+        {
+          "action": "none"
+        }
+      ],
+      "transitions": [
+        {
+          "from_state": "active",
+          "index_after": 2,
+          "index_before": 1,
+          "to_state": "complete"
+        }
+      ]
+    }
+  ]
+}

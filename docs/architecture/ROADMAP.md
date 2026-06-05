@@ -549,16 +549,16 @@
 - Replan per subgoal
 
 ✅ 2.12.4 — Subgoal Trace
-- ✅ Add subgoal transitions  
-- ✅ Add subgoal drift  
-- ✅ Add subgoal repair  
-- ✅ Add subgoal reflection
+- Add subgoal transitions  
+- Add subgoal drift  
+- Add subgoal repair  
+- Add subgoal reflection
 
 ## PHASE 2.13 — Full Agent‑Level Loop v3 (Release‑Ready)
 *Depends On*: PHASE 2.12  
 *Goal*: The complete hierarchical reasoner required for Stratum‑3.
 
-2.13.1 — Full Agent Loop
+✅ 2.13.1 — Full Agent Loop
 - Multi‑subgoal  
 - Multi‑segment  
 - Multi‑cycle  
@@ -567,14 +567,14 @@
 - Reflection‑aware  
 - Memory‑aware
 
-2.13.2 — Full Error Handling
+✅ 2.13.2 — Full Error Handling
 - catastrophic drift  
 - catastrophic repair failure  
 - invalid memory state  
 - invalid subgoal state  
 - invalid segment state
 
-2.13.3 — Full Trace
+✅ 2.13.3 — Full Trace
 - agent trace  
 - subgoal trace  
 - segment trace  
@@ -583,13 +583,132 @@
 - reflection trace  
 - memory trace
 
-2.13.4 — Release 1 Validation
+✅ 2.13.4 — Release 1 Validation
 - determinism tests  
 - drift tests  
 - repair tests  
 - multi‑segment tests  
 - multi‑subgoal tests  
 - long‑horizon tests 
+
+## PHASE 2.14 — Stratum 2 Closure & S1 Integration
+
+2.14.1 — S2/S1 Contract Hardening
+
+Define the exact boundary between S2 and S1.
+- S1 request schema
+- S1 response schema
+- Tool call schema
+- Error schema
+
+2.14.2 — S1 Adapter Layer
+
+Introduce a thin, deterministic adapter layer:
+- s2tos1adapter
+- s1tos2adapter
+
+This ensures:
+- S2 never calls the LLM directly  
+- S2 never sees raw strings  
+- S1 never sees internal S2 structures  
+
+Adapters are pure functions.  
+No side effects.
+
+2.14.3 — Deterministic S1 Simulation Backend
+Preserve the current deterministic world as a first‑class mode.
+
+- backend="simulation"  
+- backend="real_llm"
+
+Simulation backend provides:
+
+- deterministic drift  
+- deterministic repair  
+- deterministic reflection  
+- deterministic plan shaping  
+
+2.14.4 — Prompt Shaping & Response Validation
+Make the LLM safe.
+- strict JSON‑only prompts
+- schema‑guided instructions
+- invalid response handling
+
+If the LLM returns garbage:
+- S2 does not crash  
+- S2 does not drift  
+- S2 does not mutate state  
+- S2 surfaces a structured AgentError  
+
+2.14.5 — End‑to‑End S1+S2 Smoke Tests
+Run tiny plans through the full stack:
+- 1 subgoal, 1 segment  
+- 1 subgoal, 3 segments  
+- 2 subgoals, 2 segments each  
+
+Run each with:
+- backend="simulation"  
+- backend="real_llm"
+
+Assertions:
+- no crashes  
+- trace is valid  
+- errors are structured  
+- S2 state machine behaves identically where possible  
+
+2.14.6 — LLM‑On Readiness Checklist
+A binary checklist for flipping the switch:
+
+- [ ] All 2.13.x tests green  
+- [ ] All critical/high architecture issues resolved  
+- [ ] S2/S1 contract locked  
+- [ ] Simulation backend stable  
+- [ ] Real LLM backend wired behind a flag  
+- [ ] Invalid S1 response handling tested  
+- [ ] E2E smoke tests pass  
+- [ ] Architecture audit clean for S2/S1 boundary  
+
+2.14.7 — Actual Integration to S1 (Live LLM Enablement)
+1. Implement the real S1 client
+- callllm(request)
+- Uses your chosen provider (OpenAI, Azure, local model, etc.)
+- Handles:
+  - retries  
+  - timeouts  
+  - rate limits  
+  - streaming (if you choose)  
+
+2. Wire S2 to use the real client
+- Replace all stubbed S1 calls with:
+  `
+  s1client.callllm(request)
+  `
+- But only when:
+  `
+  backend == "real_llm"
+  `
+
+3. Add safety wrappers
+- Validate JSON  
+- Validate schema  
+- Validate required fields  
+- On failure:
+  - return AgentError(type="invalids1response")  
+  - do not mutate S2 state  
+
+4. Add a “LLM‑on” smoke test
+- Run a tiny plan  
+- Confirm:
+  - no crashes  
+  - trace is valid  
+  - S2 state machine stays intact  
+
+5. Add a kill‑switch
+A simple config flag:
+
+`
+enablerealllm = false
+`
 
 ---
 🚀 Release 1 — "Hierarchical Reasoner"

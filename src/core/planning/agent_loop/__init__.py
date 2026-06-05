@@ -22,16 +22,28 @@ from src.core.planning.agent_loop.agent_loop_types import (
     TerminationReason,
 )
 from src.core.planning.agent_loop.agent_loop_v2 import AgentLoopV2
+from src.core.planning.agent_loop.agent_loop_v3 import (
+    AgentCycleRecord,
+    AgentExecutionState,
+    AgentLoopResult,
+    AgentTrace,
+    run_agent_loop,
+)
 
 __all__ = [
+    "AgentCycleRecord",
+    "AgentExecutionState",
     "AgentLoopConfig",
+    "AgentLoopResult",
     "AgentCycleOutcome",
     "AgentLoopError",
     "AgentLoopV2",
     "AgentRunTrace",
     "AgentState",
+    "AgentTrace",
     "MemorySnapshot",
     "SubgoalCycleResult",
     "SubgoalRuntimeState",
     "TerminationReason",
+    "run_agent_loop",
 ]
