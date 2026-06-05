@@ -359,13 +359,13 @@
 - Add confidence scoring  
 - Add multi‑cycle confirmation
 
-2.6.5 — Behavioural Repair Actions
+✅ 2.6.5 — Behavioural Repair Actions
 - Fix wrong capability  
 - Fix malformed step  
 - Regenerate segment  
 - Regenerate plan (if needed)
 
-2.6.6 — Behavioural Trace
+✅ 2.6.6 — Behavioural Trace
 - Add behavioural deltas to trace  
 - Add drift signals to trace  
 - Add repair actions to trace
