@@ -29,3 +29,7 @@ tools/custom/
 .idea/
 *.swp
 .aider*
+
+# CI architecture check (auto-generated)
+docs/architecture.json
+docs/architecture_audit.md
