@@ -419,12 +419,12 @@
   - contradicting memory  
   - contradicting prior behaviour
 
-2.8.3 — Semantic Drift Classifier
+✅ 2.8.3 — Semantic Drift Classifier
 - Multi‑signal semantic drift detection  
 - Confidence scoring  
 - Confirmation logic
 
-2.8.4 — Semantic Repair Actions
+2.8.4 — Semantic Repair Actions ✅
 - Rewrite step  
 - Rewrite segment  
 - Rewrite plan  

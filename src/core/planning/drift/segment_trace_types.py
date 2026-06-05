@@ -16,6 +16,15 @@ temporal‑reasoning information across cycles.
 It is constructed **after** progress detection (2.7.1), temporal drift
 signals (2.7.2), classification (2.7.3), and repair (2.7.4).
 
+Phase 2.8.5 — Semantic Trace Types
+==================================
+
+``SemanticTrace`` is a frozen, JSON‑safe dataclass that persists per‑segment
+semantic‑reasoning information across cycles.
+
+It is constructed **after** semantic validation (2.8.1), semantic drift
+signals (2.8.2), classification (2.8.3), and repair (2.8.4).
+
 Fields
 ------
 BehaviouralTrace
@@ -47,6 +56,23 @@ TemporalTrace
     oscillation_markers
         JSON‑safe list of oscillation pattern descriptions, derived from
         ``TemporalDriftSignal`` of type ``oscillation``.
+
+SemanticTrace
+    semantic_mismatches
+        JSON‑safe list of mismatch summary dicts.  Each dict contains
+        ``type``, ``confidence``, and ``details`` derived from a
+        ``SemanticMismatch`` object.  Sorted deterministically by type.
+
+    semantic_repair_actions
+        JSON‑safe list of semantic repair action strings (e.g.
+        ``"rewrite plan"``) derived from ``SemanticRepairPlan.repair_actions``.
+        Sorted deterministically.
+
+    semantic_drift_history
+        JSON‑safe list of classification summary dicts.  Each dict contains
+        ``status``, ``categories``, ``confidence``, and ``streak`` derived
+        from a ``SemanticDriftClassification``.  The current classification
+        is appended to the previous trace's history.
 """
 from __future__ import annotations
 
@@ -113,4 +139,41 @@ class TemporalTrace:
         )
         object.__setattr__(
             self, "oscillation_markers", list(self.oscillation_markers)
+        )
+
+
+# ── 2.8.5 — SemanticTrace ───────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SemanticTrace:
+    """
+    Per‑segment semantic trace persisted across cycles.
+
+    Constructed after semantic validation, semantic drift signals,
+    classification, and repair in Phase 2.8.1–2.8.4.
+
+    All fields are JSON‑safe.  Defensive copies prevent external mutation.
+    """
+
+    semantic_mismatches: List[Dict[str, Any]]
+    semantic_repair_actions: List[str]
+    semantic_drift_history: List[Dict[str, Any]]
+
+    def __post_init__(self) -> None:
+        for item in self.semantic_mismatches:
+            ensure_json_pure(item)
+        for item in self.semantic_drift_history:
+            ensure_json_pure(item)
+        object.__setattr__(
+            self, "semantic_mismatches",
+            [copy.deepcopy(item) for item in self.semantic_mismatches],
+        )
+        object.__setattr__(
+            self, "semantic_repair_actions",
+            list(self.semantic_repair_actions),
+        )
+        object.__setattr__(
+            self, "semantic_drift_history",
+            [copy.deepcopy(item) for item in self.semantic_drift_history],
         )
