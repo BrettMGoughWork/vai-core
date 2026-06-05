@@ -21,7 +21,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Ensure the project root is on sys.path so 'src' imports work
+# Ensure the project root is on sys.path so ``from src.…`` imports work
+# regardless of how the harness is invoked.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
@@ -39,6 +40,7 @@ from src.core.planning.drift.repair_action_library import (
     repair_plan,
     repair_segment,
     repair_subgoal,
+    normalize_steps,
 )
 from src.core.planning.drift.repair_budget import (
     RepairBudgetConfig,
@@ -361,14 +363,19 @@ def _construct_plan(raw: Dict[str, Any]) -> Plan:
 
 
 def _construct_segment(raw: Dict[str, Any]) -> PlanSegment:
-    """Construct a PlanSegment from raw dict (with fallback defaults)."""
+    """Construct a PlanSegment from raw dict (with fallback defaults).
+
+    Uses ``normalize_steps`` from the repair library so that dict‑based steps
+    (e.g. ``{"action": "noop"}``) are preserved as deterministic JSON strings
+    rather than silently dropped.
+    """
     steps = raw.get("steps")
     if not isinstance(steps, list):
         steps = []
-    valid_steps = [s for s in steps if isinstance(s, str)]
+    preserved_steps = normalize_steps(steps)
     return PlanSegment(
         subgoal_id=raw.get("subgoal_id") if isinstance(raw.get("subgoal_id"), str) and raw.get("subgoal_id") else "unknown",
-        steps=valid_steps,
+        steps=preserved_steps,
         context=raw.get("context") if isinstance(raw.get("context"), dict) else {},
         metadata=raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {},
     )
@@ -403,14 +410,31 @@ def _execute_action(
     segment: PlanSegment,
     subgoal: Subgoal,
     input_type: str,
+    raw: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Execute the arbitration decision and return a JSON‑safe result dict."""
+    """Execute the arbitration decision and return a JSON‑safe result dict.
+
+    For ``repair`` actions the output always contains the **full** repaired
+    structure — plan fields plus any segments/scopes that were present in the
+    raw input.  Steps inside segments are normalised by ``repair_segment``.
+    """
     if action == "none":
         return {"action": "none"}
     elif action == "repair":
         if input_type == "plan":
-            repaired = repair_plan(plan)
-            return {"action": "repair", "result": _plan_to_safe(repaired)}
+            repaired_plan = repair_plan(plan)
+            result = _plan_to_safe(repaired_plan)
+            # If the raw input contained segments, repair each and include them
+            segments_raw = raw.get("segments")
+            if isinstance(segments_raw, list):
+                repaired_segments: List[Dict[str, Any]] = []
+                for seg_raw in segments_raw:
+                    if isinstance(seg_raw, dict):
+                        seg = _construct_segment(seg_raw)
+                        repaired_seg = repair_segment(seg)
+                        repaired_segments.append(_segment_to_safe(repaired_seg))
+                result["segments"] = repaired_segments
+            return {"action": "repair", "result": result}
         elif input_type == "segment":
             repaired = repair_segment(segment)
             return {"action": "repair", "result": _segment_to_safe(repaired)}
@@ -442,13 +466,30 @@ def _plan_to_safe(plan: Plan) -> Dict[str, Any]:
 
 
 def _segment_to_safe(seg: PlanSegment) -> Dict[str, Any]:
-    """Convert PlanSegment to JSON‑safe dict."""
+    """Convert PlanSegment to JSON‑safe dict.
+
+    Steps that were serialised from dicts (e.g. ``{"action": "noop"}`` → JSON
+    string) are parsed back to dicts for human‑readable output.
+    """
     return {
         "subgoal_id": seg.subgoal_id,
-        "steps": list(seg.steps),
+        "steps": [_step_str_to_safe(s) for s in seg.steps],
         "context": deepcopy(seg.context),
         "metadata": deepcopy(seg.metadata),
     }
+
+
+def _step_str_to_safe(step_text: str) -> Any:
+    """Try to parse a step string as JSON; return dict if successful, else str."""
+    if not isinstance(step_text, str):
+        return step_text
+    stripped = step_text.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        try:
+            return json.loads(stripped)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return step_text
 
 
 def _subgoal_to_safe(sg: Subgoal) -> Dict[str, Any]:
@@ -543,7 +584,9 @@ def run_pipeline(raw_input: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     # ── 5. Execute action ──
-    action_output = _execute_action(decision.action, plan, segment, subgoal, input_type)
+    action_output = _execute_action(
+        decision.action, plan, segment, subgoal, input_type, input_value,
+    )
 
     # ── 6. Update budgets ──
     if decision.action == "none":
@@ -564,25 +607,54 @@ def run_pipeline(raw_input: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _summarise_raw(input_type: str, raw: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a minimal, JSON‑safe summary of the raw input."""
+    """Create a minimal structural summary of the raw input.
+
+    Returns a JSON‑safe dict with:
+    * ``type`` — "plan", "segment", or "subgoal"
+    * ``segments`` — number of segments (plan only)
+    * ``steps`` — total number of steps (plan or segment)
+    * ``missing_fields`` — list of missing required fields
+    """
+    summary: Dict[str, Any] = {"type": input_type}
+
     if input_type == "plan":
-        return {
-            "has_intent": bool(raw.get("intent")),
-            "has_targetskillid": bool(raw.get("targetskillid")),
-            "arguments_type": type(raw.get("arguments")).__name__,
-        }
+        segments = raw.get("segments")
+        if isinstance(segments, list):
+            summary["segments"] = len(segments)
+            total_steps = 0
+            for s in segments:
+                if isinstance(s, dict) and isinstance(s.get("steps"), list):
+                    total_steps += len(s["steps"])
+            summary["steps"] = total_steps
+        else:
+            summary["segments"] = 0
+            summary["steps"] = 0
+        missing: List[str] = []
+        if not raw.get("intent") or not isinstance(raw.get("intent"), str) or not raw["intent"].strip():
+            missing.append("intent")
+        if not raw.get("targetskillid") or not isinstance(raw.get("targetskillid"), str) or not raw["targetskillid"].strip():
+            missing.append("targetskillid")
+        if not isinstance(raw.get("arguments"), dict):
+            missing.append("arguments")
+        if not isinstance(raw.get("segments"), list):
+            missing.append("segments")
+        summary.setdefault("missing_fields", missing)
+
     elif input_type == "segment":
         steps = raw.get("steps")
-        return {
-            "has_subgoal_id": bool(raw.get("subgoal_id")),
-            "steps_count": len(steps) if isinstance(steps, list) else 0,
-            "steps_type": type(steps).__name__,
-        }
+        summary["steps"] = len(steps) if isinstance(steps, list) else 0
+        missing: List[str] = []
+        if not isinstance(raw.get("steps"), list):
+            missing.append("steps")
+        summary.setdefault("missing_fields", missing)
+
     else:  # subgoal
-        return {
-            "has_subgoal_id": bool(raw.get("subgoal_id")),
-            "has_goal": bool(raw.get("goal")),
-        }
+        missing: List[str] = []
+        if not raw.get("goal") or not isinstance(raw.get("goal"), str) or not raw["goal"].strip():
+            missing.append("goal")
+        summary.setdefault("missing_fields", missing)
+
+    return summary
 
 
 # ──────────────────────────────────────────────────────────────────────────────

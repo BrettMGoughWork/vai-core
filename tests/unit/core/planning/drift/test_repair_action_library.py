@@ -119,7 +119,15 @@ class TestRepairSegment:
             steps=["step-1", None, 42, "step-2"],  # type: ignore[list-item]
         )
         result = repair_segment(seg)
-        assert result.steps == ["step-1", "step-2"]
+        # Non-string steps are now *preserved* (as deterministic JSON sentinels)
+        # rather than silently dropped.  String steps stay as-is.
+        assert result.steps[0] == "step-1"
+        # None → JSON sentinel
+        assert json.loads(result.steps[1]) == {"step_type": "unknown", "payload": {}}
+        # int → JSON sentinel
+        assert json.loads(result.steps[2]) == {"step_type": "unknown", "payload": {}}
+        assert result.steps[3] == "step-2"
+        assert len(result.steps) == 4  # All steps preserved
 
     def test_empty_subgoal_id_defaults_to_unknown(self) -> None:
         seg = PlanSegment(
@@ -167,7 +175,10 @@ class TestRepairSegment:
         )
         result = repair_segment(seg)
         assert result.subgoal_id == "unknown"
-        assert result.steps == ["step-1"]
+        # None → JSON sentinel (preserved, not dropped)
+        assert json.loads(result.steps[0]) == {"step_type": "unknown", "payload": {}}
+        assert result.steps[1] == "step-1"
+        assert len(result.steps) == 2  # All steps preserved
         assert result.context == {}
         assert result.metadata == {}
 

@@ -27,6 +27,7 @@ No LLM calls, no tool calls, no I/O.
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import replace
 from typing import Any, Dict, List
 
@@ -52,10 +53,59 @@ def _ensure_dict(value: object) -> Dict[str, Any]:
 
 
 def _ensure_list_of_str(value: object) -> List[str]:
-    """Deterministic list‑of‑str normalisation — filters out non‑strings."""
+    """Deterministic list‑of‑str normalisation — filters out non‑strings.
+
+    ⚠  Deprecated for steps — use ``normalize_steps`` instead, which preserves
+    dict‑based step entries rather than silently dropping them.  Kept for
+    backward‑compatibility with callers that legitimately expect string‑only lists.
+    """
     if not isinstance(value, list):
         return []
     return [v for v in value if isinstance(v, str)]
+
+
+def normalize_steps(raw_steps: object) -> List[str]:
+    """Normalize raw step inputs into a deterministic list of JSON‑safe strings.
+
+    Accepts a list that may contain:
+    * ``str`` — kept as‑is
+    * ``dict`` — converted to a ``CoreStep`` via ``repair_step``, then serialised
+      to a stable JSON string
+    * ``CoreStep`` — passed through ``repair_step`` and serialised
+    * Anything else — replaced with a sentinel ``CoreStep`` and serialised
+
+    **No steps are ever dropped.**  The returned list has the same length as the
+    input list.  Dict entries (e.g. ``{"action": "noop"}``) are preserved as
+    deterministic JSON so that downstream consumers can reconstruct the original
+    intent.
+    """
+    if not isinstance(raw_steps, list):
+        return []
+    normalized: List[str] = []
+    for s in raw_steps:
+        if isinstance(s, str):
+            normalized.append(s)
+        elif isinstance(s, dict):
+            # Convert dict → CoreStep for validation, then serialise back
+            try:
+                step_type = s.get("action") or s.get("step_type") or "unknown"
+                payload = {k: v for k, v in s.items() if k not in ("action", "step_type")}
+                repaired = repair_step(CoreStep(step_type=step_type, payload=payload))
+                normalized.append(json.dumps(_core_step_to_safe(repaired), sort_keys=True))
+            except Exception:
+                normalized.append(json.dumps({"step_type": "unknown", "payload": {}}, sort_keys=True))
+        elif isinstance(s, CoreStep):
+            repaired = repair_step(s)
+            normalized.append(json.dumps(_core_step_to_safe(repaired), sort_keys=True))
+        else:
+            # Fallback for strings, ints, None, etc.
+            normalized.append(json.dumps({"step_type": "unknown", "payload": {}}, sort_keys=True))
+    return normalized
+
+
+def _core_step_to_safe(step: CoreStep) -> Dict[str, Any]:
+    """Convert a CoreStep to a deterministic JSON‑safe dict."""
+    return {"step_type": step.step_type, "payload": step.payload}
 
 
 def _ensure_list_of_dict(value: object) -> List[Dict[str, Any]]:
@@ -105,14 +155,14 @@ def repair_segment(segment: PlanSegment) -> PlanSegment:
     * Each surviving step is run through ``repair_step()`` (via string normalisation).
     * Never mutates the input.
     """
-    repaired_steps = _ensure_list_of_str(segment.steps)
+    repaired_steps = normalize_steps(segment.steps)
     repaired_subgoal_id = _ensure_str(segment.subgoal_id, "unknown")
     repaired_context = _ensure_dict(segment.context)
     repaired_metadata = _ensure_dict(segment.metadata)
     repaired_created_at = _ensure_str(segment.created_at, "1970-01-01T00:00:00")
 
-    # Steps are List[str] in PlanSegment, not CoreStep, so we just normalise strings.
-    # (If future versions store CoreStep objects, repair each.)
+    # Steps are preserved through normalize_steps which converts dicts/CoreSteps
+    # to deterministic JSON strings — no step is ever dropped.
 
     needs_repair = (
         repaired_steps != segment.steps
