@@ -20,7 +20,13 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+
+# Ensure the project root is on sys.path so 'src' imports work
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from src.core.planning.drift.unified_drift_types import (
     UnifiedDriftClassification,
