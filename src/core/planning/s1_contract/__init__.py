@@ -29,6 +29,19 @@ from src.core.planning.s1_contract.validators import (
 
 from src.core.planning.s1_contract.s2_to_s1_adapter import build_prompt_request, validate_s2_to_s1, validate_s2_to_s1_detailed
 from src.core.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response, validate_s1_to_s2, validate_s1_to_s2_detailed
+from src.core.planning.s1_contract.s1_client import call_s1_backend
+from src.core.planning.s1_contract.s1_simulation_backend import simulate_prompt_response
+from src.core.planning.s1_contract.s1_simulation_fixtures import (
+    DEFAULT_DRIFT_OUTPUT,
+    DEFAULT_REPAIR_OUTPUT,
+    DEFAULT_REFLECTION_OUTPUT,
+    DEFAULT_PLAN_SHAPING_OUTPUT,
+    STRUCTURAL_DRIFT_TEMPLATE,
+    BEHAVIOURAL_DRIFT_TEMPLATE,
+    REPAIR_FILL_MISSING_TEMPLATE,
+    make_default_output,
+    make_minimal_plan_context,
+)
 
 __all__ = [
     # Types
@@ -53,4 +66,17 @@ __all__ = [
     # Adapters
     "build_prompt_request",
     "parse_prompt_response",
+    # S1 backend (2.14.3)
+    "call_s1_backend",
+    "simulate_prompt_response",
+    # Fixtures (2.14.3)
+    "DEFAULT_DRIFT_OUTPUT",
+    "DEFAULT_REPAIR_OUTPUT",
+    "DEFAULT_REFLECTION_OUTPUT",
+    "DEFAULT_PLAN_SHAPING_OUTPUT",
+    "STRUCTURAL_DRIFT_TEMPLATE",
+    "BEHAVIOURAL_DRIFT_TEMPLATE",
+    "REPAIR_FILL_MISSING_TEMPLATE",
+    "make_default_output",
+    "make_minimal_plan_context",
 ]
