@@ -593,8 +593,7 @@
 
 ## PHASE 2.14 — Stratum 2 Closure & S1 Integration
 
-2.14.1 — S2/S1 Contract Hardening
-
+✅ 2.14.1 — S2/S1 Contract Hardening
 Define the exact boundary between S2 and S1.
 - S1 request schema
 - S1 response schema
@@ -602,27 +601,21 @@ Define the exact boundary between S2 and S1.
 - Error schema
 
 2.14.2 — S1 Adapter Layer
-
 Introduce a thin, deterministic adapter layer:
 - s2tos1adapter
 - s1tos2adapter
-
 This ensures:
 - S2 never calls the LLM directly  
 - S2 never sees raw strings  
 - S1 never sees internal S2 structures  
-
 Adapters are pure functions.  
 No side effects.
 
 2.14.3 — Deterministic S1 Simulation Backend
 Preserve the current deterministic world as a first‑class mode.
-
 - backend="simulation"  
 - backend="real_llm"
-
 Simulation backend provides:
-
 - deterministic drift  
 - deterministic repair  
 - deterministic reflection  

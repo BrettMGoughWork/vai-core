@@ -24,6 +24,11 @@ from tests.integration.agent.conftest import (
 _GOLDEN_DIR = Path(__file__).parent / "_golden"
 
 
+def _normalize(data: object) -> object:
+    """Round-trip through JSON to strip Python objects (enums, etc.) to primitives."""
+    return json.loads(json.dumps(data, sort_keys=True, default=str))
+
+
 def _save_golden(name: str, data: object) -> None:
     """Save a golden trace to disk for future comparison."""
     _GOLDEN_DIR.mkdir(exist_ok=True)
@@ -48,7 +53,7 @@ class TestAgentGoldenTraces:
         """Golden trace for the simplest valid plan: 1 subgoal, 1 segment."""
         sgs, segs = plan_1_1()
         result = run_agent_loop(subgoals=sgs, segments=segs, max_cycles=10)
-        trace_dict = result.trace.to_dict()
+        trace_dict = _normalize(result.trace.to_dict())
 
         existing = _load_golden("plan_1_1")
         if existing is None:
@@ -64,7 +69,7 @@ class TestAgentGoldenTraces:
         """Golden trace for 2 subgoals, 3 segments."""
         sgs, segs = plan_2_3()
         result = run_agent_loop(subgoals=sgs, segments=segs, max_cycles=20)
-        trace_dict = result.trace.to_dict()
+        trace_dict = _normalize(result.trace.to_dict())
 
         existing = _load_golden("plan_2_3")
         if existing is None:
@@ -80,7 +85,7 @@ class TestAgentGoldenTraces:
         """Golden trace for a plan that triggers deterministic drift."""
         sgs, segs = plan_with_drift()
         result = run_agent_loop(subgoals=sgs, segments=segs, max_cycles=20)
-        trace_dict = result.trace.to_dict()
+        trace_dict = _normalize(result.trace.to_dict())
 
         existing = _load_golden("plan_with_drift")
         if existing is None:
@@ -110,11 +115,11 @@ class TestAgentGoldenTraces:
         if golden is None:
             # First run will create the golden
             result = run_agent_loop(subgoals=sgs, segments=segs, max_cycles=10)
-            _save_golden("plan_1_1", result.trace.to_dict())
+            _save_golden("plan_1_1", _normalize(result.trace.to_dict()))
             golden = _load_golden("plan_1_1")
 
         for _ in range(5):
             result = run_agent_loop(subgoals=sgs, segments=segs, max_cycles=10)
-            assert result.trace.to_dict() == golden, (
+            assert _normalize(result.trace.to_dict()) == golden, (
                 "Non-deterministic trace: run diverged from golden"
             )
