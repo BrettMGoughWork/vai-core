@@ -6,7 +6,7 @@ import json
 import pytest
 
 from src.core.planning.segments.execution import (
-    SegmentState,
+    SegmentLifecycle,
     SegmentExecutionState,
     transition_segment_state,
     advance_segment_index,
@@ -24,13 +24,13 @@ class TestSegmentStateEnum:
     """The enum must define exactly PENDING, ACTIVE, COMPLETE."""
 
     def test_values(self):
-        assert SegmentState.PENDING == "pending"
-        assert SegmentState.ACTIVE == "active"
-        assert SegmentState.COMPLETE == "complete"
+        assert SegmentLifecycle.PENDING == "pending"
+        assert SegmentLifecycle.ACTIVE == "active"
+        assert SegmentLifecycle.COMPLETE == "complete"
 
     def test_is_string_enum(self):
-        assert isinstance(SegmentState.PENDING, str)
-        assert issubclass(SegmentState, str)
+        assert isinstance(SegmentLifecycle.PENDING, str)
+        assert issubclass(SegmentLifecycle, str)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ class TestTransitionSegmentState:
         for state in ("pending", "active", "complete"):
             for is_complete in (True, False):
                 result = transition_segment_state(state, is_complete)
-                assert result in (SegmentState.PENDING, SegmentState.ACTIVE, SegmentState.COMPLETE)
+                assert result in (SegmentLifecycle.PENDING, SegmentLifecycle.ACTIVE, SegmentLifecycle.COMPLETE)
                 assert isinstance(result, str)
 
 

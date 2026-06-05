@@ -8,7 +8,7 @@ import json
 import pytest
 
 from src.core.planning.segments.drift import SegmentDriftResult
-from src.core.planning.segments.execution import SegmentExecutionState, SegmentState
+from src.core.planning.segments.execution import SegmentExecutionState, SegmentLifecycle
 from src.core.planning.segments.reflection import (
     SegmentReflectionResult,
     reflect_on_segment,
@@ -342,7 +342,7 @@ class TestExecuteSegmentCycle:
         result = execute_segment_cycle(exec_state, seg, total_segments=1)
 
         new_state = result["execution_state"]
-        assert new_state.state == SegmentState.ACTIVE
+        assert new_state.state == SegmentLifecycle.ACTIVE
 
     def test_active_stays_active_if_not_complete(self):
         """Active segment that is not complete stays active."""
@@ -352,7 +352,7 @@ class TestExecuteSegmentCycle:
         result = execute_segment_cycle(exec_state, seg, total_segments=1)
 
         new_state = result["execution_state"]
-        assert new_state.state == SegmentState.ACTIVE
+        assert new_state.state == SegmentLifecycle.ACTIVE
 
     def test_active_transitions_to_complete_if_complete(self):
         """Complete active segment transitions to complete."""
@@ -361,7 +361,7 @@ class TestExecuteSegmentCycle:
         result = execute_segment_cycle(exec_state, seg, total_segments=1)
 
         new_state = result["execution_state"]
-        assert new_state.state == SegmentState.COMPLETE
+        assert new_state.state == SegmentLifecycle.COMPLETE
 
     def test_complete_advances_index(self):
         """When segment completes, index advances if more segments exist."""
@@ -370,7 +370,7 @@ class TestExecuteSegmentCycle:
         result = execute_segment_cycle(exec_state, seg, total_segments=3)
 
         new_state = result["execution_state"]
-        assert new_state.state == SegmentState.COMPLETE
+        assert new_state.state == SegmentLifecycle.COMPLETE
         assert new_state.index == 1
 
     def test_transition_trace_present(self):
@@ -481,7 +481,7 @@ class TestExecuteSegmentCycle:
         result = execute_segment_cycle(exec_state, seg, total_segments=3)
 
         new_state = result["execution_state"]
-        assert new_state.state == SegmentState.COMPLETE
+        assert new_state.state == SegmentLifecycle.COMPLETE
         assert new_state.index == 1  # no further advancement
 
     def test_transition_trace_has_correct_indices(self):
@@ -511,12 +511,12 @@ class TestMultipleCycles:
 
         # Cycle 1: pending → active → complete → index 1
         r1 = execute_segment_cycle(exec_state, seg, total_segments=2)
-        assert r1["execution_state"].state == SegmentState.ACTIVE
+        assert r1["execution_state"].state == SegmentLifecycle.ACTIVE
 
         # Cycle 2: (needs a new active state from index 1)
         exec2 = SegmentExecutionState(
             index=r1["execution_state"].index, state="active"
         )
         r2 = execute_segment_cycle(exec2, seg, total_segments=2)
-        assert r2["execution_state"].state == SegmentState.COMPLETE
+        assert r2["execution_state"].state == SegmentLifecycle.COMPLETE
         assert r2["execution_state"].index == 1

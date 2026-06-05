@@ -9,7 +9,7 @@ from typing import Dict, Any
 # Segment State Enum
 # ──────────────────────────────────────────────────────────────────────────────
 
-class SegmentState(str, Enum):
+class SegmentLifecycle(str, Enum):
     """Deterministic segment lifecycle states.
 
     States:
@@ -32,10 +32,10 @@ class SegmentExecutionState:
 
     Fields:
         index — 0-based index of the current segment
-        state — current SegmentState value (pending | active | complete)
+        state — current SegmentLifecycle value (pending | active | complete)
     """
     index: int = 0
-    state: str = SegmentState.PENDING.value
+    state: str = SegmentLifecycle.PENDING.value
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -59,22 +59,22 @@ def transition_segment_state(current: str, is_complete: bool) -> str:
         The next segment state string.
 
     Raises:
-        ValueError: If current is not a valid SegmentState value.
+        ValueError: If current is not a valid SegmentLifecycle value.
     """
-    if current not in (SegmentState.PENDING, SegmentState.ACTIVE, SegmentState.COMPLETE):
+    if current not in (SegmentLifecycle.PENDING, SegmentLifecycle.ACTIVE, SegmentLifecycle.COMPLETE):
         raise ValueError(
             f"Invalid segment state: {current!r}. "
-            f"Expected one of: {[s.value for s in SegmentState]}"
+            f"Expected one of: {[s.value for s in SegmentLifecycle]}"
         )
 
-    if current == SegmentState.PENDING:
-        return SegmentState.ACTIVE
+    if current == SegmentLifecycle.PENDING:
+        return SegmentLifecycle.ACTIVE
 
-    if current == SegmentState.ACTIVE:
-        return SegmentState.COMPLETE if is_complete else SegmentState.ACTIVE
+    if current == SegmentLifecycle.ACTIVE:
+        return SegmentLifecycle.COMPLETE if is_complete else SegmentLifecycle.ACTIVE
 
     # current == COMPLETE — terminal
-    return SegmentState.COMPLETE
+    return SegmentLifecycle.COMPLETE
 
 
 def advance_segment_index(current_index: int, total_segments: int) -> int:
@@ -144,11 +144,11 @@ def update_segment_execution_state(
             f"total_segments must be >= 0, got {total_segments}"
         )
 
-    was_complete = exec_state.state == SegmentState.COMPLETE
+    was_complete = exec_state.state == SegmentLifecycle.COMPLETE
     new_state = transition_segment_state(exec_state.state, is_complete)
     new_index = exec_state.index
     # Only advance index when the state actually transitions to COMPLETE
-    if not was_complete and new_state == SegmentState.COMPLETE:
+    if not was_complete and new_state == SegmentLifecycle.COMPLETE:
         new_index = advance_segment_index(exec_state.index, total_segments)
     return SegmentExecutionState(index=new_index, state=new_state)
 
@@ -186,5 +186,5 @@ def segment_completion_summary(exec_state: SegmentExecutionState) -> Dict[str, A
         Dict with is_complete flag.
     """
     return {
-        "is_complete": exec_state.state == SegmentState.COMPLETE,
+        "is_complete": exec_state.state == SegmentLifecycle.COMPLETE,
     }
