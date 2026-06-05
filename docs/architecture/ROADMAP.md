@@ -600,10 +600,10 @@ Define the exact boundary between S2 and S1.
 - Tool call schema
 - Error schema
 
-2.14.2 — S1 Adapter Layer
+✅ 2.14.2 — S1 Adapter Layer
 Introduce a thin, deterministic adapter layer:
-- s2tos1adapter
-- s1tos2adapter
+- s2_to_s1_adapter
+- s1_to_s2_adapter
 This ensures:
 - S2 never calls the LLM directly  
 - S2 never sees raw strings  
