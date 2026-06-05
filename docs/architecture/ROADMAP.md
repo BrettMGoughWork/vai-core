@@ -398,21 +398,21 @@
 - Reset segment state
 
 ✅ 2.7.5 — Temporal Trace
-- ✅ Add progress deltas  
-- ✅ Add stall reasons  
-- ✅ Add oscillation markers
+-  Add progress deltas  
+-  Add stall reasons  
+-  Add oscillation markers
 
 ## PHASE 2.8 — Semantic Reasoner (Meaning, Intent, Goal Alignment)
 *Depends On*: PHASE 2.7  
 *Goal*: Give Stratum‑2 the ability to detect when behaviour contradicts the plan or subgoal.
 
-2.8.1 — Semantic Validator
+✅ 2.8.1 — Semantic Validator
 - Validate output against step description  
 - Validate output against plan intent  
 - Validate output against subgoal goal  
 - Validate output against memory context
 
-2.8.2 — Semantic Drift Signals
+✅ 2.8.2 — Semantic Drift Signals
 - Emit signals for:  
   - contradicting plan  
   - contradicting subgoal  
