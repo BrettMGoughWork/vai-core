@@ -374,12 +374,12 @@
 *Depends On*: PHASE 2.6  
 *Goal*: Give Stratum‑2 a sense of time, progress, and stagnation.
 
-2.7.1 — Progress Detector ✅
+✅ 2.7.1 — Progress Detector
 - Compare segment outputs across cycles  
 - Detect: steady, stalled, regressed  
 - Add progress confidence scoring
 
-2.7.2 — Temporal Drift Signals
+✅ 2.7.2 — Temporal Drift Signals
 - Emit signals for:  
   - no progress  
   - repeated identical outputs  
