@@ -31,6 +31,9 @@ from src.core.planning.s1_contract.s2_to_s1_adapter import build_prompt_request,
 from src.core.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response, validate_s1_to_s2, validate_s1_to_s2_detailed
 from src.core.planning.s1_contract.s1_client import call_s1_backend
 from src.core.planning.s1_contract.s1_simulation_backend import simulate_prompt_response
+from src.core.planning.s1_contract.s1_prompt_builder import build_llm_prompt
+from src.core.planning.s1_contract.s1_response_validator import validate_llm_response
+from src.core.planning.s1_contract.s1_to_s2_adapter import map_s1_error_to_agent_error
 from src.core.planning.s1_contract.s1_simulation_fixtures import (
     DEFAULT_DRIFT_OUTPUT,
     DEFAULT_REPAIR_OUTPUT,
@@ -66,9 +69,13 @@ __all__ = [
     # Adapters
     "build_prompt_request",
     "parse_prompt_response",
+    "map_s1_error_to_agent_error",
     # S1 backend (2.14.3)
     "call_s1_backend",
     "simulate_prompt_response",
+    # Prompt builder & response validator (2.14.4)
+    "build_llm_prompt",
+    "validate_llm_response",
     # Fixtures (2.14.3)
     "DEFAULT_DRIFT_OUTPUT",
     "DEFAULT_REPAIR_OUTPUT",
