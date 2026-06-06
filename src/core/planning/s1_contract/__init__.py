@@ -45,6 +45,11 @@ from src.core.planning.s1_contract.s1_simulation_fixtures import (
     make_default_output,
     make_minimal_plan_context,
 )
+from src.core.planning.s1_contract.readiness import (
+    ReadinessResult,
+    check_llm_on_readiness,
+    render_readiness_status,
+)
 
 __all__ = [
     # Types
@@ -86,4 +91,8 @@ __all__ = [
     "REPAIR_FILL_MISSING_TEMPLATE",
     "make_default_output",
     "make_minimal_plan_context",
+    # Readiness (2.14.6)
+    "ReadinessResult",
+    "check_llm_on_readiness",
+    "render_readiness_status",
 ]
