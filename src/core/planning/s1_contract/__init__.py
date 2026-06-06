@@ -1,5 +1,5 @@
 """
-Phase 2.14.1 — S2/S1 Contract Module
+Phase 2.14.7 — S2/S1 Contract Module
 =====================================
 
 Exports for the S1 contract layer:
@@ -7,6 +7,8 @@ Exports for the S1 contract layer:
 - validators: pure validation functions
 - s2_to_s1_adapter: build_prompt_request
 - s1_to_s2_adapter: parse_prompt_response
+- s1_client: backend routing (simulation + real_llm)
+- s1_real_client: real LLM provider behind kill‑switch
 """
 
 from src.core.planning.s1_contract.types import (
@@ -34,6 +36,11 @@ from src.core.planning.s1_contract.s1_simulation_backend import simulate_prompt_
 from src.core.planning.s1_contract.s1_prompt_builder import build_llm_prompt
 from src.core.planning.s1_contract.s1_response_validator import validate_llm_response
 from src.core.planning.s1_contract.s1_to_s2_adapter import map_s1_error_to_agent_error
+from src.core.planning.s1_contract.s1_real_client import (
+    call_llm,
+    ENABLE_REAL_LLM,
+    S1RealLLMError,
+)
 from src.core.planning.s1_contract.s1_simulation_fixtures import (
     DEFAULT_DRIFT_OUTPUT,
     DEFAULT_REPAIR_OUTPUT,
@@ -75,9 +82,13 @@ __all__ = [
     "build_prompt_request",
     "parse_prompt_response",
     "map_s1_error_to_agent_error",
-    # S1 backend (2.14.3)
+    # S1 backend (2.14.3/2.14.7)
     "call_s1_backend",
     "simulate_prompt_response",
+    # Real S1 client (2.14.7)
+    "call_llm",
+    "ENABLE_REAL_LLM",
+    "S1RealLLMError",
     # Prompt builder & response validator (2.14.4)
     "build_llm_prompt",
     "validate_llm_response",

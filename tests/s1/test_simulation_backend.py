@@ -18,7 +18,7 @@ import json
 
 import pytest
 
-from src.core.planning.s1_contract.types import PromptRequest, PromptResponse
+from src.core.planning.s1_contract.types import PromptRequest, PromptResponse, S1Error
 from src.core.planning.s1_contract.s1_simulation_backend import (
     simulate_prompt_response,
     _detect_missing_fields,
@@ -281,13 +281,13 @@ class TestBackendRouting:
         assert "drift_detected" in resp.output
 
     def test_real_llm_stubbed(self):
-        """backend='real_llm' → stubbed response (no real LLM call)."""
+        """backend='real_llm' → S1Error from kill-switch (real LLM disabled by default)."""
         req = _make_valid_request()
         resp = call_s1_backend(req, backend="real_llm")
-        assert isinstance(resp, PromptResponse)
-        assert resp.output["drift_detected"] is False
-        assert resp.tool_calls == []
-        assert resp.errors == []
+        # Kill-switch is active → returns structured S1Error, not a live call
+        assert isinstance(resp, S1Error)
+        assert resp.type == "real_llm_disabled"
+        assert "Kill-switch" in resp.message
 
     def test_real_llm_deterministic(self):
         """The real_llm stub is also deterministic."""

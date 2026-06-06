@@ -156,7 +156,7 @@ def _check_real_llm_behind_flag() -> bool:
 
     Checks:
     - call_s1_backend supports backend="real_llm"
-    - backend="real_llm" returns stubbed (not real LLM) output
+    - backend="real_llm" returns S1Error (kill-switch active) — NOT a live call
     - unknown backends raise an error
     """
     try:
@@ -182,9 +182,11 @@ def _check_real_llm_behind_flag() -> bool:
         if not isinstance(sim_result, PromptResponse):
             return False
 
-        # real_llm should return stubbed PromptResponse (not hit real LLM)
+        # real_llm with kill-switch active → S1Error (expected safe behaviour)
         llm_result = call_s1_backend(request, backend="real_llm")
-        if not isinstance(llm_result, PromptResponse):
+        if not isinstance(llm_result, S1Error):
+            return False
+        if llm_result.type != "real_llm_disabled":
             return False
 
         # unknown backend must raise
@@ -343,6 +345,50 @@ def _check_architecture_audit_clean() -> bool:
     return True
 
 
+def _check_real_s1_client_importable() -> bool:
+    """Verify the real S1 client module exists, is importable, and the
+    kill‑switch defaults to False.
+    """
+    try:
+        from src.core.planning.s1_contract.s1_real_client import (
+            call_llm,
+            ENABLE_REAL_LLM,
+            S1RealLLMError,
+        )
+
+        # Kill‑switch must default to False
+        if ENABLE_REAL_LLM:
+            return False
+
+        # Verify that calling with kill‑switch active raises RuntimeError
+        from src.core.planning.s1_contract.types import PromptRequest
+
+        request = PromptRequest(
+            prompt={"instruction": "import-check"},
+            memory={},
+            plan_context={
+                "subgoal": {"index": 0, "state": "pending"},
+                "segment": {"index": 0, "state": "pending"},
+            },
+            tool_context=[],
+        )
+
+        raised = False
+        try:
+            call_llm(request)
+        except (RuntimeError, S1RealLLMError):
+            # Both are acceptable: RuntimeError from kill‑switch, or
+            # S1RealLLMError from transport failure if kill‑switch disabled.
+            raised = True
+        if not raised:
+            return False
+
+    except Exception:
+        return False
+
+    return True
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Master readiness gate
 # ──────────────────────────────────────────────────────────────────────────────
@@ -372,6 +418,10 @@ _CHECKS: Dict[str, tuple] = {
     "architecture_audit_clean": (
         "Architecture audit clean: no raw strings cross S2/S1 boundary, all types JSON-safe",
         _check_architecture_audit_clean,
+    ),
+    "real_s1_client_importable": (
+        "Real S1 client importable: module exists, kill-switch defaults to False",
+        _check_real_s1_client_importable,
     ),
 }
 

@@ -649,59 +649,48 @@ Assertions:
 - errors are structured  
 - S2 state machine behaves identically where possible  
 
-2.14.6 — LLM‑On Readiness Checklist
+2.14.6 — LLM‑On Readiness Checklist  ✅ COMPLETE
 A binary checklist for flipping the switch:
 
-- [ ] All 2.13.x tests green  
-- [ ] All critical/high architecture issues resolved  
-- [ ] S2/S1 contract locked  
-- [ ] Simulation backend stable  
-- [ ] Real LLM backend wired behind a flag  
-- [ ] Invalid S1 response handling tested  
-- [ ] E2E smoke tests pass  
-- [ ] Architecture audit clean for S2/S1 boundary  
+- [x] All 2.13.x tests green  
+- [x] All critical/high architecture issues resolved  
+- [x] S2/S1 contract locked  
+- [x] Simulation backend stable  
+- [x] Real LLM backend wired behind a flag  
+- [x] Invalid S1 response handling tested  
+- [x] E2E smoke tests pass  
+- [x] Architecture audit clean for S2/S1 boundary  
 
-2.14.7 — Actual Integration to S1 (Live LLM Enablement)
+2.14.7 — Actual Integration to S1 (Live LLM Enablement)  ✅ COMPLETE
 1. Implement the real S1 client
-- callllm(request)
-- Uses your chosen provider (OpenAI, Azure, local model, etc.)
-- Handles:
-  - retries  
-  - timeouts  
-  - rate limits  
-  - streaming (if you choose)  
+- [x] call_llm(request)
+- [x] Uses your chosen provider (OpenAI, Azure, local model, etc.)
+- [x] Handles:
+  - [x] retries  
+  - [x] timeouts  
+  - [x] rate limits  
+  - [x] streaming (if you choose)  
 
 2. Wire S2 to use the real client
-- Replace all stubbed S1 calls with:
-  `
-  s1client.callllm(request)
-  `
-- But only when:
-  `
-  backend == "real_llm"
-  `
+- [x] Replace all stubbed S1 calls with real S1 client when backend == "real_llm"  
 
 3. Add safety wrappers
-- Validate JSON  
-- Validate schema  
-- Validate required fields  
-- On failure:
-  - return AgentError(type="invalids1response")  
-  - do not mutate S2 state  
+- [x] Validate JSON  
+- [x] Validate schema  
+- [x] Validate required fields  
+- [x] On failure:
+  - [x] return AgentError(type="invalids1response")  
+  - [x] do not mutate S2 state  
 
 4. Add a “LLM‑on” smoke test
-- Run a tiny plan  
-- Confirm:
-  - no crashes  
-  - trace is valid  
-  - S2 state machine stays intact  
+- [x] Run a tiny plan  
+- [x] Confirm:
+  - [x] no crashes  
+  - [x] trace is valid  
+  - [x] S2 state machine stays intact  
 
 5. Add a kill‑switch
-A simple config flag:
-
-`
-enablerealllm = false
-`
+- [x] A simple config flag: `enable_real_llm = false`
 
 ---
 🚀 Release 1 — "Hierarchical Reasoner"
