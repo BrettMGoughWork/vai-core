@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any
 
 from src.core.types.hashing import stable_hash
@@ -16,7 +16,7 @@ class PlanSegment:
     context: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     segment_id: str = field(init=False)
     canonical_hash: str = field(init=False)
 
@@ -32,7 +32,6 @@ class PlanSegment:
         payload = {
             "subgoal_id": self.subgoal_id,
             "steps": self.steps,
-            "created_at": self.created_at,
         }
         return stable_hash(payload)
 

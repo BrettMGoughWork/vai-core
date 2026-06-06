@@ -633,7 +633,7 @@ If the LLM returns garbage:
 - S2 does not mutate state  
 - S2 surfaces a structured AgentError  
 
-2.14.5 — End‑to‑End S1+S2 Smoke Tests
+✅ 2.14.5 — End‑to‑End S1+S2 Smoke Tests
 Run tiny plans through the full stack:
 - 1 subgoal, 1 segment  
 - 1 subgoal, 3 segments  
