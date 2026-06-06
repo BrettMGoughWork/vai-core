@@ -817,7 +817,7 @@ A registry that loads primitives from code, CLI definitions, MCP manifests, and 
 - Generate embeddings from primitive name + description + signature; cosine-similarity search via `registry.find("resize an image")`
 
 3.2.6 — Plugin loader stub
-- Placeholder for Phase 3.12; directory scanned but empty initially
+- Placeholder for Phase 3.14; directory scanned but empty initially
 
 3.2.7 — Tests
 - Registration, duplicate handling, name collisions, discovery relevance ranking, loader edge cases
@@ -872,219 +872,376 @@ Skills are discoverable via embeddings and ranked by relevance. S2 can select sk
 
 ---
 
-### PHASE 3.5 — Standard Library Core (stdlib)
+### PHASE 3.5 — Skill & Primitive Metadata Export
+*Depends On*: PHASE 3.4
+
+S3 exposes static, declarative metadata so S2 can make deterministic planning decisions without violating purity.
+
+3.5.1 — Metadata fields on primitives and skills
+- Capability cost (latency, resource usage)
+- Determinism (pure, impure, nondeterministic)
+- Side-effects (fs, network, dangerous)
+- Expected output shape (schema, types)
+- Failure modes (TimeoutError, HTTPError, etc.)
+- Safety level (low, medium, high)
+- Prerequisites (domain policy, auth, environment)
+
+3.5.2 — Metadata export via SkillDiscoveryResult
+- S3 attaches metadata to every discovered skill and primitive
+- Metadata is versioned and stable across releases
+
+3.5.3 — S2 consumption points
+- Metadata consumed during skill discovery, plan generation, segment construction
+- Also used for repair decisions, drift detection, and reflection
+
+3.5.4 — Tests
+- Deterministic ordering and hashing of exported metadata
+- Metadata stability across registry rebuilds
+
+---
+
+### PHASE 3.6 — Structured Skill Discoverability
+*Depends On*: PHASE 3.5
+
+Extends SkillManifest with metadata fields for deterministic, ranked skill discovery.
+
+3.6.1 — SkillManifest metadata fields
+- Capability tags (e.g., "fetch", "parse", "transform")
+- Input/output types, side-effect class, safety level
+- Cost estimate, determinism level
+- Prerequisites (domain policy, auth)
+
+3.6.2 — Deterministic discovery ranking
+- Rank by: exact tag match → schema compatibility → safety level → determinism → cost → embedding similarity
+- Ensures S2 picks the same skill every time for a given query
+
+3.6.3 — Skill discovery families
+- Group skills into families: fetch.*, file.*, parse.*, transform.*, browser.*
+- Helps S2 reason about alternatives during planning
+
+3.6.4 — Tests
+- Ranking determinism across repeated queries
+- Family grouping correctness
+
+---
+
+### PHASE 3.7 — Standard Library Core v1 (stdlib MVP)
 *Depends On*: PHASE 3.4
 
 A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 
-3.5.1 — `python.echo` primitive
+3.7.1 — `echo` primitive
 - Returns input unchanged; used as canary for the full S2→S3→S2 round-trip
 
-3.5.2 — `python.file.read` primitive
+3.7.2 — `file.read` primitive
 - Reads file at path, returns content as string
 
-3.5.3 — `python.file.write` primitive
+3.7.3 — `file.write` primitive
 - Writes content to file at path
 
-3.5.4 — `cli.shell` primitive
+3.7.4 — `proc.exec` primitive
 - Executes shell command via subprocess, returns stdout/stderr/exit_code
 
-3.5.5 — `echo_text` skill
-- `.skill.md` wrapping `python.echo`; validates input schema
+3.7.5 — `echo` skill
+- `.skill.md` wrapping `echo` primitive; validates input schema
 
-3.5.6 — `parse_json` skill
-- Parses JSON string via `python.echo` → Python parsing; returns dict or error
+3.7.6 — `json.parse` skill
+- Parses JSON string via `echo` → Python parsing; returns dict or error
 
-3.5.7 — `fetch_url` skill (stub)
-- Declares `mcp.http.fetch` dependency; stub implementation until Phase 3.8
+3.7.7 — `fetch.simple` skill (stub)
+- Declares `net.httpget` dependency; stub implementation until Phase 3.10
 
-3.5.8 — Tests
+3.7.8 — Tests
 - Each stdlib primitive and skill executed end-to-end via SkillExecutor
 
 ---
 
-### PHASE 3.6 — S2 ↔ S3 Integration (Thin Adapter)
-*Depends On*: PHASE 3.5
+### PHASE 3.8 — S2 ↔ S3 Integration (Thin Adapter)
+*Depends On*: PHASE 3.7
 *Design rule*: S3 (`src/capabilities/`) never imports S1/S2. Integration code lives in `src/runtime/s3_adapter.py` as an adapter that speaks S3's public contract.
 
-3.6.1 — Finalize boundary contracts
+3.8.1 — Finalize boundary contracts
 - `SkillCallRequest` (skill_name, args, context), `SkillResult` (status, data, error, side_effects), `SkillDiscoveryQuery` (description, limit), `SkillDiscoveryResult` (matches list)
 
-3.6.2 — `skill_runner.py` entry point
+3.8.2 — `skill_runner.py` entry point
 - Accepts `SkillCallRequest`, resolves skill from registry, executes via `SkillExecutor`, returns `SkillResult`
 - `discover(query, limit) → SkillDiscoveryResult` for discovery queries
 
-3.6.3 — S3 adapter in S2 runtime
+3.8.3 — S3 adapter in S2 runtime
 - `src/runtime/s3_adapter.py`: `discover_skills(query)`, `call_skill(request)`, handles contract translation S2-native ↔ S3 contract types
 - This is the ONLY file that imports from both S2 and S3
 
-3.6.4 — Wire skill discovery into S2 planning
+3.8.4 — Wire skill discovery into S2 planning
 - S2 queries S3 for relevant skills during plan construction; skill names stored in plan segments
 
-3.6.5 — Wire skill execution into S2 cycle
+3.8.5 — Wire skill execution into S2 cycle
 - Segment referencing a skill triggers `s3_adapter.call_skill()` during cycle execution
 
-3.6.6 — Wire skill results into S2 state
+3.8.6 — Wire skill results into S2 state
 - `SkillResult` → S2 state update → segment memory record
 
-3.6.7 — Tests
+3.8.7 — Tests
 - S2→S3→S2 round-trip with `echo_text` skill: subgoal → segment → skill call → result → state update
 - Error propagation: invalid skill name, failed execution
 - Discovery flow: S2 queries skills, receives ranked list
 
 ---
 
-### PHASE 3.7 — Tiny S3 Smoke Test
-*Depends On*: PHASE 3.6
+### PHASE 3.9 — Tiny S3 Smoke Test
+*Depends On*: PHASE 3.8
 
 A minimal end-to-end test against the real LLM that proves S2 can discover and call an S3 skill. Pattern mirrors Phase 2.14.7's smoke test.
 
-3.7.1 — `tests/manual/test_s3_smoke.py`
+3.9.1 — `tests/manual/test_s3_smoke.py`
 - 1 subgoal, 1 segment calling `echo_text` via `backend=real_llm`
 
-3.7.2 — Verify skill discovery
+3.9.2 — Verify skill discovery
 - S2 queries S3 for relevant skills; `echo_text` appears in results
 
-3.7.3 — Verify plan construction
+3.9.3 — Verify plan construction
 - S2 builds a plan with a segment that references `echo_text`
 
-3.7.4 — Verify skill execution
+3.9.4 — Verify skill execution
 - S3 executes `echo_text` via SkillExecutor; result returned to S2
 
-3.7.5 — Verify state update
+3.9.5 — Verify state update
 - S2 updates segment memory from `SkillResult`
 
-3.7.6 — Verify trace completeness
+3.9.6 — Verify trace completeness
 - Trace contains: skill discovery query → discovery result → skill call → skill result → state update
 
-3.7.7 — Real LLM confirmation
+3.9.7 — Real LLM confirmation
 - Run with `--backend real_llm`; confirm the full S2→S3→S2 circuit works end-to-end
 
-3.7.8 — Statistical conformance
+3.9.8 — Statistical conformance
 - Run `python -m tests.statistical.cli --scenario tiny_s3_smoke --repetitions 25 --backend real_llm`; verify 100% json_validity, 100% schema_validity, 0 catastrophic failures
 
 ---
 
-### PHASE 3.8 — Fetch Orchestrator: Simple HTTP
-*Depends On*: PHASE 3.5
+### PHASE 3.10 — Fetch Orchestrator: Simple HTTP
+*Depends On*: PHASE 3.7
 
-3.8.1 — FetchError taxonomy
+3.10.1 — FetchError taxonomy
 - Dataclasses: `TimeoutError`, `HTTPError` (status_code, body), `ParseError`, `ConnectionError`
 
-3.8.2 — `mcp.http.fetch` primitive
+3.10.2 — `mcp.http.fetch` primitive
 - httpx GET with configurable timeout, headers, status-code handling
 - Returns: `status_code`, `body` (str), `headers` (dict), `elapsed` (ms)
 
-3.8.3 — `fetch_url` skill
+3.10.3 — `fetch_url` skill
 - Wires to `mcp.http.fetch` primitive; returns status + body + headers
 - Accepts `url` and optional `timeout`, `headers` args
 
-3.8.4 — Tests
+3.10.4 — Tests
 - Successful fetch, timeout, 4xx response, 5xx response, connection refused, invalid URL
 
 ---
 
-### PHASE 3.9 — Fetch Orchestrator: Hardened Modes
-*Depends On*: PHASE 3.8
+### PHASE 3.11 — Fetch Orchestrator: Hardened Modes
+*Depends On*: PHASE 3.10
 
-3.9.1 — Hardened HTTP fetch mode
+3.11.1 — Hardened HTTP fetch mode
 - Anti-bot headers (rotating User-Agent, Accept-Language), retry with exponential backoff, cookie jar
 
-3.9.2 — Playwright headless fetch mode
+3.11.2 — Playwright headless fetch mode
 - JS rendering via Playwright; handles SPA and JS-dependent content
 
-3.9.3 — Playwright stealth fetch mode
+3.11.3 — Playwright stealth fetch mode
 - Stealth plugin, human-like timing, rate limiting, fingerprint masking
 
-3.9.4 — Tests
+3.11.4 — Tests
 - Each mode exercised against a known endpoint; mode-selection by flag; fallback on mode failure
 
 ---
 
-### PHASE 3.10 — Fetch Orchestrator: Escalation & Domain Policy
-*Depends On*: PHASE 3.9
+### PHASE 3.12 — Fetch Orchestrator: Escalation & Domain Policy
+*Depends On*: PHASE 3.11
 
-3.10.1 — Fetch heuristics
+3.12.1 — Fetch heuristics
 - Select initial mode based on URL pattern, content-type hints, prior success/failure history
 
-3.10.2 — Fallback chain
+3.12.2 — Fallback chain
 - `simple → hardened → browser → stealth → search`; each step triggered by `FetchError` type
 - Mode-specific timeouts: simple (10s), hardened (15s), browser (30s), stealth (45s)
 
-3.10.3 — Per-domain policy
+3.12.3 — Per-domain policy
 - Allowlists, deny lists, rate limits, mode preferences per domain
 - Configurable via `domain_policy.json` or equivalent
 
-3.10.4 — Single LLM-facing interface
+3.12.4 — Single LLM-facing interface
 - Expose only `fetch_url` skill; internal strategies (modes, escalation, policy) hidden behind it
 - LLM sees `fetch_url(url)` — nothing else
 
-3.10.5 — Tests
+3.12.5 — Tests
 - Escalation triggers correctly per error type; fallback transitions observed; policy enforces allow/deny; rate limiting honoured
 
 ---
 
-### PHASE 3.11 — Search Provider
-*Depends On*: PHASE 3.10
+### PHASE 3.13 — Search Provider
+*Depends On*: PHASE 3.12
 
 Depends on fetch infrastructure (simple HTTP) to retrieve search results.
 
-3.11.1 — Search primitive
+3.13.1 — Search primitive
 - Query → list of URLs with titles and snippets; uses fetch_url internally
 
-3.11.2 — `search_urls` skill
+3.13.2 — `search_urls` skill
 - Wraps search primitive; normalises results; returns structured list
 
-3.11.3 — Wire into fetch fallback
+3.13.3 — Wire into fetch fallback
 - When all fetch modes fail, search for alternative sources as last-resort fallback
 
-3.11.4 — `GetPageFromUrl` taxonomy
+3.13.4 — `GetPageFromUrl` taxonomy
 - Define content type taxonomy (article, documentation, blog, unknown) for multimodal retrieval
 
-3.11.5 — Tests
+3.13.5 — Tests
 - Search returns results; fetch fallback triggers search; search results are usable by downstream fetch
 
 ---
 
-### PHASE 3.12 — Plugin System
-*Depends On*: PHASE 3.5
+### PHASE 3.14 — Plugin System
+*Depends On*: PHASE 3.7
 
 Users can drop in new primitives and skills with no code changes. Hot-loadable.
 
-3.12.1 — Plugin manifest format
+3.14.1 — Plugin manifest format
 - `plugin.yml`: name, version, primitives (list), skills (list), dependencies
 
-3.12.2 — Plugin loader
+3.14.2 — Plugin loader
 - Scans plugin directories, loads manifests, registers primitives + skills into registries
 
-3.12.3 — Hot-reload
+3.14.3 — Hot-reload
 - Detect new/removed/modified plugins on file system changes; reload without restart
 
-3.12.4 — Plugin authoring guide
+3.14.4 — Plugin authoring guide
 - Document plugin structure, manifest schema, and examples in `docs/`
 
-3.12.5 — Tests
+3.14.5 — Tests
 - Load plugin, execute plugin skill, unload/reload cycle, invalid manifest rejection, version conflict handling
 
 ---
 
-### PHASE 3.13 — Agent-Authored Skills (Future)
-*Depends On*: PHASE 3.7
+### PHASE 3.15 — Deterministic Plugin Hot-Reload
+*Depends On*: PHASE 3.14
+
+Versioned, stable registries ensure hot-reloading plugins does not violate S2's determinism invariants.
+
+3.15.1 — Stable registry ordering
+- Sort by skill name → version → plugin name
+- Guarantees deterministic iteration order across reloads
+
+3.15.2 — Stable embedding IDs
+- Hash of skill name + version + manifest hash
+- Embedding IDs remain stable across reloads
+
+3.15.3 — Registry snapshots
+- On plugin change: compute new snapshot, freeze it, expose snapshot ID to S2
+- S2 uses snapshot ID for deterministic planning
+
+3.15.4 — Hot-reload flow
+- Load plugin → rebuild registry → compute snapshot → freeze → notify S2
+- S2 can continue with old snapshot or switch at a safe boundary
+
+3.15.5 — Tests
+- Same plugin set produces identical snapshot IDs
+- Snapshot stability across registry rebuilds
+- S2 snapshot selection and boundary switching
+
+---
+
+### PHASE 3.16 — Agent-Authored Skills (Future)
+*Depends On*: PHASE 3.9
 
 The agent can author new `.skill.md` files, propose new primitives, and extend its own capability layer.
 
-3.13.1 — Skill authoring pipeline
+3.16.1 — Skill authoring pipeline
 - LLM writes `.skill.md` content; submitted to registry via validation gate
 
-3.13.2 — Safety checks
+3.16.2 — Safety checks
 - Validate all referenced primitives exist; input schemas are safe; no privilege escalation patterns
 - Reject skills that reference disallowed primitives or attempt to override system skills
 
-3.13.3 — Validation + embedding update
+3.16.3 — Validation + embedding update
 - Validated skills are registered and embedded; immediately discoverable by future S2 planning
 
-3.13.4 — Tests
+3.16.4 — Tests
 - Agent authors a valid skill, exercises it; validation rejects dangerous skills; authored skill appears in discovery results
+
+---
+
+### PHASE 3.17 — Agent-Authored Skill Safety Layer
+*Depends On*: PHASE 3.16
+
+Layered safety gates for agent-authored skills: structural, semantic, behavioural, and governance.
+
+3.17.1 — Structural safety
+- Validates: no recursive skill references, no unbounded loops, no dynamic primitive selection
+- Extends existing primitive-existence, schema, and privilege-escalation checks
+
+3.17.2 — Semantic safety
+- Validator checks: skill description matches behaviour, no domain-policy bypass
+- Also checks: no chaining of high-risk primitives, no embedded user code
+
+3.17.3 — Behavioural safety
+- Run authored skill in sandbox with mock primitives and side-effect tracking
+- Reject on unexpected side-effects
+
+3.17.4 — Governance
+- Skill provenance (author, timestamp), versioning, optional signing
+- Quarantine until validated; approval workflow
+
+3.17.5 — Tests
+- Validator rejects recursive references, policy bypass, high-risk primitive chains
+- Sandbox captures unexpected side-effects
+- Quarantine/approval workflow exercised
+
+---
+
+### PHASE 3.18 — Standard Library v2 (Full stdlib)
+*Depends On*: PHASE 3.7
+
+Expands the MVP stdlib to a comprehensive, well-organised standard library across ten capability families.
+
+3.18.1 — Ultra-Low-Level File Primitives
+- `file.read`, `file.readhead`, `file.readtail`, `file.readrange`
+- `file.exists`, `file.list`, `file.search`, `file.glob`, `file.stat`
+- `file.write`, `file.append`, `file.delete`
+
+3.18.2 — Structured Data Primitives
+- `json.parse`, `json.get`, `json.set`
+- `yaml.parse`, `toml.parse`
+- `markdown.parse`, `html.parse`, `html.select`, `pdf.extracttext`
+- `csv.read`, `csv.write`
+
+3.18.3 — Database Primitives (Safe CRUD)
+- `db.connect`, `db.query`, `db.insert`, `db.update`, `db.delete`
+- `db.listtables`, `db.describetable`
+
+3.18.4 — Network Primitives
+- `net.httpget`, `net.httppost`, `net.dnslookup`, `net.ping`, `net.tcpcheck`
+
+3.18.5 — Web Interaction Primitives
+- `fetch.simple`, `fetch.hardened`, `fetch.browser`, `fetch.stealth`
+- `search.web`
+
+3.18.6 — Text & Document Processing
+- `text.split`, `text.join`, `text.replace`, `text.extract`, `text.normalize`
+- `doc.detecttype`, `doc.extractmetadata`
+
+3.18.7 — System & Environment Primitives
+- `sys.envget`, `sys.envlist`, `sys.timenow`, `sys.uuid`, `sys.tempfile`
+
+3.18.8 — Process & Execution Primitives
+- `proc.exec`, `proc.execsafe`, `proc.kill`, `proc.ps`
+- (Optional; many runtimes omit for safety.)
+
+3.18.9 — Compression & Encoding
+- `zip.extract`, `zip.create`, `gzip.compress`, `gzip.decompress`
+- `base64.encode`, `base64.decode`
+
+3.18.10 — Tests
+- Each primitive exercised end-to-end via SkillExecutor
+- Category-level conformance suites (file, data, network, web, text, db, sys, proc, compression)
 
 ---
 
