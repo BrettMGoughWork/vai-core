@@ -649,9 +649,8 @@ Assertions:
 - errors are structured  
 - S2 state machine behaves identically where possible  
 
-2.14.6 — LLM‑On Readiness Checklist  ✅ COMPLETE
-A binary checklist for flipping the switch:
-
+✅ 2.14.6 — LLM‑On Readiness Checklist 
+A binary checklist for flipping the switch:  
 - [x] All 2.13.x tests green  
 - [x] All critical/high architecture issues resolved  
 - [x] S2/S1 contract locked  
@@ -661,38 +660,52 @@ A binary checklist for flipping the switch:
 - [x] E2E smoke tests pass  
 - [x] Architecture audit clean for S2/S1 boundary  
 
-2.14.7 — Actual Integration to S1 (Live LLM Enablement)  ✅ COMPLETE
-1. Implement the real S1 client
-- [x] call_llm(request)
-- [x] Uses your chosen provider (OpenAI, Azure, local model, etc.)
-- [x] Handles:
-  - [x] retries  
-  - [x] timeouts  
-  - [x] rate limits  
-  - [x] streaming (if you choose)  
-
-2. Wire S2 to use the real client
-- [x] Replace all stubbed S1 calls with real S1 client when backend == "real_llm"  
-
-3. Add safety wrappers
-- [x] Validate JSON  
-- [x] Validate schema  
-- [x] Validate required fields  
-- [x] On failure:
-  - [x] return AgentError(type="invalids1response")  
-  - [x] do not mutate S2 state  
-
-4. Add a “LLM‑on” smoke test
-- [x] Run a tiny plan  
-- [x] Confirm:
-  - [x] no crashes  
-  - [x] trace is valid  
-  - [x] S2 state machine stays intact  
-
+✅ 2.14.7 — Actual Integration to S1 (Live LLM Enablement)  
+1. Implement the real S1 client  
+- call_llm(request)  
+- Uses your chosen provider (OpenAI, Azure, local model, etc.)  
+- Handles:  
+  - retries    
+  - timeouts    
+  - rate limits    
+  - streaming (if you choose)    
+2. Wire S2 to use the real client  
+- Replace all stubbed S1 calls with real S1 client when backend == "real_llm"    
+3. Add safety wrappers  
+- Validate JSON    
+- Validate schema    
+- Validate required fields    
+- On failure:  
+  - return AgentError(type="invalids1response")  
+  - do not mutate S2 state  
+4. Add a “LLM‑on” smoke test  
+- Run a tiny plan    
+- Confirm:  
+  - no crashes    
+  - trace is valid    
+  - S2 state machine stays intact    
 5. Add a kill‑switch
-- [x] A simple config flag: `enable_real_llm = false`
+- A simple config flag: `enable_real_llm = false`  
+
+✅ 2.14.8 — Testing LLM Integration  
+1. Smoke testing  
+- Minimal S1→LLM→S1 round‑trip    
+- Tiny S2 plan test   
+2. Developer tooling    
+- Manual cycle runner    
+3. Statistical conformance runner    
+- scenario‑agnostic probabilistic test harness  
+- Metric extractors  
+- Scenario JSON definitions    
+- Aggregator, thresholds evaluator, CLI entry point (`python -m tests.statistical.cli`)  
+4. Integration verified    
+- DeepSeek v4 Flash (default) and v4 Pro both produce schema‑valid PromptResponse  
+- Kill‑switch (`ENABLE_REAL_LLM`) honoured at all entry points  
+- No S2 state mutation on invalid S1 responses  
+- All manual tests pass against live LLM  
 
 ---
+
 🚀 Release 1 — "Hierarchical Reasoner"
 ---
 

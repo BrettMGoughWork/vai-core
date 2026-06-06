@@ -1,0 +1,8 @@
+{
+  "name": "tiny_plan2x2",
+  "plan_builder": "plan_2_2",
+  "cycles": 1,
+  "repetitions": 100,
+  "backend": "simulation",
+  "description": "2 subgoals, 2 segments each — multi-subgoal. Tests multi-subgoal contract stability."
+}

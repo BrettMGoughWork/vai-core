@@ -33,7 +33,7 @@ class OpenAIClient(ChatProvider):
     ) -> None:
         # Load local .env values for dev/runtime environments where env vars
         # are not pre-exported by the shell/session.
-        load_dotenv(override=False)
+        load_dotenv(override=True)
 
         self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
         if not self.api_key:

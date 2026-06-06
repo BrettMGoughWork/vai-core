@@ -15,10 +15,7 @@ class Config:
 
         # hydrate Agent config
         raw_agent = raw.get("agent", {})
-        raw_loop = raw_agent.get("loop_policy", {})
-        loop = LoopPolicyConfig(**raw_loop)
-
-        agent = AgentConfig(loop_policy=loop)
+        agent = AgentConfig.from_yaml(raw_agent)
 
         # store fully typed config
         self._config = CoreConfig(

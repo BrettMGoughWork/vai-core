@@ -1,6 +1,10 @@
 llm:
   provider: deepseek
   model: deepseek-chat
+  model_variants:
+    flash: deepseek-chat
+    pro: deepseek-chat
+  active_variant: flash
   temperature: 0.0
   max_tokens: 4096
 

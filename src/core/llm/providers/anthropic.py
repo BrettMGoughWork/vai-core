@@ -29,7 +29,7 @@ class AnthropicClient(ChatProvider):
         anthropic_version: str = "2023-06-01",
         default_max_tokens: int = 1024,
     ) -> None:
-        load_dotenv(override=False)
+        load_dotenv(override=True)
 
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
         if not self.api_key:

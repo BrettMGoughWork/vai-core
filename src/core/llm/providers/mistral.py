@@ -32,7 +32,7 @@ class MistralClient(ChatProvider):
         base_url: str = "https://api.mistral.ai/v1",
         timeout: float = 30.0,
     ) -> None:
-        load_dotenv(override=False)
+        load_dotenv(override=True)
         self.api_key = api_key or os.getenv("MISTRAL_API_KEY", "")
         if not self.api_key:
             raise ValueError("MistralClient requires an API key (env MISTRAL_API_KEY or api_key=...)")
