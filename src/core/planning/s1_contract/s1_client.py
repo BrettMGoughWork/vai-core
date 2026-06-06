@@ -56,62 +56,60 @@ def _generate_real_llm_raw_response(request: PromptRequest) -> str:
     return json.dumps(response_dict)
 
 
+def _resolve_model(llm_raw: dict) -> str:
+    """Resolve the active model from variant config.
+
+    If model_variants and active_variant are set, use the variant mapping.
+    Otherwise fall back to the top-level model field.
+    Pure function.
+    """
+    variants = llm_raw.get("model_variants", {})
+    active = llm_raw.get("active_variant", "")
+    if variants and active in variants:
+        return variants[active]
+    return llm_raw.get("model", "default")
+
+
 def _get_llm_transport():
     """Lazily create an LLMTransport for the configured provider.
 
     Returns None if no provider is configured or the config is missing.
+    Uses the canonical LLM builder factory.
     """
     try:
-        from src.core.llm.transport import LLMTransport
-        from src.core.config.loader import AppConfigLoader
+        from src.core.llm.builder import create_llm_transport
     except ImportError:
         return None
 
-    loader = AppConfigLoader.load()
-    if loader is None:
-        return None
-
-    provider_name = loader.config.get("llm", {}).get("provider")
-    if not provider_name:
-        return None
-
-    model = loader.config.get("llm", {}).get("model", "default")
-    temperature = loader.config.get("llm", {}).get("temperature", 0.0)
-    max_tokens = loader.config.get("llm", {}).get("max_tokens", 4096)
-
-    client = _make_provider_client(provider_name, loader.config)
-    if client is None:
-        return None
-
-    return LLMTransport(client, model, temperature, max_tokens)
-
-
-def _make_provider_client(provider_name: str, config: dict):
-    """Instantiate the appropriate ChatProvider for the given name."""
     try:
-        from src.core.llm.providers.openai import OpenAIChatProvider
-        from src.core.llm.providers.anthropic import AnthropicChatProvider
-        from src.core.llm.providers.gemini import GeminiChatProvider
-        from src.core.llm.providers.deepseek import DeepSeekChatProvider
-        from src.core.llm.providers.qwen import QwenChatProvider
-        from src.core.llm.providers.mistral import MistralChatProvider
-    except ImportError:
+        import yaml
+        from pathlib import Path
+
+        config_path = Path("config/config.yaml")
+        if not config_path.exists():
+            return None
+
+        with open(config_path, "r") as f:
+            raw = yaml.safe_load(f)
+
+        llm_raw = raw.get("llm", {})
+        provider_name = llm_raw.get("provider", "")
+        if not provider_name:
+            return None
+
+        model = _resolve_model(llm_raw)
+
+        from src.core.state.config import LLMConfig
+        llm_config = LLMConfig(
+            provider=llm_raw.get("provider", ""),
+            model=model,
+            temperature=llm_raw.get("temperature", 0.0),
+            max_tokens=llm_raw.get("max_tokens", 4096),
+        )
+    except Exception:
         return None
 
-    providers = {
-        "openai": OpenAIChatProvider,
-        "anthropic": AnthropicChatProvider,
-        "gemini": GeminiChatProvider,
-        "deepseek": DeepSeekChatProvider,
-        "qwen": QwenChatProvider,
-        "mistral": MistralChatProvider,
-    }
-
-    provider_cls = providers.get(provider_name.lower())
-    if provider_cls is None:
-        return None
-
-    return provider_cls.from_config(config)
+    return create_llm_transport(llm_config)
 
 
 def call_s1_backend(

@@ -28,7 +28,7 @@ class DeepSeekClient(ChatProvider):
     ) -> None:
         # Load local .env values for dev/runtime environments where env vars
         # are not pre-exported by the shell/session.
-        load_dotenv(override=False)
+        load_dotenv(override=True)
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY", "")
         if not self.api_key:
             raise ValueError("DeepSeekClient requires an API key (env DEEPSEEK_API_KEY or api_key=...)")

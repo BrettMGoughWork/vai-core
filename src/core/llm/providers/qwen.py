@@ -33,7 +33,7 @@ class QwenClient(ChatProvider):
         base_url: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
-        load_dotenv(override=False)
+        load_dotenv(override=True)
 
         # Alibaba Cloud docs commonly use DASHSCOPE_API_KEY for Model Studio/DashScope keys. [5](https://www.alibabacloud.com/help/en/model-studio/first-api-call-to-qwen)
         self.api_key = api_key or os.getenv("DASHSCOPE_API_KEY", "")

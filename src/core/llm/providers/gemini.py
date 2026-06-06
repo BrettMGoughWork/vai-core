@@ -27,7 +27,7 @@ class GeminiClient(ChatProvider):
         use_query_key: bool = True,
         default_max_output_tokens: int = 1024,
     ) -> None:
-        load_dotenv(override=False)
+        load_dotenv(override=True)
 
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
         if not self.api_key:

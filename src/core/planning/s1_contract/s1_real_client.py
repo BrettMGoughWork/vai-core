@@ -79,18 +79,55 @@ _DEFAULT_RATE_LIMIT_BACKOFF_SECONDS: float = 2.0
 
 
 def _serialise_prompt(prompt_payload: dict) -> str:
-    """Convert the structured prompt into a JSON string for the LLM."""
+    """Convert the structured prompt builder output into a string for the LLM.
+
+    The prompt builder (s1_prompt_builder.build_llm_prompt) returns a dict
+    with keys: system_instruction, response_schema, context, valid_examples,
+    invalid_examples.  This function serialises that dict into a single
+    plain-text prompt that the LLM transport can consume as a user message.
+    """
     import json
 
-    instruction = prompt_payload.get("instruction", "")
-    schema_str = json.dumps(prompt_payload.get("schema", {}), indent=2)
-    examples_str = json.dumps(prompt_payload.get("examples", []), indent=2)
+    parts: list[str] = []
 
-    return (
-        f"{instruction}\n\n"
-        f"JSON SCHEMA:\n{schema_str}\n\n"
-        f"EXAMPLES:\n{examples_str}"
-    )
+    # 1. System instruction (the rules the LLM must follow)
+    system = prompt_payload.get("system_instruction", "")
+    if system:
+        parts.append(system)
+
+    # 2. Response schema (what the LLM must output)
+    schema = prompt_payload.get("response_schema", {})
+    if schema:
+        parts.append("JSON SCHEMA you MUST follow:\n" + json.dumps(schema, indent=2))
+
+    # 3. Execution context (plan_context, memory, tool_context, instruction)
+    context = prompt_payload.get("context", {})
+    if context:
+        parts.append("EXECUTION CONTEXT:\n" + json.dumps(context, indent=2))
+
+    # 4. Valid examples (what a correct response looks like)
+    valid_examples = prompt_payload.get("valid_examples", [])
+    if valid_examples:
+        lines = ["VALID RESPONSE EXAMPLES:"]
+        for ex in valid_examples:
+            label = ex.get("label", "Example")
+            response = ex.get("response", {})
+            lines.append(f"\n  [{label}]")
+            lines.append(f"  {json.dumps(response, indent=2)}")
+        parts.append("\n".join(lines))
+
+    # 5. Invalid examples (what NOT to do)
+    invalid_examples = prompt_payload.get("invalid_examples", [])
+    if invalid_examples:
+        lines = ["INVALID RESPONSE EXAMPLES (do NOT do this):"]
+        for ex in invalid_examples:
+            label = ex.get("label", "Example")
+            why = ex.get("why_invalid", "")
+            lines.append(f"\n  [{label}]")
+            lines.append(f"  Why invalid: {why}")
+        parts.append("\n".join(lines))
+
+    return "\n\n".join(parts)
 
 
 def _call_provider(prompt_text: str) -> str:
