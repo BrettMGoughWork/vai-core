@@ -1,0 +1,8 @@
+{
+  "name": "tiny_plan1",
+  "plan_builder": "plan_1_1",
+  "cycles": 1,
+  "repetitions": 100,
+  "backend": "simulation",
+  "description": "1 subgoal, 1 segment — simplest happy path. Baseline contract conformance."
+}

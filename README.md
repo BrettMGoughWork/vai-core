@@ -27,3 +27,57 @@ Usage:
 
 Optional arguments allow you to specify a trace directory or enable live watching.
 
+
+Developer Tools
+---------------
+
+### Manual Cycle Runner (`run_cycle.py`)
+
+A single-cycle debug REPL for the S2 ↔ S1 ↔ LLM boundary. Runs exactly one cycle, prints full trace, and exits. Useful for debugging prompt construction, schema validation, and state transitions.
+
+Usage:
+    python run_cycle.py "your request" --backend simulation
+    python run_cycle.py "your request" --backend real_llm --verbose
+
+Options:
+    --backend, -b     "simulation" (deterministic mock) or "real_llm" (DeepSeek)
+    --verbose, -v     Print full details (PromptRequest, PromptResponse, S2 updates)
+    --silent          Suppress trace printing
+    --example, -e     Use built-in example request
+
+
+### Statistical Conformance Runner (`tests/statistical/`)
+
+A reusable, scenario-agnostic harness for probabilistic testing against the agent runtime. Runs a scenario N times, extracts metrics, aggregates results, and evaluates against configurable thresholds.
+
+Usage:
+    # Run a scenario with default repetitions from the scenario file
+    python -m tests.statistical.cli --scenario tiny_plan1
+
+    # Override repetitions
+    python -m tests.statistical.cli --scenario tiny_plan1 --repetitions 100
+
+    # With real LLM backend
+    python -m tests.statistical.cli --scenario tiny_plan1 --repetitions 10 --backend real_llm --verbose
+
+    # List available scenarios
+    python -m tests.statistical.cli --list
+
+    # Skip threshold evaluation (report only)
+    python -m tests.statistical.cli --scenario tiny_plan1 --repetitions 50 --no-thresholds
+
+Metrics collected per run:
+    • JSON validity — is the S1 response valid JSON?
+    • Schema validity — does it conform to the PromptResponse schema?
+    • Drift signals — count of behavioural drift signals detected
+    • Repair attempts — count of repair operations triggered
+    • Catastrophic failures — runs that crashed or produced no usable output
+    • Invariant violations — S2 invariants that did not hold
+    • Trace stability — measure of deterministic output reproducibility
+
+Scenarios are defined as JSON files in `tests/statistical/scenarios/` and include:
+    • `tiny_plan1` — 1 subgoal, 1 segment (baseline)
+    • `tiny_plan3` — 1 subgoal, 3 segments (multi-segment)
+    • `tiny_plan2x2` — 2 subgoals, 2 segments each (multi-subgoal)
+
+Add new scenarios by creating a JSON file in that directory with the same shape.
