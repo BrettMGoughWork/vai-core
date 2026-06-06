@@ -300,29 +300,30 @@ class TestE2ESingleSubgoalSingleSegment:
         assert is_json_safe(s2_updates), "S2 updates not JSON-safe"
 
     def test_real_llm_backend_contract_pipeline(self):
-        """S1 contract pipeline with real_llm (stubbed) must produce valid response."""
+        """S1 contract pipeline with real_llm blocked by kill-switch → S1Error."""
         response = _run_s1_contract_pipeline(
             cycle=0,
             subgoal_index=0,
             segment_index=0,
             backend="real_llm",
         )
-        assert isinstance(response, PromptResponse), (
-            f"Expected PromptResponse from stubbed real_llm, got: {type(response)}"
+        assert isinstance(response, S1Error), (
+            f"Expected S1Error from kill-switch, got: {type(response)}"
         )
+        assert response.type == "real_llm_disabled"
 
     def test_real_llm_round_trip(self):
-        """Full S2→S1→S2 round-trip with stubbed real_llm backend."""
+        """Round-trip with real_llm (kill-switch active) → structured error."""
         s2_updates = _run_s2_s1_s2_round_trip(
             cycle=0,
             subgoal_index=0,
             segment_index=0,
             backend="real_llm",
         )
-        assert "error" not in s2_updates, (
-            f"Stubbed real_llm round-trip returned error: {s2_updates.get('error')}"
-        )
-        assert is_json_safe(s2_updates), "S2 updates not JSON-safe"
+        # Kill-switch active → error is expected and structured
+        assert "error" in s2_updates, "Kill-switch should produce structured error"
+        assert isinstance(s2_updates["error"], dict)
+        assert s2_updates["error"]["type"] == "real_llm_disabled"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -384,27 +385,28 @@ class TestE2ESingleSubgoalThreeSegments:
         assert isinstance(response, PromptResponse)
 
     def test_real_llm_backend_contract_pipeline(self):
-        """Contract pipeline with real_llm (stubbed) at mid-segment."""
+        """Contract pipeline with real_llm (kill-switch) at mid-segment."""
         response = _run_s1_contract_pipeline(
             cycle=1,
             subgoal_index=0,
             segment_index=1,
             backend="real_llm",
         )
-        assert isinstance(response, PromptResponse), (
-            f"Expected PromptResponse, got: {type(response)}"
+        assert isinstance(response, S1Error), (
+            f"Expected S1Error from kill-switch, got: {type(response)}"
         )
+        assert response.type == "real_llm_disabled"
 
     def test_real_llm_round_trip(self):
-        """Full round-trip with stubbed real_llm backend, 1+3 plan."""
+        """Full round-trip with real_llm (kill-switch active), 1+3 plan."""
         s2_updates = _run_s2_s1_s2_round_trip(
             cycle=1,
             subgoal_index=0,
             segment_index=1,
             backend="real_llm",
         )
-        assert "error" not in s2_updates
-        assert is_json_safe(s2_updates)
+        assert "error" in s2_updates
+        assert s2_updates["error"]["type"] == "real_llm_disabled"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -465,27 +467,28 @@ class TestE2ETwoSubgoalsTwoSegmentsEach:
         assert isinstance(response, PromptResponse)
 
     def test_real_llm_backend_contract_pipeline(self):
-        """Contract pipeline with real_llm (stubbed) in second subgoal."""
+        """Contract pipeline with real_llm (kill-switch) in second subgoal."""
         response = _run_s1_contract_pipeline(
             cycle=3,
             subgoal_index=1,
             segment_index=0,
             backend="real_llm",
         )
-        assert isinstance(response, PromptResponse), (
-            f"Expected PromptResponse, got: {type(response)}"
+        assert isinstance(response, S1Error), (
+            f"Expected S1Error from kill-switch, got: {type(response)}"
         )
+        assert response.type == "real_llm_disabled"
 
     def test_real_llm_round_trip(self):
-        """Full round-trip with stubbed real_llm backend, 2+2 plan."""
+        """Full round-trip with real_llm (kill-switch active), 2+2 plan."""
         s2_updates = _run_s2_s1_s2_round_trip(
             cycle=2,
             subgoal_index=1,
             segment_index=0,
             backend="real_llm",
         )
-        assert "error" not in s2_updates
-        assert is_json_safe(s2_updates)
+        assert "error" in s2_updates
+        assert s2_updates["error"]["type"] == "real_llm_disabled"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -521,7 +524,7 @@ class TestE2EBackendDeterminism:
         )
 
     def test_real_llm_is_deterministic(self):
-        """Same input → real_llm backend (stubbed) → same output every time."""
+        """Same input → real_llm (kill-switch) → same S1Error every time."""
         request1 = build_prompt_request(
             agent_state=_FakeAgentState(cycle=1),
             subgoal_state=_FakeSubgoalState(index=0, state="active"),
@@ -537,10 +540,10 @@ class TestE2EBackendDeterminism:
         resp1 = call_s1_backend(request1, backend="real_llm")
         resp2 = call_s1_backend(request2, backend="real_llm")
 
-        assert isinstance(resp1, PromptResponse)
-        assert isinstance(resp2, PromptResponse)
+        assert isinstance(resp1, S1Error)
+        assert isinstance(resp2, S1Error)
         assert resp1.to_dict() == resp2.to_dict(), (
-            "Stubbed real_llm backend is not deterministic"
+            "Kill-switch S1Error is not deterministic"
         )
 
     def test_round_trip_determinism(self):
@@ -605,7 +608,7 @@ class TestE2EErrorHandling:
         )
 
     def test_backend_routing_real_llm(self):
-        """backend='real_llm' routes to stubbed LLM backend."""
+        """backend='real_llm' routes correctly but kill-switch blocks with S1Error."""
         request = build_prompt_request(
             agent_state=_FakeAgentState(cycle=0),
             subgoal_state=_FakeSubgoalState(index=0),
@@ -613,9 +616,11 @@ class TestE2EErrorHandling:
             memory=_make_fake_memory(),
         )
         response = call_s1_backend(request, backend="real_llm")
-        assert isinstance(response, PromptResponse), (
-            f"real_llm backend returned {type(response)}"
+        # Kill-switch active → S1Error, not a crash
+        assert isinstance(response, S1Error), (
+            f"real_llm backend returned {type(response)} — expected S1Error from kill-switch"
         )
+        assert response.type == "real_llm_disabled"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

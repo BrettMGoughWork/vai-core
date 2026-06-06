@@ -453,20 +453,22 @@ class TestSafetyGuarantees:
         assert isinstance(result, PromptResponse)
 
     def test_real_llm_stub_returns_prompt_response(self):
-        """Real LLM stub produces valid JSON that passes validation."""
+        """Real LLM backend blocked by kill-switch → returns S1Error (safe)."""
         req = _make_minimal_request()
         result = call_s1_backend(req, backend="real_llm")
-        assert isinstance(result, PromptResponse)
-        assert isinstance(result.output, dict)
+        # Kill-switch is active by default → safe S1Error, not a live call
+        assert isinstance(result, S1Error)
+        assert result.type == "real_llm_disabled"
 
     def test_real_llm_stub_output_is_fully_valid(self):
-        """Real LLM stub output passes schema validation."""
+        """Real LLM kill-switch error has all required S1Error fields."""
         req = _make_minimal_request()
         result = call_s1_backend(req, backend="real_llm")
-        assert result.output["drift_detected"] is False
-        assert "progress" in result.output
-        assert "is_complete" in result.output
-        assert "confidence" in result.output
+        # Kill-switch active → returns structured S1Error
+        assert isinstance(result, S1Error)
+        assert result.type == "real_llm_disabled"
+        assert result.message is not None
+        assert "hint" in result.details
 
 
 # ══════════════════════════════════════════════════════════════════════
