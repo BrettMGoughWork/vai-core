@@ -611,7 +611,7 @@ This ensures:
 Adapters are pure functions.  
 No side effects.
 
-2.14.3 — Deterministic S1 Simulation Backend
+✅ 2.14.3 — Deterministic S1 Simulation Backend
 Preserve the current deterministic world as a first‑class mode.
 - backend="simulation"  
 - backend="real_llm"
@@ -621,7 +621,7 @@ Simulation backend provides:
 - deterministic reflection  
 - deterministic plan shaping  
 
-2.14.4 — Prompt Shaping & Response Validation
+✅ 2.14.4 — Prompt Shaping & Response Validation
 Make the LLM safe.
 - strict JSON‑only prompts
 - schema‑guided instructions

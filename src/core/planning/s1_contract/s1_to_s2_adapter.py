@@ -199,6 +199,43 @@ def validate_s1_to_s2(response: PromptResponse) -> bool:
     return True
 
 
+def map_s1_error_to_agent_error(err: S1Error) -> dict:
+    """Convert an S1Error into a structured AgentError update dict.
+
+    Pure function. No I/O. No inference.
+
+    The returned dict contains AgentError fields:
+        type, message, details, recoverable, timestamp
+
+    timestamp is set to None (caller fills if needed) to keep
+    this function pure.
+
+    Rules:
+    - Must produce all required AgentError fields
+    - Must not mutate S2 state
+    - Must not continue execution (recoverable=False for S1 errors)
+    - Must not emit drift or repair signals
+
+    Args:
+        err: An S1Error from response validation.
+
+    Returns:
+        A JSON-safe dict matching AgentError structure.
+    """
+    from datetime import datetime, timezone
+
+    return {
+        "type": "S1ResponseError",
+        "message": err.message,
+        "details": {
+            "s1_error_type": err.type,
+            "s1_error_details": err.details,
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "recoverable": False,
+    }
+
+
 def validate_s1_to_s2_detailed(response: PromptResponse) -> dict:
     """Detailed variant: returns {"valid": bool, "errors": [str]}."""
     errors = []
