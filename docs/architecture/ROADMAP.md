@@ -710,54 +710,385 @@ A binary checklist for flipping the switch:
 ---
 
 ## STRATUM 3 - Agent Runtime
-*Invariant*: Stratum 3 orchestrates agents, capabilities and external intefaces, but never performs long-horizion reasoning planning, and execution itself. It delegates all reasoning to Stratum 2 and all action execution to Stratum 1
+*Invariant*: Stratum 3 orchestrates agents, capabilities and external interfaces, but never performs long-horizon reasoning, planning, and execution itself. It delegates all reasoning to Stratum 2 and all action execution to Stratum 1.
 
-### PHASE 3.1 — Skill & Capability Layer (Core Skill)
-*Depends On*: PHASE 2.5  
-*Note:: Stratum 3 requires the full hierarchical reasoner to ensure agent-level planning is stable
-
-3.1.1. Implement skill registry — register skills, metadata, ToolSpecs.  
-3.1.2. Add permission model — allow/deny categories per agent/runtime.  
-3.1.3. Implement filesystem skill — safe paths, locking.  
-3.1.4. Implement HTTP simple skill — allowlist, limits.  
-3.1.5. Implement math utilities — parse, convert.  
-3.1.6. Implement text utilities — split, regex.  
+**Isolation rule**: All S3 code lives under `src/capabilities/` — completely isolated from S1 (`src/core/`) and S2 (`src/runtime/`). S3 defines its own contracts using only standard Python types and never imports S1/S2 internals. Integration occurs via a thin adapter in S2's runtime that speaks S3's public contract.
 
 ---
-🚀 Release 2 — "Skillful Agent"
+
+### PHASE 3.0 — Foundations: Specs, Contracts, and Directory Layout
+*Depends On*: PHASE 2.14.8
+
+3.0.1 — Folder layout
+- Create `src/capabilities/` with sub-packages:
+  ```
+  src/capabilities/
+    __init__.py
+    contracts.py            # S2↔S3 boundary types
+    primitives/
+      __init__.py
+      base.py               # PrimitiveBase, PrimitiveResult
+      python.py             # PythonPrimitive
+      cli.py                # CLIPrimitive
+      mcp.py                # MCPPrimitive
+    registry/
+      __init__.py
+      primitive_registry.py
+      loaders/
+        __init__.py
+        python_loader.py
+        cli_loader.py
+        mcp_loader.py
+        plugin_loader.py
+    skills/
+      __init__.py
+      manifest.py           # .skill.md parser
+      skill.py              # Skill dataclass
+      executor.py           # Step interpreter
+    discovery/
+      __init__.py
+      embedder.py
+      search.py
+    stdlib/
+      __init__.py
+      primitives/           # Built-in primitives live here
+      skills/               # Built-in .skill.md files live here
+    runtime/
+      __init__.py
+      skill_runner.py       # Entry point for S2→S3 calls
+  ```
+
+3.0.2 — Primitive metadata spec
+- Define the shape of a primitive: name, type (`python` | `cli` | `mcp`), function signature, description, declared side effects, input/output schema
+
+3.0.3 — Skill manifest spec (`.skill.md`)
+- YAML front matter: `skill`, `description`, `primitives` (list of names), `inputs` (schema), `steps` (ordered list of `call:` references)
+- Markdown body: human-readable description and usage notes
+
+3.0.4 — S2↔S3 boundary contracts
+- `SkillCallRequest`, `SkillResult`, `SkillDiscoveryQuery`, `SkillDiscoveryResult` as pure dataclasses in `src/capabilities/contracts.py`
+- No imports from `src/core/` or `src/runtime/`
+
 ---
 
-### PHASE 3.2 — Skill & Capability Layer (Extension Skills)
+### PHASE 3.1 — Primitive Abstraction Layer
+*Depends On*: PHASE 3.0
+
+A single interface for all primitive types (Python, CLI, MCP) with deterministic execution semantics.
+
+3.1.1 — PrimitiveBase
+- Abstract base class with unified signature: `execute(args: dict, context: dict) → PrimitiveResult`
+
+3.1.2 — PrimitiveResult
+- Dataclass: `status` (success | error), `data`, `error` (message string), `side_effects` (list of observed effects)
+
+3.1.3 — PythonPrimitive
+- Wraps a Python callable with signature validation and side-effect tracking
+
+3.1.4 — CLIPrimitive
+- Wraps a CLI command string; subprocess execution with stdout/stderr capture and exit-code handling
+
+3.1.5 — MCPPrimitive
+- Wraps an MCP tool reference; delegates to MCP client for execution
+
+3.1.6 — Tests
+- Each primitive type: valid args, invalid args, side-effect tracking, error propagation
+
+---
+
+### PHASE 3.2 — Primitive Registration & Discovery
 *Depends On*: PHASE 3.1
 
-3.2.1. Define plugin interface — simple Python module exposing register_all()  
-3.2.2. Implement plugin loader — load skills from external repos  
-3.2.3. Document how to build personal plugins (e.g., vai‑extensions)  
+A registry that loads primitives from code, CLI definitions, MCP manifests, and plugins. Vector-based semantic discovery.
+
+3.2.1 — PrimitiveRegistry
+- `register(name, primitive)`, `get(name) → PrimitiveBase`, `list(filter) → list`, `find(query) → list[Match]`
+
+3.2.2 — Python loader
+- Scans Python modules for `PrimitiveBase` subclasses, auto-registers by name
+
+3.2.3 — CLI loader
+- Reads CLI definition files (JSON/YAML), instantiates `CLIPrimitive` instances
+
+3.2.4 — MCP loader
+- Reads MCP server manifests, instantiates `MCPPrimitive` instances
+
+3.2.5 — Embedding-based discovery
+- Generate embeddings from primitive name + description + signature; cosine-similarity search via `registry.find("resize an image")`
+
+3.2.6 — Plugin loader stub
+- Placeholder for Phase 3.12; directory scanned but empty initially
+
+3.2.7 — Tests
+- Registration, duplicate handling, name collisions, discovery relevance ranking, loader edge cases
 
 ---
-🚀 Release 3 — "Extensible Agent"
----
 
-### PHASE 3.3a — Fetch Orchestrator
+### PHASE 3.3 — Skills: Declarative Capability Layer
 *Depends On*: PHASE 3.2
 
-3.3.1. Define FetchError taxonomy  
-3.3.2. Define fetchurl skill interface — url, mode="auto".    
-3.3.3. Implement simple httpx fetch — fast, strict.    
-3.3.4. Implement hardened HTTP (CRW) — anti‑bot header (opinionated).    
-3.3.5. Implement Playwright headless — JS rendering (opinionated)    
-3.3.6. Implement Playwright stealth — heavy, rate‑limited (opnionated)  
-3.3.7. Implement search — query → URLs (see 3.3b search provider)  
-3.3.8. Implement fetch heuristics — escalation logic.    
-3.3.9. Implement fallback chain — simple → hardened → browser → stealth → search.    
-3.3.10. Add per‑domain policy — allowlists, rate limits.    
-3.3.11. Expose only fetch_url to LLM — hide internal strategies.  
+Skills are declarative `.skill.md` files with YAML front matter. S2 can call skills deterministically.
+
+3.3.1 — `.skill.md` parser
+- Extract YAML front matter, validate required fields, resolve primitive references against registry
+
+3.3.2 — SkillManifest dataclass
+- `name`, `description`, `primitives` (list of primitive names), `inputs` (schema dict), `steps` (ordered list of `{call, args, on_error}`)
+
+3.3.3 — Skill dataclass
+- Manifest + resolved `PrimitiveBase` objects + validated input/output schemas
+
+3.3.4 — SkillExecutor
+- Interpret steps sequentially: resolve primitive by name → call `primitive.execute(args, context)` → collect results → return `SkillResult`
+
+3.3.5 — Validation
+- At parse time: all referenced primitives exist; input schema is well-formed; step ordering is valid
+- At execution time: args match input schema; all steps complete or error
+
+3.3.6 — Tests
+- Parse valid `.skill.md`, reject malformed front matter, execute skill with mock primitives, test error propagation from failed primitives
 
 ---
 
-### PHASE 3.3b - Search Provider
-*Depends On*: PHASE 3.2 (Note: this may need to swap with fetch orchestrator phase)
+### PHASE 3.4 — Skill Registration & Semantic Discovery
+*Depends On*: PHASE 3.3
 
+Skills are discoverable via embeddings and ranked by relevance. S2 can select skills during planning.
+
+3.4.1 — SkillRegistry
+- `register(skill)`, `get(name) → Skill`, `list(filter) → list`, `find(query) → list[Match]`
+
+3.4.2 — Skill embedding generation
+- Embed skill name + description + step descriptions for semantic search
+
+3.4.3 — Semantic skill search
+- `find(query)` returns skills ranked by cosine similarity to query embedding
+
+3.4.4 — Skill metadata validation
+- At registration time: validate primitive references resolve, input schemas are consistent, no circular skill references
+
+3.4.5 — Tests
+- Registration, discovery relevance ranking, same-query consistency, validation rejection of broken skills
+
+---
+
+### PHASE 3.5 — Standard Library Core (stdlib)
+*Depends On*: PHASE 3.4
+
+A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
+
+3.5.1 — `python.echo` primitive
+- Returns input unchanged; used as canary for the full S2→S3→S2 round-trip
+
+3.5.2 — `python.file.read` primitive
+- Reads file at path, returns content as string
+
+3.5.3 — `python.file.write` primitive
+- Writes content to file at path
+
+3.5.4 — `cli.shell` primitive
+- Executes shell command via subprocess, returns stdout/stderr/exit_code
+
+3.5.5 — `echo_text` skill
+- `.skill.md` wrapping `python.echo`; validates input schema
+
+3.5.6 — `parse_json` skill
+- Parses JSON string via `python.echo` → Python parsing; returns dict or error
+
+3.5.7 — `fetch_url` skill (stub)
+- Declares `mcp.http.fetch` dependency; stub implementation until Phase 3.8
+
+3.5.8 — Tests
+- Each stdlib primitive and skill executed end-to-end via SkillExecutor
+
+---
+
+### PHASE 3.6 — S2 ↔ S3 Integration (Thin Adapter)
+*Depends On*: PHASE 3.5
+*Design rule*: S3 (`src/capabilities/`) never imports S1/S2. Integration code lives in `src/runtime/s3_adapter.py` as an adapter that speaks S3's public contract.
+
+3.6.1 — Finalize boundary contracts
+- `SkillCallRequest` (skill_name, args, context), `SkillResult` (status, data, error, side_effects), `SkillDiscoveryQuery` (description, limit), `SkillDiscoveryResult` (matches list)
+
+3.6.2 — `skill_runner.py` entry point
+- Accepts `SkillCallRequest`, resolves skill from registry, executes via `SkillExecutor`, returns `SkillResult`
+- `discover(query, limit) → SkillDiscoveryResult` for discovery queries
+
+3.6.3 — S3 adapter in S2 runtime
+- `src/runtime/s3_adapter.py`: `discover_skills(query)`, `call_skill(request)`, handles contract translation S2-native ↔ S3 contract types
+- This is the ONLY file that imports from both S2 and S3
+
+3.6.4 — Wire skill discovery into S2 planning
+- S2 queries S3 for relevant skills during plan construction; skill names stored in plan segments
+
+3.6.5 — Wire skill execution into S2 cycle
+- Segment referencing a skill triggers `s3_adapter.call_skill()` during cycle execution
+
+3.6.6 — Wire skill results into S2 state
+- `SkillResult` → S2 state update → segment memory record
+
+3.6.7 — Tests
+- S2→S3→S2 round-trip with `echo_text` skill: subgoal → segment → skill call → result → state update
+- Error propagation: invalid skill name, failed execution
+- Discovery flow: S2 queries skills, receives ranked list
+
+---
+
+### PHASE 3.7 — Tiny S3 Smoke Test
+*Depends On*: PHASE 3.6
+
+A minimal end-to-end test against the real LLM that proves S2 can discover and call an S3 skill. Pattern mirrors Phase 2.14.7's smoke test.
+
+3.7.1 — `tests/manual/test_s3_smoke.py`
+- 1 subgoal, 1 segment calling `echo_text` via `backend=real_llm`
+
+3.7.2 — Verify skill discovery
+- S2 queries S3 for relevant skills; `echo_text` appears in results
+
+3.7.3 — Verify plan construction
+- S2 builds a plan with a segment that references `echo_text`
+
+3.7.4 — Verify skill execution
+- S3 executes `echo_text` via SkillExecutor; result returned to S2
+
+3.7.5 — Verify state update
+- S2 updates segment memory from `SkillResult`
+
+3.7.6 — Verify trace completeness
+- Trace contains: skill discovery query → discovery result → skill call → skill result → state update
+
+3.7.7 — Real LLM confirmation
+- Run with `--backend real_llm`; confirm the full S2→S3→S2 circuit works end-to-end
+
+3.7.8 — Statistical conformance
+- Run `python -m tests.statistical.cli --scenario tiny_s3_smoke --repetitions 25 --backend real_llm`; verify 100% json_validity, 100% schema_validity, 0 catastrophic failures
+
+---
+
+### PHASE 3.8 — Fetch Orchestrator: Simple HTTP
+*Depends On*: PHASE 3.5
+
+3.8.1 — FetchError taxonomy
+- Dataclasses: `TimeoutError`, `HTTPError` (status_code, body), `ParseError`, `ConnectionError`
+
+3.8.2 — `mcp.http.fetch` primitive
+- httpx GET with configurable timeout, headers, status-code handling
+- Returns: `status_code`, `body` (str), `headers` (dict), `elapsed` (ms)
+
+3.8.3 — `fetch_url` skill
+- Wires to `mcp.http.fetch` primitive; returns status + body + headers
+- Accepts `url` and optional `timeout`, `headers` args
+
+3.8.4 — Tests
+- Successful fetch, timeout, 4xx response, 5xx response, connection refused, invalid URL
+
+---
+
+### PHASE 3.9 — Fetch Orchestrator: Hardened Modes
+*Depends On*: PHASE 3.8
+
+3.9.1 — Hardened HTTP fetch mode
+- Anti-bot headers (rotating User-Agent, Accept-Language), retry with exponential backoff, cookie jar
+
+3.9.2 — Playwright headless fetch mode
+- JS rendering via Playwright; handles SPA and JS-dependent content
+
+3.9.3 — Playwright stealth fetch mode
+- Stealth plugin, human-like timing, rate limiting, fingerprint masking
+
+3.9.4 — Tests
+- Each mode exercised against a known endpoint; mode-selection by flag; fallback on mode failure
+
+---
+
+### PHASE 3.10 — Fetch Orchestrator: Escalation & Domain Policy
+*Depends On*: PHASE 3.9
+
+3.10.1 — Fetch heuristics
+- Select initial mode based on URL pattern, content-type hints, prior success/failure history
+
+3.10.2 — Fallback chain
+- `simple → hardened → browser → stealth → search`; each step triggered by `FetchError` type
+- Mode-specific timeouts: simple (10s), hardened (15s), browser (30s), stealth (45s)
+
+3.10.3 — Per-domain policy
+- Allowlists, deny lists, rate limits, mode preferences per domain
+- Configurable via `domain_policy.json` or equivalent
+
+3.10.4 — Single LLM-facing interface
+- Expose only `fetch_url` skill; internal strategies (modes, escalation, policy) hidden behind it
+- LLM sees `fetch_url(url)` — nothing else
+
+3.10.5 — Tests
+- Escalation triggers correctly per error type; fallback transitions observed; policy enforces allow/deny; rate limiting honoured
+
+---
+
+### PHASE 3.11 — Search Provider
+*Depends On*: PHASE 3.10
+
+Depends on fetch infrastructure (simple HTTP) to retrieve search results.
+
+3.11.1 — Search primitive
+- Query → list of URLs with titles and snippets; uses fetch_url internally
+
+3.11.2 — `search_urls` skill
+- Wraps search primitive; normalises results; returns structured list
+
+3.11.3 — Wire into fetch fallback
+- When all fetch modes fail, search for alternative sources as last-resort fallback
+
+3.11.4 — `GetPageFromUrl` taxonomy
+- Define content type taxonomy (article, documentation, blog, unknown) for multimodal retrieval
+
+3.11.5 — Tests
+- Search returns results; fetch fallback triggers search; search results are usable by downstream fetch
+
+---
+
+### PHASE 3.12 — Plugin System
+*Depends On*: PHASE 3.5
+
+Users can drop in new primitives and skills with no code changes. Hot-loadable.
+
+3.12.1 — Plugin manifest format
+- `plugin.yml`: name, version, primitives (list), skills (list), dependencies
+
+3.12.2 — Plugin loader
+- Scans plugin directories, loads manifests, registers primitives + skills into registries
+
+3.12.3 — Hot-reload
+- Detect new/removed/modified plugins on file system changes; reload without restart
+
+3.12.4 — Plugin authoring guide
+- Document plugin structure, manifest schema, and examples in `docs/`
+
+3.12.5 — Tests
+- Load plugin, execute plugin skill, unload/reload cycle, invalid manifest rejection, version conflict handling
+
+---
+
+### PHASE 3.13 — Agent-Authored Skills (Future)
+*Depends On*: PHASE 3.7
+
+The agent can author new `.skill.md` files, propose new primitives, and extend its own capability layer.
+
+3.13.1 — Skill authoring pipeline
+- LLM writes `.skill.md` content; submitted to registry via validation gate
+
+3.13.2 — Safety checks
+- Validate all referenced primitives exist; input schemas are safe; no privilege escalation patterns
+- Reject skills that reference disallowed primitives or attempt to override system skills
+
+3.13.3 — Validation + embedding update
+- Validated skills are registered and embedded; immediately discoverable by future S2 planning
+
+3.13.4 — Tests
+- Agent authors a valid skill, exercises it; validation rejects dangerous skills; authored skill appears in discovery results
+
+---
+
+🚀 Release 3 — "Extensible Agent"
 ---
 
 ## STRATUM 4 - Distributed Runtime and System Infrastructure
