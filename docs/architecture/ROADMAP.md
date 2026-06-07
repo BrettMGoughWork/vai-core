@@ -855,19 +855,19 @@ Skills are declarative `.skill.md` files with YAML front matter. S2 can call ski
 
 Skills are discoverable via embeddings and ranked by relevance. S2 can select skills during planning.
 
-3.4.1 — SkillRegistry
+✅ 3.4.1 — SkillRegistry
 - `register(skill)`, `get(name) → Skill`, `list(filter) → list`, `find(query) → list[Match]`
 
-3.4.2 — Skill embedding generation
+✅ 3.4.2 — Skill embedding generation
 - Embed skill name + description + step descriptions for semantic search
 
-3.4.3 — Semantic skill search
+✅ 3.4.3 — Semantic skill search
 - `find(query)` returns skills ranked by cosine similarity to query embedding
 
-3.4.4 — Skill metadata validation
+✅ 3.4.4 — Skill metadata validation
 - At registration time: validate primitive references resolve, input schemas are consistent, no circular skill references
 
-3.4.5 — Tests
+✅ 3.4.5 — Tests
 - Registration, discovery relevance ranking, same-query consistency, validation rejection of broken skills
 
 ---
@@ -877,7 +877,7 @@ Skills are discoverable via embeddings and ranked by relevance. S2 can select sk
 
 S3 exposes static, declarative metadata so S2 can make deterministic planning decisions without violating purity.
 
-3.5.1 — Metadata fields on primitives and skills
+✅ 3.5.1 — Metadata fields on primitives and skills
 - Capability cost (latency, resource usage)
 - Determinism (pure, impure, nondeterministic)
 - Side-effects (fs, network, dangerous)
@@ -886,15 +886,15 @@ S3 exposes static, declarative metadata so S2 can make deterministic planning de
 - Safety level (low, medium, high)
 - Prerequisites (domain policy, auth, environment)
 
-3.5.2 — Metadata export via SkillDiscoveryResult
+✅ 3.5.2 — Metadata export via SkillDiscoveryResult
 - S3 attaches metadata to every discovered skill and primitive
 - Metadata is versioned and stable across releases
 
-3.5.3 — S2 consumption points
+✅ 3.5.3 — S2 consumption points
 - Metadata consumed during skill discovery, plan generation, segment construction
 - Also used for repair decisions, drift detection, and reflection
 
-3.5.4 — Tests
+✅ 3.5.4 — Tests
 - Deterministic ordering and hashing of exported metadata
 - Metadata stability across registry rebuilds
 
