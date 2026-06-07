@@ -719,7 +719,7 @@ A binary checklist for flipping the switch:
 ### PHASE 3.0 — Foundations: Specs, Contracts, and Directory Layout
 *Depends On*: PHASE 2.14.8
 
-3.0.1 — Folder layout
+✅ 3.0.1 — Folder layout
 - Create `src/capabilities/` with sub-packages:
   ```
   src/capabilities/
@@ -739,7 +739,7 @@ A binary checklist for flipping the switch:
         python_loader.py
         cli_loader.py
         mcp_loader.py
-        plugin_loader.py
+        plugin_loader.py 
     skills/
       __init__.py
       manifest.py           # .skill.md parser
@@ -758,14 +758,14 @@ A binary checklist for flipping the switch:
       skill_runner.py       # Entry point for S2→S3 calls
   ```
 
-3.0.2 — Primitive metadata spec
+✅ 3.0.2 — Primitive metadata spec
 - Define the shape of a primitive: name, type (`python` | `cli` | `mcp`), function signature, description, declared side effects, input/output schema
 
-3.0.3 — Skill manifest spec (`.skill.md`)
+✅ 3.0.3 — Skill manifest spec (`.skill.md`)
 - YAML front matter: `skill`, `description`, `primitives` (list of names), `inputs` (schema), `steps` (ordered list of `call:` references)
 - Markdown body: human-readable description and usage notes
 
-3.0.4 — S2↔S3 boundary contracts
+✅ 3.0.4 — S2↔S3 boundary contracts
 - `SkillCallRequest`, `SkillResult`, `SkillDiscoveryQuery`, `SkillDiscoveryResult` as pure dataclasses in `src/capabilities/contracts.py`
 - No imports from `src/core/` or `src/runtime/`
 
