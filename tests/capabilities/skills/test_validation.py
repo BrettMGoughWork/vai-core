@@ -13,7 +13,7 @@ from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveType, PrimitiveResult
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 from src.capabilities.skills.manifest import SkillManifest
-from src.capabilities.skills.skill import Skill
+from src.capabilities.skills.skill import CapabilitySkill
 from src.capabilities.skills.validation import (
     validate_manifest_structure,
     validate_execution_args,
@@ -70,7 +70,7 @@ def make_manifest(**overrides):
 
 
 def make_skill(**overrides):
-    """Create a Skill from a manifest and registry."""
+    """Create a CapabilitySkill from a manifest and registry."""
     manifest_data = {
         "name": "test",
         "description": "A test skill",
@@ -87,7 +87,7 @@ def make_skill(**overrides):
     manifest_data.update(overrides)
     manifest = SkillManifest.from_dict(manifest_data)
     reg = make_registry("file.read")
-    return Skill.from_manifest(manifest, reg)
+    return CapabilitySkill.from_manifest(manifest, reg)
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ class TestValidateStepResult:
             steps=[{"call": "file.read", "args": {}}],
         )
         reg = make_registry("file.read")
-        skill = Skill(
+        skill = CapabilitySkill(
             manifest=manifest,
             primitives={"file.read": reg.get("file.read")},
             input_schema={},
@@ -309,7 +309,7 @@ class TestValidateStepResult:
             steps=[{"call": "file.read", "args": {}}],
         )
         reg = make_registry("file.read")
-        skill = Skill(
+        skill = CapabilitySkill(
             manifest=manifest,
             primitives={"file.read": reg.get("file.read")},
             input_schema={},

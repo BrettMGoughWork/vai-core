@@ -13,8 +13,8 @@ from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveType, PrimitiveResult
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 from src.capabilities.skills.manifest import SkillManifest
-from src.capabilities.skills.skill import Skill
-from src.capabilities.skills.executor import SkillExecutor, SkillResult
+from src.capabilities.skills.skill import CapabilitySkill
+from src.capabilities.skills.executor import SkillExecutor, SkillExecutionResult
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ class ErrorPrimitive(PrimitiveBase):
 # ---------------------------------------------------------------------------
 
 def make_skill(*, primitives=None, steps=None, input_schema=None, output_schema=None):
-    """Build a minimal Skill with mock primitives."""
+    """Build a minimal CapabilitySkill with mock primitives."""
     primitive_names = list(primitives.keys()) if primitives else []
     manifest = SkillManifest(
         name="test-skill",
@@ -63,7 +63,7 @@ def make_skill(*, primitives=None, steps=None, input_schema=None, output_schema=
         inputs=input_schema or {},
         steps=steps or [],
     )
-    return Skill(
+    return CapabilitySkill(
         manifest=manifest,
         primitives=primitives or {},
         input_schema=input_schema or {},
@@ -72,29 +72,29 @@ def make_skill(*, primitives=None, steps=None, input_schema=None, output_schema=
 
 
 # ---------------------------------------------------------------------------
-# SkillResult tests
+# SkillExecutionResult tests
 # ---------------------------------------------------------------------------
 
-class TestSkillResult:
-    """Tests for the SkillResult dataclass."""
+class TestSkillExecutionResult:
+    """Tests for the SkillExecutionResult dataclass."""
 
     def test_success_result_defaults(self):
         """Default success result has expected values."""
-        result = SkillResult(status="success")
+        result = SkillExecutionResult(status="success")
         assert result.status == "success"
         assert result.results == []
         assert result.error is None
 
     def test_error_result_with_error(self):
         """Error result carries an error message."""
-        result = SkillResult(status="error", error="something went wrong")
+        result = SkillExecutionResult(status="error", error="something went wrong")
         assert result.status == "error"
         assert result.error == "something went wrong"
 
     def test_result_with_primitive_results(self):
         """results field stores PrimitiveResult list."""
         pr = PrimitiveResult(status="success", data={"key": "val"})
-        result = SkillResult(status="success", results=[pr])
+        result = SkillExecutionResult(status="success", results=[pr])
         assert len(result.results) == 1
         assert result.results[0].data == {"key": "val"}
 
@@ -138,7 +138,7 @@ class TestSkillExecutor:
         assert len(result.results) == 1
 
     def test_error_primitive_returns_error_result(self):
-        """When a primitive returns error, executor returns an error SkillResult."""
+        """When a primitive returns error, executor returns an error SkillExecutionResult."""
         prim = ErrorPrimitive(name="fail", error_msg="boom")
         skill = make_skill(
             primitives={"fail": prim},

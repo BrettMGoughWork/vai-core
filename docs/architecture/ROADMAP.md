@@ -776,22 +776,22 @@ A binary checklist for flipping the switch:
 
 A single interface for all primitive types (Python, CLI, MCP) with deterministic execution semantics.
 
-3.1.1 — PrimitiveBase
+✅ 3.1.1 — PrimitiveBase
 - Abstract base class with unified signature: `execute(args: dict, context: dict) → PrimitiveResult`
 
-3.1.2 — PrimitiveResult
+✅ 3.1.2 — PrimitiveResult
 - Dataclass: `status` (success | error), `data`, `error` (message string), `side_effects` (list of observed effects)
 
-3.1.3 — PythonPrimitive
+✅ 3.1.3 — PythonPrimitive
 - Wraps a Python callable with signature validation and side-effect tracking
 
-3.1.4 — CLIPrimitive
+✅ 3.1.4 — CLIPrimitive
 - Wraps a CLI command string; subprocess execution with stdout/stderr capture and exit-code handling
 
-3.1.5 — MCPPrimitive
+✅ 3.1.5 — MCPPrimitive
 - Wraps an MCP tool reference; delegates to MCP client for execution
 
-3.1.6 — Tests
+✅ 3.1.6 — Tests
 - Each primitive type: valid args, invalid args, side-effect tracking, error propagation
 
 ---
@@ -801,25 +801,25 @@ A single interface for all primitive types (Python, CLI, MCP) with deterministic
 
 A registry that loads primitives from code, CLI definitions, MCP manifests, and plugins. Vector-based semantic discovery.
 
-3.2.1 — PrimitiveRegistry
+✅ 3.2.1 — PrimitiveRegistry
 - `register(name, primitive)`, `get(name) → PrimitiveBase`, `list(filter) → list`, `find(query) → list[Match]`
 
-3.2.2 — Python loader
+✅ 3.2.2 — Python loader
 - Scans Python modules for `PrimitiveBase` subclasses, auto-registers by name
 
-3.2.3 — CLI loader
+✅ 3.2.3 — CLI loader
 - Reads CLI definition files (JSON/YAML), instantiates `CLIPrimitive` instances
 
-3.2.4 — MCP loader
+✅ 3.2.4 — MCP loader
 - Reads MCP server manifests, instantiates `MCPPrimitive` instances
 
-3.2.5 — Embedding-based discovery
+✅ 3.2.5 — Embedding-based discovery
 - Generate embeddings from primitive name + description + signature; cosine-similarity search via `registry.find("resize an image")`
 
-3.2.6 — Plugin loader stub
+✅ 3.2.6 — Plugin loader stub
 - Placeholder for Phase 3.14; directory scanned but empty initially
 
-3.2.7 — Tests
+✅ 3.2.7 — Tests
 - Registration, duplicate handling, name collisions, discovery relevance ranking, loader edge cases
 
 ---
@@ -829,23 +829,23 @@ A registry that loads primitives from code, CLI definitions, MCP manifests, and 
 
 Skills are declarative `.skill.md` files with YAML front matter. S2 can call skills deterministically.
 
-3.3.1 — `.skill.md` parser
+✅ 3.3.1 — `.skill.md` parser
 - Extract YAML front matter, validate required fields, resolve primitive references against registry
 
-3.3.2 — SkillManifest dataclass
+✅ 3.3.2 — SkillManifest dataclass
 - `name`, `description`, `primitives` (list of primitive names), `inputs` (schema dict), `steps` (ordered list of `{call, args, on_error}`)
 
-3.3.3 — Skill dataclass
+✅ 3.3.3 — Skill dataclass
 - Manifest + resolved `PrimitiveBase` objects + validated input/output schemas
 
-3.3.4 — SkillExecutor
+✅ 3.3.4 — SkillExecutor
 - Interpret steps sequentially: resolve primitive by name → call `primitive.execute(args, context)` → collect results → return `SkillResult`
 
-3.3.5 — Validation
+✅ 3.3.5 — Validation
 - At parse time: all referenced primitives exist; input schema is well-formed; step ordering is valid
 - At execution time: args match input schema; all steps complete or error
 
-3.3.6 — Tests
+✅ 3.3.6 — Tests
 - Parse valid `.skill.md`, reject malformed front matter, execute skill with mock primitives, test error propagation from failed primitives
 
 ---

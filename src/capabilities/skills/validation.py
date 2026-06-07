@@ -15,7 +15,7 @@ from src.capabilities.primitives.types import PrimitiveResult
 
 if TYPE_CHECKING:
     from src.capabilities.skills.manifest import SkillManifest
-    from src.capabilities.skills.skill import Skill
+    from src.capabilities.skills.skill import CapabilitySkill
 
 _SCHEMA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "string": str,
@@ -83,7 +83,7 @@ def validate_manifest_structure(manifest: SkillManifest, registry: Any) -> None:
             raise ValueError("invalid step structure")
 
 
-def validate_execution_args(skill: Skill, args: dict[str, Any]) -> None:
+def validate_execution_args(skill: CapabilitySkill, args: dict[str, Any]) -> None:
     """Execution-time validation of *args* against *skill.input_schema*.
 
     Checks:
@@ -120,7 +120,7 @@ def validate_execution_args(skill: Skill, args: dict[str, Any]) -> None:
 
 
 def validate_step_result(
-    skill: Skill,
+    skill: CapabilitySkill,
     step_result: PrimitiveResult,
     step_index: int,
 ) -> None:

@@ -32,7 +32,7 @@ def _is_json_serializable(value: Any) -> bool:
 
 
 @dataclass
-class Skill:
+class CapabilitySkill:
     """Runtime‑ready skill combining a manifest, resolved primitives, and schemas."""
 
     manifest: SkillManifest
@@ -52,15 +52,15 @@ class Skill:
         cls,
         manifest: SkillManifest,
         registry: "PrimitiveRegistry",
-    ) -> "Skill":
-        """Construct and validate a ``Skill`` from a ``SkillManifest``.
+    ) -> "CapabilitySkill":
+        """Construct and validate a ``CapabilitySkill`` from a ``SkillManifest``.
 
         Args:
             manifest: A ``SkillManifest`` (must pass ``manifest.validate()``).
             registry: ``PrimitiveRegistry`` used to resolve primitive names.
 
         Returns:
-            A fully constructed and validated ``Skill``.
+            A fully constructed and validated ``CapabilitySkill``.
 
         Raises:
             ValueError: If the manifest fails validation, any primitive name

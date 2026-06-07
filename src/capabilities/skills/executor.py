@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING, Any
 from src.capabilities.primitives.types import PrimitiveResult
 
 if TYPE_CHECKING:
-    from src.capabilities.skills.skill import Skill
+    from src.capabilities.skills.skill import CapabilitySkill
 
 
 @dataclass
-class SkillResult:
+class SkillExecutionResult:
     """Result of executing a skill."""
 
     status: str
@@ -33,23 +33,23 @@ class SkillResult:
 
 
 class SkillExecutor:
-    """Executes a ``Skill`` by stepping through its manifest steps sequentially."""
+    """Executes a ``CapabilitySkill`` by stepping through its manifest steps sequentially."""
 
     def execute(
         self,
-        skill: Skill,
+        skill: CapabilitySkill,
         inputs: dict[str, Any],
         context: dict[str, Any],
-    ) -> SkillResult:
+    ) -> SkillExecutionResult:
         """Execute *skill* with *inputs* and *context*.
 
         Args:
-            skill: The runtime‑ready ``Skill`` to execute.
+            skill: The runtime‑ready ``CapabilitySkill`` to execute.
             inputs: Input arguments (validated against the skill's input schema).
             context: Execution context passed to every primitive call.
 
         Returns:
-            ``SkillResult`` with per‑step results and overall status.
+            ``SkillExecutionResult`` with per‑step results and overall status.
         """
         skill.validate_inputs(inputs)
 
@@ -70,7 +70,7 @@ class SkillExecutor:
             if result.status == "error":
                 if on_error == "continue":
                     continue
-                return SkillResult(
+                return SkillExecutionResult(
                     status="error",
                     results=step_results,
                     error=result.error,
@@ -80,7 +80,7 @@ class SkillExecutor:
         if step_results and step_results[-1].data is not None:
             skill.validate_outputs(step_results[-1].data)
 
-        return SkillResult(
+        return SkillExecutionResult(
             status="success",
             results=step_results,
             error=None,
