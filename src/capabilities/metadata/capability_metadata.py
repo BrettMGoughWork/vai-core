@@ -1,7 +1,7 @@
 """
 Phase 3.5.1 — Capability metadata dataclasses.
 
-PrimitiveMetadata and SkillMetadata describe cost, determinism,
+PrimitiveMetadata and CapabilitySkillMetadata describe cost, determinism,
 side-effects, output shape, failure modes, safety, and prerequisites.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ class PrimitiveMetadata:
 
 
 @dataclass
-class SkillMetadata:
+class CapabilitySkillMetadata:
     cost_latency: int
     cost_resources: str
     determinism: str
@@ -41,12 +41,12 @@ class SkillMetadata:
         _validate_metadata(self)
 
 
-def validate_metadata(obj: Union[PrimitiveMetadata, SkillMetadata]) -> None:
+def validate_metadata(obj: Union[PrimitiveMetadata, CapabilitySkillMetadata]) -> None:
     """Validate that all metadata fields are present and correctly typed."""
     _validate_metadata(obj)
 
 
-def _validate_metadata(obj: Union[PrimitiveMetadata, SkillMetadata]) -> None:
+def _validate_metadata(obj: Union[PrimitiveMetadata, CapabilitySkillMetadata]) -> None:
     required_fields = [
         "cost_latency",
         "cost_resources",

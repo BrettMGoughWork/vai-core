@@ -181,7 +181,7 @@ class TestSearchResultStability:
 
         from src.capabilities.registry.skill_discovery_result import (
             build_discovery_result,
-            SkillDiscoveryResult,
+            SkillSearchResult,
         )
 
         def cosine_similarity(a, b):
@@ -190,7 +190,7 @@ class TestSearchResultStability:
             n2 = math.sqrt(sum(y * y for y in b))
             return dot / (n1 * n2) if n1 and n2 else 0.0
 
-        def search(query: str, registry: FakeRegistry) -> List[SkillDiscoveryResult]:
+        def search(query: str, registry: FakeRegistry) -> List[SkillSearchResult]:
             qemb = fake_embedding(query)
             results = []
             for skill in registry:

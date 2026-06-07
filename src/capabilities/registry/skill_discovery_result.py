@@ -1,7 +1,7 @@
 """
 Phase 3.5.2 — Metadata export for semantic skill discovery.
 
-When S2 performs semantic discovery, S3 returns SkillDiscoveryResult
+When S2 performs semantic discovery, S3 returns SkillSearchResult
 objects that include skill metadata and primitive metadata for all
 referenced primitives.  Metadata is deterministic, JSON‑serializable,
 and versioned.
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from src.capabilities.skills.skill import CapabilitySkill as Skill
     from src.capabilities.metadata.capability_metadata import (
         PrimitiveMetadata,
-        SkillMetadata,
+        CapabilitySkillMetadata,
     )
 
 
@@ -55,7 +55,7 @@ class PrimitiveMetadataExport:
 
 
 @dataclass
-class SkillDiscoveryResult:
+class SkillSearchResult:
     """A discovered skill returned during semantic search.
 
     Includes skill metadata and primitive metadata for all referenced
@@ -71,15 +71,15 @@ class SkillDiscoveryResult:
     skill: "Skill" = field(repr=False)
 
 
-def build_discovery_result(skill: "Skill", score: float) -> SkillDiscoveryResult:
-    """Build a ``SkillDiscoveryResult`` from a skill and its relevance score.
+def build_discovery_result(skill: "Skill", score: float) -> SkillSearchResult:
+    """Build a ``SkillSearchResult`` from a skill and its relevance score.
 
     Args:
         skill: A runtime‑ready ``CapabilitySkill`` with metadata attached.
         score: Relevance score from semantic search (0.0–1.0).
 
     Returns:
-        ``SkillDiscoveryResult`` with exported metadata for S2 consumption.
+        ``SkillSearchResult`` with exported metadata for S2 consumption.
     """
     skill_meta = skill.metadata  # type: ignore[attr-defined]
 
@@ -103,7 +103,7 @@ def build_discovery_result(skill: "Skill", score: float) -> SkillDiscoveryResult
             PrimitiveMetadataExport.from_primitive(prim_name, prim_meta)
         )
 
-    return SkillDiscoveryResult(
+    return SkillSearchResult(
         name=skill.manifest.name,
         score=score,
         version="1.0",

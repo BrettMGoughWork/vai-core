@@ -109,7 +109,7 @@ class FakeRegistry:
 # ── canonical hash (reused from hashing tests) ────────────────────────────
 
 def compute_hash(result) -> str:
-    """Compute a stable SHA‑256 hash of a SkillDiscoveryResult."""
+    """Compute a stable SHA‑256 hash of a SkillSearchResult."""
     primitives = []
     for pe in result.primitive_metadata:
         pe_dict = vars(pe).copy()

@@ -1,7 +1,7 @@
 """
 Phase 3.5.4 — Tests for metadata export determinism.
 
-Validates that SkillDiscoveryResult exports are deterministic,
+Validates that SkillSearchResult exports are deterministic,
 JSON‑serializable, and contain no dynamic fields.
 """
 from __future__ import annotations

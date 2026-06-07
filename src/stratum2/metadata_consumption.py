@@ -12,19 +12,19 @@ from typing import Any, Dict, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.capabilities.registry.skill_discovery_result import (
-        SkillDiscoveryResult,
+        SkillSearchResult,
         PrimitiveMetadataExport,
     )
     from src.capabilities.skills.skill import CapabilitySkill as Skill
 
 
-def consume_discovery_metadata(result: "SkillDiscoveryResult") -> Dict[str, Any]:
-    """Consume a ``SkillDiscoveryResult`` for downstream S2 use.
+def consume_discovery_metadata(result: "SkillSearchResult") -> Dict[str, Any]:
+    """Consume a ``SkillSearchResult`` for downstream S2 use.
 
     Used immediately after semantic skill search.
 
     Args:
-        result: A ``SkillDiscoveryResult`` from the S3 discovery pipeline.
+        result: A ``SkillSearchResult`` from the S3 discovery pipeline.
 
     Returns:
         A JSON‑serializable dict with name, score, skill_metadata,
@@ -41,13 +41,13 @@ def consume_discovery_metadata(result: "SkillDiscoveryResult") -> Dict[str, Any]
     }
 
 
-def consume_for_plan_generation(result: "SkillDiscoveryResult") -> Dict[str, Any]:
+def consume_for_plan_generation(result: "SkillSearchResult") -> Dict[str, Any]:
     """Extract planning‑relevant metadata from a discovery result.
 
     Used when S2 selects skills for inclusion in a plan.
 
     Args:
-        result: A ``SkillDiscoveryResult`` from the S3 discovery pipeline.
+        result: A ``SkillSearchResult`` from the S3 discovery pipeline.
 
     Returns:
         A JSON‑serializable dict with cost, determinism, safety_level,

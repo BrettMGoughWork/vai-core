@@ -181,20 +181,20 @@ class TestPrimitiveMetadataExport:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# SkillDiscoveryResult tests
+# SkillSearchResult tests
 # ═══════════════════════════════════════════════════════════════════════════
 
-class TestSkillDiscoveryResult:
-    """Tests for SkillDiscoveryResult dataclass."""
+class TestSkillSearchResult:
+    """Tests for SkillSearchResult dataclass."""
 
     def test_constructed_with_all_fields(self):
         from src.capabilities.registry.skill_discovery_result import (
-            SkillDiscoveryResult,
+            SkillSearchResult,
             PrimitiveMetadataExport,
         )
 
         skill = FakeSkill("test-skill", FakeSkillMetadata(), {})
-        result = SkillDiscoveryResult(
+        result = SkillSearchResult(
             name="test-skill",
             score=0.85,
             version="1.0",
@@ -211,10 +211,10 @@ class TestSkillDiscoveryResult:
         assert result.skill is skill
 
     def test_skill_field_not_in_repr(self):
-        from src.capabilities.registry.skill_discovery_result import SkillDiscoveryResult
+        from src.capabilities.registry.skill_discovery_result import SkillSearchResult
 
         skill = FakeSkill("test", FakeSkillMetadata(), {})
-        result = SkillDiscoveryResult(
+        result = SkillSearchResult(
             name="test", score=1.0, version="1.0",
             skill_metadata={}, primitive_metadata=[], skill=skill,
         )
@@ -222,9 +222,9 @@ class TestSkillDiscoveryResult:
         assert "skill=" not in r
 
     def test_version_always_1_0(self):
-        from src.capabilities.registry.skill_discovery_result import SkillDiscoveryResult
+        from src.capabilities.registry.skill_discovery_result import SkillSearchResult
 
-        result = SkillDiscoveryResult(
+        result = SkillSearchResult(
             name="test", score=1.0, version="1.0",
             skill_metadata={}, primitive_metadata=[], skill=None,
         )
