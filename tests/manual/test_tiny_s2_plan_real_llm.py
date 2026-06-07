@@ -109,12 +109,17 @@ def test_tiny_s2_plan_real_llm():
     print(f"  agent_cycle: {request.prompt.get('agent_cycle')}")
     print(f"  plan_context keys: {list(request.plan_context.keys())}")
 
-    # 3. Enable the real LLM kill-switch
+    # 3. Enable the real LLM kill-switch (restore after test to avoid
+    #    contaminating other tests that expect the stub path)
+    _prev_enable = s1_real_client.ENABLE_REAL_LLM
     s1_real_client.ENABLE_REAL_LLM = True
+    try:
 
-    # 4. Call the real LLM backend (S2 → S1)
-    print(f"\n-- CALLING S1 BACKEND (real_llm) --")
-    response = call_s1_backend(request, backend="real_llm")
+        # 4. Call the real LLM backend (S2 → S1)
+        print(f"\n-- CALLING S1 BACKEND (real_llm) --")
+        response = call_s1_backend(request, backend="real_llm")
+    finally:
+        s1_real_client.ENABLE_REAL_LLM = _prev_enable
 
     print(f"  Response type: {type(response).__name__}")
 

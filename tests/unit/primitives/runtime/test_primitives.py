@@ -7,10 +7,9 @@ filter_by_category, filter_allowed).
 """
 import pytest
 
-from src.primitives.runtime.registry import SkillRegistry
-from src.primitives.runtime.toolspec import ToolSpec
-from src.primitives.runtime.categories import SkillCategory
-from src.primitives.runtime.side_effects import SideEffect
+from src.core.types.registry import SkillRegistry
+from src.core.types.toolspec import ToolSpec
+from src.core.types.capabilities import SkillCategory, SideEffect
 from src.core.state.config import AgentConfig
 
 
@@ -158,7 +157,7 @@ class TestAllSpecsForAgent:
         assert not any(s.name == "fs_tool" for s in result)
 
     def test_spec_with_disallowed_side_effects_excluded(self):
-        from src.primitives.runtime.side_effects import SideEffect
+        from src.core.types.capabilities import SideEffect
         SkillRegistry._skills["writer"] = _spec("writer", side_effects=SideEffect.WRITE)
         config = _config(allowed_tools=["writer"], side_effects=[SideEffect.NONE])
 
@@ -187,7 +186,7 @@ class TestAllSpecsForAgent:
 
 class TestFilterHelpers:
     def test_filter_by_category_returns_matching_specs(self):
-        from src.primitives.runtime.categories import SkillCategory
+        from src.core.types.capabilities import SkillCategory
         SkillRegistry._skills["math"] = _spec("math", category=SkillCategory.MATH)
         SkillRegistry._skills["text"] = _spec("text", category=SkillCategory.GENERAL)
 

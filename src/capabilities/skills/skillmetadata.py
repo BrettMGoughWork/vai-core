@@ -1,11 +1,2 @@
-from dataclasses import dataclass
-
-
-@dataclass
-class SkillMetadata:
-    domains: list[str]
-    input_types: list[str]
-    output_types: list[str]
-    safety_tags: list[str]
-    cost_hint: int
-    latency_hint: int
+# Re-exported from domain layer for backward compatibility.
+from src.core.types.skill import SkillMetadata  # noqa: F401

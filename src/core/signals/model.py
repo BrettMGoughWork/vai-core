@@ -16,6 +16,7 @@ class SignalType(str, Enum):
     DRIFT = "drift"
     STUCK = "stuck"
     UNSAFE = "unsafe"
+    BEHAVIOURAL_SHAPE_MISMATCH = "behavioural_shape_mismatch"
 
 
 class SignalSeverity(str, Enum):

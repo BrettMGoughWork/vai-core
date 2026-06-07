@@ -1,63 +1,103 @@
 """
-MCPPrimitive – a primitive backed by an MCP (Model Context Protocol) server.
+MCPPrimitive — a primitive backed by an MCP server (Phase 3.1.5).
 
-MCP primitives delegate execution to an external MCP server,
-enabling cross-language and cross-process capabilities.
+MCP primitives delegate execution to an external MCP server via the
+Model Context Protocol, enabling cross‑language and cross‑process
+capabilities.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+import json
+from typing import Any
 
-from src.capabilities.primitives.base import PrimitiveBase, PrimitiveType
+from src.capabilities.primitives.base import PrimitiveBase
+from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 
 
 class MCPPrimitive(PrimitiveBase):
     """A primitive backed by an MCP server endpoint."""
 
+    __match_args__ = ("name",)
+
     def __init__(
         self,
+        *,
         name: str,
         description: str,
         server_name: str,
         tool_name: str,
-        *,
-        input_schema: Optional[Dict[str, Any]] = None,
-        output_schema: Optional[Dict[str, Any]] = None,
-        side_effects: Optional[list[str]] = None,
-        deterministic: bool = False,
-        pure: bool = False,
-        idempotent: bool = False,
-        enabled: bool = True,
-        server_config: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         super().__init__(
             name=name,
-            primitive_type=PrimitiveType.MCP,
             description=description,
-            handler=self._call_mcp,
-            input_schema=input_schema or {},
-            output_schema=output_schema,
-            side_effects=side_effects or [],
-            deterministic=deterministic,
-            pure=pure,
-            idempotent=idempotent,
-            enabled=enabled,
+            primitive_type=PrimitiveType.MCP,
         )
-        self._server_name = server_name
-        self._tool_name = tool_name
-        self._server_config = server_config or {}
+        self.server_name = server_name
+        """Key used to look up the MCP server in the registry."""
+        self.tool_name = tool_name
+        """The MCP tool to invoke on that server."""
 
-    def _call_mcp(self, **kwargs) -> Any:
-        """
-        Placeholder MCP call implementation.
+    # ------------------------------------------------------------------
+    # PrimitiveBase interface
+    # ------------------------------------------------------------------
 
-        Full MCP integration requires an MCP client transport
-        and connection lifecycle management. This will be
-        implemented in a later phase when the MCP runtime is ready.
+    def validate_args(self, args: dict) -> None:
         """
-        raise NotImplementedError(
-            f"MCP primitive '{self.name}' is not yet implemented. "
-            f"Server: {self._server_name}, Tool: {self._tool_name}. "
-            f"Arguments: {kwargs}"
+        Validate that ``args`` is a dict suitable for MCP transport.
+
+        All keys must be strings and all values must be
+        JSON‑serializable (best‑effort check).
+        """
+        if not isinstance(args, dict):
+            raise ValueError("args must be a dict")
+
+        for key in args:
+            if not isinstance(key, str):
+                raise ValueError(f"All keys must be strings, got {type(key).__name__}")
+
+        # Best-effort JSON-serialisability check
+        try:
+            json.dumps(args)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"args values must be JSON-serializable: {exc}") from exc
+
+    def execute(self, args: dict, context: dict) -> PrimitiveResult:
+        """
+        Resolve the MCP server from ``context`` and invoke the tool.
+
+        Expects ``context`` to contain an ``"mcpclient"`` entry whose
+        ``get_server()`` method returns the server handle backing
+        ``self.server_name``.
+        """
+        self.validate_args(args)
+
+        # --- resolve MCP client ---
+        mcp_client = context.get("mcpclient")
+        if mcp_client is None:
+            return PrimitiveResult(
+                status="error",
+                error="missing mcpclient",
+            )
+
+        # --- resolve server ---
+        server = mcp_client.get_server(self.server_name)
+        if server is None:
+            return PrimitiveResult(
+                status="error",
+                error=f"unknown MCP server: {self.server_name!r}",
+            )
+
+        # --- invoke tool ---
+        try:
+            response = server.call_tool(self.tool_name, args)
+        except Exception as exc:
+            return PrimitiveResult(
+                status="error",
+                error=str(exc),
+            )
+
+        return PrimitiveResult(
+            status="success",
+            data=response,
         )

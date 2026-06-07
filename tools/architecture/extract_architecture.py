@@ -14,10 +14,17 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "architecture.json"
@@ -33,6 +40,9 @@ STRATUM_RULES: list[tuple[str, str]] = [
     ("primitives\\_dev", "test"),
     ("tools/", "test"),
     ("tools\\", "test"),
+    # capability (Stratum 3 — primitives, skills, registry, discovery)
+    ("capabilities/", "capability"),
+    ("capabilities\\", "capability"),
     # infrastructure
     ("core/llm", "infrastructure"),
     ("core\\llm", "infrastructure"),
@@ -268,6 +278,101 @@ def extract_class_info(
     }
 
 
+def collect_skill_files(root: Path) -> list[Path]:
+    """Collect all .skill.md files from the repository."""
+    result = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
+        for fname in sorted(filenames):
+            if fname.endswith(".skill.md"):
+                result.append(Path(dirpath) / fname)
+    return result
+
+
+def parse_skill_frontmatter(filepath: Path) -> dict[str, Any] | None:
+    """Parse YAML front-matter from a .skill.md file.
+
+    Returns a dict with keys: name, description, inputs, outputs, primitives, file.
+    Returns None on parse failure.
+    """
+    try:
+        text = filepath.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    # Extract YAML between first two --- markers
+    if not text.startswith("---"):
+        return None
+
+    end_idx = text.find("---", 3)
+    if end_idx == -1:
+        return None
+
+    yaml_block = text[3:end_idx].strip()
+
+    if HAS_YAML:
+        try:
+            front = yaml.safe_load(yaml_block)
+        except yaml.YAMLError:
+            return None
+    else:
+        front = _parse_yaml_regex(yaml_block)
+
+    if not isinstance(front, dict):
+        return None
+
+    return {
+        "name": front.get("name", ""),
+        "description": front.get("description", ""),
+        "inputs": front.get("inputs", []),
+        "outputs": front.get("outputs", []),
+        "primitives": front.get("primitives", []),
+        "file": str(filepath.relative_to(REPO_ROOT)).replace("\\", "/"),
+    }
+
+
+def _parse_yaml_regex(text: str) -> dict[str, Any]:
+    """Minimal YAML key: value parser as fallback when PyYAML is unavailable."""
+    result: dict[str, Any] = {}
+    list_key: str | None = None
+    list_vals: list[str] = []
+
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        # List item
+        if stripped.startswith("- "):
+            val = stripped[2:].strip().strip("'\"")
+            if list_key is not None:
+                list_vals.append(val)
+            continue
+
+        # Flush prior list
+        if list_key is not None:
+            result[list_key] = list_vals
+            list_vals = []
+            list_key = None
+
+        # key: value
+        m = re.match(r'^(\w[\w_-]*)\s*:\s*(.*)', stripped)
+        if m:
+            key = m.group(1)
+            val = m.group(2).strip().strip("'\"")
+            if val == "":
+                list_key = key
+                list_vals = []
+            else:
+                result[key] = val
+
+    # Flush trailing list
+    if list_key is not None:
+        result[list_key] = list_vals
+
+    return result
+
+
 def main() -> None:
     py_files = collect_py_files(REPO_ROOT)
 
@@ -332,18 +437,28 @@ def main() -> None:
     for cls in classes:
         cls["fan_in"] = fan_in_counts.get(cls["name"], 0)
 
+    # Collect skill manifests
+    skill_files = collect_skill_files(REPO_ROOT)
+    skills: list[dict] = []
+    for sf in skill_files:
+        parsed = parse_skill_frontmatter(sf)
+        if parsed:
+            skills.append(parsed)
+
     output = {
         "packages": packages,
         "classes": classes,
         "references": top_references,
+        "skills": skills,
     }
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(output, indent=2), encoding="utf-8")
     print(f"Written: {OUTPUT_PATH}")
-    print(f"  packages : {len(packages)}")
-    print(f"  classes  : {len(classes)}")
+    print(f"  packages  : {len(packages)}")
+    print(f"  classes   : {len(classes)}")
     print(f"  references: {len(top_references)}")
+    print(f"  skills    : {len(skills)}")
 
 
 if __name__ == "__main__":

@@ -1,101 +1,79 @@
 """
-Primitive metadata spec (Phase 3.0.2).
+PrimitiveBase — abstract base class for all S3 primitives (Phase 3.1.1).
 
-Defines the shape of a primitive: name, type, function signature,
-description, declared side effects, input/output schema.
+Defines the unified execution contract that every primitive must
+fulfil: ``execute(args, context) -> PrimitiveResult``.
+
+This module is the single abstraction boundary between Stratum 2
+(Planning + Execution) and Stratum 3 (Capabilities).  Every concrete
+primitive type (Python, CLI, MCP) subclasses PrimitiveBase and
+implements its own validation and execution logic.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from abc import ABC, abstractmethod
+from typing import Any
+
+from src.capabilities.primitives.types import PrimitiveType, PrimitiveResult
 
 
-class PrimitiveType(str, Enum):
-    """The runtime type of a primitive."""
-    PYTHON = "python"
-    CLI = "cli"
-    MCP = "mcp"
-
-
-@dataclass
-class PrimitiveResult:
-    """Standardised return value from primitive execution."""
-
-    success: bool
-    """Whether the call succeeded without error."""
-
-    value: Any = None
-    """The return value on success."""
-
-    error: Optional[str] = None
-    """Error message on failure."""
-
-    error_type: Optional[str] = None
-    """Machine-readable error category."""
-
-    duration_ms: Optional[float] = None
-    """Wall-clock execution time in milliseconds."""
-
-
-@dataclass
-class PrimitiveBase:
+class PrimitiveBase(ABC):
     """
-    Base class for all primitives.
+    Abstract base class for all S3 primitives.
 
     A primitive is the lowest-level building block in Stratum 3.
     Skills compose primitives into higher-level workflows.
+
+    Every primitive MUST implement two methods:
+
+    * ``validate_args(self, args: dict) -> None``
+      Validate that the supplied arguments are well-formed.
+      Raise ``ValueError`` on invalid input.
+
+    * ``execute(self, args: dict, context: dict) -> PrimitiveResult``
+      Execute the primitive with validated arguments and runtime context.
+      Return a ``PrimitiveResult`` indicating success or failure.
+
+    The ``args`` dict is a closed, explicit, serializable dictionary
+    — never ``**kwargs``.  This guarantees determinism and enables
+    replayability across S2→S3 calls.
     """
 
-    name: str
-    """Unique, dot-separated hierarchical name (e.g. 'file.read', 'json.parse')."""
+    def __init__(self, *, name: str, description: str, primitive_type: PrimitiveType) -> None:
+        self.name = name
+        """Canonical primitive name (e.g. ``'file.read'``, ``'json.parse'``)."""
 
-    primitive_type: PrimitiveType
-    """Runtime type: python, cli, or mcp."""
+        self.description = description
+        """Human-readable description of what this primitive does."""
 
-    description: str
-    """Human-readable description of what this primitive does."""
+        self.primitive_type = primitive_type
+        """Runtime type: ``python``, ``cli``, or ``mcp``."""
 
-    handler: Callable[..., Any]
-    """Python callable that executes the primitive."""
+    @abstractmethod
+    def validate_args(self, args: dict) -> None:
+        """
+        Validate that ``args`` is well-formed for this primitive.
 
-    input_schema: Dict[str, Any] = field(default_factory=dict)
-    """JSON Schema describing expected input arguments."""
+        Args:
+            args: Closed, serializable dictionary of input arguments.
 
-    output_schema: Optional[Dict[str, Any]] = None
-    """JSON Schema describing expected output shape (optional)."""
+        Raises:
+            ValueError: If ``args`` is invalid.
+        """
+        ...
 
-    side_effects: List[str] = field(default_factory=list)
-    """Declared side effects (e.g. 'read', 'write', 'network', 'system')."""
+    @abstractmethod
+    def execute(self, args: dict, context: dict) -> PrimitiveResult:
+        """
+        Execute the primitive with validated arguments and runtime context.
 
-    deterministic: bool = True
-    """Whether the primitive is deterministic (same input → same output)."""
+        Args:
+            args: Closed, serializable dictionary of input arguments.
+            context: Runtime context dictionary (may include caller info,
+                     trace ids, resource limits, etc.).
 
-    pure: bool = True
-    """Whether the primitive is pure (no side effects, no external state)."""
-
-    idempotent: bool = True
-    """Whether repeated calls with the same input yield the same result."""
-
-    enabled: bool = True
-    """Whether the primitive is enabled for use."""
-
-    def execute(self, **kwargs) -> PrimitiveResult:
-        """Execute the primitive with validated arguments."""
-        import time
-        start = time.perf_counter()
-        try:
-            result = self.handler(**kwargs)
-            return PrimitiveResult(
-                success=True,
-                value=result,
-                duration_ms=(time.perf_counter() - start) * 1000,
-            )
-        except Exception as exc:
-            return PrimitiveResult(
-                success=False,
-                error=str(exc),
-                error_type=type(exc).__name__,
-                duration_ms=(time.perf_counter() - start) * 1000,
-            )
+        Returns:
+            ``PrimitiveResult`` indicating success or failure.
+        """
+        ...

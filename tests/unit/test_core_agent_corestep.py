@@ -5,8 +5,7 @@ from src.core.state.core_step_executor import core_step
 from src.core.state.step_outcome import StepOutcome
 from src.core.state.state import ConversationState
 from src.core.llm.types import CoreLLMResponse
-from src.primitives.runtime.categories import SkillCategory
-from src.primitives.runtime.side_effects import SideEffect
+from src.core.types.capabilities import SkillCategory, SideEffect
 from src.core.types.result import CoreResult
 
 

@@ -20,8 +20,7 @@ from src.execution.retry.circuit_breaker import CircuitBreaker
 from src.execution.degraded_mode import DegradedModeController
 from src.execution.self_healing import SelfHealingController
 from src.execution.poison_job_detector import PoisonJobDetector
-from src.primitives.runtime.categories import SkillCategory
-from src.primitives.runtime.side_effects import SideEffect
+from src.core.types.capabilities import SkillCategory, SideEffect
 
 
 # ── Fakes ─────────────────────────────────────────────────────────────────────
