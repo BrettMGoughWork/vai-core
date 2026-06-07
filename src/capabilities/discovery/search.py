@@ -18,7 +18,7 @@ from src.capabilities.contracts import (
 from src.capabilities.discovery.embedder import SkillEmbedder
 from src.capabilities.discovery.skill_filter import SkillFilter
 from src.capabilities.discovery.skill_ranker import SkillRanker
-from src.capabilities.registry.primitive_registry import SkillRegistry
+from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
 
 
 class SkillSearch:
@@ -31,10 +31,10 @@ class SkillSearch:
 
     def __init__(
         self,
-        registry: Optional[SkillRegistry] = None,
+        registry: Optional[CapabilitySkillRegistry] = None,
         embedder: Optional[SkillEmbedder] = None,
     ):
-        self._registry = registry or SkillRegistry
+        self._registry = registry or CapabilitySkillRegistry
         self._embedder = embedder or SkillEmbedder()
         self._filter = SkillFilter()
         self._ranker = SkillRanker()
