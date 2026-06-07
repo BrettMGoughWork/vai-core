@@ -97,7 +97,7 @@ def rank_discovered_skills(
         latency = meta.cost_estimate.get("latency", 0)
         resources = meta.cost_estimate.get("resources", "unknown")
         res_rank = _RES_RANK.get(resources, 0)
-        cost_score = (-latency, res_rank)
+        cost_score = (latency, -res_rank)
 
         # F.  Embedding similarity (already computed)
         # G.  Name (final tiebreaker)
@@ -106,8 +106,8 @@ def rank_discovered_skills(
             -schema_score,
             -safety_rank,
             -det_rank,
-            cost_score[0],        # -latency  (more negative = larger latency = worse)
-            -cost_score[1],       # -res_rank
+            cost_score[0],        # latency  (lower = better, ascending)
+            cost_score[1],        # -res_rank  (more negative = higher priority = better)
             -result.score,
             result.name,
         )
