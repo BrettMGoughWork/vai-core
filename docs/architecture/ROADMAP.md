@@ -905,21 +905,21 @@ S3 exposes static, declarative metadata so S2 can make deterministic planning de
 
 Extends SkillManifest with metadata fields for deterministic, ranked skill discovery.
 
-3.6.1 — SkillManifest metadata fields
+✅ 3.6.1 — SkillManifest metadata fields
 - Capability tags (e.g., "fetch", "parse", "transform")
 - Input/output types, side-effect class, safety level
 - Cost estimate, determinism level
 - Prerequisites (domain policy, auth)
 
-3.6.2 — Deterministic discovery ranking
+✅ 3.6.2 — Deterministic discovery ranking
 - Rank by: exact tag match → schema compatibility → safety level → determinism → cost → embedding similarity
 - Ensures S2 picks the same skill every time for a given query
 
-3.6.3 — Skill discovery families
+✅ 3.6.3 — Skill discovery families
 - Group skills into families: fetch.*, file.*, parse.*, transform.*, browser.*
 - Helps S2 reason about alternatives during planning
 
-3.6.4 — Tests
+✅ 3.6.4 — Tests
 - Ranking determinism across repeated queries
 - Family grouping correctness
 
