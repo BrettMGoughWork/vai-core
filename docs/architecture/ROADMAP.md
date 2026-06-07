@@ -930,28 +930,28 @@ Extends SkillManifest with metadata fields for deterministic, ranked skill disco
 
 A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 
-3.7.1 — `echo` primitive
+✅ 3.7.1 — `echo` primitive
 - Returns input unchanged; used as canary for the full S2→S3→S2 round-trip
 
-3.7.2 — `file.read` primitive
+✅ 3.7.2 — `file.read` primitive
 - Reads file at path, returns content as string
 
-3.7.3 — `file.write` primitive
+✅ 3.7.3 — `file.write` primitive
 - Writes content to file at path
 
-3.7.4 — `proc.exec` primitive
+✅ 3.7.4 — `proc.exec` primitive
 - Executes shell command via subprocess, returns stdout/stderr/exit_code
 
-3.7.5 — `echo` skill
+✅ 3.7.5 — `echo` skill
 - `.skill.md` wrapping `echo` primitive; validates input schema
 
-3.7.6 — `json.parse` skill
+✅ 3.7.6 — `json.parse` skill
 - Parses JSON string via `echo` → Python parsing; returns dict or error
 
-3.7.7 — `fetch.simple` skill (stub)
+✅ 3.7.7 — `fetch.simple` skill (stub)
 - Declares `net.httpget` dependency; stub implementation until Phase 3.10
 
-3.7.8 — Tests
+✅ 3.7.8 — Tests
 - Each stdlib primitive and skill executed end-to-end via SkillExecutor
 
 ---
