@@ -5,7 +5,7 @@ from dataclasses import asdict
 
 from src.capabilities.metadata.capability_metadata import (
     PrimitiveMetadata,
-    SkillMetadata,
+    CapabilitySkillMetadata,
     validate_metadata,
 )
 
@@ -141,9 +141,9 @@ class TestPrimitiveMetadata:
         meta.validate()
 
 
-class TestSkillMetadata:
+class TestCapabilitySkillMetadata:
     def test_constructs_with_valid_fields(self):
-        meta = SkillMetadata(**MINIMAL_SKILL_META)
+        meta = CapabilitySkillMetadata(**MINIMAL_SKILL_META)
         assert meta.cost_latency == 200
         assert meta.cost_resources == "medium"
         assert meta.determinism == "impure"
@@ -154,27 +154,27 @@ class TestSkillMetadata:
         assert meta.prerequisites == ["auth:admin"]
 
     def test_validate_passes_with_valid_data(self):
-        meta = SkillMetadata(**MINIMAL_SKILL_META)
+        meta = CapabilitySkillMetadata(**MINIMAL_SKILL_META)
         meta.validate()
 
     def test_validate_rejects_bad_cost_latency(self):
         bad = dict(MINIMAL_SKILL_META)
         bad["cost_latency"] = "200"
-        meta = SkillMetadata(**bad)
+        meta = CapabilitySkillMetadata(**bad)
         with pytest.raises(ValueError, match="cost_latency"):
             meta.validate()
 
     def test_validate_rejects_non_list_side_effects(self):
         bad = dict(MINIMAL_SKILL_META)
         bad["side_effects"] = "fs"
-        meta = SkillMetadata(**bad)
+        meta = CapabilitySkillMetadata(**bad)
         with pytest.raises(ValueError, match="side_effects"):
             meta.validate()
 
     def test_validate_rejects_non_json_output_schema(self):
         bad = dict(MINIMAL_SKILL_META)
         bad["output_schema"] = {"handler": object()}
-        meta = SkillMetadata(**bad)
+        meta = CapabilitySkillMetadata(**bad)
         with pytest.raises(ValueError, match="JSON-serializable"):
             meta.validate()
 
@@ -185,7 +185,7 @@ class TestValidateMetadata:
         validate_metadata(meta)
 
     def test_accepts_skill_metadata(self):
-        meta = SkillMetadata(**MINIMAL_SKILL_META)
+        meta = CapabilitySkillMetadata(**MINIMAL_SKILL_META)
         validate_metadata(meta)
 
     def test_rejects_bad_primitive(self):
@@ -195,7 +195,7 @@ class TestValidateMetadata:
             validate_metadata(meta)
 
     def test_rejects_bad_skill(self):
-        meta = SkillMetadata(**MINIMAL_SKILL_META)
+        meta = CapabilitySkillMetadata(**MINIMAL_SKILL_META)
         meta.output_schema = "bad"  # type: ignore
         with pytest.raises(ValueError):
             validate_metadata(meta)
@@ -208,6 +208,6 @@ class TestMetadataRoundtrip:
         assert d == MINIMAL_PRIMITIVE_META
 
     def test_skill_metadata_is_dataclass(self):
-        meta = SkillMetadata(**MINIMAL_SKILL_META)
+        meta = CapabilitySkillMetadata(**MINIMAL_SKILL_META)
         d = asdict(meta)
         assert d == MINIMAL_SKILL_META
