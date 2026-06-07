@@ -1,133 +1,87 @@
 """
-Skill step executor (Phase 3.0.1).
+Skill step executor (Phase 3.3.4).
 
-Interprets the ordered 'steps' from a SkillManifest and executes
-each step by calling the referenced primitives in sequence.
-
-Each step has the shape:
-  - call: primitive.name
-    with:
-      param: value
-
-The executor resolves template variables (e.g. {{inputs.path}})
-and chains outputs between steps.
+Executes a ``Skill`` by interpreting its ordered steps from the
+``SkillManifest``: resolves each primitive by name, calls
+``primitive.execute(args, context)``, collects ``PrimitiveResult``
+objects, and returns a ``SkillResult``.
 """
 
 from __future__ import annotations
 
-import re
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
-from src.capabilities.contracts import SkillResult
-from src.capabilities.registry.primitive_registry import SkillRegistry
-from src.capabilities.runtime.validator import validate_structural
+from src.capabilities.primitives.types import PrimitiveResult
 
-# Template variable pattern: {{name}} or {{name.path}}
-_TEMPLATE_RE = re.compile(r"\{\{(.+?)\}\}")
+if TYPE_CHECKING:
+    from src.capabilities.skills.skill import CapabilitySkill
+
+
+@dataclass
+class SkillExecutionResult:
+    """Result of executing a skill."""
+
+    status: str
+    """``"success"`` or ``"error"``."""
+
+    results: list[PrimitiveResult] = field(default_factory=list)
+    """Per‑step results in execution order."""
+
+    error: str | None = None
+    """Error message when *status* is ``"error"``."""
 
 
 class SkillExecutor:
-    """
-    Executes a skill by stepping through its manifest steps.
-
-    Each step calls a primitive referenced by name. Template variables
-    in step arguments are resolved against the execution context.
-    """
+    """Executes a ``CapabilitySkill`` by stepping through its manifest steps sequentially."""
 
     def execute(
         self,
-        skill_name: str,
-        steps: List[Dict[str, Any]],
-        inputs: Dict[str, Any],
-        registry: SkillRegistry | None = None,
-    ) -> SkillResult:
-        """
-        Execute a sequence of steps.
+        skill: CapabilitySkill,
+        inputs: dict[str, Any],
+        context: dict[str, Any],
+    ) -> SkillExecutionResult:
+        """Execute *skill* with *inputs* and *context*.
 
         Args:
-            skill_name: Name of the skill being executed (for result metadata).
-            steps: Ordered list of step dicts (from manifest).
-            inputs: Input arguments to the skill.
-            registry: Skill registry for primitive lookup (defaults to global).
+            skill: The runtime‑ready ``CapabilitySkill`` to execute.
+            inputs: Input arguments (validated against the skill's input schema).
+            context: Execution context passed to every primitive call.
 
         Returns:
-            SkillResult with the final step's output on success.
+            ``SkillExecutionResult`` with per‑step results and overall status.
         """
-        import time
+        skill.validate_inputs(inputs)
 
-        if registry is None:
-            registry = SkillRegistry
+        step_results: list[PrimitiveResult] = []
 
-        start = time.perf_counter()
-        context: Dict[str, Any] = {"inputs": inputs}
+        for step in skill.manifest.steps:
+            call: str = step["call"]
+            args: dict[str, Any] = step.get("args", {})
+            on_error: str | None = step.get("on_error")
 
-        last_output: Any = None
+            primitive = skill.primitives.get(call)
+            if primitive is None:
+                raise ValueError(f"unknown primitive: {call}")
 
-        try:
-            for step in steps:
-                primitive_name = step["call"]
-                step_args_raw = step.get("with", {})
+            result = primitive.execute(args, context)
+            step_results.append(result)
 
-                # Resolve template variables in step arguments
-                step_args = self._resolve_templates(step_args_raw, context)
+            if result.status == "error":
+                if on_error == "continue":
+                    continue
+                return SkillExecutionResult(
+                    status="error",
+                    results=step_results,
+                    error=result.error,
+                )
 
-                # Look up and execute the primitive
-                spec = registry.get(primitive_name)
-                spec.run(**step_args)
+        # Validate outputs against the final step's data.
+        if step_results and step_results[-1].data is not None:
+            skill.validate_outputs(step_results[-1].data)
 
-                # Store output for chaining
-                last_output = step_args  # placeholder; real impl tracks primitive output
-                context["output"] = last_output
-
-            duration = (time.perf_counter() - start) * 1000
-            return SkillResult(
-                skill_name=skill_name,
-                success=True,
-                output=last_output,
-                duration_ms=duration,
-            )
-
-        except Exception as exc:
-            duration = (time.perf_counter() - start) * 1000
-            return SkillResult(
-                skill_name=skill_name,
-                success=False,
-                error=str(exc),
-                error_type=type(exc).__name__,
-                duration_ms=duration,
-            )
-
-    def _resolve_templates(
-        self, template_dict: Dict[str, Any], context: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Resolve {{...}} template variables in a dict against context."""
-        resolved: Dict[str, Any] = {}
-        for key, value in template_dict.items():
-            resolved[key] = self._resolve_value(value, context)
-        return resolved
-
-    def _resolve_value(self, value: Any, context: Dict[str, Any]) -> Any:
-        """Recursively resolve template variables in a value."""
-        if isinstance(value, str):
-            return self._resolve_string(value, context)
-        elif isinstance(value, dict):
-            return {k: self._resolve_value(v, context) for k, v in value.items()}
-        elif isinstance(value, list):
-            return [self._resolve_value(v, context) for v in value]
-        return value
-
-    def _resolve_string(self, value: str, context: Dict[str, Any]) -> str:
-        """Replace {{...}} patterns in a string with context values."""
-
-        def replacer(match: re.Match) -> str:
-            path = match.group(1).strip()
-            parts = path.split(".")
-            current: Any = context
-            for part in parts:
-                if isinstance(current, dict):
-                    current = current.get(part, match.group(0))
-                else:
-                    return match.group(0)
-            return str(current) if current is not None else match.group(0)
-
-        return _TEMPLATE_RE.sub(replacer, value)
+        return SkillExecutionResult(
+            status="success",
+            results=step_results,
+            error=None,
+        )

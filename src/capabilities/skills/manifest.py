@@ -1,146 +1,109 @@
 """
-Skill manifest spec (Phase 3.0.3).
+Skill manifest dataclass (Phase 3.3.2).
 
-Parses .skill.md files with YAML front matter and Markdown body.
-
-A .skill.md file has this shape:
----
-skill: file.read
-description: Read a file from disk
-primitives:
-  - file.read
-inputs:
-  type: object
-  properties:
-    path:
-      type: string
-      description: Path to the file
-  required: [path]
-steps:
-  - call: file.read
-    with:
-      path: "{{inputs.path}}"
----
-
-# file.read
-
-Human-readable description and usage notes go here.
+Defines a structured, validated representation of a parsed .skill.md
+manifest — metadata, primitive references, input schema, and ordered
+execution steps.  File parsing is handled separately by skill_parser.py.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-import yaml
-
-
-# YAML front matter regex: matches content between --- delimiters
-_FRONT_MATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+from typing import Any
 
 
 @dataclass
 class SkillManifest:
-    """Parsed representation of a .skill.md file."""
+    """Validated representation of a .skill.md manifest."""
 
     name: str
-    """Skill name (from YAML front matter 'skill' key)."""
+    """Skill name."""
 
     description: str
-    """Short description (from YAML front matter 'description' key)."""
+    """Human-readable description of what this skill does."""
 
-    primitives: List[str] = field(default_factory=list)
+    primitives: list[str] = field(default_factory=list)
     """List of primitive names this skill depends on."""
 
-    inputs: Dict[str, Any] = field(default_factory=dict)
-    """JSON Schema for the skill's input arguments."""
+    inputs: dict[str, Any] = field(default_factory=dict)
+    """Schema describing expected inputs."""
 
-    steps: List[Dict[str, Any]] = field(default_factory=list)
-    """Ordered list of execution steps (call: primitive refs)."""
+    steps: list[dict[str, Any]] = field(default_factory=list)
+    """Ordered list of execution steps."""
 
-    body: str = ""
-    """Human-readable Markdown body."""
-
-    @classmethod
-    def from_file(cls, path: Path | str) -> "SkillManifest":
-        """
-        Parse a .skill.md file into a SkillManifest.
-
-        Args:
-            path: Path to a .skill.md file.
-
-        Returns:
-            SkillManifest instance.
+    def validate(self) -> None:
+        """Validate all fields, step structure, and primitive references.
 
         Raises:
-            FileNotFoundError: If the file doesn't exist.
-            ValueError: If the file has no YAML front matter or is malformed.
+            ValueError: If any field is missing, has the wrong type, or if any
+                        step references a primitive not listed in *primitives*.
         """
-        path = Path(path)
-        content = path.read_text(encoding="utf-8")
+        if not isinstance(self.name, str) or not self.name:
+            raise ValueError("SkillManifest.name must be a non-empty str")
+        if not isinstance(self.description, str) or not self.description:
+            raise ValueError("SkillManifest.description must be a non-empty str")
+        if not isinstance(self.primitives, list):
+            raise ValueError("SkillManifest.primitives must be a list")
+        if not all(isinstance(p, str) for p in self.primitives):
+            raise ValueError("SkillManifest.primitives must be a list of str")
+        if not isinstance(self.inputs, dict):
+            raise ValueError("SkillManifest.inputs must be a dict")
+        if not isinstance(self.steps, list):
+            raise ValueError("SkillManifest.steps must be a list")
 
-        return cls.from_text(content, source=str(path))
+        primitive_set = set(self.primitives)
+        for i, step in enumerate(self.steps):
+            if not isinstance(step, dict):
+                raise ValueError(
+                    f"SkillManifest.steps[{i}] must be a dict, got {type(step).__name__}"
+                )
+
+            call = step.get("call")
+            if not isinstance(call, str):
+                raise ValueError(
+                    f"SkillManifest.steps[{i}].call must be a str, "
+                    f"got {type(call).__name__}"
+                )
+
+            args = step.get("args")
+            if args is not None and not isinstance(args, dict):
+                raise ValueError(
+                    f"SkillManifest.steps[{i}].args must be a dict, "
+                    f"got {type(args).__name__}"
+                )
+
+            on_error = step.get("on_error")
+            if on_error is not None and not isinstance(on_error, str):
+                raise ValueError(
+                    f"SkillManifest.steps[{i}].on_error must be str or None, "
+                    f"got {type(on_error).__name__}"
+                )
+
+            if call not in primitive_set:
+                raise ValueError(
+                    f"SkillManifest.steps[{i}].call='{call}' is not listed "
+                    f"in SkillManifest.primitives"
+                )
 
     @classmethod
-    def from_text(cls, text: str, source: str = "<string>") -> "SkillManifest":
-        """
-        Parse .skill.md text into a SkillManifest.
+    def from_dict(cls, data: dict[str, Any]) -> SkillManifest:
+        """Construct and validate a SkillManifest from a dictionary.
 
         Args:
-            text: Full text of the .skill.md file.
-            source: Label for error messages (e.g. filename).
+            data: Dict produced by the .skill.md parser.
 
         Returns:
-            SkillManifest instance.
+            A validated ``SkillManifest`` instance.
 
         Raises:
-            ValueError: If no YAML front matter is found or if required keys are missing.
+            ValueError: If *data* fails validation.
         """
-        match = _FRONT_MATTER_RE.match(text)
-        if not match:
-            raise ValueError(
-                f"No YAML front matter found in {source}. "
-                f"Expected --- delimited block at the top of the file."
-            )
-
-        front_matter_text = match.group(1)
-        body = text[match.end():].strip()
-
-        try:
-            front_matter = yaml.safe_load(front_matter_text)
-        except yaml.YAMLError as exc:
-            raise ValueError(f"Invalid YAML front matter in {source}: {exc}") from exc
-
-        if not isinstance(front_matter, dict):
-            raise ValueError(
-                f"YAML front matter in {source} must be a mapping, "
-                f"got {type(front_matter).__name__}"
-            )
-
-        if "skill" not in front_matter:
-            raise ValueError(f"Missing required key 'skill' in {source} front matter")
-
-        if "description" not in front_matter:
-            raise ValueError(f"Missing required key 'description' in {source} front matter")
-
-        return cls(
-            name=front_matter["skill"],
-            description=front_matter["description"],
-            primitives=front_matter.get("primitives", []),
-            inputs=front_matter.get("inputs", {}),
-            steps=front_matter.get("steps", []),
-            body=body,
+        manifest = cls(
+            name=data.get("name", ""),
+            description=data.get("description", ""),
+            primitives=data.get("primitives", []),
+            inputs=data.get("inputs", {}),
+            steps=data.get("steps", []),
         )
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize the manifest back to a dictionary (for LLM consumption)."""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "primitives": self.primitives,
-            "inputs": self.inputs,
-            "steps": self.steps,
-            "body": self.body,
-        }
+        manifest.validate()
+        return manifest
