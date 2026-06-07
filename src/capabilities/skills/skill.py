@@ -104,6 +104,33 @@ class CapabilitySkill:
         """
         _validate_against_schema(data, self.output_schema, "output")
 
+    def run(self, **inputs: Any) -> Any:
+        """Execute this skill with the given inputs.
+
+        This is the entry point called by ``SkillRunner``.  It delegates to
+        ``SkillExecutor`` and bridges the ``SkillExecutionResult`` to a
+        simple return value or raised exception.
+
+        Args:
+            **inputs: Keyword arguments matching the skill's input schema.
+
+        Returns:
+            The ``data`` payload from the last step's ``PrimitiveResult``
+            on success, or ``None`` if there are no steps.
+
+        Raises:
+            RuntimeError: If any step returns an error status.
+        """
+        from src.capabilities.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        result = executor.execute(self, inputs, {})
+        if result.status == "error":
+            raise RuntimeError(result.error or "skill execution failed")
+        if result.results:
+            return result.results[-1].data
+        return None
+
     # ── helpers ────────────────────────────────────────────────────────────
 
     @staticmethod

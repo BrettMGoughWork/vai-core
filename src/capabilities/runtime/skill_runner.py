@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 from src.capabilities.contracts import SkillCallRequest, SkillResult
-from src.capabilities.registry.primitive_registry import SkillRegistry
+from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
 from src.capabilities.skills.executor import SkillExecutor
 
 
@@ -27,8 +27,8 @@ class SkillRunner:
         ))
     """
 
-    def __init__(self, registry: Optional[SkillRegistry] = None):
-        self._registry = registry or SkillRegistry
+    def __init__(self, registry: Optional[CapabilitySkillRegistry] = None):
+        self._registry = registry or CapabilitySkillRegistry
         self._executor = SkillExecutor()
 
     def execute(self, request: SkillCallRequest) -> SkillResult:
