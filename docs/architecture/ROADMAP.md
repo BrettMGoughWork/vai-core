@@ -712,7 +712,7 @@ A binary checklist for flipping the switch:
 ## STRATUM 3 - Agent Runtime
 *Invariant*: Stratum 3 orchestrates agents, capabilities and external interfaces, but never performs long-horizon reasoning, planning, and execution itself. It delegates all reasoning to Stratum 2 and all action execution to Stratum 1.
 
-**Isolation rule**: All S3 code lives under `src/capabilities/` — completely isolated from S1 (`src/core/`) and S2 (`src/runtime/`). S3 defines its own contracts using only standard Python types and never imports S1/S2 internals. Integration occurs via a thin adapter in S2's runtime that speaks S3's public contract.
+**Isolation rule**: All S3 code lives under `src/capabilities/` — completely isolated from S1 (`src/core/`) and S2 (`src/stratum2/`). S3 defines its own contracts using only standard Python types and never imports S1/S2 internals. Integration occurs via a thin adapter in S2's runtime that speaks S3's public contract.
 
 ---
 
@@ -956,32 +956,49 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 
 ---
 
-### PHASE 3.8 — S2 ↔ S3 Integration (Thin Adapter)
+### PHASE 3.8 — S2 ↔ S3 Integration (Thin Adapter + Bug Fixes)
 *Depends On*: PHASE 3.7
-*Design rule*: S3 (`src/capabilities/`) never imports S1/S2. Integration code lives in `src/runtime/s3_adapter.py` as an adapter that speaks S3's public contract.
+*Design rule*: S3 (`src/capabilities/`) never imports S1/S2. Integration code lives in `src/stratum2/s3_adapter.py` as an adapter that speaks S3's public contract.
 
-3.8.1 — Finalize boundary contracts
-- `SkillCallRequest` (skill_name, args, context), `SkillResult` (status, data, error, side_effects), `SkillDiscoveryQuery` (description, limit), `SkillDiscoveryResult` (matches list)
+✅ 3.8.1 — Finalize boundary contracts
+- `SkillCallRequest`, `SkillResult`, `SkillDiscoveryQuery`, `SkillDiscoveryResult`, `DiscoveredSkill` as pure dataclasses in `src/capabilities/contracts.py`
 
-3.8.2 — `skill_runner.py` entry point
-- Accepts `SkillCallRequest`, resolves skill from registry, executes via `SkillExecutor`, returns `SkillResult`
-- `discover(query, limit) → SkillDiscoveryResult` for discovery queries
+3.8.2 — Fix `SkillRunner` bugs + add `discover()`
+- **BUG**: Line 31 uses class `CapabilitySkillRegistry` instead of instance `CapabilitySkillRegistry()` — `self._registry.get()` will raise `TypeError` at runtime
+- Fix the instantiation bug
+- Add `discover(query, limit) → SkillDiscoveryResult` method wrapping registry's `find()`
+- Unit tests for both paths
 
-3.8.3 — S3 adapter in S2 runtime
-- `src/runtime/s3_adapter.py`: `discover_skills(query)`, `call_skill(request)`, handles contract translation S2-native ↔ S3 contract types
+3.8.3 — SkillExecutor template variable interpolation (**CRITICAL: resolves current {{ value }} literal-passing**)
+- The `SkillExecutor.execute()` passes step-args literally (e.g. `{"value": "{{ value }}"}`) to primitives
+- Implement a lightweight `_interpolate_args(args, inputs)` step that resolves `{{ key }}` tokens against user-supplied inputs before calling `primitive.execute()`
+- Must support nested templates in string values within `args`
+- Must not use Jinja2/Mustache — implement a simple regex-based resolver (`re.sub(r'\{\{\s*(\w+)\s*\}', ...)`)
+- Must be deterministic, pure, and side-effect-free
+- Update skill tests to interpolate args instead of asserting literal `{{ value }}`
+
+3.8.4 — `SkillExecutor` inline Python step support
+- The `json.parse` skill has a `- python: |` block that `SkillExecutor` does not currently support
+- Implement Python block execution: detect `python` key in step (vs `call`), execute via `exec()` or inline, return dict as primitive result
+- Must be deterministic, sandboxed, and clean up local namespace
+
+3.8.5 — S3 adapter in S2 runtime
+- `src/stratum2/s3_adapter.py`: `discover_skills(query)`, `call_skill(request)`, handles contract translation S2-native ↔ S3 contract types
 - This is the ONLY file that imports from both S2 and S3
 
-3.8.4 — Wire skill discovery into S2 planning
+3.8.6 — Wire skill discovery into S2 planning
 - S2 queries S3 for relevant skills during plan construction; skill names stored in plan segments
 
-3.8.5 — Wire skill execution into S2 cycle
+3.8.7 — Wire skill execution into S2 cycle
 - Segment referencing a skill triggers `s3_adapter.call_skill()` during cycle execution
 
-3.8.6 — Wire skill results into S2 state
+3.8.8 — Wire skill results into S2 state
 - `SkillResult` → S2 state update → segment memory record
 
-3.8.7 — Tests
-- S2→S3→S2 round-trip with `echo_text` skill: subgoal → segment → skill call → result → state update
+3.8.9 — Tests
+- S2→S3→S2 round-trip with e.g. `stdlib.echo` skill: subgoal → segment → skill call → result → state update
+- Template interpolation correctness: `{{ value }}` resolves to actual user input
+- Python step execution via SkillExecutor
 - Error propagation: invalid skill name, failed execution
 - Discovery flow: S2 queries skills, receives ranked list
 
@@ -993,16 +1010,16 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 A minimal end-to-end test against the real LLM that proves S2 can discover and call an S3 skill. Pattern mirrors Phase 2.14.7's smoke test.
 
 3.9.1 — `tests/manual/test_s3_smoke.py`
-- 1 subgoal, 1 segment calling `echo_text` via `backend=real_llm`
+- 1 subgoal, 1 segment calling `stdlib.echo` via `backend=real_llm`
 
 3.9.2 — Verify skill discovery
-- S2 queries S3 for relevant skills; `echo_text` appears in results
+- S2 queries S3 for relevant skills; `stdlib.echo` appears in results
 
 3.9.3 — Verify plan construction
-- S2 builds a plan with a segment that references `echo_text`
+- S2 builds a plan with a segment that references `stdlib.echo`
 
 3.9.4 — Verify skill execution
-- S3 executes `echo_text` via SkillExecutor; result returned to S2
+- S3 executes `stdlib.echo` via SkillExecutor; result returned to S2
 
 3.9.5 — Verify state update
 - S2 updates segment memory from `SkillResult`
