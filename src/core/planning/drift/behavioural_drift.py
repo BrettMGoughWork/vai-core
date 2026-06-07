@@ -7,6 +7,7 @@ from src.core.memory.drift_memory_types import DriftEvent
 from src.core.signals.model import (
     SignalType,
     SignalSeverity,
+    SignalSource,
     GovernedSignal,
 )
 from src.core.planning.validation.execution_shape_validation import (
@@ -38,9 +39,10 @@ def evaluate_behavioural_drift(
 
     signal = GovernedSignal(
         signal_type=signal_type,
-        severity=SignalSeverity.WARNING,
-        message="Executor output does not match expected capability shape.",
-        details={
+        severity=SignalSeverity.WARN,
+        confidence=0.7,
+        source=SignalSource.BEHAVIOURAL_SHAPE_MISMATCH,
+        payload={
             "subgoal_id": subgoal_id,
             "segment_id": segment_id,
             "step_id": step_id,
@@ -50,14 +52,15 @@ def evaluate_behavioural_drift(
     )
 
     # Record into DriftMemory for later multi‑cycle reasoning.
+    import time
     event = DriftEvent(
-        timestamp=None, # let DriftEvent default or set inside constructor if needed
+        timestamp=int(time.time() * 1000),
         subgoal_id=subgoal_id,
         segment_id=segment_id,
         step_id=step_id,
-        signal_type=signal.signal_type.name,
+        signal_type=SignalSource.BEHAVIOURAL_SHAPE_MISMATCH,
         confidence=0.7, # initial heuristic; refined in later phases
-        details=signal.details or {},
+        details=signal.payload or {},
     )
     drift_memory.record(event)
 

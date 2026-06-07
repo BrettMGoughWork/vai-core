@@ -1,6 +1,6 @@
 import pytest
 
-from src.primitives.runtime.validator import validate_structural
+from src.capabilities.runtime.validator import validate_structural
 from src.core.types.errors import ValidationError
 
 

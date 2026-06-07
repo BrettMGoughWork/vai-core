@@ -1,45 +1,91 @@
 """
-PythonPrimitive – a primitive implemented as a Python callable.
+PythonPrimitive — a primitive backed by a Python callable (Phase 3.1.3).
 
 Python primitives run in-process and are the simplest, fastest
-primitive type. They are suitable for pure functions, data transforms,
+primitive type.  They are suitable for pure functions, data transforms,
 and anything that doesn't need sandboxing.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional
+import inspect
+from typing import Any, Callable
 
-from src.capabilities.primitives.base import PrimitiveBase, PrimitiveType
+from src.capabilities.primitives.base import PrimitiveBase
+from src.capabilities.primitives.types import PrimitiveType, PrimitiveResult
 
 
 class PythonPrimitive(PrimitiveBase):
     """A primitive backed by a Python callable."""
 
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        handler: Callable[..., Any],
-        *,
-        input_schema: Optional[Dict[str, Any]] = None,
-        output_schema: Optional[Dict[str, Any]] = None,
-        side_effects: Optional[list[str]] = None,
-        deterministic: bool = True,
-        pure: bool = True,
-        idempotent: bool = True,
-        enabled: bool = True,
-    ):
+    __match_args__ = ("name",)
+
+    def __init__(self, *, name: str, description: str, func: Callable[..., Any]) -> None:
         super().__init__(
             name=name,
-            primitive_type=PrimitiveType.PYTHON,
             description=description,
-            handler=handler,
-            input_schema=input_schema or {},
-            output_schema=output_schema,
-            side_effects=side_effects or [],
-            deterministic=deterministic,
-            pure=pure,
-            idempotent=idempotent,
-            enabled=enabled,
+            primitive_type=PrimitiveType.PYTHON,
+        )
+        self.func = func
+        """The underlying Python callable that this primitive wraps."""
+        self._sig = inspect.signature(func)
+
+    # ------------------------------------------------------------------
+    # PrimitiveBase interface
+    # ------------------------------------------------------------------
+
+    def validate_args(self, args: dict) -> None:
+        """
+        Validate that ``args`` matches the wrapped callable's signature.
+
+        Every required parameter must be present and no unexpected keys
+        may appear in ``args``.
+
+        When the callable has a single positional parameter (the most
+        common case) it receives the ``args`` dict directly and any keys
+        are accepted — the callable is responsible for its own internal
+        validation.  When the callable exposes multiple named parameters
+        the ``execute`` method unpacks ``**args`` and this validator
+        enforces parameter-name discipline.
+        """
+        if not isinstance(args, dict):
+            raise ValueError("args must be a dict")
+
+        params = list(self._sig.parameters.values())
+
+        # Single-parameter callable — accept any keys
+        if len(params) == 1:
+            return
+
+        # Multi-parameter callable — validate key discipline
+        given = set(args)
+        allowed = {p.name for p in params}
+        unexpected = given - allowed
+        if unexpected:
+            raise ValueError(
+                f"Unexpected arguments: {sorted(unexpected)}. "
+                f"Expected: {sorted(allowed) or '(none)'}"
+            )
+        for p in params:
+            if p.name not in given and p.default is p.empty:
+                raise ValueError(f"Missing required argument: {p.name!r}")
+
+    def execute(self, args: dict, context: dict) -> PrimitiveResult:
+        """Execute the wrapped callable and wrap the outcome."""
+        self.validate_args(args)
+
+        try:
+            if len(list(self._sig.parameters.values())) == 1:
+                result = self.func(args)
+            else:
+                result = self.func(**args)
+        except Exception as exc:
+            return PrimitiveResult(
+                status="error",
+                error=str(exc),
+            )
+
+        return PrimitiveResult(
+            status="success",
+            data=result,
         )

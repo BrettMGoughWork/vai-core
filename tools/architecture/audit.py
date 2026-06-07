@@ -45,7 +45,8 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "infrastructure": {"domain", "infrastructure", "utility"},
     "adapter":        {"domain", "infrastructure", "adapter"},
     "utility":        {"domain", "infrastructure", "utility"},
-    "test":           {"domain", "infrastructure", "adapter", "utility", "test"},
+    "capability":     {"capability", "domain"},
+    "test":           {"domain", "infrastructure", "adapter", "utility", "capability", "test"},
 }
 
 # Severity weights for priority ranking
@@ -267,6 +268,271 @@ def find_invariant_violations(classes: list[dict]) -> list[dict]:
     return issues
 
 
+# ── S3 (Capability) invariant checks ──────────────────────────────────────────
+
+# Allowed primitive module filenames
+VALID_PRIMITIVE_MODULES = {
+    "python.py", "cli.py", "mcp.py", "base.py", "types.py", "__init__.py",
+}
+
+
+def find_primitive_module_violations(classes: list[dict]) -> list[dict]:
+    """S3 I7 — Primitive module invariants.
+
+    - Only VALID_PRIMITIVE_MODULES may exist in src/capabilities/primitives/
+    - Each primitive class must declare: name, description, type, execute method.
+    """
+    issues: list[dict] = []
+    primitives_dir = REPO_ROOT / "src" / "capabilities" / "primitives"
+
+    if not primitives_dir.is_dir():
+        issues.append({
+            "severity": "high",
+            "category": "invariant",
+            "title": "I7 — Primitives directory missing: `src/capabilities/primitives/`",
+            "detail": "The primitives directory does not exist. Phase 3.1 must create it.",
+            "fan_in": 0,
+            "fan_out": 0,
+        })
+        return issues
+
+    # Check for invalid .py files
+    for py_file in primitives_dir.glob("*.py"):
+        if py_file.name not in VALID_PRIMITIVE_MODULES:
+            rel = str(py_file.relative_to(REPO_ROOT)).replace("\\", "/")
+            issues.append({
+                "severity": "high",
+                "category": "invariant",
+                "title": f"I7 — Invalid file in primitives directory: `{py_file.name}`",
+                "detail": f"`{rel}` is not one of the allowed primitive modules: {sorted(VALID_PRIMITIVE_MODULES)}.",
+                "fan_in": 0,
+                "fan_out": 0,
+            })
+
+    # Check each primitive class found in extraction has required attributes
+    primitive_class_names = {"PythonPrimitive", "CLIPrimitive", "MCPPrimitive"}
+    for cls in classes:
+        if cls["name"] not in primitive_class_names:
+            continue
+        missing = []
+        if "name" not in cls.get("public_attributes", []) and cls["name"] != "PythonPrimitive":
+            pass  # name/description/type set in __init__, not as class attrs
+        if "execute" not in cls.get("public_methods", []):
+            missing.append("execute")
+        if "validate_args" not in cls.get("public_methods", []):
+            missing.append("validate_args")
+        if missing:
+            issues.append({
+                "severity": "high",
+                "category": "invariant",
+                "title": f"I7 — Primitive class `{cls['name']}` missing required methods: {missing}",
+                "detail": f"`{cls['name']}` in `{cls['file']}` must define: {', '.join(missing)}.",
+                "fan_in": cls["fan_in"],
+                "fan_out": cls["fan_out"],
+            })
+
+    return issues
+
+
+def find_skill_manifest_violations(data: dict[str, Any]) -> list[dict]:
+    """S3 I8 — Skill manifest invariants.
+
+    - No .py files in src/capabilities/skills/
+    - Each .skill.md file must have valid YAML front-matter with: name, description, inputs, outputs, primitives.
+    """
+    issues: list[dict] = []
+    skills_dir = REPO_ROOT / "src" / "capabilities" / "skills"
+
+    if not skills_dir.is_dir():
+        # Skills not yet implemented — expected at this phase
+        return issues
+
+    # Check for .py files in skills directory
+    py_files = list(skills_dir.glob("*.py"))
+    if py_files:
+        py_names = sorted(f.name for f in py_files)
+        issues.append({
+            "severity": "medium",
+            "category": "invariant",
+            "title": f"I8 — Python files in skills directory: {py_names}",
+            "detail": (
+                f"`src/capabilities/skills/` contains {len(py_files)} .py file(s): {py_names}. "
+                "Skills must be defined as `.skill.md` files with YAML front-matter, not Python modules."
+            ),
+            "fan_in": 0,
+            "fan_out": 0,
+        })
+
+    # Validate extracted skill manifests
+    skills = data.get("skills", [])
+    for skill in skills:
+        file = skill.get("file", "unknown")
+        missing = []
+        for field in ("name", "description", "inputs", "outputs", "primitives"):
+            if not skill.get(field):
+                missing.append(field)
+        if missing:
+            issues.append({
+                "severity": "high",
+                "category": "invariant",
+                "title": f"I8 — Skill manifest `{file}` missing required fields: {missing}",
+                "detail": f"`.skill.md` file `{file}` is missing YAML front-matter fields: {missing}.",
+                "fan_in": 0,
+                "fan_out": 0,
+            })
+
+    # Check for .skill.md files with no YAML front-matter (parse failed)
+    md_files = set()
+    for dirpath, _, filenames in os.walk(skills_dir):
+        for f in filenames:
+            if f.endswith(".skill.md"):
+                md_files.add(
+                    str(Path(dirpath).relative_to(REPO_ROOT) / f).replace("\\", "/")
+                )
+    extracted_files = {s["file"] for s in skills}
+    unparseable = md_files - extracted_files
+    for f in sorted(unparseable):
+        issues.append({
+            "severity": "high",
+            "category": "invariant",
+            "title": f"I8 — Skill file `{f}` has invalid or missing YAML front-matter",
+            "detail": "The `.skill.md` file must start with `---` delimited YAML front-matter containing name, description, inputs, outputs, and primitives.",
+            "fan_in": 0,
+            "fan_out": 0,
+        })
+
+    return issues
+
+
+def find_registry_violations(classes: list[dict]) -> list[dict]:
+    """S3 I9 — Registry invariants.
+
+    - Registry modules must live under src/capabilities/registry/ or src/core/types/
+    - Must define: PrimitiveRegistry, SkillRegistry
+    - Registries must not import S1 (utility/infrastructure/adapter) modules.
+      Domain imports are allowed for shared types.
+    """
+    issues: list[dict] = []
+    registry_dir = REPO_ROOT / "src" / "capabilities" / "registry"
+
+    if not registry_dir.is_dir():
+        issues.append({
+            "severity": "high",
+            "category": "invariant",
+            "title": "I9 — Registry directory missing: `src/capabilities/registry/`",
+            "detail": "The registry directory does not exist.",
+            "fan_in": 0,
+            "fan_out": 0,
+        })
+        return issues
+
+    # Check for PrimitiveRegistry and SkillRegistry
+    # These may live in src/capabilities/registry/ OR src/core/types/
+    registry_class_names = {
+        c["name"] for c in classes
+        if c["file"].startswith("src/capabilities/registry/")
+        or c["file"].startswith("src/core/types/registry")
+    }
+    required = {"PrimitiveRegistry", "SkillRegistry"}
+    missing_classes = required - registry_class_names
+    for mc in sorted(missing_classes):
+        issues.append({
+            "severity": "high",
+            "category": "invariant",
+            "title": f"I9 — Missing required registry class: `{mc}`",
+            "detail": f"`{mc}` must be defined in `src/capabilities/registry/` or `src/core/types/`.",
+            "fan_in": 0,
+            "fan_out": 0,
+        })
+
+    # Registries must not import S1 (utility/infrastructure/adapter)
+    # Domain imports are allowed — shared types like enums and dataclasses
+    forbidden_strata = {"infrastructure", "adapter", "utility"}
+    stratum_of = {c["name"]: c["inferred_stratum"] for c in classes}
+    for cls in classes:
+        if cls["inferred_stratum"] != "capability":
+            continue
+        if "registry" not in cls["file"] and "registry" not in cls.get("package", ""):
+            continue
+        for imp in cls["imports"]:
+            # Only check internal vai-core imports
+            top = imp.split(".")[0]
+            if top not in ("src", "capabilities"):
+                continue
+            # Resolve target stratum from the class map
+            last = imp.split(".")[-1]
+            tgt_stratum = stratum_of.get(last)
+            if tgt_stratum in forbidden_strata:
+                issues.append({
+                    "severity": "high",
+                    "category": "invariant",
+                    "title": f"I9 — Registry class `{cls['name']}` imports from forbidden stratum: `{imp}` ({tgt_stratum})",
+                    "detail": f"`{cls['name']}` in `{cls['file']}`. Registries must not import S1 or S2 modules.",
+                    "fan_in": cls["fan_in"],
+                    "fan_out": cls["fan_out"],
+                })
+
+    return issues
+
+
+def find_discovery_violations(classes: list[dict]) -> list[dict]:
+    """S3 I10 — Discovery invariants.
+
+    - Discovery modules must live under src/capabilities/discovery/
+    - Must define: SkillDiscoveryQuery, SkillDiscoveryResult
+    - Discovery must not import primitives directly.
+    """
+    issues: list[dict] = []
+    discovery_dir = REPO_ROOT / "src" / "capabilities" / "discovery"
+
+    if not discovery_dir.is_dir():
+        issues.append({
+            "severity": "high",
+            "category": "invariant",
+            "title": "I10 — Discovery directory missing: `src/capabilities/discovery/`",
+            "detail": "The discovery directory does not exist.",
+            "fan_in": 0,
+            "fan_out": 0,
+        })
+        return issues
+
+    # Check for SkillDiscoveryQuery and SkillDiscoveryResult
+    discovery_class_names = {c["name"] for c in classes if (
+        c["file"].startswith("src/capabilities/discovery/")
+        or c["file"].startswith("src/capabilities/contracts")
+    )}
+    required = {"SkillDiscoveryQuery", "SkillDiscoveryResult"}
+    missing_classes = required - discovery_class_names
+    for mc in sorted(missing_classes):
+        issues.append({
+            "severity": "high",
+            "category": "invariant",
+            "title": f"I10 — Missing required discovery class: `{mc}`",
+            "detail": f"`{mc}` must be defined in `src/capabilities/discovery/` or `src/capabilities/contracts.py`.",
+            "fan_in": 0,
+            "fan_out": 0,
+        })
+
+    # Discovery must not import primitives directly
+    for cls in classes:
+        if cls["inferred_stratum"] != "capability":
+            continue
+        if "discovery" not in cls["file"] and cls["file"] != "src/capabilities/contracts.py":
+            continue
+        for imp in cls["imports"]:
+            if "primitives" in imp.lower() and "Primitive" in imp:
+                issues.append({
+                    "severity": "high",
+                    "category": "invariant",
+                    "title": f"I10 — Discovery class `{cls['name']}` imports primitives directly: `{imp}`",
+                    "detail": f"`{cls['name']}` in `{cls['file']}`. Discovery must not import primitives directly.",
+                    "fan_in": cls["fan_in"],
+                    "fan_out": cls["fan_out"],
+                })
+
+    return issues
+
+
 def find_dead_code(classes: list[dict]) -> list[dict]:
     """
     Classes with fan_in == 0 that are not in the test stratum and not __init__-only stubs.
@@ -360,8 +626,12 @@ def main() -> None:
     arch     = find_arch_violations(classes, refs)
     inv      = find_invariant_violations(classes)
     dead     = find_dead_code(classes)
+    s3_prim  = find_primitive_module_violations(classes)
+    s3_skill = find_skill_manifest_violations(data)
+    s3_reg   = find_registry_violations(classes)
+    s3_disc  = find_discovery_violations(classes)
 
-    all_issues = dupes + arch + inv + dead
+    all_issues = dupes + arch + inv + dead + s3_prim + s3_skill + s3_reg + s3_disc
     ranked     = rank_issues(all_issues)
 
     # Summary counts by severity
@@ -398,6 +668,18 @@ def main() -> None:
         "---",
         "",
         render_section("4. Dead Code (fan_in = 0)", dead),
+        "---",
+        "",
+        render_section("5. S3 Primitives (I7)", s3_prim),
+        "---",
+        "",
+        render_section("6. S3 Skills (I8)", s3_skill),
+        "---",
+        "",
+        render_section("7. S3 Registry (I9)", s3_reg),
+        "---",
+        "",
+        render_section("8. S3 Discovery (I10)", s3_disc),
         "---",
         "",
         render_priority_table(ranked),

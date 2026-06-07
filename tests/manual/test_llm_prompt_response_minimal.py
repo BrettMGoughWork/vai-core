@@ -45,11 +45,16 @@ def test_llm_prompt_response_minimal():
         tool_context=[],
     )
 
-    # 2. Enable the real LLM kill-switch
+    # 2. Enable the real LLM kill-switch (restore after test to avoid
+    #    contaminating other tests that expect the stub path)
+    _prev_enable = s1_real_client.ENABLE_REAL_LLM
     s1_real_client.ENABLE_REAL_LLM = True
+    try:
 
-    # 3. Call the real LLM backend
-    result = call_s1_backend(request, backend="real_llm")
+        # 3. Call the real LLM backend
+        result = call_s1_backend(request, backend="real_llm")
+    finally:
+        s1_real_client.ENABLE_REAL_LLM = _prev_enable
 
     # 4. Print trace for inspection
     print("=" * 72)
