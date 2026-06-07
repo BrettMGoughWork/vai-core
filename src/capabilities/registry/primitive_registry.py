@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Optional
 
-from .toolspec import ToolSpec
+from src.capabilities.runtime.toolspec import ToolSpec
 
 class SkillRegistry:
     """

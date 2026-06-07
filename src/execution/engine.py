@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from src.primitives.base import BaseSkill
+from src.capabilities.primitives.base import PrimitiveBase
 from src.execution.errors import ToolExecutionError
 from src.core.types.result import CoreResult
 from src.core.planning.validation.execution_shape_validation import validate_execution_shape
