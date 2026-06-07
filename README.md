@@ -15,7 +15,7 @@ Repository Layout
 src/core/ — core types and contracts
 src/primitives/ — reusable building blocks
 src/skills/ — reusable agent behaviours
-src/runtime/ — the execution engine
+src/stratum2/ — planning and execution (Stratum 2)
 docs/architecture/ — deep technical docs
 
 Inspector Dashboard
