@@ -1,5 +1,5 @@
 """
-Skill step executor (Phase 3.3.3).
+Skill step executor (Phase 3.3.4).
 
 Executes a ``Skill`` by interpreting its ordered steps from the
 ``SkillManifest``: resolves each primitive by name, calls
