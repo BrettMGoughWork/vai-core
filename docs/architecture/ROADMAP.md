@@ -990,7 +990,7 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 ✅ 3.8.6 — Wire skill discovery into S2 planning
 - S2 queries S3 for relevant skills during plan construction; skill names stored in plan segments
 
-(integrated in neighbouring steps) 3.8.7 — Wire skill execution into S2 cycle
+✅ 3.8.7 — Wire skill execution into S2 cycle
 - Segment referencing a skill triggers `s3_adapter.call_skill()` during cycle execution
 
 ✅ 3.8.8 — Wire skill results into S2 state
@@ -1017,28 +1017,28 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 
 A minimal end-to-end test against the real LLM that proves S2 can discover and call an S3 skill. Pattern mirrors Phase 2.14.7's smoke test.
 
-3.9.1 — `tests/manual/test_s3_smoke.py`
+✅ 3.9.1 — `tests/manual/test_s3_smoke.py`
 - 1 subgoal, 1 segment calling `stdlib.echo` via `backend=real_llm`
 
-3.9.2 — Verify skill discovery
+✅ 3.9.2 — Verify skill discovery
 - S2 queries S3 for relevant skills; `stdlib.echo` appears in results
 
-3.9.3 — Verify plan construction
+✅ 3.9.3 — Verify plan construction
 - S2 builds a plan with a segment that references `stdlib.echo`
 
-3.9.4 — Verify skill execution
+✅ 3.9.4 — Verify skill execution
 - S3 executes `stdlib.echo` via SkillExecutor; result returned to S2
 
-3.9.5 — Verify state update
+✅ 3.9.5 — Verify state update
 - S2 updates segment memory from `SkillResult`
 
-3.9.6 — Verify trace completeness
+✅ 3.9.6 — Verify trace completeness
 - Trace contains: skill discovery query → discovery result → skill call → skill result → state update
 
-3.9.7 — Real LLM confirmation
+✅ 3.9.7 — Real LLM confirmation
 - Run with `--backend real_llm`; confirm the full S2→S3→S2 circuit works end-to-end
 
-3.9.8 — Statistical conformance
+✅ 3.9.8 — Statistical conformance
 - Run `python -m tests.statistical.cli --scenario tiny_s3_smoke --repetitions 25 --backend real_llm`; verify 100% json_validity, 100% schema_validity, 0 catastrophic failures
 
 ---
@@ -1054,7 +1054,7 @@ A minimal end-to-end test against the real LLM that proves S2 can discover and c
 - Returns: `status_code`, `body` (str), `headers` (dict), `elapsed` (ms)
 
 3.10.3 — `fetch_url` skill
-- Wires to `mcp.http.fetch` primitive; returns status + body + headers
+- Wires to `http.fetch` primitive; returns status + body + headers
 - Accepts `url` and optional `timeout`, `headers` args
 
 3.10.4 — Tests

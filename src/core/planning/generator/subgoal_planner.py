@@ -22,6 +22,27 @@ from src.core.types.hashing import stable_hash
 from src.core.types.plan_segment import PlanSegment
 from src.stratum2.s3_adapter import S3Adapter, S2DiscoveryQuery
 
+_SYSTEM_PROMPT: str = (
+    "You are a planning assistant. Given a user goal, produce a plan in JSON format.\n"
+    "\n"
+    "Return ONLY a JSON object with this exact structure:\n"
+    "{\n"
+    '  "plan": {\n'
+    '    "subgoal": "<a concise re-statement of the goal>",\n'
+    '    "steps": [\n'
+    '      {"id": "<step-id>", "description": "<what to do>", "capability": "<capability name>"}\n'
+    "    ]\n"
+    "  }\n"
+    "}\n"
+    "\n"
+    'Rules:\n'
+    '- "subgoal" must be a concise re-statement of the user goal (1 sentence).\n'
+    '- "steps" must contain 1-3 step objects.\n'
+    '- Each step must have "id", "description", and "capability" fields.\n'
+    '- "capability" should be a short identifier like "echo", "print", "parse", etc.\n'
+    '- Return ONLY the JSON object, no other text, no markdown fences.'
+)
+
 
 class SubgoalPlanner:
     """
@@ -68,9 +89,21 @@ class SubgoalPlanner:
         """
         raw = self._llm.chat(
             model=self._model,
-            messages=[{"role": "user", "content": goal}],
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": goal},
+            ],
         )
-        plan_dict: Dict[str, Any] = json.loads(raw["choices"][0]["message"]["content"])
+        content: str = raw["choices"][0]["message"]["content"]
+        # Strip markdown code fences if the LLM wraps the JSON in them
+        content = content.strip()
+        if content.startswith("```"):
+            # Remove ```json or ``` prefix and trailing ```
+            content = content.split("\n", 1)[-1] if "\n" in content else content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+        plan_dict: Dict[str, Any] = json.loads(content)
 
         # Parse the LLM response shape: {"plan": {"subgoal": str, "steps": [{id, description, capability}]}}
         plan_body = plan_dict["plan"]
