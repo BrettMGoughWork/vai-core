@@ -1,0 +1,636 @@
+[
+  {
+    "name": "escalation_simple_to_hardened_on_network_error",
+    "input": {
+      "url": "https://example.com",
+      "fallback_input": {
+        "current_mode": "http_simple",
+        "error": { "error_type": "NetworkError", "error_message": "connection refused" }
+      }
+    },
+    "expected_output": {
+      "next_mode": "http_hardened",
+      "timeout_seconds": 15
+    },
+    "purpose": "NetworkError in simple mode escalates to hardened"
+  },
+  {
+    "name": "escalation_hardened_to_headless_on_timeout",
+    "input": {
+      "url": "https://example.com",
+      "fallback_input": {
+        "current_mode": "http_hardened",
+        "error": { "error_type": "TimeoutError", "error_message": "request timed out after 15s" }
+      }
+    },
+    "expected_output": {
+      "next_mode": "http_headless_browser",
+      "timeout_seconds": 30
+    },
+    "purpose": "TimeoutError in hardened mode escalates to headless"
+  },
+  {
+    "name": "escalation_headless_to_stealth_on_dns_failure",
+    "input": {
+      "url": "https://example.com",
+      "fallback_input": {
+        "current_mode": "http_headless_browser",
+        "error": { "error_type": "DNSFailure", "error_message": "name resolution failed" }
+      }
+    },
+    "expected_output": {
+      "next_mode": "http_stealth",
+      "timeout_seconds": 45
+    },
+    "purpose": "DNSFailure in headless mode escalates to stealth"
+  },
+  {
+    "name": "escalation_stealth_to_search_on_ssl_error",
+    "input": {
+      "url": "https://example.com",
+      "fallback_input": {
+        "current_mode": "http_stealth",
+        "error": { "error_type": "SSLError", "error_message": "certificate verification failed" }
+      }
+    },
+    "expected_output": {
+      "next_mode": "search",
+      "timeout_seconds": 10
+    },
+    "purpose": "SSLError in stealth mode escalates to search"
+  },
+  {
+    "name": "escalation_search_to_give_up",
+    "input": {
+      "url": "https://example.com",
+      "fallback_input": {
+        "current_mode": "search",
+        "error": { "error_type": "TimeoutError", "error_message": "search timed out" }
+      }
+    },
+    "expected_output": {
+      "next_mode": "give_up",
+      "timeout_seconds": 0
+    },
+    "purpose": "Any error in search mode results in give_up"
+  },
+  {
+    "name": "signal_js_required_triggers_headless",
+    "input": {
+      "url": "https://example.com",
+      "signals": { "js_required": true, "blank_html": true },
+      "current_mode": "http_simple",
+      "response": { "ok": false, "body": "<html><head></head><body><div id='app'></div></body></html>" }
+    },
+    "expected_output": {
+      "next_mode": "http_headless_browser",
+      "timeout_seconds": 30
+    },
+    "purpose": "JavaScript-required signals (blank SPA shell) jump to headless"
+  },
+  {
+    "name": "signal_cloudflare_challenge_triggers_stealth",
+    "input": {
+      "url": "https://example.com",
+      "signals": { "cloudflare_challenge": true },
+      "current_mode": "http_hardened",
+      "response": { "ok": false, "status_code": 403, "body": "cf-challenge running" }
+    },
+    "expected_output": {
+      "next_mode": "http_stealth",
+      "timeout_seconds": 45
+    },
+    "purpose": "Cloudflare challenge signal jumps to stealth"
+  },
+  {
+    "name": "signal_datadome_block_triggers_stealth",
+    "input": {
+      "url": "https://example.com",
+      "signals": { "datadome_block": true },
+      "current_mode": "http_hardened",
+      "response": { "ok": false, "status_code": 403, "body": "datadome" }
+    },
+    "expected_output": {
+      "next_mode": "http_stealth",
+      "timeout_seconds": 45
+    },
+    "purpose": "DataDome block signal jumps to stealth"
+  },
+  {
+    "name": "signal_perimeterx_block_triggers_stealth",
+    "input": {
+      "url": "https://example.com",
+      "signals": { "perimeterx_block": true },
+      "current_mode": "http_hardened",
+      "response": { "ok": false, "status_code": 403 }
+    },
+    "expected_output": {
+      "next_mode": "http_stealth",
+      "timeout_seconds": 45
+    },
+    "purpose": "PerimeterX block signal jumps to stealth"
+  },
+  {
+    "name": "signal_captcha_present_triggers_stealth",
+    "input": {
+      "url": "https://example.com",
+      "signals": { "captcha_present": true },
+      "current_mode": "http_headless_browser",
+      "response": { "ok": false, "status_code": 403, "body": "recaptcha challenge" }
+    },
+    "expected_output": {
+      "next_mode": "http_stealth",
+      "timeout_seconds": 45
+    },
+    "purpose": "Captcha presence signal jumps to stealth"
+  },
+  {
+    "name": "signal_json_endpoint_retries_simple",
+    "input": {
+      "url": "https://api.example.com/data",
+      "signals": { "json_endpoint_detected": true },
+      "current_mode": "http_hardened",
+      "response": { "ok": false, "headers": { "content-type": "application/json" }, "body": "{\"error\":\"unauthorized\"}" }
+    },
+    "expected_output": {
+      "next_mode": "http_simple",
+      "timeout_seconds": 10
+    },
+    "purpose": "JSON endpoint detection retries with simple mode"
+  },
+  {
+    "name": "signal_static_asset_retries_simple",
+    "input": {
+      "url": "https://example.com/style.css",
+      "signals": { "static_asset": true },
+      "current_mode": "http_hardened",
+      "response": { "ok": false, "headers": { "content-type": "text/css" } }
+    },
+    "expected_output": {
+      "next_mode": "http_simple",
+      "timeout_seconds": 10
+    },
+    "purpose": "Static asset detection retries with simple mode"
+  },
+  {
+    "name": "signal_redirect_loop_hard_escalation",
+    "input": {
+      "url": "https://example.com",
+      "signals": { "redirect_loop": true },
+      "current_mode": "http_simple",
+      "response": { "ok": false, "error_type": "RedirectLoopError" }
+    },
+    "expected_output": {
+      "next_mode": "http_hardened",
+      "timeout_seconds": 15
+    },
+    "purpose": "Redirect loop signal triggers hard escalation to next mode"
+  },
+  {
+    "name": "domain_policy_deny_immediate_give_up",
+    "input": {
+      "url": "https://blocked.example.com",
+      "domain_policy": { "blocked.example.com": { "deny": true } }
+    },
+    "expected_output": {
+      "ok": false,
+      "error_type": "Blocked"
+    },
+    "purpose": "Denied domain returns immediate failure without any fetch attempt"
+  },
+  {
+    "name": "domain_policy_allow_false_immediate_give_up",
+    "input": {
+      "url": "https://restricted.example.com",
+      "domain_policy": { "restricted.example.com": { "allow": false } }
+    },
+    "expected_output": {
+      "ok": false,
+      "error_type": "Blocked"
+    },
+    "purpose": "allow=false is treated as denied and returns immediate failure"
+  },
+  {
+    "name": "domain_policy_preferred_mode_overrides_heuristics",
+    "input": {
+      "url": "https://example.com",
+      "domain_policy": { "example.com": { "preferred_mode": "http_stealth" } }
+    },
+    "expected_output": {
+      "ok": true,
+      "status_code": 200
+    },
+    "purpose": "Preferred mode is used as initial mode regardless of heuristics"
+  },
+  {
+    "name": "domain_policy_forbidden_mode_skipped_during_escalation",
+    "input": {
+      "url": "https://example.com",
+      "domain_policy": { "example.com": { "forbidden_modes": ["http_hardened"] } }
+    },
+    "expected_output": {
+      "ok": true
+    },
+    "purpose": "Forbidden mode is skipped; escalation jumps over it to the next available mode"
+  },
+  {
+    "name": "domain_policy_rate_limit_delay_enforced",
+    "input": {
+      "url": "https://example.com",
+      "domain_policy": { "example.com": { "rate_limit_ms": 500 } }
+    },
+    "expected_output": {
+      "elapsed_ms": { "min": 500 }
+    },
+    "purpose": "Rate limit delay is enforced between successive fetch attempts"
+  },
+  {
+    "name": "hydration_preserves_cookies_across_attempts",
+    "input": {
+      "url": "https://example.com",
+      "first_response_cookies": { "session": "abc123", "csrf": "token1" }
+    },
+    "expected_output": {
+      "second_request_cookies_contain": { "session": "abc123", "csrf": "token1" }
+    },
+    "purpose": "Cookies from a failed response are carried forward to the next request"
+  },
+  {
+    "name": "hydration_preserves_headers_across_attempts",
+    "input": {
+      "url": "https://example.com",
+      "initial_headers": { "authorization": "Bearer token1", "user-agent": "test/1.0" }
+    },
+    "expected_output": {
+      "second_request_headers_contain": { "authorization": "Bearer token1" }
+    },
+    "purpose": "Headers from the initial request are preserved in subsequent attempts"
+  },
+  {
+    "name": "hydration_updates_url_on_redirect",
+    "input": {
+      "url": "https://example.com/start",
+      "response_url": "https://example.com/redirected"
+    },
+    "expected_output": {
+      "next_request_url": "https://example.com/redirected"
+    },
+    "purpose": "The response URL is used for the next request when it differs from the original"
+  },
+  {
+    "name": "hydration_merges_new_cookies_with_existing",
+    "input": {
+      "url": "https://example.com",
+      "initial_cookies": { "tracking": "old" },
+      "response_cookies": { "session": "new" }
+    },
+    "expected_output": {
+      "second_request_cookies_contain": { "tracking": "old", "session": "new" }
+    },
+    "purpose": "New cookies from a response are merged with existing request cookies"
+  },
+  {
+    "name": "hydration_no_internal_metadata_in_request",
+    "input": {
+      "url": "https://example.com",
+      "response_with_internal": {
+        "ok": false,
+        "internal": { "mode": "http_simple", "signals": { "js_required": true }, "fallback_history": ["simple->hardened"] }
+      }
+    },
+    "expected_output": {
+      "next_request_fields": ["url", "method", "headers", "cookies", "timeout", "body"]
+    },
+    "purpose": "Hydrated request contains only public fields with no internal metadata"
+  },
+  {
+    "name": "sanitisation_success_never_exposes_modes",
+    "input": {
+      "raw_response": {
+        "ok": true,
+        "status_code": 200,
+        "final_url": "https://example.com",
+        "headers": { "content-type": "text/html" },
+        "cookies": {},
+        "body": "<html>hello</html>",
+        "elapsed_ms": 150,
+        "internal": {
+          "mode": "http_simple",
+          "signals": {},
+          "fallback_history": [],
+          "policy": { "domain": "example.com", "allow": true }
+        }
+      }
+    },
+    "expected_output": {
+      "ok": true,
+      "status_code": 200,
+      "final_url": "https://example.com",
+      "headers": { "content-type": "text/html" },
+      "cookies": {},
+      "body": "<html>hello</html>",
+      "elapsed_ms": 150
+    },
+    "purpose": "Success response never exposes internal mode, signals, or policy fields"
+  },
+  {
+    "name": "sanitisation_failure_never_exposes_signals",
+    "input": {
+      "raw_response": {
+        "ok": false,
+        "elapsed_ms": 500,
+        "internal": {
+          "mode": "http_stealth",
+          "error_type": "CloudflareBlockError",
+          "error_message": "blocked by cloudflare_challenge after http_stealth attempt",
+          "signals": { "cloudflare_challenge": true, "captcha_present": true },
+          "fallback_history": ["http_simple", "http_hardened", "http_headless_browser", "http_stealth"],
+          "policy": { "domain": "protected.example.com", "preferred_mode": "http_stealth" },
+          "search_provider": null,
+          "stack": "File 'fetch.py', line 42, in execute..."
+        }
+      }
+    },
+    "expected_output": {
+      "ok": false,
+      "error_type": "Blocked",
+      "error_message": "The request was blocked by the target site.",
+      "elapsed_ms": 500
+    },
+    "purpose": "Failure response sanitizes internal error details into public-safe categories"
+  },
+  {
+    "name": "sanitisation_never_exposes_fallback_history",
+    "input": {
+      "raw_response": {
+        "ok": false,
+        "elapsed_ms": 1200,
+        "internal": {
+          "error_type": "FetchExhaustedError",
+          "error_message": "escalation chain exhausted: http_simple→http_hardened→http_headless_browser→http_stealth→search→give_up",
+          "fallback_history": [
+            { "from": "http_simple", "to": "http_hardened", "reason": "NetworkError" },
+            { "from": "http_hardened", "to": "http_headless_browser", "reason": "signal: js_required" },
+            { "from": "http_headless_browser", "to": "http_stealth", "reason": "signal: cloudflare_challenge" },
+            { "from": "http_stealth", "to": "search", "reason": "TimeoutError" },
+            { "from": "search", "to": "give_up", "reason": "no results" }
+          ]
+        }
+      }
+    },
+    "expected_output": {
+      "ok": false,
+      "error_type": "UnknownError",
+      "error_message": "An unexpected error occurred while fetching the URL."
+    },
+    "purpose": "Exhaustion response never exposes fallback history or escalation chain"
+  },
+  {
+    "name": "sanitisation_never_exposes_search_provider",
+    "input": {
+      "raw_response": {
+        "ok": true,
+        "status_code": 200,
+        "final_url": "https://example.com",
+        "headers": {},
+        "cookies": {},
+        "body": "search result page",
+        "elapsed_ms": 200,
+        "internal": {
+          "mode": "search",
+          "search_provider": "tavily",
+          "signals": {},
+          "fallback_history": ["http_simple", "http_hardened", "http_headless_browser", "http_stealth", "search"]
+        }
+      }
+    },
+    "expected_output": {
+      "ok": true,
+      "status_code": 200,
+      "final_url": "https://example.com",
+      "body": "search result page"
+    },
+    "purpose": "Search provider name (tavily) is never exposed to the LLM"
+  },
+  {
+    "name": "sanitisation_never_exposes_stack_traces",
+    "input": {
+      "raw_response": {
+        "ok": false,
+        "elapsed_ms": 100,
+        "internal": {
+          "error_type": "ConnectionError",
+          "error_message": "Traceback (most recent call last):\n  File 'fetch.py', line 42, in execute\n    raise ConnectionError('refused')\nConnectionError: connection refused",
+          "stack": "File 'fetch.py', line 42, in execute\n  File 'transport.py', line 15, in connect\nConnectionError"
+        }
+      }
+    },
+    "expected_output": {
+      "ok": false,
+      "error_type": "NetworkError"
+    },
+    "purpose": "Stack traces and file paths are never exposed in error messages"
+  },
+  {
+    "name": "timeout_simple_is_10_seconds",
+    "input": { "mode": "http_simple" },
+    "expected_output": { "timeout_seconds": 10 },
+    "purpose": "http_simple mode uses 10-second timeout"
+  },
+  {
+    "name": "timeout_hardened_is_15_seconds",
+    "input": { "mode": "http_hardened" },
+    "expected_output": { "timeout_seconds": 15 },
+    "purpose": "http_hardened mode uses 15-second timeout"
+  },
+  {
+    "name": "timeout_headless_is_30_seconds",
+    "input": { "mode": "http_headless_browser" },
+    "expected_output": { "timeout_seconds": 30 },
+    "purpose": "http_headless_browser mode uses 30-second timeout"
+  },
+  {
+    "name": "timeout_stealth_is_45_seconds",
+    "input": { "mode": "http_stealth" },
+    "expected_output": { "timeout_seconds": 45 },
+    "purpose": "http_stealth mode uses 45-second timeout"
+  },
+  {
+    "name": "timeout_search_is_10_seconds",
+    "input": { "mode": "search" },
+    "expected_output": { "timeout_seconds": 10 },
+    "purpose": "search mode uses 10-second timeout"
+  },
+  {
+    "name": "timeout_give_up_is_0_seconds",
+    "input": { "mode": "give_up" },
+    "expected_output": { "timeout_seconds": 0 },
+    "purpose": "give_up uses 0-second timeout (no further attempts)"
+  },
+  {
+    "name": "search_invoked_only_after_all_modes_exhausted",
+    "input": {
+      "url": "https://example.com",
+      "executor_responses": [
+        { "mode": "http_simple", "ok": false, "error_type": "HTTPError" },
+        { "mode": "http_hardened", "ok": false, "error_type": "HTTPError" },
+        { "mode": "http_headless_browser", "ok": false, "error_type": "HTTPError" },
+        { "mode": "http_stealth", "ok": false, "error_type": "TimeoutError" },
+        { "mode": "search", "ok": true, "body": "search result" }
+      ]
+    },
+    "expected_output": {
+      "ok": true,
+      "body": "search result"
+    },
+    "purpose": "Search is invoked ONLY after simple, hardened, headless, and stealth all fail"
+  },
+  {
+    "name": "search_failure_results_in_give_up",
+    "input": {
+      "url": "https://example.com",
+      "executor_responses": [
+        { "mode": "http_simple", "ok": false },
+        { "mode": "http_hardened", "ok": false },
+        { "mode": "http_headless_browser", "ok": false },
+        { "mode": "http_stealth", "ok": false },
+        { "mode": "search", "ok": false, "error_type": "TimeoutError" }
+      ]
+    },
+    "expected_output": {
+      "ok": false
+    },
+    "purpose": "When search also fails, the orchestrator gives up"
+  },
+  {
+    "name": "search_success_returns_valid_response",
+    "input": {
+      "url": "https://example.com",
+      "search_result": {
+        "ok": true,
+        "status_code": 200,
+        "final_url": "https://example.com/cached",
+        "headers": { "content-type": "text/html" },
+        "cookies": {},
+        "body": "<html>cached page</html>",
+        "elapsed_ms": 250
+      }
+    },
+    "expected_output": {
+      "ok": true,
+      "status_code": 200,
+      "final_url": "https://example.com/cached",
+      "body": "<html>cached page</html>",
+      "elapsed_ms": 250
+    },
+    "purpose": "Successful search fallback returns a valid public FetchResponse"
+  },
+  {
+    "name": "success_response_returns_ok_true_with_body",
+    "input": {
+      "url": "https://example.com",
+      "executor": "immediate_success"
+    },
+    "expected_output": {
+      "ok": true,
+      "status_code": 200,
+      "body": "<html>hello</html>"
+    },
+    "purpose": "Successful fetch returns ok=true, status code, and full body"
+  },
+  {
+    "name": "failure_response_returns_ok_false_with_public_error",
+    "input": {
+      "url": "https://example.com",
+      "executor": "always_fail"
+    },
+    "expected_output": {
+      "ok": false,
+      "error_type": "matches:NetworkError|Timeout|InvalidResponse|Blocked|UnknownError"
+    },
+    "purpose": "Failed fetch returns ok=false with a public-safe error_type only"
+  },
+  {
+    "name": "elapsed_ms_present_and_numeric_on_success",
+    "input": {
+      "url": "https://example.com",
+      "executor": "immediate_success"
+    },
+    "expected_output": {
+      "ok": true,
+      "elapsed_ms": { "type": "number", "min": 0 }
+    },
+    "purpose": "elapsed_ms is always present and is a non-negative integer"
+  },
+  {
+    "name": "elapsed_ms_present_and_numeric_on_failure",
+    "input": {
+      "url": "https://example.com",
+      "executor": "always_fail"
+    },
+    "expected_output": {
+      "ok": false,
+      "elapsed_ms": { "type": "number", "min": 0 }
+    },
+    "purpose": "elapsed_ms is present even when the fetch fails"
+  },
+  {
+    "name": "headers_are_well_formed_dict",
+    "input": {
+      "url": "https://example.com",
+      "executor": "returns_headers"
+    },
+    "expected_output": {
+      "ok": true,
+      "headers": { "content-type": "string", "content-length": "string" }
+    },
+    "purpose": "Response headers are a well-formed string-to-string dictionary"
+  },
+  {
+    "name": "cookies_are_well_formed_dict",
+    "input": {
+      "url": "https://example.com",
+      "executor": "returns_cookies"
+    },
+    "expected_output": {
+      "ok": true,
+      "cookies": { "session": "string" }
+    },
+    "purpose": "Response cookies are a well-formed string-to-string dictionary"
+  },
+  {
+    "name": "no_internal_metadata_in_success_response",
+    "input": {
+      "url": "https://example.com",
+      "executor": "immediate_success"
+    },
+    "expected_output": {
+      "forbidden_fields": ["mode", "signals", "fallback_history", "policy", "search_provider", "hydration", "internal", "stack"]
+    },
+    "purpose": "Success response contains zero internal metadata fields"
+  },
+  {
+    "name": "no_internal_metadata_in_failure_response",
+    "input": {
+      "url": "https://blocked.example.com",
+      "domain_policy": { "blocked.example.com": { "deny": true } }
+    },
+    "expected_output": {
+      "forbidden_fields": ["mode", "signals", "fallback_history", "policy", "search_provider", "hydration", "internal", "stack"]
+    },
+    "purpose": "Failure response contains zero internal metadata fields"
+  },
+  {
+    "name": "schema_stable_on_multiple_invocations",
+    "input": {
+      "url": "https://example.com",
+      "executor": "immediate_success",
+      "iterations": 10
+    },
+    "expected_output": {
+      "schema_keys": ["ok", "status_code", "final_url", "headers", "cookies", "body", "elapsed_ms", "error_type", "error_message"],
+      "invariant": "all responses have identical keys"
+    },
+    "purpose": "The public FetchResponse schema is stable and deterministic across repeated calls"
+  }
+]

@@ -1096,10 +1096,10 @@ Requirements:
 ✅ 3.11.2 — Playwright headless fetch mode
 - JS rendering via Playwright; handles SPA and JS-dependent content
 
-3.11.3 — Playwright stealth fetch mode
+✅ 3.11.3 — Playwright stealth fetch mode
 - Stealth plugin, human-like timing, rate limiting, fingerprint masking
 
-3.11.4 — Tests
+✅ 3.11.4 — Tests
 - Each mode exercised against a known endpoint; mode-selection by flag; fallback on mode failure
 
 ---
@@ -1107,23 +1107,44 @@ Requirements:
 ### PHASE 3.12 — Fetch Orchestrator: Escalation & Domain Policy
 *Depends On*: PHASE 3.11
 
-3.12.1 — Fetch heuristics
+✅ 3.12.1 — Fetch heuristics
 - Select initial mode based on URL pattern, content-type hints, prior success/failure history
 
-3.12.2 — Fallback chain
+✅ 3.12.2 — Fallback chain
 - `simple → hardened → browser → stealth → search`; each step triggered by `FetchError` type
 - Mode-specific timeouts: simple (10s), hardened (15s), browser (30s), stealth (45s)
 
-3.12.3 — Per-domain policy
+✅ 3.12.3 — Per-domain policy
 - Allowlists, deny lists, rate limits, mode preferences per domain
 - Configurable via `domain_policy.json` or equivalent
 
-3.12.4 — Single LLM-facing interface
+✅ 3.12.4 — Signals Taxonomy & Extraction
+- JavaScript / Rendering Signals
+- Anti‑Bot / Security Signals
+- Content‑Type Signals
+- Network / Protocol Signals
+- Quality / Structure Signals
+
+✅ 3.12.5 — Signal‑Driven Fallback Router
+
+- Hard failures
+- JavaScript / Rendering Signals
+- Anti‑Bot Signals
+- Content‑Type Signals
+- Domain Policy Overrides
+- Exhaustion
+
+✅ 3.12.6 — Single LLM-facing interface
 - Expose only `fetch_url` skill; internal strategies (modes, escalation, policy) hidden behind it
 - LLM sees `fetch_url(url)` — nothing else
 
-3.12.5 — Tests
-- Escalation triggers correctly per error type; fallback transitions observed; policy enforces allow/deny; rate limiting honoured
+✅ 3.12.7 - Internal Mode and Metadata Sanitisation
+- Ensure no internal fetch strategy, fallback step, signal, domain policy, or orchestrator meta is ever expose to the LLM
+
+✅ 3.12.8 — Test Suite Specification
+- Comprehensive test suite spec at `src/core/types/fetch/test_suite_3_12_8.json` (44 test cases)
+- Covers: escalation triggers (6 error types × 5 mode transitions), signal-driven fallback (12 signals), domain policy enforcement (5 rules), request hydration (5 rules), sanitisation layer (6 leakage checks), timeout rules (6 modes), search fallback (3 scenarios), final response validation (5 cases)
+- Test harness integration deferred to 3.18.3
 
 ---
 
@@ -1339,33 +1360,39 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 - `markdown.parse`, `html.parse`, `html.select`, `pdf.extracttext`
 - `csv.read`, `csv.write`
 
-3.18.3 — Database Primitives (Safe CRUD)
+✅ 3.18.3 — Test Harness
+- `tools/test_harness/run_cycle.py` — end-to-end prompt runner
+- `tools/test_harness/ai_harness.sh` — LLM agent harness for structured system+planner+skill testing
+- Validates: prompt → LLM with system instructions, planner execution, skill selection & usage
+- Ready for smoke-testing complex prompts utilising stdlib primitives and skills
+
+3.18.4 — Database Primitives (Safe CRUD)
 - `db.connect`, `db.query`, `db.insert`, `db.update`, `db.delete`
 - `db.listtables`, `db.describetable`
 
-3.18.4 — Network Primitives
+3.18.5 — Network Primitives
 - `net.httpget`, `net.httppost`, `net.dnslookup`, `net.ping`, `net.tcpcheck`
 
-3.18.5 — Web Interaction Primitives
+3.18.6 — Web Interaction Primitives
 - `fetch.simple`, `fetch.hardened`, `fetch.browser`, `fetch.stealth`
 - `search.web`
 
-3.18.6 — Text & Document Processing
+3.18.7 — Text & Document Processing
 - `text.split`, `text.join`, `text.replace`, `text.extract`, `text.normalize`
 - `doc.detecttype`, `doc.extractmetadata`
 
-3.18.7 — System & Environment Primitives
+3.18.8 — System & Environment Primitives
 - `sys.envget`, `sys.envlist`, `sys.timenow`, `sys.uuid`, `sys.tempfile`
 
-3.18.8 — Process & Execution Primitives
+3.18.9 — Process & Execution Primitives
 - `proc.exec`, `proc.execsafe`, `proc.kill`, `proc.ps`
 - (Optional; many runtimes omit for safety.)
 
-3.18.9 — Compression & Encoding
+3.18.10 — Compression & Encoding
 - `zip.extract`, `zip.create`, `gzip.compress`, `gzip.decompress`
 - `base64.encode`, `base64.decode`
 
-3.18.10 — Tests
+3.18.11 — Tests
 - Each primitive exercised end-to-end via SkillExecutor
 - Category-level conformance suites (file, data, network, web, text, db, sys, proc, compression)
 
