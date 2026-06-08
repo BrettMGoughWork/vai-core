@@ -13,6 +13,8 @@ Lifecycle within a single cycle:
   4. Refresh memory snapshot — pick up state changes from steps 2-3.
   4.5 Seed plans — if a SubgoalPlanner is injected, call it for any active subgoal
      that has no plan in PlanMemory.  Errors are captured but do not abort the cycle.
+  4.6 Dispatch plans — if a PlanExecutor is injected, execute each freshly-seeded
+     plan through S3 before reflection runs (Phase 3.8.10).
   5. Run one ReflectionLoop cycle per active subgoal (sorted deterministically).
   6. Post-reflection safety gate — check SafetyValidationResult from each outcome.
   7. Classify termination — detect when all work is done.
@@ -30,7 +32,9 @@ from typing import Dict, List, Optional, Tuple
 from src.core.memory.governance.memory_governance import MemoryGovernance
 from src.core.memory.governance.governance_errors import MemoryGovernanceError
 from src.core.memory.subgoal_memory_types import SubgoalMemoryRecord
+from src.core.planning.dispatch.plan_executor import PlanExecutor
 from src.core.planning.generator.subgoal_planner import SubgoalPlanner
+from src.core.planning.models.plan import Plan
 from src.core.planning.reflection.reflection_loop import ReflectionLoop
 from src.core.planning.reflection.reflection_types import (
     ReflectionOutcome,
@@ -127,11 +131,22 @@ class AgentLoopV2:
       - SubgoalPlanner (optional):    plan generation via injectable ChatProvider
                                       (pass planner=SubgoalPlanner(llm=MockLLM()) for tests;
                                        replace MockLLM with any ChatProvider for production)
+      - PlanExecutor (optional):      plan dispatch through S3 (Phase 3.8.10).
+                                      Plans seeded by SubgoalPlanner in step 4.5 are
+                                      dispatched through PlanExecutor in step 4.6 before
+                                      reflection runs.  Omit for S2-only testing.
     """
 
-    def __init__(self, config: AgentLoopConfig = AgentLoopConfig(), *, planner: Optional[SubgoalPlanner] = None) -> None:
+    def __init__(
+        self,
+        config: AgentLoopConfig = AgentLoopConfig(),
+        *,
+        planner: Optional[SubgoalPlanner] = None,
+        plan_executor: Optional[PlanExecutor] = None,
+    ) -> None:
         self._config = config
         self._planner = planner
+        self._plan_executor = plan_executor
         self._reflection_loop = ReflectionLoop(
             confirmation_cycles=config.confirmation_cycles,
             cooldown_cycles=config.cooldown_cycles,
@@ -315,7 +330,8 @@ class AgentLoopV2:
         if self._planner is not None:
             for record in active_records:
                 sg_id = record.subgoal_id
-                if state.plan_memory.get_latest_for_subgoal(sg_id) is not None:
+                existing = state.plan_memory.get_latest_for_subgoal(sg_id)
+                if existing is not None:
                     continue  # plan already exists — skip
                 try:
                     self._planner.plan_for_subgoal(
@@ -329,6 +345,79 @@ class AgentLoopV2:
                         cycle=state.cycle,
                         error_type="planning",
                         message=f"Plan seeding failed for {sg_id!r}: {exc}",
+                        subgoal_id=sg_id,
+                    )
+                    cycle_errors.append(err)
+                    state.accumulated_errors.append(err)
+                    state.last_error = err
+
+        # ── 4.6. Dispatch plans through PlanExecutor (3.8.10) ────────────
+        if self._plan_executor is not None:
+            for record in active_records:
+                sg_id = record.subgoal_id
+                latest_plan_record = state.plan_memory.get_latest_for_subgoal(sg_id)
+                if latest_plan_record is None:
+                    continue
+                # Guard against re-dispatch: PlanExecutor writes a
+                # SegmentMemoryRecord keyed by targetskillid — if one
+                # already exists the plan was dispatched in a prior cycle.
+                if state.segment_memory.get_record(latest_plan_record.targetskillid) is not None:
+                    continue
+                try:
+                    plan = Plan(
+                        intent=latest_plan_record.intent,
+                        targetskillid=latest_plan_record.targetskillid,
+                        arguments=dict(latest_plan_record.arguments),
+                        reasoning_summary=latest_plan_record.reasoning_summary,
+                    )
+                    _, result, metrics = self._plan_executor.execute(plan)
+                    if metrics.termination_reason == "failure":
+                        fail_err = AgentLoopError(
+                            cycle=state.cycle,
+                            error_type="execution",
+                            message=(
+                                f"Plan dispatch failed for {sg_id!r}: "
+                                f"{result.reason}"
+                            ),
+                            subgoal_id=sg_id,
+                        )
+                        cycle_errors.append(fail_err)
+                        state.accumulated_errors.append(fail_err)
+                        state.last_error = fail_err
+                    else:
+                        # Dispatch succeeded — advance subgoal lifecycle:
+                        #   ready → (start) → running → (succeed) → success
+                        subgoal = state.subgoal_memory.get(sg_id)
+                        if subgoal is not None:
+                            # ready → running
+                            start_result = self._transition_rules.apply_subgoal_transition(
+                                subgoal.state, SubgoalEvent.START
+                            )
+                            if start_result.success:
+                                subgoal = subgoal.with_state(
+                                    SubgoalLifecycleState(start_result.to_state)
+                                )
+                                try:
+                                    governance.put_subgoal(subgoal)
+                                except MemoryGovernanceError:
+                                    pass  # best-effort; don't fail the cycle
+                                # running → success
+                                succeed_result = self._transition_rules.apply_subgoal_transition(
+                                    subgoal.state, SubgoalEvent.SUCCEED
+                                )
+                                if succeed_result.success:
+                                    subgoal = subgoal.with_state(
+                                        SubgoalLifecycleState(succeed_result.to_state)
+                                    )
+                                    try:
+                                        governance.put_subgoal(subgoal)
+                                    except MemoryGovernanceError:
+                                        pass  # best-effort
+                except Exception as exc:  # noqa: BLE001
+                    err = AgentLoopError(
+                        cycle=state.cycle,
+                        error_type="execution",
+                        message=f"Plan dispatch crashed for {sg_id!r}: {exc}",
                         subgoal_id=sg_id,
                     )
                     cycle_errors.append(err)

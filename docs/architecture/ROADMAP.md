@@ -959,7 +959,7 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 ### PHASE 3.8 — S2 ↔ S3 Integration (Thin Adapter + Bug Fixes) — 9/10 complete
 *Depends On*: PHASE 3.7
 *Design rule*: S3 (`src/capabilities/`) never imports S1/S2. Integration code lives in `src/stratum2/s3_adapter.py` as an adapter that speaks S3's public contract.
-*Note*: All S3 components (contracts, SkillRunner, SkillExecutor, S3Adapter) are built, tested, and verified via 26 integration tests. The only remaining gap is wiring `PlanExecutor` into `AgentLoopV2`'s main cycle (3.8.10, deferred to post-3.9).
+*Note*: All S3 components (contracts, SkillRunner, SkillExecutor, S3Adapter) are built and tested via 26 integration tests. PlanExecutor is now wired into AgentLoopV2's main cycle via step 4.6 (3.8.10 ✅).
 
 ✅ 3.8.1 — Finalize boundary contracts
 - `SkillCallRequest`, `SkillResult`, `SkillDiscoveryQuery`, `SkillDiscoveryResult`, `DiscoveredSkill` as pure dataclasses in `src/capabilities/contracts.py`
@@ -1003,12 +1003,11 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 - Error propagation: invalid skill name, failed execution
 - Discovery flow: S2 queries skills, receives ranked list
 
-⏳ 3.8.10 — Wire PlanExecutor into the agent cycle (**DEFERRED: PlanExecutor built + tested; main-loop wiring is post-3.9 work**)
-- `AgentLoopV2` seeds plans via `SubgoalPlanner.plan_for_subgoal()` (step 4.5) but never dispatches them through `PlanExecutor`
-- `PlanExecutor.execute()` calls `S3Adapter.call_skill()`, writes `SegmentMemoryRecord` — but is never invoked from the agent loop
-- Gap: between plan seeding (step 4.5) and ReflectionLoop (step 5), there is no S3 skill dispatch
-- Resolution path: inject `PlanExecutor` into `AgentLoopV2`, add a plan-dispatch step between seed (4.5) and reflect (5)
-- **Note**: 3.9 smoke test can bypass the agent loop entirely and call `PlanExecutor` directly (validated in 3.8.9 integration tests)
+✅ 3.8.10 — Wire PlanExecutor into the agent cycle (**DONE — AgentLoopV2 step 4.6**)
+- `AgentLoopV2` seeds plans via `SubgoalPlanner.plan_for_subgoal()` (step 4.5) and now dispatches them through `PlanExecutor` in step 4.6 before reflection runs.
+- `PlanExecutor.execute()` calls `S3Adapter.call_skill()`, writes `SegmentMemoryRecord` — invoked from the agent loop as an optional injection.
+- **Re-dispatch guard**: Step 4.6 checks `SegmentMemoryRecord` existence for `plan.targetskillid` before dispatching (PlanExecutor writes one on first successful execution), preventing duplicate skill calls across cycles.
+- `AgentLoopV2.__init__()` accepts optional `plan_executor: Optional[PlanExecutor] = None`.  Pass it from `planning_composition.py` (which already constructs it).
 
 ---
 
@@ -1041,6 +1040,9 @@ A minimal end-to-end test against the real LLM that proves S2 can discover and c
 ✅ 3.9.8 — Statistical conformance
 - Run `python -m tests.statistical.cli --scenario tiny_s3_smoke --repetitions 25 --backend real_llm`; verify 100% json_validity, 100% schema_validity, 0 catastrophic failures
 
+✅ 3.9.9 — AgentLoopV2 full-cycle smoke
+- Inject PlanExecutor into AgentLoopV2, run one cycle, verify: plan seeded (step 4.5), dispatched (step 4.6) → SegmentMemoryRecord written, reflection ran (step 5), no errors.
+
 ---
 
 ### PHASE 3.10 — Fetch Orchestrator: Simple HTTP
@@ -1049,7 +1051,7 @@ A minimal end-to-end test against the real LLM that proves S2 can discover and c
 3.10.1 — FetchError taxonomy
 - Dataclasses: `TimeoutError`, `HTTPError` (status_code, body), `ParseError`, `ConnectionError`
 
-3.10.2 — `http.fetch` primitive
+3.10.2 — `stdlib.http.fetch` primitive
 - httpx GET with configurable timeout, headers, status-code handling
 - Returns: `status_code`, `body` (str), `headers` (dict), `elapsed` (ms)
 

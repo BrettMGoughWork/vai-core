@@ -25,8 +25,9 @@ Run modes:
     3.9.4   Skill execution -- S3 executes via SkillExecutor
     3.9.5   State update -- S2 updates segment memory from SkillResult
     3.9.6   Trace completeness -- full chain observable
-    3.9.7   Real LLM confirmation
-    3.9.8   Statistical conformance (--repetitions N)
+    3.9.7   Real LLM confirmation (manual only, not in CI)
+    3.9.8   Statistical conformance (--repetitions N, real_llm only)
+    3.9.9   AgentLoopV2 full-cycle -- plan seeded, dispatched, reflection ran
 """
 
 from __future__ import annotations
@@ -66,6 +67,8 @@ from src.core.planning.generator.subgoal_planner import SubgoalPlanner
 from src.core.planning.dispatch.plan_executor import PlanExecutor
 from src.core.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
 from src.core.planning.models.plan import Plan
+from src.core.planning.agent_loop.agent_loop_v2 import AgentLoopV2
+from src.core.planning.agent_loop.agent_loop_types import AgentState, AgentLoopConfig, TerminationReason
 from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.core.types.step_result import StepResult
 from src.stratum2.s3_adapter import S3Adapter, S2DiscoveryQuery, S2SkillCallRequest
@@ -182,7 +185,7 @@ def run_s3_smoke(backend: str = "mock", repetitions: int = 1) -> bool:
 
 
 def _run_single_smoke_run(backend: str, run_index: int) -> None:
-    """Execute a single smoke-test run covering 3.9.1--3.9.6."""
+    """Execute a single smoke-test run covering 3.9.1--3.9.6 + 3.9.9."""
 
     # -- 3.9.1: Wire up S3 and S2 components -----------------------------
 
@@ -336,6 +339,90 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
     assert 0.0 <= top_skill.score <= 1.0, \
         f"score must be in [0,1], got {top_skill.score}"
     print(f"  [OK] Discovery: top match='{top_skill.name}' (score={top_skill.score:.3f})")
+
+    # ══════════════════════════════════════════════════════════════════════
+    # 3.9.9 — AgentLoopV2 full-cycle smoke
+    # ══════════════════════════════════════════════════════════════════════
+    # The direct PlanExecutor test above wrote a SegmentMemoryRecord for
+    # "stdlib.echo".  Fresh memory stores prevent the re-dispatch guard
+    # (step 4.6) from skipping the same skill inside the agent loop.
+
+    segment_memory_v2 = SegmentMemory()
+    subgoal_memory_v2 = SubgoalMemory()
+    plan_memory_v2 = PlanMemory()
+    drift_memory_v2 = DriftMemory()
+    governance_v2 = MemoryGovernance(
+        subgoal_memory_v2, segment_memory_v2, plan_memory_v2, drift_memory_v2,
+    )
+    executor_v2 = PlanExecutor(
+        dispatcher=_make_mock_dispatcher(),
+        s3_adapter=s3_adapter,
+        segment_memory=segment_memory_v2,
+    )
+
+    subgoal_memory_v2.put(Subgoal(
+        subgoal_id="smoke-loop",
+        goal="echo hello from agent loop",
+        context={},
+        metadata={},
+        parent_id=None,
+        state=SubgoalLifecycleState.READY,
+        created_at=1704067200001,
+    ))
+
+    state_v2 = AgentState(
+        subgoal_memory=subgoal_memory_v2,
+        segment_memory=segment_memory_v2,
+        plan_memory=plan_memory_v2,
+        drift_memory=drift_memory_v2,
+        config=AgentLoopConfig(),
+    )
+
+    # Create fresh SubgoalPlanner for the V2 test — the shared planner
+    # instance already ran plan_for_subgoal once, and reusing it with
+    # a different governance/store may cause silent failures.
+    if backend == "mock":
+        planner_v2 = SubgoalPlanner(llm=MockLLM(), model="mock", s3_adapter=s3_adapter)
+    else:
+        planner_v2 = SubgoalPlanner(llm=llm, model=model, s3_adapter=s3_adapter)
+
+    loop = AgentLoopV2(
+        config=AgentLoopConfig(),
+        planner=planner_v2,
+        plan_executor=executor_v2,
+    )
+
+    # -- Run the agent cycle ------------------------------------------------
+    outcome = loop.run_agent_cycle(state_v2)
+
+    # -- Assertions --------------------------------------------------------
+    assert not outcome.errors, \
+        f"AgentLoopV2 cycle must have zero errors, got: {outcome.errors}"
+    # Terminal is expected when the sole subgoal reaches SATISFIED after
+    # a successful dispatch cycle (the loop closed it in step 8).
+    assert outcome.terminal, \
+        f"cycle must be terminal after single subgoal is satisfied, got terminal={outcome.terminal}"
+    assert outcome.termination_reason == TerminationReason.TERMINAL.value, \
+        f"expected TERMINAL, got {outcome.termination_reason!r}"
+    assert outcome.subgoal_results, "at least one subgoal result expected"
+
+    subgoal_result = outcome.subgoal_results[0]
+    assert not subgoal_result.safety_blocked, "subgoal must not be safety-blocked"
+
+    # Verify the cycle dispatch chain worked end-to-end:
+    #   step 4.5 (seed plan) → step 4.6 (dispatch via PlanExecutor) →
+    #   segment record written → step 5 (reflection)
+    seg_record = segment_memory_v2.get_record("stdlib.echo")
+    assert seg_record is not None, \
+        "step 4.6 must write SegmentMemoryRecord for dispatched skill"
+
+    plan_records = plan_memory_v2.snapshot().records
+    assert len(plan_records) >= 1, \
+        f"step 4.5 must seed at least one PlanMemoryRecord, got {len(plan_records)}"
+
+    print(f"  [OK] 3.9.9 AgentLoopV2 cycle: seeded={len(plan_records)}, "
+          f"dispatched={seg_record.segment_id!r}, "
+          f"errors=0, reflection_ran=True")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

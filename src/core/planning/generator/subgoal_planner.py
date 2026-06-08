@@ -29,6 +29,7 @@ _SYSTEM_PROMPT: str = (
     "{\n"
     '  "plan": {\n'
     '    "subgoal": "<a concise re-statement of the goal>",\n'
+    '    "arguments": {},\n'
     '    "steps": [\n'
     '      {"id": "<step-id>", "description": "<what to do>", "capability": "<capability name>"}\n'
     "    ]\n"
@@ -37,6 +38,9 @@ _SYSTEM_PROMPT: str = (
     "\n"
     'Rules:\n'
     '- "subgoal" must be a concise re-statement of the user goal (1 sentence).\n'
+    '- "arguments" is a JSON object of key-value pairs to pass to the capability.\n'
+    '  For an "echo" capability, use {"value": "<the message to echo>"}.\n'
+    '  For other capabilities, extract the relevant parameters from the goal text.\n'
     '- "steps" must contain 1-3 step objects.\n'
     '- Each step must have "id", "description", and "capability" fields.\n'
     '- "capability" should be a short identifier like "echo", "print", "parse", etc.\n'
@@ -105,10 +109,11 @@ class SubgoalPlanner:
             content = content.strip()
         plan_dict: Dict[str, Any] = json.loads(content)
 
-        # Parse the LLM response shape: {"plan": {"subgoal": str, "steps": [{id, description, capability}]}}
+        # Parse the LLM response shape: {"plan": {"subgoal": str, "arguments": {...}, "steps": [{id, description, capability}]}}
         plan_body = plan_dict["plan"]
         subgoal_text: str = plan_body["subgoal"]
         steps_list: List[Dict[str, Any]] = plan_body["steps"]
+        plan_arguments: Dict[str, Any] = plan_body.get("arguments", {})
 
         # All step descriptions become a single PlanSegment's steps list.
         step_descriptions = [s["description"] for s in steps_list]
@@ -147,7 +152,7 @@ class SubgoalPlanner:
         plan = Plan(
             intent=subgoal_text,
             targetskillid=targetskillid,
-            arguments={},
+            arguments=plan_arguments,
             reasoning_summary=f"Steps: {', '.join(step_ids)}",
         )
         plan_id = stable_hash({
