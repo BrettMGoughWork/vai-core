@@ -1059,8 +1059,31 @@ A minimal end-to-end test against the real LLM that proves S2 can discover and c
 - Wires to `http.fetch` primitive; returns status + body + headers
 - Accepts `url` and optional `timeout`, `headers` args
 
-3.10.4 — Tests
+✅ 3.10.4 — Tests
 - Successful fetch, timeout, 4xx response, 5xx response, connection refused, invalid URL
+
+3.10.5 - FetchRequest, FetchResponse objects
+
+Purpose:
+Provide consistent, chainable request/response objects that allow the fallback router to:
+- inspect responses
+- classify signals
+- retry with modified requests
+- propagate cookies/headers
+- maintain a trace of attempts
+
+Requirements:
+- collect request and response data, which will allow subsequent fetches to honour headers, cookies, etc
+- ensure any fallback actions propagate these objects
+- hydrate_next_request() method
+- JSON-serialisable shapes for LLM inspection
+- Integration with http.fetch primitive
+- Integration with fetch_url skill
+
+3.10.6 - Test Harness
+- Allow fetch to be executed independently
+- Allow user to inject websites that are use-cases for things like simple fetch, hardened fetch, javascript, SPA, anti-bot, etc
+- This test harness will be used to define fetch hardness as we iterate
 
 ---
 
@@ -1229,12 +1252,12 @@ Layered safety gates for agent-authored skills: structural, semantic, behavioura
 
 Expands the MVP stdlib to a comprehensive, well-organised standard library across ten capability families.
 
-3.18.1 — Ultra-Low-Level File Primitives
+✅ 3.18.1 — Ultra-Low-Level File Primitives
 - `file.read`, `file.readhead`, `file.readtail`, `file.readrange`
 - `file.exists`, `file.list`, `file.search`, `file.glob`, `file.stat`
 - `file.write`, `file.append`, `file.delete`
 
-3.18.2 — Structured Data Primitives
+✅ 3.18.2 — Structured Data Primitives
 - `json.parse`, `json.get`, `json.set`
 - `yaml.parse`, `toml.parse`
 - `markdown.parse`, `html.parse`, `html.select`, `pdf.extracttext`
