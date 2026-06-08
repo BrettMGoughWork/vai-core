@@ -179,17 +179,15 @@ class TestSingleStepSkillExecution:
         skill_registry.register(skill)
 
         # Execute via SkillRunner
-        result = runner.execute(SkillCallRequest(skill_name="echo_skill"))
+        request = SkillCallRequest(skill_name="echo_skill", request_id="test-echo")
+        result = runner.execute(request)
 
         # Verify SkillResult contract
         assert isinstance(result, SkillResult)
-        assert result.skill_name == "echo_skill"
+        assert result.request_id == "test-echo"
         assert result.success is True
         assert result.output == {"message": "hello"}
         assert result.error is None
-        assert result.error_type is None
-        assert isinstance(result.duration_ms, float)
-        assert result.duration_ms >= 0.0
 
     def test_single_step_with_arguments(self, primitive_registry, skill_registry, runner):
         """Arguments are forwarded through the pipeline to the primitive."""
@@ -205,7 +203,7 @@ class TestSingleStepSkillExecution:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="increment"))
+        result = runner.execute(SkillCallRequest(skill_name="increment", request_id="test-inc"))
 
         assert result.success is True
         assert result.output == {"value": 42}
@@ -235,7 +233,7 @@ class TestMultiStepSequentialExecution:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="sequencer"))
+        result = runner.execute(SkillCallRequest(skill_name="sequencer", request_id="test-seq"))
 
         assert result.success is True
         assert tracker == ["step_a", "step_b"]
@@ -260,7 +258,7 @@ class TestMultiStepSequentialExecution:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="pipeline"))
+        result = runner.execute(SkillCallRequest(skill_name="pipeline", request_id="test-pipe"))
 
         assert result.success is True
         # The final step's data is returned; the last step (add_one)
@@ -288,7 +286,7 @@ class TestMultiStepSequentialExecution:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="last_wins"))
+        result = runner.execute(SkillCallRequest(skill_name="last_wins", request_id="test-last"))
 
         assert result.success is True
         assert result.output == {"value": "final"}
@@ -311,15 +309,13 @@ class TestErrorPropagation:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="doomed"))
+        result = runner.execute(SkillCallRequest(skill_name="doomed", request_id="test-doom"))
 
         assert isinstance(result, SkillResult)
-        assert result.skill_name == "doomed"
+        assert result.request_id == "test-doom"
         assert result.success is False
         assert "critical failure" in result.error
-        assert result.error_type == "RuntimeError"
         assert result.output is None
-        assert isinstance(result.duration_ms, float)
 
     def test_error_stops_subsequent_steps(self, primitive_registry, skill_registry, runner):
         """When a step fails without on_error='continue', later steps never run."""
@@ -342,7 +338,7 @@ class TestErrorPropagation:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="stops_early"))
+        result = runner.execute(SkillCallRequest(skill_name="stops_early", request_id="test-stop"))
 
         assert result.success is False
         assert tracker == []  # Second step was never reached.
@@ -353,14 +349,12 @@ class TestUnknownSkill:
 
     def test_unknown_skill_name_returns_failed_result(self, runner):
         """Calling a skill not in the registry returns a failed SkillResult."""
-        result = runner.execute(SkillCallRequest(skill_name="nonexistent_skill"))
+        result = runner.execute(SkillCallRequest(skill_name="nonexistent_skill", request_id="test-unknown"))
 
         assert isinstance(result, SkillResult)
-        assert result.skill_name == "nonexistent_skill"
+        assert result.request_id == "test-unknown"
         assert result.success is False
         assert result.error is not None
-        # The underlying error is an AttributeError because None has no .run()
-        assert result.error_type is not None
         assert result.output is None
 
 
@@ -428,16 +422,16 @@ class TestSkillResultContract:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="simple"))
+        request = SkillCallRequest(skill_name="simple", request_id="test-success")
+        result = runner.execute(request)
 
         # Type checks per contracts.SkillResult
-        assert isinstance(result.skill_name, str)
+        assert isinstance(result.request_id, str)
+        assert result.request_id == "test-success"
         assert isinstance(result.success, bool)
         assert result.success is True
         assert result.output is not None
         assert result.error is None
-        assert result.error_type is None
-        assert isinstance(result.duration_ms, float)
 
     def test_failure_result_fields(self, primitive_registry, skill_registry, runner):
         """Failed SkillResult has all expected fields with correct types."""
@@ -453,18 +447,18 @@ class TestSkillResultContract:
         )
         skill_registry.register(skill)
 
-        result = runner.execute(SkillCallRequest(skill_name="always_fails"))
+        request = SkillCallRequest(skill_name="always_fails", request_id="test-fail")
+        result = runner.execute(request)
 
-        assert isinstance(result.skill_name, str)
+        assert isinstance(result.request_id, str)
+        assert result.request_id == "test-fail"
         assert isinstance(result.success, bool)
         assert result.success is False
         assert result.output is None
         assert isinstance(result.error, str)
-        assert isinstance(result.error_type, str)
-        assert isinstance(result.duration_ms, float)
 
-    def test_idempotency_key_preserved_in_request(self, primitive_registry, skill_registry, runner):
-        """SkillCallRequest fields are correctly accepted."""
+    def test_request_id_echoed_in_result(self, primitive_registry, skill_registry, runner):
+        """SkillResult echoes the request_id from SkillCallRequest."""
         echo = EchoPrimitive(name="echo")
         primitive_registry.register("echo", echo)
 
@@ -480,10 +474,9 @@ class TestSkillResultContract:
         request = SkillCallRequest(
             skill_name="echoer",
             arguments={},
-            timeout_ms=5000,
-            idempotency_key="key-123",
+            request_id="req-123",
         )
         result = runner.execute(request)
 
         assert result.success is True
-        assert result.skill_name == "echoer"
+        assert result.request_id == "req-123"

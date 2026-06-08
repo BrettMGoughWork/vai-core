@@ -45,67 +45,40 @@ class SkillSearch:
 
         Pipeline:
         1. Get all candidate skills from registry
-        2. Filter by domain/input/output hints
-        3. Rank by relevance to natural-language query
-        4. Truncate to max_results
+        2. Rank by relevance to natural-language query
+        3. Truncate to query.limit
         """
-        # Get candidates
-        if query.include_disabled:
-            candidates = list(self._registry._skills.values())
-        else:
-            candidates = self._registry.all_specs()
+        candidates = self._registry.all_specs()
 
         if not candidates:
-            return SkillDiscoveryResult(
-                query=query.query,
-                skills=[],
-                total_count=0,
-            )
+            return SkillDiscoveryResult(query=query, skills=[])
 
-        # Filter
-        if query.domain or query.input_type_hint or query.output_type_hint:
-            candidates = self._filter.filter(candidates, query.query or "")
+        # Rank candidates by relevance to the query text
+        ranked = self._ranker.rank(candidates, query.query)
 
-        # Rank
-        if query.query:
-            ranked = self._ranker.rank(candidates, query.query)
-        else:
-            ranked = candidates
+        # Truncate to limit
+        top = ranked[: query.limit]
 
-        total_count = len(ranked)
+        # Compute embedding-based scores
+        query_vec = self._embedder.embed_query(query.query)
+        scored: list[tuple[float, DiscoveredSkill]] = []
+        for spec in top:
+            skill_vec = self._embedder.embed_skill(spec.name, spec.description)
+            score = self._embedder.similarity(query_vec, skill_vec)
+            scored.append((
+                score,
+                DiscoveredSkill(
+                    name=spec.name,
+                    description=spec.description,
+                    score=score,
+                ),
+            ))
 
-        # Truncate
-        top = ranked[: query.max_results]
+        # Sort by descending score
+        scored.sort(key=lambda s: s[0], reverse=True)
+        skills = [s[1] for s in scored]
 
-        # Build result skills
-        discovered = [
-            DiscoveredSkill(
-                name=spec.name,
-                description=spec.description,
-                input_schema=spec.schema,
-                output_schema=getattr(spec, "output_schema", None),
-                domains=getattr(spec, "category", None),
-                cost_hint=0,
-                relevance_score=1.0,
-            )
-            for spec in top
-        ]
-
-        # Compute relevance scores from embeddings
-        if query.query:
-            query_vec = self._embedder.embed_query(query.query)
-            for i, skill in enumerate(discovered):
-                skill_vec = self._embedder.embed_skill(
-                    skill.name, skill.description
-                )
-                score = self._embedder.similarity(query_vec, skill_vec)
-                discovered[i].relevance_score = score
-
-        return SkillDiscoveryResult(
-            query=query.query,
-            skills=discovered,
-            total_count=total_count,
-        )
+        return SkillDiscoveryResult(query=query, skills=skills)
 
     def lookup(self, skill_name: str) -> Optional[DiscoveredSkill]:
         """Look up a single skill by name and return its discovery summary."""
@@ -117,6 +90,4 @@ class SkillSearch:
         return DiscoveredSkill(
             name=spec.name,
             description=spec.description,
-            input_schema=spec.schema,
-            output_schema=getattr(spec, "output_schema", None),
         )

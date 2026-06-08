@@ -40,6 +40,7 @@ class SegmentMemory:
             steps=steps,
             context=context,
             metadata=metadata,
+            skills=list(segment.skills),
             created_at=segment.created_at,
         )
 
@@ -63,6 +64,7 @@ class SegmentMemory:
             created_at=normalised.created_at,
             context=copy.deepcopy(dict(normalised.context)),
             metadata=copy.deepcopy(dict(normalised.metadata)),
+            skills=list(normalised.skills),
         
             # --- 2.6.2 behavioural-observation fields ---
             previous_output=previous_output,
@@ -71,6 +73,9 @@ class SegmentMemory:
 
             # --- 2.6.3 behavioural drift signals ---
             behavioural_signals=behavioural_signals,
+
+            # --- 3.8.8 error preservation ---
+            error=prev_record.error if prev_record else None,
         )
 
     def get(self, segment_id: str) -> Optional[PlanSegment]:
@@ -83,6 +88,10 @@ class SegmentMemory:
     def get_record(self, segment_id: str) -> Optional[SegmentMemoryRecord]:
         """Return the raw SegmentMemoryRecord for segment_id, or None."""
         return self._store.get(segment_id)
+
+    def put_record(self, record: SegmentMemoryRecord) -> None:
+        """Directly store a SegmentMemoryRecord, overwriting any existing entry."""
+        self._store[record.segment_id] = record
 
     def exists(self, segment_id: str) -> bool:
         return segment_id in self._store
@@ -184,10 +193,12 @@ class SegmentMemory:
             created_at=record.created_at,
             context=copy.deepcopy(record.context),
             metadata=copy.deepcopy(record.metadata),
+            skills=list(record.skills),
             previous_output=record.previous_output,
             last_output=record.last_output,
             behavioural_delta=record.behavioural_delta,
             behavioural_signals=list(signals),
+            error=record.error,
         )
 
     # ------------------------------------------------------------------
@@ -200,5 +211,6 @@ class SegmentMemory:
             steps=list(record.content),
             context=copy.deepcopy(record.context),
             metadata=copy.deepcopy(record.metadata),
+            skills=list(record.skills),
             created_at=record.created_at,
         )

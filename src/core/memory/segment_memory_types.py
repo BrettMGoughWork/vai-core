@@ -24,6 +24,7 @@ class SegmentMemoryRecord:
     created_at: str
     context: Dict[str, Any]
     metadata: Dict[str, Any]
+    skills: List[str] = field(default_factory=list)
 
     # --- 2.6.2 Behavioural Observation Layer ---
     # Last executor output (JSON-pure)
@@ -40,6 +41,10 @@ class SegmentMemoryRecord:
     # Each signal captures a specific mismatch between declared vs actual execution
     # behaviour (e.g. WRONG_CAPABILITY, WRONG_OUTPUT_SHAPE).
     behavioural_signals: List[BehaviouralSignal] = field(default_factory=list)
+
+    # --- 3.8.8 Skill Result Error ---
+    # Error message from a failed skill execution; None if the skill succeeded.
+    error: Optional[str] = None
 
 @dataclass(frozen=True)
 class SegmentMemorySnapshot:

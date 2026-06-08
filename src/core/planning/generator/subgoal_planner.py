@@ -20,6 +20,7 @@ from src.core.memory.governance.memory_governance import MemoryGovernance
 from src.core.planning.models.plan import Plan
 from src.core.types.hashing import stable_hash
 from src.core.types.plan_segment import PlanSegment
+from src.stratum2.s3_adapter import S3Adapter, S2DiscoveryQuery
 
 
 class SubgoalPlanner:
@@ -37,9 +38,15 @@ class SubgoalPlanner:
     within a cycle — retried writes within the same cycle are idempotent.
     """
 
-    def __init__(self, llm: ChatProvider, model: str = "mock") -> None:
+    def __init__(
+        self,
+        llm: ChatProvider,
+        model: str = "mock",
+        s3_adapter: S3Adapter | None = None,
+    ) -> None:
         self._llm = llm
         self._model = model
+        self._s3_adapter = s3_adapter
 
     def plan_for_subgoal(
         self,
@@ -75,20 +82,35 @@ class SubgoalPlanner:
         step_capabilities = [s["capability"] for s in steps_list if s.get("capability")]
         step_ids = [s["id"] for s in steps_list]
 
+        # --- skill discovery via S3 adapter (Phase 3.8.6) ---
+        discovered_skill_names: list[str] = []
+        if self._s3_adapter is not None:
+            discovery = self._s3_adapter.discover_skills(
+                S2DiscoveryQuery(query=subgoal_text, limit=10)
+            )
+            discovered_skill_names = [sk.name for sk in discovery.skills]
+
         # 1. Write segment first — plan governance validates segment IDs exist.
         segment = PlanSegment(
             subgoal_id=subgoal_id,
             steps=step_descriptions,
             context={"capabilities": step_capabilities, "step_ids": step_ids},
             metadata={},
+            skills=discovered_skill_names,
             created_at=timestamp,  # deterministic: same timestamp → same segment_id
         )
         governance.put_segment(segment)
         segment_ids = [segment.segment_id]
 
         # 2. Write the plan (references segment IDs persisted above).
-        # targetskillid = capability of the first step; intent = the subgoal text.
-        targetskillid = step_capabilities[0] if step_capabilities else "unknown"
+        # targetskillid = first discovered skill if available, else first
+        # LLM capability, falling back to "unknown".
+        if discovered_skill_names:
+            targetskillid = discovered_skill_names[0]
+        elif step_capabilities:
+            targetskillid = step_capabilities[0]
+        else:
+            targetskillid = "unknown"
         plan = Plan(
             intent=subgoal_text,
             targetskillid=targetskillid,

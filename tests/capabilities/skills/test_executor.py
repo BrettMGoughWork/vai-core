@@ -283,3 +283,281 @@ class TestSkillExecutor:
         ctx = {"trace_id": "abc-123", "user": "test"}
         executor.execute(skill, {}, ctx)
         assert received_context == [ctx]
+
+
+# ---------------------------------------------------------------------------
+# Template interpolation tests (Phase 3.8.3)
+# ---------------------------------------------------------------------------
+
+class ArgCapturePrimitive(PrimitiveBase):
+    """A primitive that captures the args it receives, for interpolation testing."""
+
+    def __init__(self, *, name: str = "capture") -> None:
+        super().__init__(name=name, description="Captures args", primitive_type=PrimitiveType.PYTHON)
+        self.received_args: dict[str, Any] | None = None
+
+    def validate_args(self, _args: dict) -> None:
+        return
+
+    def execute(self, args: dict, _context: dict) -> PrimitiveResult:
+        self.received_args = dict(args)
+        return PrimitiveResult(status="success", data=self.received_args)
+
+
+class TestTemplateInterpolation:
+    """Tests for SkillExecutor._interpolate_args template resolution."""
+
+    def test_simple_interpolation(self):
+        """{{ key }} tokens are replaced with input values."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[{"call": "capture", "args": {"msg": "{{ value }}"}}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"value": "hello"}, {})
+        assert result.status == "success"
+        assert prim.received_args == {"msg": "hello"}
+
+    def test_nested_interpolation(self):
+        """Deeply nested dict keys are interpolated."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[{"call": "capture", "args": {"outer": {"inner": "{{ x }}"}}}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"x": "nested-val"}, {})
+        assert result.status == "success"
+        assert prim.received_args == {"outer": {"inner": "nested-val"}}
+
+    def test_multiple_tokens_in_one_string(self):
+        """Multiple {{ tokens }} in a single string are all resolved."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[{"call": "capture", "args": {"combined": "{{ a }}-{{ b }}"}}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"a": "first", "b": "second"}, {})
+        assert result.status == "success"
+        assert prim.received_args == {"combined": "first-second"}
+
+    def test_prefix_suffix_template(self):
+        """Template in the middle of other text is resolved."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[{"call": "capture", "args": {"path": "prefix-{{ id }}-suffix"}}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"id": "42"}, {})
+        assert result.status == "success"
+        assert prim.received_args == {"path": "prefix-42-suffix"}
+
+    def test_missing_key_raises_keyerror(self):
+        """Referencing an unknown token key raises KeyError."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[{"call": "capture", "args": {"msg": "{{ missing_key }}"}}],
+        )
+        executor = SkillExecutor()
+        with pytest.raises(KeyError, match="missing_key"):
+            executor.execute(skill, {}, {})
+
+    def test_non_string_values_passed_through(self):
+        """Integer, float, bool, None, and list values are unchanged."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[
+                {
+                    "call": "capture",
+                    "args": {
+                        "int_val": 42,
+                        "float_val": 3.14,
+                        "bool_val": True,
+                        "none_val": None,
+                        "list_val": [1, 2, "{{ x }}"],
+                    },
+                }
+            ],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"x": "replaced"}, {})
+        assert result.status == "success"
+        assert prim.received_args == {
+            "int_val": 42,
+            "float_val": 3.14,
+            "bool_val": True,
+            "none_val": None,
+            "list_val": [1, 2, "replaced"],
+        }
+
+    def test_no_template_tokens_passthrough(self):
+        """Args with no {{ }} tokens pass through unchanged."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[{"call": "capture", "args": {"plain": "no template here"}}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"unused": "ignored"}, {})
+        assert result.status == "success"
+        assert prim.received_args == {"plain": "no template here"}
+
+    def test_entire_value_is_template(self):
+        """When the entire string is {{ key }}, the resolved value is passed as-is (stringified)."""
+        prim = ArgCapturePrimitive()
+        skill = make_skill(
+            primitives={"capture": prim},
+            steps=[{"call": "capture", "args": {"value": "{{ name }}"}}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"name": "world"}, {})
+        assert result.status == "success"
+        assert prim.received_args == {"value": "world"}
+
+
+# ---------------------------------------------------------------------------
+# Inline Python step tests (Phase 3.8.4)
+# ---------------------------------------------------------------------------
+
+
+class TestInlinePythonSteps:
+    """Tests for SkillExecutor inline Python block execution."""
+
+    def test_basic_python_block(self):
+        """python: block computes result from inputs."""
+        skill = make_skill(
+            primitives={},
+            steps=[{"python": "result = {'x': inputs['value'] + 1}"}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"value": 41}, {})
+        assert result.status == "success"
+        assert len(result.results) == 1
+        assert result.results[0].data == {"x": 42}
+
+    def test_missing_result_variable(self):
+        """python: block that does not define 'result' returns error."""
+        skill = make_skill(
+            primitives={},
+            steps=[{"python": "x = 10"}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {}, {})
+        assert result.status == "error"
+        assert "result missing" in result.error
+
+    def test_non_dict_result(self):
+        """python: block with a non-dict result returns error."""
+        skill = make_skill(
+            primitives={},
+            steps=[{"python": "result = 123"}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {}, {})
+        assert result.status == "error"
+        assert "result must be a dict" in result.error
+
+    def test_inputs_are_available(self):
+        """The inputs dict is accessible inside the python block."""
+        skill = make_skill(
+            primitives={},
+            steps=[{"python": "result = {'echo': inputs}"}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"a": 1, "b": "two"}, {})
+        assert result.status == "success"
+        assert result.results[0].data == {"echo": {"a": 1, "b": "two"}}
+
+    def test_no_access_to_builtins(self):
+        """Builtins like len() are not available in the sandbox."""
+        skill = make_skill(
+            primitives={},
+            steps=[{"python": "result = {'x': len([1,2,3])}"}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {}, {})
+        assert result.status == "error"
+        assert "len" in result.error
+
+    def test_no_imports_allowed(self):
+        """Import statements are blocked in the sandbox."""
+        skill = make_skill(
+            primitives={},
+            steps=[{"python": "import os\nresult = {'x': 1}"}],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {}, {})
+        assert result.status == "error"
+
+    def test_python_and_call_mutual_exclusivity(self):
+        """A step with both 'python' and 'call' raises ValueError."""
+        prim = SuccessPrimitive(name="a")
+        skill = make_skill(
+            primitives={"a": prim},
+            steps=[{"python": "result = {}", "call": "a", "args": {}}],
+        )
+        executor = SkillExecutor()
+        with pytest.raises(ValueError, match="both"):
+            executor.execute(skill, {}, {})
+
+    def test_neither_python_nor_call_raises(self):
+        """A step without 'python' or 'call' raises ValueError."""
+        skill = make_skill(
+            primitives={},
+            steps=[{"description": "no python or call here"}],
+        )
+        executor = SkillExecutor()
+        with pytest.raises(ValueError, match="must contain"):
+            executor.execute(skill, {}, {})
+
+    def test_python_step_on_error_continue(self):
+        """A python step with on_error='continue' proceeds to next step."""
+        skill = make_skill(
+            primitives={},
+            steps=[
+                {"python": "x = 10", "on_error": "continue"},
+                {"python": "result = {'recovered': True}"},
+            ],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {}, {})
+        assert result.status == "success"
+        assert len(result.results) == 2
+        assert result.results[0].status == "error"
+        assert result.results[1].status == "success"
+
+    def test_python_step_on_error_stops(self):
+        """A python step without on_error stops execution on failure."""
+        skill = make_skill(
+            primitives={},
+            steps=[
+                {"python": "x = 10"},
+                {"python": "result = {'never': True}"},
+            ],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {}, {})
+        assert result.status == "error"
+        assert len(result.results) == 1
+
+    def test_mixed_python_and_call_steps(self):
+        """A skill can mix python: and call: steps sequentially."""
+        prim = SuccessPrimitive(name="echo", return_data={"from_primitive": True})
+        skill = make_skill(
+            primitives={"echo": prim},
+            steps=[
+                {"python": "result = {'computed': inputs['x'] * 2}"},
+                {"call": "echo", "args": {}},
+            ],
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"x": 5}, {})
+        assert result.status == "success"
+        assert len(result.results) == 2
+        assert result.results[0].data == {"computed": 10}
+        assert result.results[1].data == {"from_primitive": True}

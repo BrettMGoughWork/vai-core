@@ -88,6 +88,10 @@ class ConversationState:
     subgoal_state: SubgoalSubstrateState = field(default_factory=SubgoalSubstrateState)
     segment_state: SegmentSubstrateState = field(default_factory=SegmentSubstrateState)
 
+    # --- 3.8.8 Segment memory mapping ---
+    # Maps segment_id → SegmentMemoryRecord, tracking execution results per segment.
+    segment_memory: dict[str, Any] = field(default_factory=dict)
+
     termination_reason: Optional[str] = None
 
     # runtime layer
