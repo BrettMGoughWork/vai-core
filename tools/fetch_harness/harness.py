@@ -1,18 +1,17 @@
 """
-Phase 3.10.6 - Fetch Test Harness
-===================================
+Fetch Test Harness
+==================
 
 Standalone CLI tool that loads scenarios from ``scenarios.json``, executes
-real HTTP fetches using the appropriate fetch primitive, and reports success
-metrics.  Supports multiple fetch modes (simple, hardened) selected per
-scenario or via ``--mode``.
+real HTTP fetches through the full ``fetch_url`` orchestrator pipeline
+(mode selection → execution → signal extraction → fallback → sanitisation),
+and reports success metrics.
 
 Usage::
 
     python -m tools.fetch_harness.harness                     # run all scenarios
     python -m tools.fetch_harness.harness --hardness simple    # filter by level
     python -m tools.fetch_harness.harness --name httpbin_get   # run one scenario
-    python -m tools.fetch_harness.harness --mode hardened      # use hardened fetch
     python -m tools.fetch_harness.harness --json               # JSON output only
     python -m tools.fetch_harness.harness --list               # list scenarios
     python -m tools.fetch_harness.harness --add "name,url,hardness"
@@ -28,22 +27,60 @@ from typing import Any
 
 from src.capabilities.primitives.stdlib.http_simple import HttpSimpleFetchPrimitive
 from src.core.types.fetch import FetchRequest, FetchResponse
+from src.core.types.fetch.fetch_url import FetchResult, fetch_url
 
 HERE = Path(__file__).resolve().parent
 SCENARIOS_PATH = HERE / "scenarios.json"
 
-_PRIMITIVES: dict[str, Any] = {
-    "simple": HttpSimpleFetchPrimitive(),
-}
+# ---------------------------------------------------------------------------
+# Executor factory — wires real primitives into the orchestrator
+# ---------------------------------------------------------------------------
 
-try:
-    from src.capabilities.primitives.stdlib.http_hardened import (
-        HttpHardenedFetchPrimitive,
-    )
 
-    _PRIMITIVES["hardened"] = HttpHardenedFetchPrimitive()
-except ImportError:
-    pass
+def _build_executor() -> Any:
+    """Build a real executor that dispatches mode strings to fetch primitives.
+
+    The executor signature is ``(mode: str, request: FetchRequest) ->
+    FetchResponse``, which is the DI seam that ``fetch_url()`` requires.
+    """
+    primitives: dict[str, Any] = {
+        "http_simple": HttpSimpleFetchPrimitive(),
+    }
+
+    try:
+        from src.capabilities.primitives.stdlib.http_hardened import (
+            HttpHardenedFetchPrimitive,
+        )
+        primitives["http_hardened"] = HttpHardenedFetchPrimitive()
+    except ImportError:
+        pass
+
+    def _exec(mode: str, request: FetchRequest) -> FetchResponse:
+        primitive = primitives.get(mode)
+        if primitive is None:
+            return FetchResponse(
+                ok=False,
+                url=request.url,
+                elapsed_ms=0,
+                error_type="UnsupportedModeError",
+                error_message=f"no primitive for mode '{mode}'",
+            )
+        result = primitive.execute(request.to_args(), {})
+        if result.status == "success":
+            return FetchResponse.from_primitive_result(
+                result.data, url=request.url
+            )
+        return FetchResponse(
+            ok=False,
+            url=request.url,
+            elapsed_ms=int(result.data.get("elapsed_ms", 0)),
+            error_type=result.data.get("error_type", "UnknownError"),
+            error_message=result.data.get(
+                "error_message", str(result.error or "")
+            ),
+        )
+
+    return _exec
 
 # ---------------------------------------------------------------------------
 # Data helpers
@@ -58,11 +95,11 @@ def load_scenarios(path: Path = SCENARIOS_PATH) -> list[dict[str, Any]]:
 
 
 def _assess(
-    scenario: dict[str, Any], resp: FetchResponse
+    scenario: dict[str, Any], result: FetchResult
 ) -> dict[str, Any]:
     """Assess a fetch result against the scenario's expected characteristics.
 
-    Returns a dict with ``pass``, ``checks`` (list of per-check outcomes),
+    Returns a dict with ``passed``, ``checks`` (list of per-check outcomes),
     and ``notes`` (list of informational observations).
     """
     expect = scenario.get("expect", {})
@@ -72,26 +109,26 @@ def _assess(
     # --- Status code check ---
     expected_status: str | int = expect.get("status_code", "2xx")
     if isinstance(expected_status, int):
-        status_ok = resp.status_code == expected_status
+        status_ok = result.status_code == expected_status
     elif isinstance(expected_status, str) and expected_status.endswith("xx"):
         prefix = int(expected_status[0])
-        status_ok = resp.status_code is not None and resp.status_code // 100 == prefix
+        status_ok = result.status_code is not None and result.status_code // 100 == prefix
     else:
-        status_ok = resp.status_code == int(expected_status)
+        status_ok = result.status_code == int(expected_status)
 
     checks.append({
         "check": "status_code",
         "expected": str(expected_status),
-        "actual": resp.status_code,
-        "passed": bool(resp.ok) and status_ok,
+        "actual": result.status_code,
+        "passed": bool(result.ok) and status_ok,
     })
 
-    if not resp.ok:
-        notes.append(f"Transport failure: {resp.error_type} - {resp.error_message}")
+    if not result.ok:
+        notes.append(f"Transport failure: {result.error_type} - {result.error_message}")
 
     # --- Body length check ---
     min_len = expect.get("body_min_length", 0)
-    actual_len = len(resp.body) if resp.body else 0
+    actual_len = len(result.body) if result.body else 0
     checks.append({
         "check": "body_min_length",
         "expected": min_len,
@@ -101,8 +138,10 @@ def _assess(
 
     # --- Content-type hint ---
     ct_hint = expect.get("content_type_hint")
-    if ct_hint and resp.headers:
-        actual_ct = resp.headers.get("content-type", resp.headers.get("Content-Type", ""))
+    if ct_hint and result.headers:
+        actual_ct = result.headers.get(
+            "content-type", result.headers.get("Content-Type", "")
+        )
         ct_ok = actual_ct.startswith(ct_hint)
         checks.append({
             "check": "content_type",
@@ -111,8 +150,10 @@ def _assess(
             "passed": ct_ok,
         })
         if not ct_ok and actual_ct:
-            notes.append(f"Content-Type mismatch: expected '{ct_hint}', got '{actual_ct}'")
-    elif ct_hint and not resp.headers:
+            notes.append(
+                f"Content-Type mismatch: expected '{ct_hint}', got '{actual_ct}'"
+            )
+    elif ct_hint and not result.headers:
         checks.append({
             "check": "content_type",
             "expected": ct_hint,
@@ -130,55 +171,41 @@ def _assess(
 def run_scenario(
     scenario: dict[str, Any],
     timeout: float | None = None,
+    executor: Any | None = None,
 ) -> dict[str, Any]:
-    """Execute one scenario and return its full result dict.
+    """Execute one scenario through the full ``fetch_url`` orchestrator.
 
-    The dict is JSON-safe and includes the assessment block.
+    The orchestrator handles mode selection, execution, signal extraction,
+    fallback routing, and sanitisation.  ``hardness`` is metadata only —
+    it does NOT drive mode selection.
     """
-    req = FetchRequest(
-        url=scenario["url"],
-        timeout=timeout or 10.0,
-    )
+    if executor is None:
+        executor = _build_executor()
+
     start = time.perf_counter()
-    try:
-        hardness = scenario.get("hardness", "simple")
-        primitive = _PRIMITIVES.get(hardness, _PRIMITIVES["simple"])
-        result = primitive.execute(req.to_args(), {})
-        elapsed_ms = int((time.perf_counter() - start) * 1000)
-        if result.status == "success":
-            resp = FetchResponse.from_primitive_result(result.data, url=scenario["url"])
-        else:
-            resp = FetchResponse(
-                ok=False,
-                elapsed_ms=elapsed_ms,
-                url=scenario["url"],
-                error_type=result.data.get("error_type", "UnknownError"),
-                error_message=result.data.get("error_message", str(result.error or "")),
-            )
-    except Exception as exc:
-        elapsed_ms = int((time.perf_counter() - start) * 1000)
-        resp = FetchResponse(
-            ok=False,
-            elapsed_ms=elapsed_ms,
-            url=scenario["url"],
-            error_type=type(exc).__name__,
-            error_message=str(exc),
-        )
+    result: FetchResult = fetch_url(
+        scenario["url"],
+        timeout=timeout,
+        executor=executor,
+    )
+    # fetch_url already tracks elapsed_ms internally, but we also measure
+    # wall-clock here for the summary metrics.
+    wall_ms = int((time.perf_counter() - start) * 1000)
 
     # Summary metrics
-    body_len = len(resp.body) if resp.body else 0
-    metrics = {
-        "success": resp.ok,
-        "status_code": resp.status_code,
+    body_len = len(result.body) if result.body else 0
+    metrics: dict[str, Any] = {
+        "success": result.ok,
+        "status_code": result.status_code,
         "body_length": body_len,
-        "elapsed_ms": resp.elapsed_ms,
-        "has_cookies": bool(resp.cookies),
+        "elapsed_ms": result.elapsed_ms or wall_ms,
+        "has_cookies": bool(result.cookies),
     }
-    if not resp.ok:
-        metrics["error_type"] = resp.error_type
-        metrics["error_message"] = resp.error_message
+    if not result.ok:
+        metrics["error_type"] = result.error_type
+        metrics["error_message"] = result.error_message
 
-    assessment = _assess(scenario, resp)
+    assessment = _assess(scenario, result)
 
     return {
         "scenario": scenario["name"],
@@ -196,15 +223,18 @@ def run_all(
     hardness_filter: str | None = None,
     name_filter: str | None = None,
     timeout: float | None = None,
+    executor: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Run a filtered subset of scenarios and return result dicts."""
+    if executor is None:
+        executor = _build_executor()
     results: list[dict[str, Any]] = []
     for sc in scenarios:
         if hardness_filter and sc.get("hardness") != hardness_filter:
             continue
         if name_filter and sc.get("name") != name_filter:
             continue
-        results.append(run_scenario(sc, timeout=timeout))
+        results.append(run_scenario(sc, timeout=timeout, executor=executor))
     return results
 
 

@@ -63,14 +63,33 @@ detailed check-level pass/fail assessment against expected characteristics.
 A single-cycle debug REPL for the S2 ↔ S1 ↔ LLM boundary. Runs exactly one cycle, prints full trace, and exits. Useful for debugging prompt construction, schema validation, and state transitions.
 
 Usage:
-    python run_cycle.py "your request" --backend simulation
-    python run_cycle.py "your request" --backend real_llm --verbose
+    python tools/testing_harness/run_cycle.py "your request" --backend simulation
+    python tools/testing_harness/run_cycle.py "your request" --backend real_llm --verbose
 
 Options:
-    --backend, -b     "simulation" (deterministic mock) or "real_llm" (DeepSeek)
-    --verbose, -v     Print full details (PromptRequest, PromptResponse, S2 updates)
-    --silent          Suppress trace printing
-    --example, -e     Use built-in example request
+    --backend        "simulation" (deterministic mock) or "real_llm" (DeepSeek)
+    --verbose, -v    Print full details (PromptRequest, PromptResponse, S2 updates)
+    --silent         Suppress trace printing
+    --example, -e    Use built-in example request
+
+### E2E Harness (`tools/testing_harness/e2e_harness.py`)
+
+End-to-end Prompt → LLM → Planner → Skill pipeline. Sends a prompt through the real LLM, discovers skills via S3Adapter, generates a plan via SubgoalPlanner, and executes referenced skills through the S3 SkillRunner.
+
+Usage:
+    # Run with default real LLM backend
+    python -m tools.testing_harness.e2e_harness "echo back: hello world"
+
+    # Run with mock LLM (deterministic, no API calls)
+    python -m tools.testing_harness.e2e_harness "echo test" --backend mock
+
+    # JSON output for scripting
+    python -m tools.testing_harness.e2e_harness "list files" --json
+
+Options:
+    prompt            (positional) The user prompt to send through the pipeline
+    --backend         "real_llm" (default) or "mock" (deterministic MockLLM)
+    --json            Output machine-readable JSON instead of formatted text
 
 
 ### Statistical Conformance Runner (`tests/statistical/`)

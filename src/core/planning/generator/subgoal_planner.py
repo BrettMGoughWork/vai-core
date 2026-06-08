@@ -141,12 +141,12 @@ class SubgoalPlanner:
         segment_ids = [segment.segment_id]
 
         # 2. Write the plan (references segment IDs persisted above).
-        # targetskillid = first discovered skill if available, else first
-        # LLM capability, falling back to "unknown".
-        if discovered_skill_names:
-            targetskillid = discovered_skill_names[0]
-        elif step_capabilities:
+        # targetskillid = LLM-chosen capability first (the LLM is the planner),
+        # falling back to top discovery hint, then "unknown".
+        if step_capabilities:
             targetskillid = step_capabilities[0]
+        elif discovered_skill_names:
+            targetskillid = discovered_skill_names[0]
         else:
             targetskillid = "unknown"
         plan = Plan(

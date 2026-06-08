@@ -4,7 +4,7 @@ Tests A–D verify that:
   A. SubgoalPlanner calls S3Adapter.discover_skills() with the correct query.
   B. PlanSegment stores discovered skill names.
   C. Discovered ordering (descending score) is preserved.
-  D. Plan.targetskillid is set to segment.skills[0].
+  D. Plan.targetskillid prefers LLM step capability over discovery (the LLM is the planner).
 """
 
 from __future__ import annotations
@@ -185,8 +185,9 @@ class TestDeterministicOrdering:
 
 class TestPlanTargetSkillIdUsesFirstSkill:
 
-    def test_targetskillid_is_first_discovered_skill(self):
-        """plan.targetskillid == segment.skills[0] when discovery found skills."""
+    def test_targetskillid_prefers_llm_capability_over_discovery(self):
+        """plan.targetskillid == LLM step capability when LLM provides one,
+        even when discovery also found skills (the LLM is the planner)."""
         governance, _, seg_mem, pm = _make_governance()
         mock_adapter = Mock()
         mock_adapter.discover_skills.return_value = _make_mock_discovery([
@@ -198,11 +199,13 @@ class TestPlanTargetSkillIdUsesFirstSkill:
         plan_id = planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         record = pm.get_latest_for_subgoal(SG_ID)
-        assert record.targetskillid == "json.validate"
+        # LLM capability "echo" wins over discovery "json.validate"
+        assert record.targetskillid == "echo"
 
         snap = seg_mem.snapshot()
         segment = snap.records[0]
-        assert record.targetskillid == segment.skills[0]
+        # segment.skills still records the discovery results for reference
+        assert segment.skills == ["json.validate", "json.pretty"]
 
     def test_targetskillid_falls_back_when_no_discovery(self):
         """Without discovery, targetskillid falls back to LLM capability."""

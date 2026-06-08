@@ -26,7 +26,11 @@
       "url": "https://example.com",
       "hardness": "simple",
       "description": "IANA example domain - static HTML, no JS, always up",
-      "tags": ["static", "html", "canonical"],
+      "tags": [
+        "static",
+        "html",
+        "canonical"
+      ],
       "expect": {
         "status_code": "200",
         "body_min_length": 100,
@@ -38,7 +42,11 @@
       "url": "https://httpbin.org/get",
       "hardness": "simple",
       "description": "httpbin GET echo - returns JSON with request metadata",
-      "tags": ["api", "json", "echo"],
+      "tags": [
+        "api",
+        "json",
+        "echo"
+      ],
       "expect": {
         "status_code": "200",
         "body_min_length": 50,
@@ -50,7 +58,11 @@
       "url": "https://httpbin.org/status/404",
       "hardness": "simple",
       "description": "httpbin returns 404 - tests non-2xx handling",
-      "tags": ["api", "error", "4xx"],
+      "tags": [
+        "api",
+        "error",
+        "4xx"
+      ],
       "expect": {
         "status_code": "404",
         "body_min_length": 0
@@ -61,7 +73,11 @@
       "url": "https://httpbin.org/status/500",
       "hardness": "simple",
       "description": "httpbin returns 500 - tests 5xx handling",
-      "tags": ["api", "error", "5xx"],
+      "tags": [
+        "api",
+        "error",
+        "5xx"
+      ],
       "expect": {
         "status_code": "500",
         "body_min_length": 0
@@ -72,7 +88,11 @@
       "url": "https://httpbin.org/delay/3",
       "hardness": "simple",
       "description": "httpbin delays 3s - tests timeout configuration",
-      "tags": ["api", "delay", "timeout"],
+      "tags": [
+        "api",
+        "delay",
+        "timeout"
+      ],
       "expect": {
         "status_code": "200",
         "body_min_length": 50,
@@ -84,7 +104,11 @@
       "url": "https://httpbin.org/cookies/set?session=abc123&theme=dark",
       "hardness": "simple",
       "description": "httpbin sets cookies via redirect - tests cookie propagation",
-      "tags": ["api", "cookies", "redirect"],
+      "tags": [
+        "api",
+        "cookies",
+        "redirect"
+      ],
       "expect": {
         "status_code": "2xx",
         "body_min_length": 10
@@ -95,7 +119,11 @@
       "url": "https://jsonplaceholder.typicode.com/posts/1",
       "hardness": "simple",
       "description": "JSONPlaceholder - free fake REST API, returns JSON todo item",
-      "tags": ["api", "json", "rest"],
+      "tags": [
+        "api",
+        "json",
+        "rest"
+      ],
       "expect": {
         "status_code": "200",
         "body_min_length": 50,
@@ -107,7 +135,11 @@
       "url": "https://api.github.com",
       "hardness": "simple",
       "description": "GitHub public API - tests JSON API with auth headers",
-      "tags": ["api", "json", "auth"],
+      "tags": [
+        "api",
+        "json",
+        "auth"
+      ],
       "expect": {
         "status_code": "200",
         "body_min_length": 100,
@@ -119,7 +151,11 @@
       "url": "https://httpbin.org/redirect/3",
       "hardness": "simple",
       "description": "httpbin follows 3 redirects - tests redirect handling",
-      "tags": ["api", "redirect", "chain"],
+      "tags": [
+        "api",
+        "redirect",
+        "chain"
+      ],
       "expect": {
         "status_code": "200",
         "body_min_length": 50
@@ -130,7 +166,11 @@
       "url": "https://blog.cloudflare.com",
       "hardness": "hardened",
       "description": "Cloudflare blog behind their own WAF - tests anti-bot headers",
-      "tags": ["waf", "cdn", "antibot"],
+      "tags": [
+        "waf",
+        "cdn",
+        "antibot"
+      ],
       "expect": {
         "status_code": "2xx",
         "body_min_length": 100,
@@ -142,7 +182,11 @@
       "url": "https://old.reddit.com",
       "hardness": "hardened",
       "description": "Old Reddit - lightweight but may rate-limit non-browser User-Agent",
-      "tags": ["social", "rate-limit", "html"],
+      "tags": [
+        "social",
+        "rate-limit",
+        "html"
+      ],
       "expect": {
         "status_code": "2xx",
         "body_min_length": 100,
@@ -154,7 +198,11 @@
       "url": "https://react.dev",
       "hardness": "spa",
       "description": "React.dev - SPA, fully JS-rendered, won't work with simple fetch",
-      "tags": ["spa", "javascript", "react"],
+      "tags": [
+        "spa",
+        "javascript",
+        "react"
+      ],
       "expect": {
         "status_code": "2xx",
         "body_min_length": 100,
@@ -166,11 +214,27 @@
       "url": "https://www.google.com/search?q=test",
       "hardness": "antibot",
       "description": "Google Search - advanced bot detection, CAPTCHA, JS mandatory",
-      "tags": ["antibot", "captcha", "javascript"],
+      "tags": [
+        "antibot",
+        "captcha",
+        "javascript"
+      ],
       "expect": {
         "status_code": "2xx",
         "body_min_length": 100,
         "content_type_hint": "text/html"
+      }
+    },
+    {
+      "name": "abcau",
+      "url": "http://www.abc.net.au",
+      "hardness": "simple",
+      "description": "Quick-added scenario: abcau",
+      "tags": [
+        "user-added"
+      ],
+      "expect": {
+        "body_min_length": 0
       }
     }
   ]

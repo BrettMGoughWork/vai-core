@@ -1360,11 +1360,15 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 - `markdown.parse`, `html.parse`, `html.select`, `pdf.extracttext`
 - `csv.read`, `csv.write`
 
-✅ 3.18.3 — Test Harness
-- `tools/test_harness/run_cycle.py` — end-to-end prompt runner
-- `tools/test_harness/ai_harness.sh` — LLM agent harness for structured system+planner+skill testing
-- Validates: prompt → LLM with system instructions, planner execution, skill selection & usage
-- Ready for smoke-testing complex prompts utilising stdlib primitives and skills
+🔧 3.18.3 — Test Harness (IN PROGRESS)
+- `tools/testing_harness/run_cycle.py` — single-cycle architecture verifier (moved from root)
+- `tools/testing_harness/e2e_harness.py` — end-to-end Prompt → LLM → Planner → Skills pipeline
+- Wires: PrimitiveRegistry (29 primitives) → CapabilitySkillRegistry (21 skills) → SkillRunner → S3Adapter → SubgoalPlanner
+- Backends: `--backend mock` (MockLLM) for plumbing tests, `--backend real_llm` (deepseek-chat) for live E2E
+- Validates: skill discovery (semantic embedding search), plan generation (intent + target skill + steps), skill execution via SkillRunner
+- Fixed: `targetskillid` priority — LLM step capability now drives execution (discovery is a hint, not a command). See `subgoal_planner.py` lines 143‑151.
+- Known: `json.parse.skill.md` fails to load (inline Python step unsupported by SkillManifest); `_simple_embedding_fn` is non‑semantic (character‑bucket hash) → LLM may select hallucinated capability names for step execution (→ "NoneType has no attribute run"); semantic embeddings deferred to PHASE 3.19
+- TODO: fix `json.parse.skill.md` Python‑step support; improve real‑LLM skill selection prompt quality; add more comprehensive integration test scenarios
 
 3.18.4 — Database Primitives (Safe CRUD)
 - `db.connect`, `db.query`, `db.insert`, `db.update`, `db.delete`
@@ -1395,6 +1399,39 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 3.18.11 — Tests
 - Each primitive exercised end-to-end via SkillExecutor
 - Category-level conformance suites (file, data, network, web, text, db, sys, proc, compression)
+
+---
+
+### PHASE 3.19 — Semantic Embeddings & Vector Search
+*Depends On*: PHASE 3.4
+
+Skills are currently discovered via a character-bucket hash (`_simple_embedding_fn`) which produces non‑semantic embeddings. The top‑ranked skill is essentially random. This phase replaces the character‑bucket hash with a proper embedding model and pre‑computed vector store, so that S2 discovery and S3 skill selection return semantically meaningful results.
+
+3.19.1 — Real embedding function
+- Integrate `EmbeddingGenerator` (currently a stub returning dummy vectors) with a real embedding provider (OpenAI `text-embedding-3-small` or similar).
+- Replace all test harnesses (`e2e_harness.py`, `test_s3_smoke.py`, `test_s2_s3_roundtrip.py`) to use the real embedding function.
+- Keep `_simple_embedding_fn` for fast deterministic unit tests; real embeddings for integration/E2E.
+
+3.19.2 — Pre‑computed skill embeddings
+- Generate and persist embeddings at skill registration time (name + description + step summaries).
+- Store in registry alongside the `CapabilitySkill` object — no re‑embedding per query.
+- Rebuild embeddings on skill hot‑reload (tie into PHASE 3.14/3.15).
+
+3.19.3 — Vector similarity search
+- Cosine similarity over pre‑computed embeddings.
+- Return top‑K skills with similarity scores.
+- Replace the current `registry.find()` character‑bucket path with the real vector path.
+
+3.19.4 — Embedding cache & provider abstraction
+- Cache query embeddings per session to avoid redundant API calls.
+- Abstract embedding provider behind a configurable interface (OpenAI, local model, mock).
+- Provider selection via environment variable or config file.
+
+3.19.5 — Tests
+- Embedding determinism: same text → same vector.
+- Semantic relevance: "list files" ranks `stdlib.file.list` above `stdlib.json.set`.
+- Cache hit/miss and API failure fallback.
+- Registry rebuild preserves embeddings across hot‑reload.
 
 ---
 
