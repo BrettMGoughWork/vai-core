@@ -1051,7 +1051,7 @@ A minimal end-to-end test against the real LLM that proves S2 can discover and c
 ✅ 3.10.1 — FetchError taxonomy
 - Dataclasses: `TimeoutError`, `HTTPError` (status_code, body), `ParseError`, `ConnectionError`
 
-✅ 3.10.2 — `stdlib.http.fetch` primitive
+✅ 3.10.2 — `stdlib.http.simple` primitive
 - httpx GET with configurable timeout, headers, status-code handling
 - Returns: `status_code`, `body` (str), `headers` (dict), `elapsed` (ms)
 
@@ -1090,10 +1090,10 @@ Requirements:
 ### PHASE 3.11 — Fetch Orchestrator: Hardened Modes
 *Depends On*: PHASE 3.10
 
-3.11.1 — Hardened HTTP fetch mode
+✅ 3.11.1 — Hardened HTTP fetch mode
 - Anti-bot headers (rotating User-Agent, Accept-Language), retry with exponential backoff, cookie jar
 
-3.11.2 — Playwright headless fetch mode
+✅ 3.11.2 — Playwright headless fetch mode
 - JS rendering via Playwright; handles SPA and JS-dependent content
 
 3.11.3 — Playwright stealth fetch mode
@@ -1127,25 +1127,101 @@ Requirements:
 
 ---
 
-### PHASE 3.13 — Search Provider
-*Depends On*: PHASE 3.12
+### PHASE 3.13 — Search Provider (Updated)
+*Depends On*: PHASE 3.12  
+This phase introduces a provider‑agnostic search layer.  
+The runtime configures the provider (Tavily, Bing, SerpAPI, custom, etc.) and supplies API keys + parameters.  
+The LLM does not know or care which provider is used.
 
-Depends on fetch infrastructure (simple HTTP) to retrieve search results.
+3.13.1 — Search Provider Configuration
+Define a runtime‑side configuration object:
 
-3.13.1 — Search primitive
-- Query → list of URLs with titles and snippets; uses fetch_url internally
+- provider name (e.g., "tavily", "bing", "serpapi", "custom")  
+- API key  
+- endpoint override (optional)  
+- provider‑specific parameters (optional)  
+- max results defaults  
+- rate limits (optional)
 
-3.13.2 — `search_urls` skill
-- Wraps search primitive; normalises results; returns structured list
+This is stored in the runtime, not the LLM.  
+The LLM receives only the normalized output, never the API key.
 
-3.13.3 — Wire into fetch fallback
-- When all fetch modes fail, search for alternative sources as last-resort fallback
+---
 
-3.13.4 — `GetPageFromUrl` taxonomy
-- Define content type taxonomy (article, documentation, blog, unknown) for multimodal retrieval
+3.13.2 — Search Primitive (Provider‑Agnostic)
+Implements:
 
-3.13.5 — Tests
-- Search returns results; fetch fallback triggers search; search results are usable by downstream fetch
+- Query → provider request → provider response → normalized results  
+- Uses http_simple internally  
+- Injects API key + provider params from configuration  
+- Normalizes all providers into a single schema:
+
+`
+[
+  { url, title, snippet },
+  ...
+]
+`
+
+The primitive does not perform fallback, heuristics, or ranking.
+
+---
+
+3.13.3 — search_urls Skill
+Thin wrapper around the search primitive.
+
+Responsibilities:
+
+- Accepts { query, max_results }  
+- Calls the search primitive  
+- Returns normalized list of URLs with titles + snippets  
+- No provider logic  
+- No fallback logic  
+- No heuristics  
+
+---
+
+3.13.4 — Integrate Search Into Fetch Fallback
+When all fetch modes fail (simple → hardened → headless → stealth):
+
+- The fallback router calls search_urls  
+- Receives a list of alternative URLs  
+- Attempts fetch again using the unified http_fetch orchestrator  
+- Uses taxonomy (3.13.5) to choose the best fetch mode for each URL
+
+Search is last‑resort, not a primary fetch strategy.
+
+---
+
+3.13.5 — GetPageFromUrl Taxonomy
+Define a lightweight content‑type classifier:
+
+- article  
+- documentation  
+- blog  
+- unknown  
+
+Used by fallback to choose:
+
+- simple fetch  
+- hardened fetch  
+- headless fetch  
+- stealth fetch  
+
+This is provider‑agnostic.
+
+---
+
+3.13.6 — Tests
+Verify:
+
+- Provider configuration is respected  
+- API key injection works  
+- Search primitive returns normalized results  
+- search_urls skill wraps correctly  
+- Fallback router triggers search when all fetch modes fail  
+- Search results are usable by downstream fetch  
+- Taxonomy correctly classifies URLs  
 
 ---
 

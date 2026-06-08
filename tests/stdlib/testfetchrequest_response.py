@@ -280,6 +280,32 @@ class TestFetchResponseFromPrimitiveResult:
         resp = FetchResponse.from_primitive_result(data, url="https://x.com")
         assert resp.cookies == {}
 
+    def test_from_primitive_uses_direct_cookies_key(self) -> None:
+        """The data['cookies'] key is included (headless/hardened primitives)."""
+        data = {
+            "ok": True,
+            "status_code": 200,
+            "body": "ok",
+            "headers": {"content-type": "text/plain"},
+            "cookies": {"session": "abc123"},
+            "elapsed_ms": 10,
+        }
+        resp = FetchResponse.from_primitive_result(data, url="https://x.com")
+        assert resp.cookies == {"session": "abc123"}
+
+    def test_from_primitive_merges_direct_and_header_cookies(self) -> None:
+        """Direct cookies merge with Set-Cookie; direct wins on conflict."""
+        data = {
+            "ok": True,
+            "status_code": 200,
+            "body": "ok",
+            "headers": {"set-cookie": "tracker=xyz; Path=/"},
+            "cookies": {"session": "abc123"},
+            "elapsed_ms": 10,
+        }
+        resp = FetchResponse.from_primitive_result(data, url="https://x.com")
+        assert resp.cookies == {"tracker": "xyz", "session": "abc123"}
+
 
 # =====================================================================
 # Cookie parsing

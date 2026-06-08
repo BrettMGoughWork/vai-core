@@ -3,15 +3,16 @@ Phase 3.10.6 - Fetch Test Harness
 ===================================
 
 Standalone CLI tool that loads scenarios from ``scenarios.json``, executes
-real HTTP fetches using the stdlib.http.fetch primitive, and reports success
-metrics.  Designed to be extended as new fetch modes are added (hardened,
-Playwright, stealth).
+real HTTP fetches using the appropriate fetch primitive, and reports success
+metrics.  Supports multiple fetch modes (simple, hardened) selected per
+scenario or via ``--mode``.
 
 Usage::
 
     python -m tools.fetch_harness.harness                     # run all scenarios
     python -m tools.fetch_harness.harness --hardness simple    # filter by level
     python -m tools.fetch_harness.harness --name httpbin_get   # run one scenario
+    python -m tools.fetch_harness.harness --mode hardened      # use hardened fetch
     python -m tools.fetch_harness.harness --json               # JSON output only
     python -m tools.fetch_harness.harness --list               # list scenarios
     python -m tools.fetch_harness.harness --add "name,url,hardness"
@@ -25,12 +26,24 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.capabilities.primitives.stdlib.http_fetch import HttpFetchPrimitive
+from src.capabilities.primitives.stdlib.http_simple import HttpSimpleFetchPrimitive
 from src.core.types.fetch import FetchRequest, FetchResponse
 
 HERE = Path(__file__).resolve().parent
 SCENARIOS_PATH = HERE / "scenarios.json"
-PRIMITIVE = HttpFetchPrimitive()
+
+_PRIMITIVES: dict[str, Any] = {
+    "simple": HttpSimpleFetchPrimitive(),
+}
+
+try:
+    from src.capabilities.primitives.stdlib.http_hardened import (
+        HttpHardenedFetchPrimitive,
+    )
+
+    _PRIMITIVES["hardened"] = HttpHardenedFetchPrimitive()
+except ImportError:
+    pass
 
 # ---------------------------------------------------------------------------
 # Data helpers
