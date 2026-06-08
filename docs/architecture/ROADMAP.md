@@ -1062,7 +1062,7 @@ A minimal end-to-end test against the real LLM that proves S2 can discover and c
 ✅ 3.10.4 — Tests
 - Successful fetch, timeout, 4xx response, 5xx response, connection refused, invalid URL
 
-3.10.5 - FetchRequest, FetchResponse objects
+✅ 3.10.5 - FetchRequest, FetchResponse objects
 
 Purpose:
 Provide consistent, chainable request/response objects that allow the fallback router to:
@@ -1080,7 +1080,7 @@ Requirements:
 - Integration with http.fetch primitive
 - Integration with fetch_url skill
 
-3.10.6 - Test Harness
+✅ 3.10.6 - Test Harness
 - Allow fetch to be executed independently
 - Allow user to inject websites that are use-cases for things like simple fetch, hardened fetch, javascript, SPA, anti-bot, etc
 - This test harness will be used to define fetch hardness as we iterate

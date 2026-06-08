@@ -14,6 +14,8 @@ from .errors import (
     ConnectionError,
     classify_exception,
 )
+from .request import FetchRequest
+from .response import FetchResponse
 
 __all__ = [
     "FetchError",
@@ -22,4 +24,6 @@ __all__ = [
     "ParseError",
     "ConnectionError",
     "classify_exception",
+    "FetchRequest",
+    "FetchResponse",
 ]

@@ -21,6 +21,7 @@ outputs:
   status_code: int
   body: string
   headers: object
+  cookies: object
   elapsed_ms: int
   error_type: string
   error_message: string
@@ -34,9 +35,11 @@ steps:
     save_as: result
 
   - python: |
-      # Passthrough — the primitive already returns the canonical schema.
-      # No transformation needed.
-      return result
+      # Wrap the raw primitive result in a FetchResponse for richer
+      # inspection, cookie propagation, and future chaining support.
+      from src.core.types.fetch import FetchResponse
+      resp = FetchResponse.from_primitive_result(result, url="{{ url }}")
+      return resp.to_dict()
 
 metadata:
   tags: ["fetch", "http"]
