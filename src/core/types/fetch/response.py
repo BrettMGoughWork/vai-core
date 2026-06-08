@@ -1,7 +1,7 @@
 """
 FetchResponse — Immutable HTTP response descriptor for chainable fetch operations.
 
-Captures everything returned by stdlib.http.fetch (success or error) plus parsed
+Captures everything returned by an HTTP fetch (success or error) plus parsed
 cookies for subsequent request hydration.  Pure data — no network logic.
 """
 
@@ -101,7 +101,7 @@ class FetchResponse:
 
     @classmethod
     def from_primitive_result(cls, data: dict, url: str = "") -> FetchResponse:
-        """Construct a ``FetchResponse`` from the ``stdlib.http.fetch`` return value.
+        """Construct a ``FetchResponse`` from an HTTP fetch primitive return value.
 
         *data* is the raw dictionary returned by the primitive (either the
         success or error form).  *url* is the original request URL (used for
@@ -110,7 +110,12 @@ class FetchResponse:
         ok = bool(data.get("ok", False))
         elapsed_ms = int(data.get("elapsed_ms", 0))
         headers = dict(data.get("headers", {}))
+        # Merge cookies extracted from Set-Cookie headers with cookies the
+        # primitive returned directly (e.g. browser or hardened primitives
+        # that already provide a parsed cookies map).  Direct cookies win.
         cookies = _extract_cookies(headers)
+        extra_cookies = dict(data.get("cookies", {}))
+        cookies.update(extra_cookies)
         return cls(
             ok=ok,
             status_code=data.get("status_code"),

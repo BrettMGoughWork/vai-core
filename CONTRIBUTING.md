@@ -16,7 +16,7 @@ pip install pytest
 If you use `uv`, this also works:
 
 ```bash
-uv run --with pytest --with python-dotenv pytest -q
+uv run --python 3.12 --with-requirements requirements.txt --with pytest --with python-dotenv python -m pytest -q
 ```
 
 To run the runtime locally:

@@ -1,4 +1,4 @@
-"""stdlib.http.fetch — HTTP GET primitive (Phase 3.10.2).
+"""stdlib.http.simple — HTTP GET primitive (Phase 3.10.2).
 
 Performs a real HTTP GET request using httpx and returns a structured
 response matching the S0/S1 fetch schema.  Transport-level failures
@@ -19,10 +19,10 @@ from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 from src.core.types.fetch.errors import classify_exception
 
 
-class HttpFetchPrimitive(PrimitiveBase):
+class HttpSimpleFetchPrimitive(PrimitiveBase):
     """Perform an HTTP GET request returning status, body, headers, and elapsed time."""
 
-    name = "stdlib.http.fetch"
+    name = "stdlib.http.simple"
     description = "HTTP GET request returning status, body, headers, and elapsed time"
     primitive_type = PrimitiveType.PYTHON
 

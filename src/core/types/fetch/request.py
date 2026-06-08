@@ -1,7 +1,7 @@
 """
 FetchRequest — Immutable HTTP request descriptor for chainable fetch operations.
 
-Represents every parameter needed to call stdlib.http.fetch (and, by extension,
+Represents every parameter needed to call an HTTP fetch (and, by extension,
 any transport primitive) while remaining pure data — no network logic, no
 side-effects.  Designed to be round-tripped through LLM JSON boundaries.
 """
@@ -69,7 +69,7 @@ class FetchRequest:
     # ------------------------------------------------------------------
 
     def to_args(self) -> dict[str, Any]:
-        """Return the argument dict expected by ``stdlib.http.fetch``.
+        """Return the argument dict expected by the HTTP fetch primitive.
 
         Cookies embedded in the request are rendered as a ``Cookie`` header so
         that the primitive (which is request/response‑unaware) sends them on the
