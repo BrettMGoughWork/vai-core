@@ -1048,14 +1048,14 @@ A minimal end-to-end test against the real LLM that proves S2 can discover and c
 ### PHASE 3.10 — Fetch Orchestrator: Simple HTTP
 *Depends On*: PHASE 3.7
 
-3.10.1 — FetchError taxonomy
+✅ 3.10.1 — FetchError taxonomy
 - Dataclasses: `TimeoutError`, `HTTPError` (status_code, body), `ParseError`, `ConnectionError`
 
-3.10.2 — `stdlib.http.fetch` primitive
+✅ 3.10.2 — `stdlib.http.fetch` primitive
 - httpx GET with configurable timeout, headers, status-code handling
 - Returns: `status_code`, `body` (str), `headers` (dict), `elapsed` (ms)
 
-3.10.3 — `fetch_url` skill
+✅ 3.10.3 — `fetch_url` skill
 - Wires to `http.fetch` primitive; returns status + body + headers
 - Accepts `url` and optional `timeout`, `headers` args
 
