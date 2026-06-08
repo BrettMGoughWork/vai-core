@@ -141,7 +141,9 @@ def run_scenario(
     )
     start = time.perf_counter()
     try:
-        result = PRIMITIVE.execute(req.to_args(), {})
+        hardness = scenario.get("hardness", "simple")
+        primitive = _PRIMITIVES.get(hardness, _PRIMITIVES["simple"])
+        result = primitive.execute(req.to_args(), {})
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         if result.status == "success":
             resp = FetchResponse.from_primitive_result(result.data, url=scenario["url"])
