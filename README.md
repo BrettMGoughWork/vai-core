@@ -31,6 +31,31 @@ Optional arguments allow you to specify a trace directory or enable live watchin
 Developer Tools
 ---------------
 
+### Fetch Test Harness (`tools/fetch_harness/`)
+
+A scenario-driven test harness for the HTTP fetch subsystem. Define websites by
+hardness level (simple, hardened, javascript, spa, antibot) and the harness
+reports success metrics for each.
+
+Usage:
+    # List available scenarios
+    python -m tools.fetch_harness.harness --list
+
+    # Run all scenarios
+    python -m tools.fetch_harness.harness
+
+    # Filter by hardness level
+    python -m tools.fetch_harness.harness --hardness simple
+
+    # Run one scenario with JSON output
+    python -m tools.fetch_harness.harness --name httpbin_get --json
+
+    # Quick-add a new scenario
+    python -m tools.fetch_harness.harness --add "mysite,https://example.com,simple"
+
+Output includes per-scenario metrics (status, timing, body length, cookies) and
+detailed check-level pass/fail assessment against expected characteristics.
+
 ### Manual Cycle Runner (`run_cycle.py`)
 
 A single-cycle debug REPL for the S2 ↔ S1 ↔ LLM boundary. Runs exactly one cycle, prints full trace, and exits. Useful for debugging prompt construction, schema validation, and state transitions.

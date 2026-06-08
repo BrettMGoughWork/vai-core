@@ -91,6 +91,7 @@ class TestFetchUrlSkillParsing:
         assert "status_code" in parsed["outputs"]
         assert "body" in parsed["outputs"]
         assert "headers" in parsed["outputs"]
+        assert "cookies" in parsed["outputs"]
         assert "elapsed_ms" in parsed["outputs"]
 
 
