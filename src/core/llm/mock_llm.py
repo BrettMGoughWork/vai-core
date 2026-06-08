@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 MOCK_PLAN_RESPONSE: Dict[str, Any] = {
     "plan": {
         "subgoal": "verify-architecture",
+        "arguments": {"value": "hello from mock"},
         "steps": [
             {
                 "id": "s1",
