@@ -1,4 +1,4 @@
-"""Tests for stdlib.fetch.simple stub skill (Phase 3.7.7)."""
+"""Tests for stdlib.fetch.url skill (Phase 3.10.3)."""
 
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ from src.capabilities.skills.skill import CapabilitySkill
 from src.capabilities.skills.skill_parser import parse_skill_file
 
 
-class StubHttpGetPrimitive(PrimitiveBase):
-    """Stub for the future net.httpget primitive (deterministic placeholder)."""
+class StubHttpFetchPrimitive(PrimitiveBase):
+    """Stub for stdlib.http.fetch primitive (deterministic placeholder)."""
 
     def __init__(self) -> None:
         super().__init__(
-            name="net.httpget",
-            description="Stub HTTP GET",
+            name="stdlib.http.fetch",
+            description="Stub HTTP GET fetch",
             primitive_type=PrimitiveType.PYTHON,
         )
 
@@ -35,41 +35,45 @@ class StubHttpGetPrimitive(PrimitiveBase):
         self.validate_args(args)
         return PrimitiveResult(
             status="success",
-            data={"status": 200, "body": '{"ok": true}', "error": None},
+            data={
+                "ok": True,
+                "status_code": 200,
+                "body": '{"ok": true}',
+                "headers": {"content-type": "application/json"},
+                "elapsed_ms": 42,
+            },
         )
 
 
 @pytest.fixture
 def registry() -> PrimitiveRegistry:
-    """PrimitiveRegistry with stub net.httpget."""
+    """PrimitiveRegistry with stub stdlib.http.fetch."""
     reg = PrimitiveRegistry()
-    reg.register("net.httpget", StubHttpGetPrimitive())
+    reg.register("stdlib.http.fetch", StubHttpFetchPrimitive())
     return reg
 
 
 @pytest.fixture
 def skill_md_path() -> Path:
-    """Path to the fetch.simple.skill.md manifest file."""
+    """Path to the fetch.url.skill.md manifest file."""
     return (
         Path(__file__).resolve().parents[2]
-        / "src" / "capabilities" / "skills" / "stdlib" / "fetch.simple.skill.md"
+        / "src" / "capabilities" / "skills" / "stdlib" / "fetch.url.skill.md"
     )
 
 
-class TestFetchSimpleSkillParsing:
-    """Tests for the fetch.simple skill manifest."""
+class TestFetchUrlSkillParsing:
+    """Tests for the fetch.url skill manifest."""
 
     def test_skill_manifest_parses_correctly(
         self, skill_md_path: Path, registry: PrimitiveRegistry
     ) -> None:
         """The .skill.md file parses and resolves primitives."""
         parsed = parse_skill_file(str(skill_md_path), registry)
-        assert parsed["name"] == "stdlib.fetch.simple"
-        assert parsed["description"] == (
-            "Stub HTTP GET fetch skill; declares net.httpget dependency"
-        )
+        assert parsed["name"] == "stdlib.fetch.url"
+        assert "HTTP GET fetch skill" in parsed["description"]
         assert len(parsed["primitives"]) == 1
-        assert isinstance(parsed["primitives"][0], StubHttpGetPrimitive)
+        assert isinstance(parsed["primitives"][0], StubHttpFetchPrimitive)
 
     def test_manifest_requires_url_input(
         self, skill_md_path: Path, registry: PrimitiveRegistry
@@ -81,56 +85,76 @@ class TestFetchSimpleSkillParsing:
     def test_manifest_declares_output_fields(
         self, skill_md_path: Path, registry: PrimitiveRegistry
     ) -> None:
-        """The manifest declares status, body, and error outputs."""
+        """The manifest declares canonical output fields."""
         parsed = parse_skill_file(str(skill_md_path), registry)
-        assert "status" in parsed["outputs"]
+        assert "ok" in parsed["outputs"]
+        assert "status_code" in parsed["outputs"]
         assert "body" in parsed["outputs"]
-        assert "error" in parsed["outputs"]
+        assert "headers" in parsed["outputs"]
+        assert "elapsed_ms" in parsed["outputs"]
 
 
-class TestFetchSimpleSkillExecution:
+class TestFetchUrlSkillExecution:
     """End-to-end tests through SkillExecutor with stub primitive."""
 
     @pytest.fixture
     def skill(self, registry: PrimitiveRegistry) -> CapabilitySkill:
-        """CapabilitySkill with a single net.httpget call step."""
+        """CapabilitySkill with a single stdlib.http.fetch call step."""
         manifest = SkillManifest(
-            name="stdlib.fetch.simple",
-            description="Stub HTTP GET fetch skill",
-            primitives=["net.httpget"],
+            name="stdlib.fetch.url",
+            description="HTTP GET fetch skill",
+            primitives=["stdlib.http.fetch"],
             inputs={
                 "type": "object",
-                "properties": {"url": {"type": "string"}},
+                "properties": {
+                    "url": {"type": "string"},
+                    "timeout": {"type": "number"},
+                    "headers": {"type": "object"},
+                },
                 "required": ["url"],
             },
-            steps=[{"call": "net.httpget", "args": {"url": "{{ url }}"}}],
+            steps=[{"call": "stdlib.http.fetch", "args": {"url": "{{ url }}"}}],
         )
         return CapabilitySkill(
             manifest=manifest,
-            primitives={"net.httpget": registry.get("net.httpget")},
+            primitives={"stdlib.http.fetch": registry.get("stdlib.http.fetch")},
             input_schema={
                 "type": "object",
-                "properties": {"url": {"type": "string"}},
+                "properties": {
+                    "url": {"type": "string"},
+                    "timeout": {"type": "number"},
+                    "headers": {"type": "object"},
+                },
                 "required": ["url"],
             },
             output_schema={
                 "type": "object",
-                "properties": {"status": {"type": "integer"}, "body": {"type": "string"}, "error": {}},
+                "properties": {
+                    "ok": {"type": "boolean"},
+                    "status_code": {"type": "integer"},
+                    "body": {"type": "string"},
+                    "headers": {"type": "object"},
+                    "elapsed_ms": {"type": "integer"},
+                    "error_type": {},
+                    "error_message": {},
+                },
             },
         )
 
-    def test_stub_primitive_returns_placeholder(
+    def test_primitive_output_passed_through(
         self, skill: CapabilitySkill
     ) -> None:
-        """The stub primitive returns a deterministic placeholder response."""
+        """The stub primitive response is passed through unchanged."""
         executor = SkillExecutor()
         result = executor.execute(skill, {"url": "https://example.com"}, {})
         assert result.status == "success"
         assert len(result.results) == 1
         data = result.results[0].data
-        assert data["status"] == 200
+        assert data["ok"] is True
+        assert data["status_code"] == 200
         assert data["body"] == '{"ok": true}'
-        assert data["error"] is None
+        assert data["headers"] == {"content-type": "application/json"}
+        assert data["elapsed_ms"] == 42
 
     def test_missing_url_raises_validation_error(self, skill: CapabilitySkill) -> None:
         """Missing required 'url' input raises ValueError."""
@@ -148,40 +172,66 @@ class TestFetchSimpleSkillExecution:
         assert all(r.status == "success" for r in results)
         assert all(r.results[0].data == results[0].results[0].data for r in results)
 
-    def test_python_fallback_logic(self) -> None:
-        """The inline Python fallback from fetch.simple.skill.md produces deterministic output."""
-        # Simulate the stub Python block from the manifest.
-        raw: dict | None = None
-        if isinstance(raw, dict) and "status" in raw and "body" in raw:
-            result = {
-                "status": raw.get("status", 0),
-                "body": raw.get("body", ""),
-                "error": raw.get("error", None),
-            }
-        else:
-            result = {
-                "status": 0,
-                "body": "",
-                "error": "net.httpget not implemented",
-            }
-        assert result == {
-            "status": 0,
-            "body": "",
-            "error": "net.httpget not implemented",
-        }
+    def test_error_result_passed_through(
+        self, registry: PrimitiveRegistry
+    ) -> None:
+        """An error from the primitive is passed through unchanged."""
+        class ErrorHttpFetchPrimitive(PrimitiveBase):
+            def __init__(self) -> None:
+                super().__init__(
+                    name="stdlib.http.fetch",
+                    description="Failing stub",
+                    primitive_type=PrimitiveType.PYTHON,
+                )
+            def validate_args(self, args: dict) -> None:
+                pass
+            def execute(self, args: dict, context: dict) -> PrimitiveResult:
+                return PrimitiveResult(
+                    status="error",
+                    data={
+                        "ok": False,
+                        "error_type": "ConnectionError",
+                        "error_message": "DNS resolution failed",
+                        "elapsed_ms": 1500,
+                    },
+                )
 
-        # With a stub dict, it passes through.
-        raw = {"status": 200, "body": "ok", "error": None}
-        if isinstance(raw, dict) and "status" in raw and "body" in raw:
-            result = {
-                "status": raw.get("status", 0),
-                "body": raw.get("body", ""),
-                "error": raw.get("error", None),
-            }
-        else:
-            result = {
-                "status": 0,
-                "body": "",
-                "error": "net.httpget not implemented",
-            }
-        assert result == {"status": 200, "body": "ok", "error": None}
+        err_reg = PrimitiveRegistry()
+        err_reg.register("stdlib.http.fetch", ErrorHttpFetchPrimitive())
+        manifest = SkillManifest(
+            name="stdlib.fetch.url",
+            description="HTTP GET fetch skill",
+            primitives=["stdlib.http.fetch"],
+            inputs={
+                "type": "object",
+                "properties": {"url": {"type": "string"}},
+                "required": ["url"],
+            },
+            steps=[{"call": "stdlib.http.fetch", "args": {"url": "{{ url }}"}}],
+        )
+        skill = CapabilitySkill(
+            manifest=manifest,
+            primitives={"stdlib.http.fetch": err_reg.get("stdlib.http.fetch")},
+            input_schema={
+                "type": "object",
+                "properties": {"url": {"type": "string"}},
+                "required": ["url"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "ok": {"type": "boolean"},
+                    "error_type": {},
+                    "error_message": {},
+                    "elapsed_ms": {"type": "integer"},
+                },
+            },
+        )
+        executor = SkillExecutor()
+        result = executor.execute(skill, {"url": "https://example.com"}, {})
+        assert result.status == "error"
+        data = result.results[0].data
+        assert data["ok"] is False
+        assert data["error_type"] == "ConnectionError"
+        assert data["error_message"] == "DNS resolution failed"
+        assert data["elapsed_ms"] == 1500
