@@ -15,6 +15,7 @@ class PlanSegment:
 
     context: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    skills: List[str] = field(default_factory=list)
 
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     segment_id: str = field(init=False)
@@ -32,6 +33,7 @@ class PlanSegment:
         payload = {
             "subgoal_id": self.subgoal_id,
             "steps": self.steps,
+            "skills": self.skills,
         }
         return stable_hash(payload)
 
@@ -39,6 +41,7 @@ class PlanSegment:
         payload = {
             "subgoal_id": self.subgoal_id,
             "steps": self.steps,
+            "skills": self.skills,
             "context": self.context,
             "metadata": self.metadata,
         }

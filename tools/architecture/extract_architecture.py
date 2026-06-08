@@ -70,6 +70,8 @@ STRATUM_RULES: list[tuple[str, str]] = [
     # adapter
     ("agent/", "adapter"),
     ("agent\\", "adapter"),
+    ("stratum2/", "adapter"),
+    ("stratum2\\", "adapter"),
     ("tools/", "adapter"),
     ("tools\\", "adapter"),
     # utility (catch-all for src/)

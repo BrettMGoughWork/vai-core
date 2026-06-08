@@ -1,118 +1,93 @@
 """
-S2↔S3 boundary contracts.
+S2↔S3 boundary contracts (Phase 3.8.1).
 
-These are pure dataclasses with NO imports from src/core/ or src/runtime/.
-They define the shape of inter-stratum communication between Stratum 2
-(Planning + Execution) and Stratum 3 (Capabilities).
+Pure dataclasses that define the only shapes allowed to cross the
+S2↔S3 boundary for skill invocation and discovery.  They are
+deterministic, JSON‑serializable, and contain no runtime logic.
+
+No business logic.  No imports from S1/S2/S3.  No circular
+dependencies.  No external libraries.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
-@dataclass
+@dataclass(frozen=True)
 class SkillCallRequest:
     """Request from S2 to S3 to execute a skill."""
 
     skill_name: str
-    """Fully-qualified skill name (e.g. 'file.read', 'json.parse')."""
-
     arguments: Dict[str, Any] = field(default_factory=dict)
-    """Keyword arguments to pass to the skill's handler."""
+    request_id: str = ""
 
-    timeout_ms: Optional[int] = None
-    """Optional execution timeout in milliseconds."""
+    def __post_init__(self) -> None:
+        if not self.skill_name:
+            raise ValueError("skill_name must be non-empty")
+        if not isinstance(self.arguments, dict):
+            raise ValueError("arguments must be a dict")
+        if not self.request_id:
+            raise ValueError("request_id must be non-empty")
 
-    idempotency_key: Optional[str] = None
-    """Optional key for idempotent execution tracking."""
 
-
-@dataclass
+@dataclass(frozen=True)
 class SkillResult:
     """Response from S3 to S2 after skill execution."""
 
-    skill_name: str
-    """The skill that was executed."""
-
+    request_id: str
     success: bool
-    """Whether execution succeeded without error."""
+    output: Dict[str, Any] | None = None
+    error: str | None = None
 
-    output: Any = None
-    """The skill's return value on success."""
-
-    error: Optional[str] = None
-    """Error message on failure."""
-
-    error_type: Optional[str] = None
-    """Machine-readable error category (e.g. 'ValidationError', 'TimeoutError')."""
-
-    duration_ms: Optional[float] = None
-    """Wall-clock execution time in milliseconds."""
-
-    output_schema_snapshot: Optional[Dict[str, Any]] = None
-    """Snapshot of the output schema used for validation (debug/audit)."""
+    def __post_init__(self) -> None:
+        if (self.output is None) == (self.error is None):
+            raise ValueError(
+                "Exactly one of output or error must be non-None"
+            )
+        if not self.request_id:
+            raise ValueError("request_id must be non-empty")
 
 
-@dataclass
+@dataclass(frozen=True)
 class SkillDiscoveryQuery:
     """Request from S2 to S3 to discover available skills."""
 
-    query: Optional[str] = None
-    """Natural-language query describing the desired capability."""
+    query: str
+    limit: int = 10
 
-    domain: Optional[str] = None
-    """Filter by domain (e.g. 'file', 'network', 'text')."""
-
-    input_type_hint: Optional[str] = None
-    """Hint about expected input type."""
-
-    output_type_hint: Optional[str] = None
-    """Hint about desired output type."""
-
-    max_results: int = 10
-    """Maximum number of results to return."""
-
-    include_disabled: bool = False
-    """Whether to include disabled skills in results."""
+    def __post_init__(self) -> None:
+        if not self.query:
+            raise ValueError("query must be non-empty")
+        if self.limit < 1:
+            raise ValueError("limit must be >= 1")
 
 
-@dataclass
-class SkillDiscoveryResult:
-    """Response from S3 to S2 with discovered skills."""
-
-    query: Optional[str]
-    """Echo of the original query for correlation."""
-
-    skills: List[DiscoveredSkill] = field(default_factory=list)
-    """Ranked list of matching skills."""
-
-    total_count: int = 0
-    """Total number of matching skills before truncation."""
-
-
-@dataclass
+@dataclass(frozen=True)
 class DiscoveredSkill:
     """Summary of a skill returned by discovery."""
 
     name: str
-    """Fully-qualified skill name."""
-
     description: str
-    """Human-readable description from the skill manifest."""
+    score: float = 0.0
 
-    input_schema: Dict[str, Any] = field(default_factory=dict)
-    """JSON Schema for the skill's inputs."""
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.score <= 1.0):
+            raise ValueError("score must be in [0.0, 1.0]")
 
-    output_schema: Optional[Dict[str, Any]] = None
-    """JSON Schema for the skill's outputs (if declared)."""
 
-    domains: List[str] = field(default_factory=list)
-    """Tags/domains this skill belongs to."""
+@dataclass(frozen=True)
+class SkillDiscoveryResult:
+    """Response from S3 to S2 with discovered skills."""
 
-    cost_hint: int = 0
-    """Estimated relative cost (0 = free, higher = more expensive)."""
+    query: SkillDiscoveryQuery
+    skills: List[DiscoveredSkill] = field(default_factory=list)
 
-    relevance_score: float = 0.0
-    """Relevance score from discovery search (0.0–1.0)."""
+    def __post_init__(self) -> None:
+        # Validate descending-score ordering
+        for i in range(1, len(self.skills)):
+            if self.skills[i - 1].score < self.skills[i].score:
+                raise ValueError("skills must be sorted by descending score")
+        if len(self.skills) > self.query.limit:
+            raise ValueError("len(skills) must not exceed query.limit")

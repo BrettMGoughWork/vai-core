@@ -110,6 +110,7 @@ class MemoryGovernance:
             created_at=segment.created_at,
             context=copy.deepcopy(dict(segment.context)),
             metadata=copy.deepcopy(dict(segment.metadata)),
+            skills=list(segment.skills),
         )
         violations = validate_segment_record(record)
 

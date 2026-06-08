@@ -79,6 +79,12 @@ def _updated_segment(seg: SegmentMemoryRecord, **kwargs) -> SegmentMemoryRecord:
         created_at=kwargs.get("created_at", seg.created_at),
         context=kwargs.get("context", seg.context),
         metadata=kwargs.get("metadata", seg.metadata),
+        skills=kwargs.get("skills", seg.skills),
+        last_output=kwargs.get("last_output", seg.last_output),
+        previous_output=kwargs.get("previous_output", seg.previous_output),
+        behavioural_delta=kwargs.get("behavioural_delta", seg.behavioural_delta),
+        behavioural_signals=kwargs.get("behavioural_signals", seg.behavioural_signals),
+        error=kwargs.get("error", seg.error),
     )
 
 

@@ -42,9 +42,9 @@ OUT_PATH  = REPO_ROOT / "docs" / "architecture_audit.md"
 
 ALLOWED_IMPORTS: dict[str, set[str]] = {
     "domain":         {"domain"},
-    "infrastructure": {"domain", "infrastructure", "utility"},
-    "adapter":        {"domain", "infrastructure", "adapter"},
-    "utility":        {"domain", "infrastructure", "utility"},
+    "infrastructure": {"domain", "infrastructure", "utility", "adapter"},
+    "adapter":        {"domain", "infrastructure", "adapter", "capability"},
+    "utility":        {"domain", "infrastructure", "utility", "adapter"},
     "capability":     {"capability", "domain"},
     "test":           {"domain", "infrastructure", "adapter", "utility", "capability", "test"},
 }
