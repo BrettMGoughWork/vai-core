@@ -1,0 +1,85 @@
+"""stdlib.net.ping — TCP ping primitive (Phase 3.18.5).
+
+Uses TCP connect to check reachability of a host:port pair.
+Does not require raw socket / ICMP privileges.
+"""
+
+from __future__ import annotations
+
+import socket
+import time
+
+from src.capabilities.primitives.base import PrimitiveBase
+from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+
+
+class NetPingPrimitive(PrimitiveBase):
+    """Check reachability of a host:port via TCP connect."""
+
+    name = "stdlib.net.ping"
+    description = "Check TCP reachability of a host and port"
+    primitive_type = PrimitiveType.PYTHON
+
+    def __init__(self) -> None:
+        super().__init__(
+            name=self.name,
+            description=self.description,
+            primitive_type=self.primitive_type,
+        )
+
+    def validate_args(self, args: dict) -> None:
+        if not isinstance(args, dict):
+            raise ValueError(f"args must be a dict, got {type(args).__name__}")
+        if "host" not in args:
+            raise ValueError("args must contain 'host' key")
+        host = args["host"]
+        if not isinstance(host, str):
+            raise ValueError(f"'host' must be a string, got {type(host).__name__}")
+        if not host:
+            raise ValueError("'host' must not be empty")
+        if "port" not in args:
+            raise ValueError("args must contain 'port' key")
+        port = args["port"]
+        if not isinstance(port, int):
+            raise ValueError(f"'port' must be an integer, got {type(port).__name__}")
+        if not 1 <= port <= 65535:
+            raise ValueError(f"'port' must be between 1 and 65535, got {port}")
+        if "timeout" in args:
+            timeout = args["timeout"]
+            if not isinstance(timeout, (int, float)):
+                raise ValueError(f"'timeout' must be a number, got {type(timeout).__name__}")
+            if timeout <= 0:
+                raise ValueError(f"'timeout' must be positive, got {timeout}")
+
+    def execute(self, args: dict, context: dict) -> PrimitiveResult:
+        self.validate_args(args)
+        host: str = args["host"]
+        port: int = args["port"]
+        timeout: float = args.get("timeout", 5.0)
+
+        start = time.perf_counter()
+        try:
+            sock = socket.create_connection((host, port), timeout=timeout)
+            sock.close()
+            elapsed_ms = int((time.perf_counter() - start) * 1000)
+            return PrimitiveResult(
+                status="success",
+                data={
+                    "reachable": True,
+                    "host": host,
+                    "port": port,
+                    "elapsed_ms": elapsed_ms,
+                },
+            )
+        except Exception as exc:
+            elapsed_ms = int((time.perf_counter() - start) * 1000)
+            return PrimitiveResult(
+                status="success",
+                data={
+                    "reachable": False,
+                    "host": host,
+                    "port": port,
+                    "elapsed_ms": elapsed_ms,
+                    "reason": f"{type(exc).__name__}: {exc}",
+                },
+            )
