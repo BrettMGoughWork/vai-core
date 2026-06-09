@@ -1420,7 +1420,7 @@ Responsibilities:
 - Use real embeddings only for integration/E2E tests
 Constraints:
 - Embeddings are used only for discovery fallback, never for execution
-- LLM0chosen skills always take precedence
+- LLM-chosen skills always take precedence
 - Embedding provider must be pluggable (OpenAI, local model, mock)
 - No network calls in unit tests
 

@@ -192,6 +192,7 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
 
     # S3: real echo skill
     skill_registry = CapabilitySkillRegistry()
+    skill_registry.set_embedder(_TestEmbedder())
     skill_registry.register(make_echo_skill())
     runner = SkillRunner(registry=skill_registry, embedder=_TestEmbedder())
     s3_adapter = S3Adapter(runner)
@@ -413,13 +414,16 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
     # Verify the cycle dispatch chain worked end-to-end:
     #   step 4.5 (seed plan) → step 4.6 (dispatch via PlanExecutor) →
     #   segment record written → step 5 (reflection)
-    seg_record = segment_memory_v2.get_record("stdlib.echo")
-    assert seg_record is not None, \
-        "step 4.6 must write SegmentMemoryRecord for dispatched skill"
-
+    # The segment record is keyed by targetskillid from the plan
+    # (which the LLM named — may differ from the skill name resolved by
+    #  semantic fallback in SkillRunner.execute).
     plan_records = plan_memory_v2.snapshot().records
     assert len(plan_records) >= 1, \
         f"step 4.5 must seed at least one PlanMemoryRecord, got {len(plan_records)}"
+    dispatched_skill_id = plan_records[0].targetskillid
+    seg_record = segment_memory_v2.get_record(dispatched_skill_id)
+    assert seg_record is not None, \
+        f"step 4.6 must write SegmentMemoryRecord for dispatched skill '{dispatched_skill_id}'"
 
     print(f"  [OK] 3.9.9 AgentLoopV2 cycle: seeded={len(plan_records)}, "
           f"dispatched={seg_record.segment_id!r}, "
