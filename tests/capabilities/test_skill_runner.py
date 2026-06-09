@@ -7,7 +7,7 @@ and empty results.
 
 from __future__ import annotations
 
-import math
+
 
 import pytest
 
@@ -87,20 +87,17 @@ def _make_skill(
 # Embedding helpers for discovery tests
 # ---------------------------------------------------------------------------
 
-def _simple_embedding_fn(text: str) -> list[float]:
-    """
-    Deterministic embedding: each character contributes a fixed vector
-    component.  Known tokens produce higher similarity for predictable
-    ordering in tests.
-    """
-    vec = [0.0] * 8
-    for ch in text:
-        idx = ord(ch) % 8
-        vec[idx] += 1.0
-    magnitude = math.sqrt(sum(v * v for v in vec))
-    if magnitude > 0:
-        vec = [v / magnitude for v in vec]
-    return vec
+from src.capabilities.discovery.providers.mock_provider import _simple_embedding_fn
+
+
+class _TestEmbedder:
+    """Minimal embedder wrapping _simple_embedding_fn for test use (PHASE 3.19.1)."""
+
+    def embed_query(self, text: str) -> list[float]:
+        return _simple_embedding_fn(text)
+
+    def embed(self, text: str) -> list[float]:
+        return _simple_embedding_fn(text)
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +158,7 @@ class TestSkillRunnerDiscover:
         registry = CapabilitySkillRegistry()
         registry.register(_make_skill("file.read", "reads files from disk"))
         registry.register(_make_skill("file.write", "writes data to files"))
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
 
         result = runner.discover(SkillDiscoveryQuery(
             query="file operations",
@@ -180,7 +177,7 @@ class TestSkillRunnerDiscover:
         """discover() returns empty list when no skills match the query."""
         # Registry with skills that won't match the query semantically
         registry = CapabilitySkillRegistry()
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
 
         result = runner.discover(SkillDiscoveryQuery(
             query="something completely unrelated",
@@ -194,7 +191,7 @@ class TestSkillRunnerDiscover:
         registry = CapabilitySkillRegistry()
         for i in range(5):
             registry.register(_make_skill(f"skill.{i}", f"skill number {i}"))
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
 
         result = runner.discover(SkillDiscoveryQuery(
             query="skill",
@@ -204,8 +201,8 @@ class TestSkillRunnerDiscover:
         assert len(result.skills) <= 2
 
     def test_discover_raises_without_embedding_fn(self) -> None:
-        """discover() raises ValueError when no embedding_fn is provided."""
+        """discover() raises ValueError when no embedder is provided."""
         runner = SkillRunner()
 
-        with pytest.raises(ValueError, match="embedding_fn"):
+        with pytest.raises(ValueError, match="embedder"):
             runner.discover(SkillDiscoveryQuery(query="test", limit=5))

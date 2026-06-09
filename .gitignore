@@ -24,6 +24,9 @@ agent_traces/
 # Custom tools
 tools/custom/
 
+# Local ML models (embedding, etc.)
+.models/
+
 # IDE
 .vscode/
 .idea/

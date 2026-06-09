@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from src.core.search.providers._base import SearchProviderError, SearchResult
+from src.capabilities.search.providers._base import SearchProviderError, SearchResult
 from src.core.state.config import ProviderConfig
 
 

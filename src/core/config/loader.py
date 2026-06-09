@@ -1,6 +1,13 @@
 import yaml
 from pathlib import Path
-from src.core.state.config import LoopPolicyConfig, AgentConfig, CoreConfig, LLMConfig, SearchConfig
+from src.core.state.config import (
+    AgentConfig,
+    CoreConfig,
+    EmbeddingConfig,
+    LLMConfig,
+    LoopPolicyConfig,
+    SearchConfig,
+)
 from ..llm.builder import create_llm_transport
 
 class Config:
@@ -21,11 +28,16 @@ class Config:
         raw_search = raw.get("search")
         search = SearchConfig.from_yaml(raw_search) if raw_search else None
 
+        # hydrate Embedding config (PHASE 3.19.1)
+        raw_embedding = raw.get("embedding")
+        embedding = EmbeddingConfig.from_yaml(raw_embedding) if raw_embedding else None
+
         # store fully typed config
         self._config = CoreConfig(
             llm=llm,
             agent=agent,
             search=search,
+            embedding=embedding,
         )
 
     def get(self, section: str):

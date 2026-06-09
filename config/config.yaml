@@ -52,3 +52,19 @@ search:
     duckduckgo:
       max_results: 5
       timeout: 10.0
+
+# ── PHASE 3.19.1 — Embedding Provider Configuration ──────────────────────
+# Controls the semantic embedding backend used for skill discovery fallback.
+# Embeddings are ONLY consulted when the LLM fails to name a capability.
+#
+# provider:  'openai' | 'local' | 'mock'
+#   - openai: requires OPENAI_API_KEY env var, fast cloud API
+#   - local:  runs MiniLM-L6-v2 in-process (384-dim), no API key needed,
+#             model auto-downloaded to .models/ on first use
+#   - mock:   deterministic zero-vector, for unit tests only
+# model:     passed to the provider (e.g. 'text-embedding-3-small')
+# dimensions: expected vector dimension (1536 for openai, 384 for MiniLM)
+embedding:
+  provider: local
+  model: all-MiniLM-L6-v2
+  dimensions: 384

@@ -60,9 +60,19 @@ def build_query_embedding(query: str, context: dict) -> list[float]:
 
 
 def _build_skill_text(skill: "CapabilitySkill") -> str:
-    """Construct a deterministic text block representing the skill."""
+    """Construct a deterministic text block representing the skill.
+
+    Combines the skill name, description, step summaries, and a
+    deterministic signature derived from the input / output schemas.
+    """
     lines = [skill.manifest.name, skill.manifest.description]
 
+    # ── Signature (Phase 3.19.2) ──────────────────────────────────────
+    sig = _build_signature(skill)
+    if sig:
+        lines.append(f"signature: {sig}")
+
+    # ── Step summaries ────────────────────────────────────────────────
     for step in skill.manifest.steps:
         call = step.get("call", "")
         args_keys = sorted(step.get("args", {}).keys())
@@ -70,3 +80,36 @@ def _build_skill_text(skill: "CapabilitySkill") -> str:
         lines.append(f"step: {call} args: {args_summary}")
 
     return "\n".join(lines)
+
+
+def _build_signature(skill: "CapabilitySkill") -> str:
+    """Build a deterministic function‑like signature from I/O schemas.
+
+    Example:
+        ``(query: str, max_results: number) -> SearchResult[]``
+    """
+    in_props: dict = (skill.manifest.inputs or {}).get("properties", {})
+    out_props: dict = getattr(skill.manifest, "outputs", {}) or {}
+    out_props = out_props.get("properties", {}) if isinstance(out_props, dict) else {}
+
+    # Input side
+    in_parts: list[str] = []
+    for key, prop in sorted(in_props.items()):
+        ptype = prop.get("type", "any") if isinstance(prop, dict) else "any"
+        in_parts.append(f"{key}:{ptype}")
+
+    # Output side
+    out_parts: list[str] = []
+    for key, prop in sorted(out_props.items()):
+        ptype = prop.get("type", "any") if isinstance(prop, dict) else "any"
+        out_parts.append(f"{key}:{ptype}")
+
+    in_str = ", ".join(in_parts)
+    out_str = ", ".join(out_parts)
+
+    if not in_str and not out_str:
+        return ""
+
+    if out_str:
+        return f"({in_str})->({out_str})"
+    return f"({in_str})"

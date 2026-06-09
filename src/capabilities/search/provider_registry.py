@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from typing import Type
 
-from src.core.search.providers._base import SearchProvider
-from src.core.search.providers.duckduckgo import DuckDuckGoProvider
-from src.core.search.providers.tavily import TavilyProvider
+from src.capabilities.search.providers._base import SearchProvider
+from src.capabilities.search.providers.duckduckgo import DuckDuckGoProvider
+from src.capabilities.search.providers.tavily import TavilyProvider
 from src.core.state.config import SearchConfig, ProviderConfig
 
 
