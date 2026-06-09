@@ -48,6 +48,8 @@ class SkillRunner:
         )
         self._executor = SkillExecutor()
         self._embedder = embedder  # SkillEmbedder | None (PHASE 3.19.1)
+        if embedder is not None:
+            self._registry.set_embedder(embedder)
 
     def execute(self, request: SkillCallRequest) -> SkillResult:
         """
@@ -74,6 +76,9 @@ class SkillRunner:
             #  embeddings pre-computed).
             spec = self._registry.get(request.skill_name)
             if spec is None:
+                # Ensure embedder is set on registry for semantic fallback
+                if self._embedder is not None:
+                    self._registry.set_embedder(self._embedder)
                 import asyncio
                 spec = asyncio.run(
                     resolve_capability_with_fallback(
