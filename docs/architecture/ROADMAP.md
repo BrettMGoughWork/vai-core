@@ -1533,22 +1533,22 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 - Known: `json.parse.skill.md` fails to load (inline Python step unsupported by SkillManifest); `_simple_embedding_fn` is non‑semantic (character‑bucket hash) → LLM may select hallucinated capability names for step execution (→ "NoneType has no attribute run"); semantic embeddings deferred to PHASE 3.19
 - TODO: fix `json.parse.skill.md` Python‑step support; improve real‑LLM skill selection prompt quality; add more comprehensive integration test scenarios
 
-3.18.4 — Database Primitives (Safe CRUD)
+✅ 3.18.4 — Database Primitives (Safe CRUD)
 - `db.connect`, `db.query`, `db.insert`, `db.update`, `db.delete`
 - `db.listtables`, `db.describetable`
 
-3.18.5 — Network Primitives
+✅ 3.18.5 — Network Primitives
 - `net.httpget`, `net.httppost`, `net.dnslookup`, `net.ping`, `net.tcpcheck`
 
-3.18.6 — Web Interaction Primitives
+✅ 3.18.6 — Web Interaction Primitives
 - `fetch.simple`, `fetch.hardened`, `fetch.browser`, `fetch.stealth`
 - `search.web`
 
-3.18.7 — Text & Document Processing
+✅ 3.18.7 — Text & Document Processing
 - `text.split`, `text.join`, `text.replace`, `text.extract`, `text.normalize`
 - `doc.detecttype`, `doc.extractmetadata`
 
-3.18.8 — System & Environment Primitives
+✅ 3.18.8 — System & Environment Primitives
 - `sys.envget`, `sys.envlist`, `sys.timenow`, `sys.uuid`, `sys.tempfile`
 
 3.18.9 — Process & Execution Primitives
