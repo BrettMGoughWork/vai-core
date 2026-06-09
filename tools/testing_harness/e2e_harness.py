@@ -309,6 +309,17 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
 
         from src.stratum2.s3_adapter import S2SkillCallRequest
 
+        # Build runtime context with search config for primitives (PHASE 3.13.2)
+        runtime_context: dict = {}
+        try:
+            from src.core.config.loader import Config
+            cfg = Config("config/config.yaml")
+            search_cfg = cfg.get("search")
+            if search_cfg is not None and search_cfg.enabled:
+                runtime_context["search_config"] = search_cfg
+        except Exception:
+            pass  # config not available — primitives use their defaults
+
         for i, step in enumerate(result.plan_steps):
             skill_name = result.target_skill if i == 0 else step.get("capability", result.target_skill)
             description = step.get("description", f"step-{i}")
@@ -320,6 +331,7 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
                 skill_name=skill_name,
                 arguments=plan_record.arguments if i == 0 else {},
                 request_id=f"e2e-{plan_id[:8]}-step-{i}",
+                context=runtime_context,
             )
 
             try:

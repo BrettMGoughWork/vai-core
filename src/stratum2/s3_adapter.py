@@ -36,6 +36,7 @@ class S2SkillCallRequest:
     skill_name: str
     arguments: dict[str, Any] = field(default_factory=dict)
     request_id: str = ""
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,7 @@ class S3Adapter:
             skill_name=request.skill_name,
             arguments=dict(request.arguments),
             request_id=request.request_id,
+            context=dict(request.context),
         )
         s3_result = self._runner.execute(s3_request)
         return self._convert_result(s3_result)

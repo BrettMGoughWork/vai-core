@@ -22,6 +22,7 @@ class SkillCallRequest:
     skill_name: str
     arguments: Dict[str, Any] = field(default_factory=dict)
     request_id: str = ""
+    context: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.skill_name:
@@ -30,6 +31,8 @@ class SkillCallRequest:
             raise ValueError("arguments must be a dict")
         if not self.request_id:
             raise ValueError("request_id must be non-empty")
+        if not isinstance(self.context, dict):
+            raise ValueError("context must be a dict")
 
 
 @dataclass(frozen=True)

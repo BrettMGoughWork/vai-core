@@ -104,7 +104,7 @@ class CapabilitySkill:
         """
         _validate_against_schema(data, self.output_schema, "output")
 
-    def run(self, **inputs: Any) -> Any:
+    def run(self, context: dict[str, Any] | None = None, **inputs: Any) -> Any:
         """Execute this skill with the given inputs.
 
         This is the entry point called by ``SkillRunner``.  It delegates to
@@ -112,6 +112,8 @@ class CapabilitySkill:
         simple return value or raised exception.
 
         Args:
+            context: Runtime context dict passed to every primitive step
+                     (e.g. ``{"search_config": SearchProviderConfig(...)}``).
             **inputs: Keyword arguments matching the skill's input schema.
 
         Returns:
@@ -124,7 +126,7 @@ class CapabilitySkill:
         from src.capabilities.skills.executor import SkillExecutor
 
         executor = SkillExecutor()
-        result = executor.execute(self, inputs, {})
+        result = executor.execute(self, inputs, context or {})
         if result.status == "error":
             raise RuntimeError(result.error or "skill execution failed")
         if result.results:
