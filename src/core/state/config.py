@@ -47,6 +47,103 @@ class AgentConfig:
 
 
 @dataclass
+class ProviderConfig:
+    """Configuration for a single search provider (PHASE 3.13.1).
+
+    One instance per registered provider (e.g. 'tavily', 'duckduckgo').
+    API keys are resolved from environment at load time, never exposed
+    to the LLM.
+    """
+
+    max_results: int = 10
+    """Default maximum number of results to return per query."""
+
+    timeout: float = 15.0
+    """Per-request timeout in seconds."""
+
+    rate_limit_rps: float | None = None
+    """Optional rate limit in requests-per-second."""
+
+    api_key_env: str | None = None
+    """Name of the environment variable holding the API key.
+
+    Set for providers that require authentication (e.g. 'TAVILY_API_KEY').
+    ``None`` for providers that don't need a key (e.g. DuckDuckGo).
+    """
+
+    endpoint: str | None = None
+    """Optional endpoint override for the provider's search API."""
+
+    params: Dict[str, Any] = field(default_factory=dict)
+    """Provider-specific parameters injected into every request."""
+
+    @classmethod
+    def from_yaml(cls, data: Dict[str, Any]) -> "ProviderConfig":
+        """Create ProviderConfig from a YAML dictionary."""
+        known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        return cls(**known)
+
+
+@dataclass
+class SearchProviderConfig:
+    """Legacy flat search provider configuration (pre‑3.13.1).
+
+    Kept for backward compatibility with existing tests and skills.
+    New code should use ``SearchConfig`` instead.
+    """
+
+    provider: str = ""
+    api_key: str | None = None
+    max_results: int = 10
+    timeout: float = 15.0
+    enabled: bool = False
+    endpoint: str | None = None
+    params: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SearchConfig:
+    """Top-level search configuration (PHASE 3.13.1).
+
+    This is stored in the runtime, NEVER exposed to the LLM.
+    The LLM receives only normalised search results.
+    """
+
+    default_provider: str
+    """Canonical name of the default search provider."""
+
+    enabled: bool = False
+    """Whether search is enabled at runtime."""
+
+    providers: Dict[str, ProviderConfig] = field(default_factory=dict)
+    """Provider configurations keyed by canonical name."""
+
+    @classmethod
+    def from_yaml(cls, data: Dict[str, Any] | None) -> "SearchConfig | None":
+        """Create SearchConfig from a YAML dictionary.
+
+        Returns ``None`` if *data* is ``None`` or empty.
+        """
+        if not data:
+            return None
+
+        enabled = data.get("enabled", False)
+        default_provider = data.get("default_provider", "")
+        raw_providers = data.get("providers", {}) or {}
+
+        providers: Dict[str, ProviderConfig] = {}
+        for name, raw_cfg in raw_providers.items():
+            providers[name] = ProviderConfig.from_yaml(raw_cfg)
+
+        return cls(
+            default_provider=default_provider,
+            enabled=enabled,
+            providers=providers,
+        )
+
+
+@dataclass
 class CoreConfig:
     llm: LLMConfig
     agent: AgentConfig
+    search: SearchConfig | None = None

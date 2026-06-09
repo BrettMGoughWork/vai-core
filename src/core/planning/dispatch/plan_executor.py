@@ -39,10 +39,12 @@ class PlanExecutor:
         dispatcher: SafeStepDispatcher,
         s3_adapter: Optional[S3Adapter] = None,
         segment_memory: Optional[SegmentMemory] = None,
+        runtime_context: dict | None = None,
     ):
         self.dispatcher = dispatcher
         self._s3_adapter = s3_adapter
         self._segment_memory = segment_memory
+        self._runtime_context = runtime_context or {}
 
     def execute(
         self, 
@@ -161,6 +163,7 @@ class PlanExecutor:
             skill_name=plan.targetskillid,
             arguments=dict(plan.arguments),
             request_id=getattr(plan, "plan_id", plan.targetskillid),
+            context=dict(self._runtime_context),
         )
         s2_result = self._s3_adapter.call_skill(request)
 

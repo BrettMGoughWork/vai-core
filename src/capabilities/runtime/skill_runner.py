@@ -58,7 +58,7 @@ class SkillRunner:
         """
         try:
             spec = self._registry.get(request.skill_name)
-            output = spec.run(**request.arguments)
+            output = spec.run(context=request.context, **request.arguments)
             return SkillResult(
                 request_id=request.request_id,
                 success=True,

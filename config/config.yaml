@@ -32,3 +32,23 @@ logging:
 
 telemetry:
   enabled: true
+
+# ── PHASE 3.13.1 — Search Provider Configuration ──────────────────────────
+# Keeping this config in the runtime ensures the LLM NEVER sees the
+# provider name, API key, or endpoint.  The LLM only receives normalised
+# search results: {title, url, snippet}.
+#
+# default_provider: canonical name of the provider to use.
+# providers.<name>.api_key_env: env var holding the API key (omitted for keyless providers).
+# providers.<name>.max_results: default maximum results per query.
+search:
+  enabled: true                    # DuckDuckGo + Tavily providers are configured
+  default_provider: tavily
+  providers:
+    tavily:
+      api_key_env: TAVILY_API_KEY
+      max_results: 5
+      timeout: 15.0
+    duckduckgo:
+      max_results: 5
+      timeout: 10.0

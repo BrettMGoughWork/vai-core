@@ -1148,13 +1148,13 @@ Requirements:
 
 ---
 
-### PHASE 3.13 — Search Provider (Updated)
+### PHASE 3.13 — Search Provider
 *Depends On*: PHASE 3.12  
 This phase introduces a provider‑agnostic search layer.  
 The runtime configures the provider (Tavily, Bing, SerpAPI, custom, etc.) and supplies API keys + parameters.  
 The LLM does not know or care which provider is used.
 
-3.13.1 — Search Provider Configuration
+✅ 3.13.1 — Search Provider Configuration
 Define a runtime‑side configuration object:
 
 - provider name (e.g., "tavily", "bing", "serpapi", "custom")  
@@ -1169,7 +1169,7 @@ The LLM receives only the normalized output, never the API key.
 
 ---
 
-3.13.2 — Search Primitive (Provider‑Agnostic)
+✅ 3.13.2 — Search Primitive (Provider‑Agnostic)
 Implements:
 
 - Query → provider request → provider response → normalized results  
@@ -1188,7 +1188,7 @@ The primitive does not perform fallback, heuristics, or ranking.
 
 ---
 
-3.13.3 — search_urls Skill
+✅ 3.13.3 — search_urls Skill
 Thin wrapper around the search primitive.
 
 Responsibilities:
@@ -1199,10 +1199,10 @@ Responsibilities:
 - No provider logic  
 - No fallback logic  
 - No heuristics  
-
+- Implement two concrete providers as a test: DuckDuckGo (free) and Tabivily (requires api key)
 ---
 
-3.13.4 — Integrate Search Into Fetch Fallback
+✅ 3.13.4 — Integrate Search Into Fetch Fallback
 When all fetch modes fail (simple → hardened → headless → stealth):
 
 - The fallback router calls search_urls  
@@ -1214,7 +1214,7 @@ Search is last‑resort, not a primary fetch strategy.
 
 ---
 
-3.13.5 — GetPageFromUrl Taxonomy
+✅ 3.13.5 — GetPageFromUrl Taxonomy
 Define a lightweight content‑type classifier:
 
 - article  
@@ -1233,7 +1233,7 @@ This is provider‑agnostic.
 
 ---
 
-3.13.6 — Tests
+✅ 3.13.6 — Tests
 Verify:
 
 - Provider configuration is respected  
