@@ -75,22 +75,13 @@ class SkillRunner:
             spec = self._registry.get(request.skill_name)
             if spec is None:
                 import asyncio
-                if asyncio.iscoroutinefunction(resolve_capability_with_fallback):
-                    # Await if it's async
-                    import asyncio
-                    spec = asyncio.get_event_loop().run_until_complete(
-                        resolve_capability_with_fallback(
-                            query=request.skill_name,
-                            llm_named=request.skill_name,
-                            registry=self._registry,
-                        )
-                    )
-                else:
-                    spec = resolve_capability_with_fallback(
+                spec = asyncio.run(
+                    resolve_capability_with_fallback(
                         query=request.skill_name,
                         llm_named=request.skill_name,
                         registry=self._registry,
                     )
+                )
 
             if spec is None:
                 return SkillResult(

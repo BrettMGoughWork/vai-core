@@ -126,10 +126,10 @@ class TestLocalProvider:
     def test_returns_correct_dimensions(self) -> None:
         """Local provider respects the dimensions parameter."""
         provider = LocalEmbeddingProvider(
-            model="test-model", dimensions=256
+            model="all-MiniLM-L6-v2", dimensions=384
         )
         result = provider.embed("test")
-        assert len(result) == 256
+        assert len(result) == 384
 
 
 class TestOpenAIProvider:
