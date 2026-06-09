@@ -1,27 +1,46 @@
 `vai-core` is a clean, deterministic agent runtime built for clarity and long-term maintainability.
 
-### this project is currently in early development 
+*Note: this project is currently in early development*
 
 It’s built around a small set of stable concepts — models, capabilities, skills, and a safety substrate — that keep the system predictable even as you extend it.
 
 The core idea is simple: give LLMs structured jobs, not free rein. The runtime forces clean JSON output, mediates all external calls through a strict capability system, and bakes in safety, observability, and self-healing by default.
-Core Concepts
 
-Models — pure data shapes. Everything the system moves around is strongly typed.
-Capabilities — declare what the agent can do (read files, make requests, etc), without giving it direct access.
-Skills — small, focused behaviours that combine prompts, guardrails, and logic on top of capabilities.
-Safety Substrate — the runtime’s guardrails. It controls execution, handles panics, manages degraded modes, and keeps things stable.
+### Dependencies
+
+**LLM**: Set `DEEPSEEK_API_KEY` (or configure another provider in `config/config.yaml`).
+
+**Embeddings** (for skill discovery fallback — used only when the LLM fails to pick a skill):
+
+| Mode | Config `provider:` | Requirements |
+|------|--------------------|-------------|
+| Local (default) | `local` | `pip install sentence-transformers` — runs MiniLM-L6-v2 in-process, models cached in `.models/` |
+| Cloud API | `openai` | Set `OPENAI_API_KEY` env var, uses text-embedding-3-small |
+| Mock (tests) | `mock` | No dependencies, returns deterministic zero-vectors |
+
+**Search**: See `search:` block in `config/config.yaml`. Tavily requires `TAVILY_API_KEY`, DuckDuckGo is keyless.
+Core Concepts  
+  
+Models — pure data shapes. Everything the system moves around is strongly typed.  
+Capabilities — declare what the agent can do (read files, make requests, etc), without giving it direct access.  
+Skills — small, focused behaviours that combine prompts, guardrails, and logic on top of capabilities.  
+Safety Substrate — the runtime’s guardrails. It controls execution, handles panics, manages degraded modes, and keeps things stable.  
 
 Repository Layout
 
-src/core/ — core types and contracts
-src/capabilities/primitives/ — reusable building blocks
-src/capabilities/skills/ — reusable agent behaviours
-src/stratum2/ — planning and execution (Stratum 2)
-docs/architecture/ — deep technical docs
+src/core/ — core types and contracts  
+src/capabilities/primitives/ — reusable building blocks  
+src/capabilities/skills/ — reusable agent behaviours  
+src/stratum2/ — planning and execution (Stratum 2)  
+docs/architecture/ — deep technical docs  
 
-Inspector Dashboard
--------------------
+
+
+## Developer Tools
+
+
+### Inspector Dashboard
+
 The Stratum-2 Inspection Dashboard is a read-only, developer-facing TUI for visualizing agent cycle traces and memory substrate state in real time. It provides a safe, side-effect-free way to inspect agent activity and health.
 
 Usage:
@@ -29,9 +48,6 @@ Usage:
 
 Optional arguments allow you to specify a trace directory or enable live watching.
 
-
-Developer Tools
----------------
 
 ### Fetch Test Harness (`tools/fetch_harness/`)
 

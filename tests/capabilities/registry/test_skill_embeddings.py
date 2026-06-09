@@ -120,6 +120,53 @@ class TestBuildSkillEmbedding:
         with pytest.raises(ValueError, match="missing embedding_fn"):
             build_skill_embedding(skill, {})
 
+    def test_includes_signature_from_inputs(self, spy_fn: SpyEmbeddingFn, context: dict) -> None:
+        """PHASE 3.19.2: Signature is derived from input schema properties."""
+        prim_registry = PrimitiveRegistry()
+        prim_registry.register("search", FakePrimitive(name="search"))
+        manifest = SkillManifest(
+            name="search_urls",
+            description="search the web",
+            primitives=["search"],
+            inputs={"properties": {"query": {"type": "string"}, "max_results": {"type": "number"}}},
+            steps=[{"call": "search", "args": {"query": "", "max_results": 0}}],
+        )
+        skill = CapabilitySkill.from_manifest(manifest, prim_registry)
+        build_skill_embedding(skill, context)
+        assert spy_fn.last_text is not None
+        assert "signature:" in spy_fn.last_text
+        assert "query:string" in spy_fn.last_text
+        assert "max_results:number" in spy_fn.last_text
+
+    def test_includes_signature_from_outputs(self, spy_fn: SpyEmbeddingFn, context: dict) -> None:
+        """PHASE 3.19.2: Signature includes outputs when present."""
+        from types import SimpleNamespace
+        prim_registry = PrimitiveRegistry()
+        prim_registry.register("search", FakePrimitive(name="search"))
+        manifest = SkillManifest(
+            name="search_urls",
+            description="search the web",
+            primitives=["search"],
+            inputs={"properties": {"query": {"type": "string"}}},
+            steps=[{"call": "search", "args": {"query": ""}}],
+        )
+        # Attach outputs via a namespace wrapper (outputs is not in SkillManifest.__init__)
+        raw_outputs = {"outputs": {"properties": {"results": {"type": "array"}}}}
+        # We can't easily set outputs on SkillManifest, so test via _build_skill_text directly
+        skill = CapabilitySkill.from_manifest(manifest, prim_registry)
+        # Monkey-patch outputs onto the manifest
+        skill.manifest.outputs = raw_outputs.get("outputs", {})  # type: ignore[attr-defined]
+        build_skill_embedding(skill, context)
+        assert spy_fn.last_text is not None
+        assert "results:array" in spy_fn.last_text
+
+    def test_no_inputs_no_signature(self, spy_fn: SpyEmbeddingFn, context: dict) -> None:
+        """No inputs or outputs → no signature line."""
+        skill = _make_skill("minimal", "just a description")
+        build_skill_embedding(skill, context)
+        assert spy_fn.last_text is not None
+        assert "signature:" not in spy_fn.last_text
+
 
 # ---------------------------------------------------------------------------
 # Query embedding

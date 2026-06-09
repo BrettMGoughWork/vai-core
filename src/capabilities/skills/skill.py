@@ -47,6 +47,13 @@ class CapabilitySkill:
     output_schema: dict[str, Any]
     """Validated schema describing expected outputs."""
 
+    embedding: list[float] | None = None
+    """Pre‑computed semantic embedding vector (Phase 3.19.2).
+
+    Populated at registration time by the ``SkillEmbedder``.  Used
+    only for discovery fallback when the LLM fails to name a capability.
+    """
+
     @classmethod
     def from_manifest(
         cls,

@@ -1,15 +1,18 @@
 """
-S2→S3 runtime entry point (Phase 3.0.1).
+S2→S3 runtime entry point (Phase 3.0.1 / 3.19.5).
 
 The SkillRunner is the single entry point for Stratum 2 to call into
 Stratum 3. It receives SkillCallRequests, resolves the appropriate
 skill, executes it, and returns SkillResults. It also supports skill
 discovery via ``discover()``, wrapping the registry's semantic search.
+
+PHASE 3.19.5: ``execute()`` automatically falls back to semantic
+search when the LLM-named skill does not exist in the registry.
 """
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Optional
 
 from src.capabilities.contracts import (
     DiscoveredSkill,
@@ -18,6 +21,7 @@ from src.capabilities.contracts import (
     SkillDiscoveryResult,
     SkillResult,
 )
+from src.capabilities.discovery.fallback import resolve_capability_with_fallback
 from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
 from src.capabilities.skills.executor import SkillExecutor
 
@@ -37,11 +41,13 @@ class SkillRunner:
     def __init__(
         self,
         registry: Optional[CapabilitySkillRegistry] = None,
-        embedding_fn: Optional[Callable[[str], list[float]]] = None,
+        embedder=None,
     ):
-        self._registry: CapabilitySkillRegistry = CapabilitySkillRegistry() if registry is None else registry
+        self._registry: CapabilitySkillRegistry = (
+            CapabilitySkillRegistry() if registry is None else registry
+        )
         self._executor = SkillExecutor()
-        self._embedding_fn = embedding_fn
+        self._embedder = embedder  # SkillEmbedder | None (PHASE 3.19.1)
 
     def execute(self, request: SkillCallRequest) -> SkillResult:
         """
@@ -50,6 +56,10 @@ class SkillRunner:
         Resolves the skill name to a primitive via the registry,
         validates inputs, and executes the handler.
 
+        PHASE 3.19.5: If the LLM-named skill is not found, falls back
+        to semantic vector search against precomputed skill embeddings.
+        LLM-chosen skills always take precedence.
+
         Args:
             request: SkillCallRequest with skill_name, arguments, and request_id.
 
@@ -57,7 +67,29 @@ class SkillRunner:
             SkillResult with success/failure status and output.
         """
         try:
+            # ── Resolve skill with fallback ─────────────────────────
+            # PHASE 3.19.5: resolve_capability_with_fallback is sync
+            # (it only uses the registry's find_semantic which is also
+            #  sync since mock embeddings are deterministic and real
+            #  embeddings pre-computed).
             spec = self._registry.get(request.skill_name)
+            if spec is None:
+                import asyncio
+                spec = asyncio.run(
+                    resolve_capability_with_fallback(
+                        query=request.skill_name,
+                        llm_named=request.skill_name,
+                        registry=self._registry,
+                    )
+                )
+
+            if spec is None:
+                return SkillResult(
+                    request_id=request.request_id,
+                    success=False,
+                    error=f"Skill '{request.skill_name}' not found and no fallback match",
+                )
+
             output = spec.run(context=request.context, **request.arguments)
             return SkillResult(
                 request_id=request.request_id,
@@ -74,7 +106,11 @@ class SkillRunner:
 
     def discover(self, query: SkillDiscoveryQuery) -> SkillDiscoveryResult:
         """
-        Discover skills matching *query* via semantic search.
+        Discover skills matching *query* via semantic search (Phase 3.19.3).
+
+        Uses ``registry.find_semantic()`` which internally embeds the query,
+        runs cosine-similarity search against pre‑computed skill embeddings,
+        and returns top‑K matches with scores.
 
         Args:
             query: SkillDiscoveryQuery with a free-text query and limit.
@@ -83,23 +119,23 @@ class SkillRunner:
             SkillDiscoveryResult with matching skills sorted by descending score.
 
         Raises:
-            ValueError: If no embedding_fn was provided to the runner.
+            ValueError: If no embedder was provided to the runner.
         """
-        if self._embedding_fn is None:
-            raise ValueError("embedding_fn is required for discovery")
+        if self._embedder is None:
+            raise ValueError("embedder is required for discovery")
 
-        matches = self._registry.find(
-            query.query,
-            {"embedding_fn": self._embedding_fn},
-        )
+        # Ensure registry has an embedder for find_semantic (3.19.3)
+        self._registry.set_embedder(self._embedder)
+
+        matches = self._registry.find_semantic(query.query, k=query.limit)
 
         skills: list[DiscoveredSkill] = []
-        for m in matches[: query.limit]:
+        for skill, score in matches:
             skills.append(
                 DiscoveredSkill(
-                    name=m["name"],
-                    description=m["skill"].manifest.description,
-                    score=m["score"],
+                    name=skill.manifest.name,
+                    description=skill.manifest.description,
+                    score=score,
                 )
             )
 

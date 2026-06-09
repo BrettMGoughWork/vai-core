@@ -33,7 +33,7 @@ Run modes:
 from __future__ import annotations
 
 import json
-import math
+
 import os
 import sys
 from time import time
@@ -79,16 +79,17 @@ from src.stratum2.s3_adapter import S3Adapter, S2DiscoveryQuery, S2SkillCallRequ
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _simple_embedding_fn(text: str) -> list[float]:
-    """Deterministic embedding: character-bucket hash, unit-normalised."""
-    vec = [0.0] * 8
-    for ch in text:
-        idx = ord(ch) % 8
-        vec[idx] += 1.0
-    magnitude = math.sqrt(sum(v * v for v in vec))
-    if magnitude > 0:
-        vec = [v / magnitude for v in vec]
-    return vec
+from src.capabilities.discovery.providers.mock_provider import _simple_embedding_fn
+
+
+class _TestEmbedder:
+    """Minimal embedder wrapping canonical _simple_embedding_fn for test use (PHASE 3.19.4)."""
+
+    def embed_query(self, text: str) -> list[float]:
+        return _simple_embedding_fn(text)
+
+    def embed(self, text: str) -> list[float]:
+        return _simple_embedding_fn(text)
 
 
 def make_echo_skill() -> CapabilitySkill:
@@ -192,7 +193,7 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
     # S3: real echo skill
     skill_registry = CapabilitySkillRegistry()
     skill_registry.register(make_echo_skill())
-    runner = SkillRunner(registry=skill_registry, embedding_fn=_simple_embedding_fn)
+    runner = SkillRunner(registry=skill_registry, embedder=_TestEmbedder())
     s3_adapter = S3Adapter(runner)
 
     # S2: memory + governance

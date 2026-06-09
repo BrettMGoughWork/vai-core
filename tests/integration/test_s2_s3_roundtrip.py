@@ -15,7 +15,7 @@ SafeStepDispatcher is mocked (it dispatches to S1 infrastructure).
 
 from __future__ import annotations
 
-import math
+
 from unittest.mock import Mock
 
 import pytest
@@ -50,16 +50,17 @@ from src.stratum2.s3_adapter import (
 # ══════════════════════════════════════════════════════════════════════════
 
 
-def _simple_embedding_fn(text: str) -> list[float]:
-    """Deterministic embedding: each character contributes a fixed vector component."""
-    vec = [0.0] * 8
-    for ch in text:
-        idx = ord(ch) % 8
-        vec[idx] += 1.0
-    magnitude = math.sqrt(sum(v * v for v in vec))
-    if magnitude > 0:
-        vec = [v / magnitude for v in vec]
-    return vec
+from src.capabilities.discovery.providers.mock_provider import _simple_embedding_fn
+
+
+class _TestEmbedder:
+    """Minimal embedder wrapping _simple_embedding_fn for test use (PHASE 3.19.1)."""
+
+    def embed_query(self, text: str) -> list[float]:
+        return _simple_embedding_fn(text)
+
+    def embed(self, text: str) -> list[float]:
+        return _simple_embedding_fn(text)
 
 
 def make_plan(
@@ -656,7 +657,7 @@ class TestDiscoveryFlow:
 
         registry.register(_make_skill("file.read", "reads files from disk"))
         registry.register(_make_skill("file.write", "writes data to files"))
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
         adapter = S3Adapter(runner)
 
         result = adapter.discover_skills(S2DiscoveryQuery(query="file operations", limit=5))
@@ -674,7 +675,7 @@ class TestDiscoveryFlow:
 
         for i in range(5):
             registry.register(_make_skill(f"skill.{i}", f"skill number {i}"))
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
         adapter = S3Adapter(runner)
 
         result = adapter.discover_skills(S2DiscoveryQuery(query="skill", limit=2))
@@ -684,7 +685,7 @@ class TestDiscoveryFlow:
     def test_discovery_returns_empty_when_no_match(self) -> None:
         """Empty results when no skills match the query."""
         registry = CapabilitySkillRegistry()
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
         adapter = S3Adapter(runner)
 
         result = adapter.discover_skills(
@@ -700,7 +701,7 @@ class TestDiscoveryFlow:
 
         registry.register(_make_skill("echo.skill", "echoes user input"))
         registry.register(_make_skill("json.parse", "parses json payloads"))
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
         adapter = S3Adapter(runner)
 
         result = adapter.discover_skills(S2DiscoveryQuery(query="echo", limit=3))
@@ -720,7 +721,7 @@ class TestDiscoveryFlow:
         from tests.capabilities.test_skill_runner import _make_skill
 
         registry.register(_make_skill("stdlib.echo", "echoes"))
-        runner = SkillRunner(registry=registry, embedding_fn=_simple_embedding_fn)
+        runner = SkillRunner(registry=registry, embedder=_TestEmbedder())
         adapter = S3Adapter(runner)
 
         query = S2DiscoveryQuery(query="echo something", limit=3)

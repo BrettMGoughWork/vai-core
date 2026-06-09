@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from src.core.search.provider_registry import ProviderRegistry, RegistryError
-from src.core.search.providers._base import SearchProviderError, SearchResult
-from src.core.search.providers.duckduckgo import DuckDuckGoProvider
-from src.core.search.providers.tavily import TavilyProvider
+from src.capabilities.search.provider_registry import ProviderRegistry, RegistryError
+from src.capabilities.search.providers._base import SearchProviderError, SearchResult
+from src.capabilities.search.providers.duckduckgo import DuckDuckGoProvider
+from src.capabilities.search.providers.tavily import TavilyProvider
 from src.core.state.config import ProviderConfig, SearchConfig
 
 

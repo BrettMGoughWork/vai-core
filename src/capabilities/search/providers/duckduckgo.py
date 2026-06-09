@@ -12,7 +12,7 @@ import urllib.parse
 import httpx
 from bs4 import BeautifulSoup
 
-from src.core.search.providers._base import SearchProviderError, SearchResult
+from src.capabilities.search.providers._base import SearchProviderError, SearchResult
 from src.core.state.config import ProviderConfig
 
 

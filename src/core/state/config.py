@@ -143,7 +143,47 @@ class SearchConfig:
 
 
 @dataclass
+class EmbeddingConfig:
+    """Configuration for embedding providers (PHASE 3.19.1).
+
+    Controls which embedding backend to use for skill-discovery
+    fallback.  Embeddings are ONLY consulted when the LLM fails to
+    name a capability.
+    """
+
+    provider: str = "mock"
+    """Canonical provider name: 'openai' | 'local' | 'mock'."""
+
+    model: str = "text-embedding-3-small"
+    """Model identifier passed to the provider."""
+
+    dimensions: int = 1536
+    """Expected embedding vector dimension."""
+
+    api_key_env: str | None = None
+    """Name of the environment variable holding the API key.
+
+    Set for providers that require authentication (e.g. ``'OPENAI_API_KEY'``).
+    ``None`` for providers that don't need a key (e.g. mock, local)."""
+
+    @classmethod
+    def from_yaml(cls, data: Dict[str, Any] | None) -> "EmbeddingConfig | None":
+        """Create EmbeddingConfig from a YAML dictionary.
+
+        Returns ``None`` if *data* is ``None`` or empty.
+        """
+        if not data:
+            return None
+        return cls(
+            provider=data.get("provider", "mock"),
+            model=data.get("model", "text-embedding-3-small"),
+            dimensions=data.get("dimensions", 1536),
+        )
+
+
+@dataclass
 class CoreConfig:
     llm: LLMConfig
     agent: AgentConfig
     search: SearchConfig | None = None
+    embedding: EmbeddingConfig | None = None

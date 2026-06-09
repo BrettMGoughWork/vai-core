@@ -1407,31 +1407,72 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 
 Skills are currently discovered via a character-bucket hash (`_simple_embedding_fn`) which produces non‑semantic embeddings. The top‑ranked skill is essentially random. This phase replaces the character‑bucket hash with a proper embedding model and pre‑computed vector store, so that S2 discovery and S3 skill selection return semantically meaningful results.
 
-3.19.1 — Real embedding function
-- Integrate `EmbeddingGenerator` (currently a stub returning dummy vectors) with a real embedding provider (OpenAI `text-embedding-3-small` or similar).
-- Replace all test harnesses (`e2e_harness.py`, `test_s3_smoke.py`, `test_s2_s3_roundtrip.py`) to use the real embedding function.
-- Keep `_simple_embedding_fn` for fast deterministic unit tests; real embeddings for integration/E2E.
+✅ 3.19.1 — Real embedding function
+- Integrate `EmbeddingGenerator` with a real semantic embedding provider, but only for discovery fallback, not for primary skill selection.
+Responsibilities:
+- Replace the dummy vector generator with a real embedding model (Open AI text-embedding-3-small-bge-small-en, or MiniLM-L6-v2)
+- Wrap the embedding model behind a provider-agnostic interface
+- Add a query embedding cache (per session) to avoid recomputing embeddings during retries, re-planning or fallback
+- Add a skill embedding generator that produces embeddings from skill name, description, step summaries, signature
+- Precompute and store skill embeddings at registration time
+- Store embeddings inside the skill registry entry (no re-embedding per query)
+- Keep _simple_embedding_fn for deterministic unit tests
+- Use real embeddings only for integration/E2E tests
+Constraints:
+- Embeddings are used only for discovery fallback, never for execution
+- LLM0chosen skills always take precedence
+- Embedding provider must be pluggable (OpenAI, local model, mock)
+- No network calls in unit tests
 
-3.19.2 — Pre‑computed skill embeddings
+✅ 3.19.2 — Pre‑computed skill embeddings
 - Generate and persist embeddings at skill registration time (name + description + step summaries).
 - Store in registry alongside the `CapabilitySkill` object — no re‑embedding per query.
 - Rebuild embeddings on skill hot‑reload (tie into PHASE 3.14/3.15).
 
-3.19.3 — Vector similarity search
+✅ 3.19.3 — Vector similarity search
 - Cosine similarity over pre‑computed embeddings.
 - Return top‑K skills with similarity scores.
 - Replace the current `registry.find()` character‑bucket path with the real vector path.
 
-3.19.4 — Embedding cache & provider abstraction
+✅ 3.19.4 — Embedding cache & provider abstraction
 - Cache query embeddings per session to avoid redundant API calls.
 - Abstract embedding provider behind a configurable interface (OpenAI, local model, mock).
 - Provider selection via environment variable or config file.
 
-3.19.5 — Tests
+✅ 3.19.5 - Discovery Fallback Wiring
+- Modify planner to trust LLM-named skill first
+- Modify planner to only invoke semantic search when the LLM fails
+Add a fallback path:
+- LLM produces a plan
+- Extract named capabilities
+- Validate capability existence
+- if missing -> run semantic search
+- select top-1 match
+- insert into the execution plan
+
+✅ 3.19.6 — Tests
 - Embedding determinism: same text → same vector.
 - Semantic relevance: "list files" ranks `stdlib.file.list` above `stdlib.json.set`.
 - Cache hit/miss and API failure fallback.
 - Registry rebuild preserves embeddings across hot‑reload.
+- Fallback wiring tests (`test_fallback.py`): 15 tests, all passing.
+
+### PHASE 3.19.7 — Remaining test gaps
+*Depends On*: PHASE 3.19.6
+
+**[HIGH]**
+- [ ] Vector store count assertion after N skill registrations.
+- [ ] Hot‑reload e2e test — re‑embed a skill, call `find_semantic`, verify updated results.
+
+**[MEDIUM]**
+- [ ] Real provider `embed()` call test (integration scope).
+- [ ] `config.yaml` → `EmbeddingConfig` parse chain test.
+- [ ] Cache isolation test — two `SkillEmbedder` instances with independent caches.
+- [ ] Cache‑under‑provider‑error test — verify cache survives embedding provider failure.
+
+**[LOW]**
+- [ ] Invalid `EmbeddingConfig` error handling test.
+- [ ] `find_semantic` exact k boundary test (k=1, k=0, k > available).
 
 ---
 

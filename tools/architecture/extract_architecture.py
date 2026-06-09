@@ -57,6 +57,8 @@ STRATUM_RULES: list[tuple[str, str]] = [
     # domain
     ("core/types", "domain"),
     ("core\\types", "domain"),
+    ("core/state/config", "domain"),       # config dataclasses (EmbeddingConfig, SearchConfig, ...)
+    ("core\\state\\config", "domain"),
     ("core/planning/models", "domain"),
     ("core\\planning\\models", "domain"),
     ("core/signals", "domain"),

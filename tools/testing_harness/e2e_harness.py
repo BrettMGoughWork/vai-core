@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import importlib
 import json
-import math
+
 import os
 import sys
 import time
@@ -41,16 +41,7 @@ load_dotenv(override=True)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _simple_embedding_fn(text: str) -> list[float]:
-    """Deterministic embedding: character-bucket hash, unit-normalised."""
-    vec = [0.0] * 8
-    for ch in text:
-        idx = ord(ch) % 8
-        vec[idx] += 1.0
-    magnitude = math.sqrt(sum(v * v for v in vec))
-    if magnitude > 0:
-        vec = [v / magnitude for v in vec]
-    return vec
+from src.capabilities.discovery.providers.mock_provider import _simple_embedding_fn
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -128,17 +119,26 @@ def _extract_yaml_frontmatter(text: str, source: str) -> dict[str, Any]:
     return yaml.safe_load(yaml_text)
 
 
-def load_all_skills(skill_registry, prim_registry) -> int:
+def load_all_skills(skill_registry, prim_registry, embedder=None) -> int:
     """Load all .skill.md files from stdlib into the CapabilitySkillRegistry.
 
     Uses ``SkillManifest.from_dict()`` to parse the raw YAML frontmatter
     into a validated manifest, then ``CapabilitySkill.from_manifest()`` to
     resolve primitives and build the runtime skill.
 
+    **PHASE 3.19.2**: If *embedder* is provided, it is set on the registry
+    before loading so that every skill receives a pre‑computed embedding at
+    registration time.  The embedding is stored on ``CapabilitySkill.embedding``
+    and in the vector store.
+
     Returns the count of loaded skills.
     """
     from src.capabilities.skills.manifest import SkillManifest
     from src.capabilities.skills.skill import CapabilitySkill
+
+    # Wire embedder into the registry BEFORE loading (3.19.2)
+    if embedder is not None:
+        skill_registry.set_embedder(embedder)
 
     skills_dir = _PROJECT_ROOT / "src" / "capabilities" / "skills" / "stdlib"
     count = 0
@@ -207,14 +207,20 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
 
         # ── 2. Wire up SkillRegistry ─────────────────────────────────────
         from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
-        skill_registry = CapabilitySkillRegistry()
-        skill_count = load_all_skills(skill_registry, prim_registry)
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        # Create embedder FIRST so skills embed at registration (3.19.2)
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8))
+        skill_registry = CapabilitySkillRegistry(embedder=embedder)
+        skill_count = load_all_skills(skill_registry, prim_registry, embedder=embedder)
         _out(f"  Loaded: {skill_count} skills")
 
         # ── 3. Wire up SkillRunner → S3Adapter ───────────────────────────
         from src.capabilities.runtime.skill_runner import SkillRunner
         from src.stratum2.s3_adapter import S3Adapter
-        runner = SkillRunner(registry=skill_registry, embedding_fn=_simple_embedding_fn)
+
+        runner = SkillRunner(registry=skill_registry, embedder=embedder)
         s3_adapter = S3Adapter(runner)
 
         # ── 4. Wire up MemoryGovernance ──────────────────────────────────
