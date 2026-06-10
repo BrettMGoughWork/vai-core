@@ -709,7 +709,7 @@ Depends On: PHASE 2.4, PHASE 2.8, PHASE 2.13
 
 Goal: Formalise and freeze the planning and execution contracts used by S2, S3, and future S4 workers. No new planning logic — this is schema hardening and boundary definition.
 
-2.15.1 — AgentPlan schema (versioned)
+✅ 2.15.1 — AgentPlan schema (versioned)
 Define a stable, versioned schema for full plans:
 - subgoals  
 - segments  
@@ -717,7 +717,7 @@ Define a stable, versioned schema for full plans:
 - failure modes  
 - metadata  
 
-2.15.2 — StepSpec schema (versioned)
+✅ 2.15.2 — StepSpec schema (versioned)
 Define deterministic step contract:
 - intent  
 - args  
@@ -725,14 +725,14 @@ Define deterministic step contract:
 - target_skill (optional)  
 - fallback strategies (optional)  
 
-2.15.3 — Unified planning entrypoint
+✅ 2.15.3 — Unified planning entrypoint
 Expose AgentPlanner.plan(goal) that:
 - calls SubgoalPlanner  
 - calls PlanGenerator  
 - validates via PlanValidator  
 - returns a complete AgentPlan  
 
-2.15.4 — Freeze S2→S3 execution contract
+✅ 2.15.4 — Freeze S2→S3 execution contract
 Stabilise and version:
 - SkillCallRequest  
 - SkillResult  
@@ -740,7 +740,7 @@ Stabilise and version:
 
 (This already exists in S3Adapter; this phase freezes it.)
 
-2.15.5 — Tests
+✅ 2.15.5 — Tests
 - multi‑subgoal plan shapes  
 - multi‑segment plan shapes  
 - contract stability across versions  
@@ -751,7 +751,7 @@ Depends On: PHASE 2.4, PHASE 2.8, PHASE 2.15, PHASE 3.19
 Goal: Introduce meaning‑aware memory structures that improve planning, repair, and reflection.  
 S2 remains pure — embeddings are computed in S3 and provided to S2.
 
-2.16.1 — Semantic memory record schema
+✅ 2.16.1 — Semantic memory record schema
 Extend memory records with:
 - topics  
 - entities  
@@ -759,25 +759,25 @@ Extend memory records with:
 - embedding vectors (precomputed by S3)  
 - outcome classification  
 
-2.16.2 — SemanticMemoryIndex (pure S2)
+✅ 2.16.2 — SemanticMemoryIndex (pure S2)
 Implement a deterministic index supporting:
 - similar subgoal lookup  
 - similar drift lookup  
 - similar capability‑chain lookup  
 - historical outcome retrieval  
 
-2.16.3 — Memory‑aware planning
+✅ 2.16.3 — Memory‑aware planning
 PlanGenerator consults SemanticMemoryIndex to:
 - bias toward historically successful strategies  
 - avoid drift‑prone patterns  
 - apply deterministic scoring  
 
-2.16.4 — Memory‑aware repair
+✅ 2.16.4 — Memory‑aware repair
 Repair engine consults SemanticMemoryIndex to:
 - prefer historically successful repair actions  
 - avoid repeated failures  
 
-2.16.5 — Tests
+✅ 2.16.5 — Tests
 - deterministic semantic lookup  
 - memory‑aware plan shaping  
 - memory‑aware repair selection  
