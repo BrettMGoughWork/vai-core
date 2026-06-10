@@ -45,86 +45,31 @@ from src.capabilities.discovery.providers.mock_provider import _simple_embedding
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Primitive auto-discovery
+# Primitive auto-discovery (delegates to canonical source loader)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 def load_all_primitives(registry) -> int:
     """Auto-discover all stdlib primitives and register them.
 
-    Scans ``src/capabilities/primitives/stdlib/`` for ``*Primitive`` classes,
-    imports each, instantiates it, and registers it by its ``.name`` attribute.
+    Delegates to the canonical loader in ``src.capabilities.primitives.stdlib``.
 
     Returns the count of registered primitives.
     """
-    from src.capabilities.primitives.base import PrimitiveBase
+    from src.capabilities.primitives.stdlib import load_all_primitives as _load
 
-    stdlib_dir = _PROJECT_ROOT / "src" / "capabilities" / "primitives" / "stdlib"
-    count = 0
-
-    for py_file in sorted(stdlib_dir.glob("*.py")):
-        if py_file.name.startswith("_"):
-            continue
-
-        module_path = f"src.capabilities.primitives.stdlib.{py_file.stem}"
-
-        try:
-            module = importlib.import_module(module_path)
-        except Exception as exc:
-            print(f"  ⚠ Failed to import {module_path}: {exc}", file=sys.stderr)
-            continue
-
-        for attr_name in dir(module):
-            if not attr_name.endswith("Primitive"):
-                continue
-            cls = getattr(module, attr_name)
-            if not isinstance(cls, type) or not issubclass(cls, PrimitiveBase):
-                continue
-            if cls is PrimitiveBase:
-                continue
-
-            try:
-                instance = cls()
-                registry.register(instance.name, instance)
-                count += 1
-            except Exception as exc:
-                print(f"  ⚠ Failed to register {cls.__name__}: {exc}", file=sys.stderr)
-                continue
-
-    return count
+    return _load(registry)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Skill loading
+# Skill loading (delegates to canonical source loader)
 # ══════════════════════════════════════════════════════════════════════════════
-
-
-def _extract_yaml_frontmatter(text: str, source: str) -> dict[str, Any]:
-    """Extract YAML between ``---`` delimiters from a .skill.md file."""
-    import yaml
-
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        raise ValueError(f"Missing opening --- in {source}")
-
-    end_idx = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end_idx = i
-            break
-    if end_idx is None:
-        raise ValueError(f"Missing closing --- in {source}")
-
-    yaml_text = "\n".join(lines[1:end_idx])
-    return yaml.safe_load(yaml_text)
 
 
 def load_all_skills(skill_registry, prim_registry, embedder=None) -> int:
     """Load all .skill.md files from stdlib into the CapabilitySkillRegistry.
 
-    Uses ``SkillManifest.from_dict()`` to parse the raw YAML frontmatter
-    into a validated manifest, then ``CapabilitySkill.from_manifest()`` to
-    resolve primitives and build the runtime skill.
+    Delegates to the canonical loader in ``src.capabilities.skills.stdlib``.
 
     **PHASE 3.19.2**: If *embedder* is provided, it is set on the registry
     before loading so that every skill receives a pre‑computed embedding at
@@ -133,30 +78,9 @@ def load_all_skills(skill_registry, prim_registry, embedder=None) -> int:
 
     Returns the count of loaded skills.
     """
-    from src.capabilities.skills.manifest import SkillManifest
-    from src.capabilities.skills.skill import CapabilitySkill
+    from src.capabilities.skills.stdlib import load_all_skills as _load
 
-    # Wire embedder into the registry BEFORE loading (3.19.2)
-    if embedder is not None:
-        skill_registry.set_embedder(embedder)
-
-    skills_dir = _PROJECT_ROOT / "src" / "capabilities" / "skills" / "stdlib"
-    count = 0
-
-    for skill_file in sorted(skills_dir.glob("*.skill.md")):
-        try:
-            raw_text = skill_file.read_text(encoding="utf-8")
-            data = _extract_yaml_frontmatter(raw_text, str(skill_file))
-
-            manifest = SkillManifest.from_dict(data)
-            skill = CapabilitySkill.from_manifest(manifest, prim_registry)
-            skill_registry.register(skill)
-            count += 1
-        except Exception as exc:
-            print(f"  ⚠ Failed to load {skill_file.name}: {exc}", file=sys.stderr)
-            continue
-
-    return count
+    return _load(skill_registry, prim_registry, embedder=embedder)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

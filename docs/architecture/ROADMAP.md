@@ -826,38 +826,41 @@ Depends On: PHASE 2.15, PHASE 2.16, PHASE 2.17
 
 Goal: Wire all S2 components end‑to‑end, freeze the Release 0.1 surface area, and validate against live LLM + S3 adapter before declaring Release 0.1.
 
-2.18.1 — Integration test suite
+✅ 2.18.1 — Integration test suite
 - Full plan‑execute‑repair loop across multi‑subgoal prompts  
 - Cross‑component boundary validation (Planner → Executor → Repair)  
 - Deterministic replay tests (record‑and‑replay for known goals)  
 
-2.18.2 — Contract freeze
+✅ 2.18.2 — Contract freeze
 - Lock AgentPlan / StepSpec schema versions at v1.0  
 - Lock S2→S3 execution contract at v1.0  
 - Document all frozen contracts in `docs/contracts/`  
 
-2.18.3 — Performance baseline
+✅ 2.18.3 — Performance baseline
 - Measure end‑to‑end latency for representative multi‑step plans  
 - Establish SLOs: plan generation < Tₚ, execution < Tₑ, repair < Tᵣ  
 - No optimisation — just measurement  
 
-2.18.4 — Release 0.1 sign‑off checklist
+✅ 2.18.4 — Release 0.1 sign‑off checklist
 - All S2 contract tests pass  
 - All S2 integration tests pass  
 - All manual LLM tests pass (3 representative prompts, documented)  
 - `ENABLE_REAL_LLM` kill‑switch honoured at all entry points  
 - No regressions in S1 or S3 pipeline  
 
-2.18.5 — Final S2 bug sweep
-- Triage all remaining S2 TODO/FIXME comments  
+✅ 2.18.5 — Final S2 bug sweep
+- Triage all remaining S2 TODO/FIXME comments (zero found)  
 - Close all S2‑specific Medium/Low audit issues  
-- Verify invariant checker passes against all strata  
+- Canonical loaders created in ``src/capabilities/primitives/stdlib/__init__.py`` and ``src/capabilities/skills/stdlib/__init__.py``  
+- Invariant checker passes against all strata  
 
-2.18.6 — REPL test harness
+✅ 2.18.6 — REPL test harness
 - Stdin loop that accepts user prompts, returns a plan, remembers conversation context  
 - Drives end‑to‑end integration testing across the full S2 pipeline  
 - Validates plan‑execute‑repair loop with real LLM interactions  
 - Serves as the primary manual testing interface for Release 0.1→1.0  
+- Two-phase output: Phase 1 (Plan creation + diagnostics) → Phase 2 (Skill execution results)  
+- Supports ``--mock`` (MockLLM) and ``--no-execute`` (plan‑only) flags  
 
 ---
 

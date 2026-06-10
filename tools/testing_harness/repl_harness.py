@@ -44,7 +44,8 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from tools.testing_harness.e2e_harness import load_all_primitives, load_all_skills
+from src.capabilities.primitives.stdlib import load_all_primitives
+from src.capabilities.skills.stdlib import load_all_skills
 
 from src.core.memory.governance.memory_governance import MemoryGovernance
 from src.core.memory.subgoal_memory import SubgoalMemory
@@ -324,6 +325,13 @@ def _display_plan(agent_plan: Any) -> None:
     print(f"  Arguments : {args_str}")
 
 
+def _display_flow_header(user_prompt: str) -> None:
+    """Display a pipeline flow header showing the S2→S3 chain."""
+    print(SEP)
+    print("  PIPELINE  Prompt → LLM → Planner → Skills → Execute")
+    print(SEP)
+
+
 def _display_breakages(report: Any) -> None:
     if not report:
         return
@@ -361,12 +369,18 @@ def _display_repair(outcome: Any) -> None:
 
 
 def _display_result(result: Dict[str, Any]) -> None:
-    print(SEP)
-    _display_plan(result["plan"])
+    """Display plan creation results with pipeline flow visualization."""
+    agent_plan = result["plan"]
+    # ── Part 1 Header: Pipeline flow ──
+    print(f"\n  {SEP}")
+    print(f"  PIPELINE  Prompt → LLM → Planner → Skill → Execute")
+    print(f"  {SEP}")
+    print(f"\n  ── PHASE 1: Plan Creation ──")
+    _display_plan(agent_plan)
     _display_breakages(result["breakage_report"])
     _display_repair(result["repair_outcome"])
     print(f"  Time      : {result['elapsed_ms']}ms")
-    print(SEP)
+    print(f"  {SEP}")
 
 
 # ── Plan execution (Part 2) ──────────────────────────────────────────────────
@@ -506,7 +520,8 @@ def _resolve_step_templates(value: Any, sources: Dict[str, Any]) -> Any:
 
 
 def _display_execution(exec_result: Dict[str, Any]) -> None:
-    """Display skill execution results."""
+    """Display skill execution results — PHASE 2 of the pipeline."""
+    print(f"  ── PHASE 2: Skill Execution ──")
     print(SEP)
     print("  EXECUTION RESULTS")
     print(SEP)
