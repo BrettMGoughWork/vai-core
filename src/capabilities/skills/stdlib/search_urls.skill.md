@@ -12,6 +12,7 @@ inputs:
   max_results:
     type: number
     required: false
+    default: 10
 
 outputs:
   results:

@@ -142,6 +142,7 @@ class SkillRunner:
                     description=skill.manifest.description,
                     score=score,
                     input_schema=skill.input_schema,
+                    output_schema=skill.output_schema,
                 )
             )
 

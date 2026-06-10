@@ -9,9 +9,11 @@ inputs:
   format:
     type: string
     required: false
+    default: "iso"
   timezone:
     type: string
     required: false
+    default: "UTC"
 
 outputs:
   timestamp:

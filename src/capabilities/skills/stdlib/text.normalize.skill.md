@@ -12,9 +12,11 @@ inputs:
   lowercase:
     type: boolean
     required: false
+    default: false
   strip_punctuation:
     type: boolean
     required: false
+    default: false
 
 outputs:
   text:

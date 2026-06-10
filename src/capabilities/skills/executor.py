@@ -18,7 +18,8 @@ from src.capabilities.primitives.types import PrimitiveResult
 if TYPE_CHECKING:
     from src.capabilities.skills.skill import CapabilitySkill
 
-_TEMPLATE_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")
+_TEMPLATE_RE = re.compile(r"^\{\{\s*(\w+)\s*\}\}$")  # matches strings that are exactly one token
+_ANY_TEMPLATE_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")  # matches tokens anywhere in a string
 
 
 @dataclass
@@ -71,6 +72,7 @@ class SkillExecutor:
         args: dict[str, Any],
         inputs: dict[str, Any],
         defaults: dict[str, Any] | None = None,
+        input_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Recursively resolve ``{{ key }}`` template tokens in *args* against *inputs*.
 
@@ -78,6 +80,7 @@ class SkillExecutor:
             args: Step argument dict potentially containing template tokens.
             inputs: User‑supplied input values keyed by name.
             defaults: Fallback values for optional keys not present in *inputs*.
+            input_schema: Skill input schema for type-aware casting.
 
         Returns:
             A new dict with all ``{{ key }}`` tokens replaced by ``inputs[key]``
@@ -89,8 +92,45 @@ class SkillExecutor:
         resolved_inputs: dict[str, Any] = dict(defaults or {})
         resolved_inputs.update(inputs)
 
+        def _cast(key: str, raw: Any) -> Any:
+            """Cast *raw* value to the type declared in *input_schema*, if available."""
+            if input_schema is None or key not in input_schema:
+                return raw
+            prop = input_schema[key]
+            if not isinstance(prop, dict):
+                return raw
+            type_name = prop.get("type", "any")
+            if type_name == "number":
+                try:
+                    return float(raw) if "." in str(raw) else int(raw)
+                except (ValueError, TypeError):
+                    return raw
+            if type_name == "integer":
+                try:
+                    return int(raw)
+                except (ValueError, TypeError):
+                    return raw
+            if type_name == "boolean":
+                if isinstance(raw, str) and raw.lower() in ("true", "1", "yes"):
+                    return True
+                if isinstance(raw, str) and raw.lower() in ("false", "0", "no"):
+                    return False
+                return bool(raw)
+            return raw
+
         def _resolve(value: Any) -> Any:
             if isinstance(value, str):
+                # Bare token: "{{ key }}" → return cast raw value
+                m = _TEMPLATE_RE.match(value)
+                if m:
+                    key = m.group(1)
+                    if key not in resolved_inputs:
+                        raise KeyError(
+                            f"interpolation token '{{{{{key}}}}}' not found in inputs"
+                        )
+                    return _cast(key, resolved_inputs[key])
+
+                # Embedded tokens: "prefix {{key}} suffix" → stringify
                 def _replace(m: re.Match[str]) -> str:
                     key = m.group(1)
                     if key not in resolved_inputs:
@@ -99,7 +139,7 @@ class SkillExecutor:
                         )
                     return str(resolved_inputs[key])
 
-                return _TEMPLATE_RE.sub(_replace, value)
+                return _ANY_TEMPLATE_RE.sub(_replace, value)
             if isinstance(value, dict):
                 return {k: _resolve(v) for k, v in value.items()}
             if isinstance(value, list):
@@ -169,7 +209,7 @@ class SkillExecutor:
             if primitive is None:
                 raise ValueError(f"unknown primitive: {call}")
 
-            result = primitive.execute(self._interpolate_args(args, inputs, defaults), context)
+            result = primitive.execute(self._interpolate_args(args, inputs, defaults, skill.input_schema), context)
             step_results.append(result)
 
             if result.status == "error":

@@ -9,9 +9,11 @@ inputs:
   file:
     type: string
     required: false
+    default: ""
   data:
     type: string
     required: false
+    default: ""
 
 outputs:
   text:

@@ -12,6 +12,7 @@ inputs:
   delimiter:
     type: string
     required: false
+    default: ", "
 
 outputs:
   text:

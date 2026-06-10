@@ -23,18 +23,23 @@ from src.core.types.plan_segment import PlanSegment
 from src.stratum2.s3_adapter import S3Adapter, S2DiscoveryQuery, S2DiscoveredSkill
 
 def _build_system_prompt(skills: list[S2DiscoveredSkill] | None = None) -> str:
-    """Build a dynamic system prompt, optionally listing available skills and their input schemas.
+    """Build a dynamic system prompt, optionally listing available skills and their input/output schemas.
 
     When *skills* are provided (Phase 3.18.3 schema‑aware planning), each skill's name,
-    description, and required inputs are injected so the LLM can produce valid per‑step
-    ``inputs`` dictionaries.
+    description, required inputs, and output keys are injected so the LLM can produce valid
+    per‑step ``inputs`` dictionaries and reference prior‑step outputs accurately (3.18.3b).
     """
     skill_block = ""
     if skills:
         lines: list[str] = ["AVAILABLE CAPABILITIES:"]
         for sk in skills:
-            schema_desc = _describe_schema(sk.input_schema)
-            lines.append(f"- {sk.name}: {sk.description}. Inputs: {schema_desc}")
+            input_desc = _describe_schema(sk.input_schema)
+            output_desc = _describe_schema(sk.output_schema)
+            lines.append(
+                f"- {sk.name}: {sk.description}. "
+                f"Inputs: {input_desc}. "
+                f"Outputs: {output_desc}"
+            )
         skill_block = "\n".join(lines) + "\n\n"
 
     return (
@@ -65,6 +70,9 @@ def _build_system_prompt(skills: list[S2DiscoveredSkill] | None = None) -> str:
         '- "capability" MUST be the exact name from the AVAILABLE CAPABILITIES list.\n'
         '- "inputs" MUST include all required parameters for the chosen capability.\n'
         '- Infer "inputs" values from the user\'s goal text. Example: if the user says "echo hello world" and the capability requires a parameter named "value", then inputs = {"value": "hello world"}. If the user says "ping example.com" and the capability requires "host", then inputs = {"host": "example.com"}.\n'
+        '- MULTI-STEP: When the user\'s goal contains sequencing words like "then", "and then", "after that", or "finally", you MUST split the work into one step per clause. Do NOT combine multiple sequential actions into a single step.\n'
+        "- When a step needs output from a previous step, you MUST use a key EXACTLY as listed in that capability's Outputs field. NEVER invent or guess key names. If step 1's capability Outputs are {\"datetime\": \"string\", \"timestamp\": \"number\"}, valid refs are \"{{datetime}}\" or \"{{timestamp}}\" — NOT \"{{time}}\", \"{{result}}\", or anything not explicitly listed. For example, if step 1 uses \"stdlib.text.split\" whose Outputs include \"parts\" (type: list), and step 2 needs those parts, write \"{{parts}}\".\n"
+        '- NEVER use "$.steps[N]" JSONPath expressions or {"$ref": "..."} objects to reference prior-step outputs. Use only the "{{key}}" template format with the actual output key name.\n'
         '- Return ONLY the JSON object, no other text, no markdown fences.'
     )
 

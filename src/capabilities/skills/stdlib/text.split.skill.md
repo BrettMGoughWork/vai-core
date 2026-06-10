@@ -12,9 +12,11 @@ inputs:
   delimiter:
     type: string
     required: false
+    default: ","
   maxsplit:
     type: number
     required: false
+    default: -1
 
 outputs:
   parts:

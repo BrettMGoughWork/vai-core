@@ -12,6 +12,7 @@ inputs:
   allowed_commands:
     type: list
     required: false
+    default: []
   timeout:
     type: integer
     required: false

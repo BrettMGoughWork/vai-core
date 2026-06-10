@@ -9,6 +9,7 @@ inputs:
   prefix:
     type: string
     required: false
+    default: ""
 
 outputs:
   variables:

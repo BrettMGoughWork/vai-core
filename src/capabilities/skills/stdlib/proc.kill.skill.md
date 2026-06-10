@@ -12,6 +12,7 @@ inputs:
   signal:
     type: integer
     required: false
+    default: 15
 
 outputs:
   pid:
