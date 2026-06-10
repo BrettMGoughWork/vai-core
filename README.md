@@ -112,11 +112,14 @@ Options:
 An interactive REPL (Read-Eval-Print Loop) that accepts user prompts, runs the full S2 pipeline (plan → detect breakages → repair), and remembers conversation context across turns. This is the primary manual testing interface for Release 0.1→1.0.
 
 Usage:
-    # Start the REPL with MockLLM (deterministic, no API calls)
-    python tools/testing_harness/repl_harness.py --mock
+    # Start the REPL with real LLM (default; set LLM_PROVIDER + LLM_MODEL env vars)
+    python -m tools.testing_harness.repl_harness
 
-    # Start the REPL (same — defaults to mock for safety)
-    python tools/testing_harness/repl_harness.py
+    # Start with MockLLM (deterministic, no API calls)
+    python -m tools.testing_harness.repl_harness --mock
+
+    # Plan-only mode — skip skill execution
+    python -m tools.testing_harness.repl_harness --no-execute
 
 REPL Commands (type at the `s2>` prompt):
     <any text>       Plan it, detect breakages, repair if needed
@@ -127,7 +130,7 @@ REPL Commands (type at the `s2>` prompt):
     :help            Show help text
     :quit / :exit    Exit the REPL
 
-Each turn runs: create subgoal → plan generation → breakage detection → repair (if not clean). The full plan, breakage report, and repair outcome are displayed after each turn.
+Each turn runs: create subgoal → plan generation → breakage detection → repair (if not clean) → execute skills. The full plan, breakage report, repair outcome, and skill execution results are displayed after each turn.
 
 
 ### Statistical Conformance Runner (`tests/statistical/`)
