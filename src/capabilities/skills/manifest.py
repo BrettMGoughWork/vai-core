@@ -58,6 +58,12 @@ class SkillManifest:
                     f"SkillManifest.steps[{i}] must be a dict, got {type(step).__name__}"
                 )
 
+            # ── return step ── (terminal step: return a value or template)
+            if "return" in step:
+                # A return step is valid as-is; nothing else to validate.
+                continue
+
+            # ── call step ── (invoke a primitive)
             call = step.get("call")
             if not isinstance(call, str):
                 raise ValueError(
@@ -65,11 +71,16 @@ class SkillManifest:
                     f"got {type(call).__name__}"
                 )
 
+            if call not in primitive_set:
+                raise ValueError(
+                    f"SkillManifest.steps[{i}].call='{call}' is not listed "
+                    f"in SkillManifest.primitives"
+                )
+
             args = step.get("args")
             if args is not None and not isinstance(args, dict):
                 raise ValueError(
-                    f"SkillManifest.steps[{i}].args must be a dict, "
-                    f"got {type(args).__name__}"
+                    f"SkillManifest.steps[{i}].args must be a dict, got {type(args).__name__}"
                 )
 
             on_error = step.get("on_error")
@@ -77,12 +88,6 @@ class SkillManifest:
                 raise ValueError(
                     f"SkillManifest.steps[{i}].on_error must be str or None, "
                     f"got {type(on_error).__name__}"
-                )
-
-            if call not in primitive_set:
-                raise ValueError(
-                    f"SkillManifest.steps[{i}].call='{call}' is not listed "
-                    f"in SkillManifest.primitives"
                 )
 
     @classmethod

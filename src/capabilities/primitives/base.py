@@ -40,14 +40,26 @@ class PrimitiveBase(ABC):
     replayability across S2→S3 calls.
     """
 
-    def __init__(self, *, name: str, description: str, primitive_type: PrimitiveType) -> None:
-        self.name = name
+    def __init__(
+        self,
+        *,
+        name: str = "",
+        description: str = "",
+        primitive_type: PrimitiveType | None = None,
+    ) -> None:
+        # Resolve from class-level attributes when not passed explicitly
+        # (supports the zero-boilerplate plugin-author pattern where
+        #  name/description/primitive_type are class attributes only).
+        cls = type(self)
+        self.name = name or getattr(cls, "name", "")
         """Canonical primitive name (e.g. ``'file.read'``, ``'json.parse'``)."""
 
-        self.description = description
+        self.description = description or getattr(cls, "description", "")
         """Human-readable description of what this primitive does."""
 
-        self.primitive_type = primitive_type
+        self.primitive_type = primitive_type or getattr(
+            cls, "primitive_type", PrimitiveType.PYTHON
+        )
         """Runtime type: ``python``, ``cli``, or ``mcp``."""
 
     @abstractmethod

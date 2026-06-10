@@ -1409,19 +1409,20 @@ Verify:
 
 Users can drop in new primitives and skills with no code changes. Hot-loadable.
 
-3.14.1 — Plugin manifest format
+✅ 3.14.1 — Plugin manifest format
 - `plugin.yml`: name, version, primitives (list), skills (list), dependencies
 
-3.14.2 — Plugin loader
+✅ 3.14.2 — Plugin loader
 - Scans plugin directories, loads manifests, registers primitives + skills into registries
 
-3.14.3 — Hot-reload
+✅ 3.14.3 — Hot-reload
 - Detect new/removed/modified plugins on file system changes; reload without restart
 
-3.14.4 — Plugin authoring guide
+✅ 3.14.4 — Plugin authoring guide
 - Document plugin structure, manifest schema, and examples in `docs/`
+- Update documentation with plugin loader usage
 
-3.14.5 — Tests
+✅ 3.14.5 — Tests
 - Load plugin, execute plugin skill, unload/reload cycle, invalid manifest rejection, version conflict handling
 
 ---
@@ -1681,9 +1682,8 @@ Define:
 ## REFACTOR - Reduce tech debt, enforce domain->stratum mapping, remove medium/low issues
 
 Refactor.1 - New folder structure
-  /src/infrastructure (s0 concerns)
   /src/runtime (s1 concerns)
-  /src/planning (s2 concerns)
+  /src/strategy (s2 concerns)
   /src/capabilities (s3 concerns)
   /src/platform (s4 concerns)
   /src/agent (s5 concerns)
@@ -1696,65 +1696,123 @@ Refactor.4 - Cleanup documentation (readme, contributing, roadmap, tools, archit
 🚀 Release 1.0 - Basic Agent
 ---
 
-## STRATUM 4 - Distributed Runtime and System Infrastructure
-*Invariant*: Provides distributed execution, workers, queues, channels  
+## STRATUM 4 — Distributed Runtime & System Infrastructure
 
-### PHASE 4.1 — Queue & Job Model
-*Depends On*: PHASE 3.3
+### PHASE 4.1 — FastAPI Ingress Layer
+The ingress layer becomes the single entry point for all external traffic.
+- FastAPI Gateway — request parsing, routing, session context  
+- Transport abstraction — unify HTTP, WS, CLI, webhook  
+- Authentication — API keys, tokens, service accounts  
+- Rate limiting — per‑user, per‑IP, per‑channel  
+- Ingress request envelope — normalize all inbound messages  
+- Ingress → Control Plane handoff  
 
-4.1.1. Choose queue backend — Redis/SQLite.  
-4.1.2. Define Job envelope — id, payload, metadata.  
-4.1.3. Define JobResult envelope — status, result, error.  
-4.1.4. Implement enqueue API  
-4.1.5. Implement dequeue API  
-4.1.6. Implement result store  
-4.1.7. Add dead‑letter queue  
-4.1.8. Add queue metrics  
-4.1.9. Add priority queues  
-4.1.10. Add backpressure handling
+Outcome:  
+A stable, typed, authenticated gateway that feeds all work into the system.
 
 ---
-🚀 Release 4 — "Distributed Agent Runtime"
----
 
-### PHASE 4.2 — Worker Pool & Supervision
-*Depends On*: PHASE 4.1
+### PHASE 4.2 — Queueing Layer & Job Model
+This is the backbone of Stratum 4: durable, observable, priority‑aware job orchestration.
 
-4.2.1. Implement worker entrypoint — dequeue → CoreStep → store result.  
-4.2.2. Add worker config — concurrency, queues, limits.  
-4.2.3. Add worker telemetry  
-4.2.4. Add worker heartbeat  
-4.2.5. Implement worker supervisor — restart on crash.  
-4.2.6. Add graceful shutdown  
-4.2.7. Add worker circuit breaker  
-4.2.8. Add job cancellation  
-4.2.9. Add job timeouts  
-4.2.10. Add heavy‑skill worker pool — browser/stealth.
+- Queue abstraction — Redis, SQS, or your own  
+- Job envelope — metadata, retries, deadlines, priority  
+- Priority queues — high/medium/low lanes  
+- DLQ — poison message handling  
+- Queue metrics — depth, throughput, latency  
+- Queue managers — balancing, draining, pausing  
+
+Outcome:  
+A durable, observable job pipeline that can feed workers at scale.
 
 ---
-🚀 Release 5 — "API-Driven Agent Platform"
+
+### PHASE 4.3 — Worker Pool & Execution Layer
+Workers become isolated, supervised, cancellable execution units.
+
+- Worker pool — concurrency, scaling  
+- Worker supervisors — crash detection, restart policy  
+- Circuit breakers — isolate failing primitives  
+- Job cancellation — cooperative cancellation  
+- Timeouts — per‑job and per‑primitive  
+- Heavy workers — browser automation, long‑running tasks  
+- Worker metrics — CPU, memory, queue lag  
+
+Outcome:  
+A resilient execution layer capable of running light and heavy tasks safely.
+
 ---
 
-### PHASE 4.3 — FastAPI & WebSocket Layer
-*Depends On*: PHASE 4.2  
-*Note*: This is currently opinionated around what human interaction should look like (rather than decisions made in the previous version of this project). When this gets a bit closer, it needs a strategy around channels, abstractions, etc.  
+### PHASE 4.4 — Control Plane
+This is the “brain” of Stratum 4 — the orchestrator of orchestrators.
 
-4.3.1. Define Channel interface — receive → runtime → send  
-4.3.2. Implement CLI channel — stdin/stdout  
-4.3.3. Implement Web channel — HTTP POST wrapper  
-4.3.4. Implement WebSocket channel — streaming  
-4.3.5. Propose Flutter channel — optional, personal  
-4.3.6. Propose OpenClaw‑style webhook channel — message envelope → runtime  
-4.3.7. Document how to build custom channels  
-4.3.8. Create FastAPI skeleton  
-4.3.9. Add simple HTTP endpoint  
-4.3.10. Add WebSocket endpoint  
-4.3.11. Implement request → job mapping  
-4.3.12. Implement result streaming  
-4.3.13. Add auth layer  
-4.3.14. Add rate limiting  
-4.3.15. Add tracing IDs  
-4.3.16. Add health checks  
+- Task ledger — durable record of all jobs  
+- State machine — pending → running → success/failure  
+- Synchronization — locks, leases, coordination  
+- Backpressure — slow workers → slow ingress  
+- Scheduling decisions — which worker gets which job  
+- Retry policy — exponential backoff, jitter  
+- Control plane API — inspect, cancel, reprioritize  
+
+Outcome:  
+A central orchestrator that manages job lifecycle, scheduling, and system health.
+
+---
+
+### PHASE 4.5 — Lifecycle Management
+This is where tasks become first‑class citizens with full lifecycle semantics.
+
+- Lifecycle hooks — before/after/cleanup  
+- Checkpoints — resumable tasks  
+- Hydration/dehydration — long‑running workflows  
+- Idempotency — safe retries  
+- Task cancellation — propagate signals to workers  
+
+Outcome:  
+Tasks become durable, resumable, and safely retryable.
+
+---
+
+### PHASE 4.6 — Transport Layer
+Unifies all inbound/outbound communication channels.
+
+- HTTP transport  
+- WebSocket transport  
+- CLI transport  
+- Webhook transport  
+- Transport envelope — unify message format  
+- Channel routing — map channels → workflows  
+
+Outcome:  
+A unified transport abstraction that supports multi‑channel agents.
+
+---
+
+### PHASE 4.7 — Heartbeat & System Health
+This is the “vital signs” layer.
+
+- Heartbeat daemon — periodic system pings  
+- Worker heartbeat — detect dead workers  
+- Queue heartbeat — detect stuck queues  
+- Health checks — liveness, readiness, startup  
+- Alerting hooks — Slack, email, PagerDuty  
+
+Outcome:  
+A self‑monitoring system that detects failures before users do.
+
+---
+
+### PHASE 4.8 — Security & Governance
+The guardrails that make Stratum 4 production‑safe.
+
+- AuthN/AuthZ — per‑channel, per‑user, per‑token  
+- Rate limiting — global + per‑tenant  
+- Audit logging — every job, every primitive  
+- Secrets management — vault integration  
+- Isolation — sandboxing heavy tasks  
+
+Outcome:  
+A secure, multi‑tenant‑capable runtime.
 
 ---
 🚀 Release 6 — "Multi-Agent System"

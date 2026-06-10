@@ -1,0 +1,3 @@
+name: "echo"
+version: "1.0.0"
+description: "Collides with stdlib.echo — should be rejected at load time"

@@ -117,6 +117,26 @@ class CapabilitySkillRegistry:
         """Return the skill registered under *name*, or ``None`` if not found."""
         return self._skills.get(name)
 
+    def remove(self, name: str) -> None:
+        """Remove a skill from the registry and its associated data.
+
+        Removes the skill object, its pre‑computed embedding, and its
+        vector‑store entry (if any).
+
+        Raises:
+            KeyError: If *name* is not registered.
+        """
+        if name not in self._skills:
+            raise KeyError(f"Skill '{name}' is not registered")
+        del self._skills[name]
+        if name in self._embeddings:
+            del self._embeddings[name]
+        if self._vector_store is not None:
+            try:
+                self._vector_store.remove(name)
+            except (KeyError, ValueError):
+                pass
+
     def list(
         self, filter: Callable[["CapabilitySkill"], bool] | None = None
     ) -> list["CapabilitySkill"]:

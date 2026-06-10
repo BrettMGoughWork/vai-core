@@ -1,0 +1,8 @@
+name: "test-plugin"
+version: "1.0.0"
+description: "Test plugin for validation and lifecycle tests"
+author: "vai-core test suite"
+primitives:
+  - uppercase
+skills:
+  - echo.skill.md
