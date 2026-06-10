@@ -789,7 +789,7 @@ Goal: Move from reactive repair to adaptive repair.
 S2 learns from past repair outcomes using deterministic rules.  
 **Scope guard**: Counterfactual and pattern recognition use only deterministic frequency‑based rules (e.g., action X succeeded ≥80% → promote; action Y failed ≥3× → demote). No LLM reasoning. If deterministic rules prove insufficient, defer 2.17.3‑4 to a future phase.
 
-2.17.1 — RepairMemory store
+✅ 2.17.1 — RepairMemory store
 Record:
 - drift type  
 - chosen repair action  
@@ -797,26 +797,26 @@ Record:
 - cost  
 - recurrence  
 
-2.17.2 — RepairPolicy engine
+✅ 2.17.2 — RepairPolicy engine
 Deterministic policy:
 - choose repair actions based on historical success  
 - avoid actions with repeated failures  
 - respect repair budgets  
 
-2.17.3 — Counterfactual repair (deterministic only)
+✅ 2.17.3 — Counterfactual repair (deterministic only)
 Record alternative actions when repair fails:
 - alternative skills  
 - alternative segment shapes  
 - alternative decompositions  
 Apply frequency‑based scoring — no LLM reasoning.
 
-2.17.4 — Pattern recognition (deterministic only)
+✅ 2.17.4 — Pattern recognition (deterministic only)
 Detect repeated drift → repeated fix → stable policy:
 - promote successful patterns (≥80% success rate)  
 - demote failing patterns (≥3 consecutive failures)  
 All thresholds determined by frequency counts, not semantic analysis.
 
-2.17.5 — Tests
+✅ 2.17.5 — Tests
 - repair policy determinism  
 - repair outcome learning  
 - counterfactual correctness
