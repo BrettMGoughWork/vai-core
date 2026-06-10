@@ -23,6 +23,15 @@ from .primitive_errors import (
     PrimitiveDependencyError,
     PrimitiveNotFound,
 )
+from .planner_errors import (
+    PlannerError,
+    PlanInvalid,
+    PlanAmbiguous,
+    PlanMissingCapabilities,
+    PlanUnsafe,
+    PlanExecutionFailed,
+    PlanDegraded,
+)
 
 
 class RecoveryAction(Enum):
@@ -103,6 +112,10 @@ def map_error_to_recovery(error: AgentError) -> RecoveryAction:
     elif isinstance(error, PrimitiveError):
         return _map_primitive_error(error)
 
+    # --- Planner Error Semantics (Phase 3.21.3) ---
+    elif isinstance(error, PlannerError):
+        return _map_planner_error(error)
+
     else:
         raise ValueError(f"Unknown error type: {error_type}")
 
@@ -154,6 +167,58 @@ def _map_primitive_error(error: PrimitiveError) -> RecoveryAction:
     if isinstance(error, _PRIMITIVE_ESCALATE_TYPES):
         return RecoveryAction.ESCALATE
     # PrimitiveExecutionError or any future subclass: defer to retryable flag
+    if error.retryable:
+        return RecoveryAction.RETRY
+    return RecoveryAction.REPLAN
+
+
+# ---------------------------------------------------------------------------
+# Planner error recovery mapping
+# ---------------------------------------------------------------------------
+
+_PLANNER_REPLAN_TYPES = (
+    PlanInvalid,
+    PlanMissingCapabilities,
+)
+
+_PLANNER_CLARIFY_TYPES = (
+    PlanAmbiguous,
+)
+
+_PLANNER_ESCALATE_TYPES = (
+    PlanUnsafe,
+)
+
+_PLANNER_RETRY_TYPES = (
+    PlanDegraded,
+)
+
+
+def _map_planner_error(error: PlannerError) -> RecoveryAction:
+    """
+    Pure mapping from a PlannerError subtype to a RecoveryAction.
+
+    Mapping rationale:
+      - PlanInvalid / PlanMissingCapabilities
+            → REPLAN  (plan was wrong or incomplete; regenerate)
+      - PlanAmbiguous
+            → CLARIFY (ask user before replanning)
+      - PlanUnsafe
+            → ESCALATE (safety violation; requires human review)
+      - PlanDegraded
+            → RETRY   (primary path may recover; try again)
+      - PlanExecutionFailed
+            → RETRY if retryable=True, else REPLAN
+    """
+    if isinstance(error, _PLANNER_REPLAN_TYPES):
+        return RecoveryAction.REPLAN
+    if isinstance(error, _PLANNER_CLARIFY_TYPES):
+        return RecoveryAction.CLARIFY
+    if isinstance(error, _PLANNER_ESCALATE_TYPES):
+        return RecoveryAction.ESCALATE
+    if isinstance(error, _PLANNER_RETRY_TYPES):
+        return RecoveryAction.RETRY
+    # PlanExecutionFailed or any future subclass: defer to retryable flag
     if error.retryable:
         return RecoveryAction.RETRY
     return RecoveryAction.REPLAN

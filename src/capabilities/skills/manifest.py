@@ -46,6 +46,14 @@ class SkillManifest:
     manifest_hash: str | None = None
     """SHA-256 of canonical skill definition (3.15.2 — stable embedding IDs)."""
 
+    execution_contract: dict[str, Any] | None = None
+    """Optional execution semantics contract declaration (3.21.2).
+
+    When present, parsed into a ``SkillExecutionContract`` by
+    ``CapabilitySkill.from_manifest()``.  Raw dict form keeps the
+    manifest JSON-pure.
+    """
+
     def validate(self) -> None:
         """Validate all fields, step structure, and primitive references.
 
@@ -126,6 +134,7 @@ class SkillManifest:
             steps=data.get("steps", []),
             plugin_name=data.get("plugin_name"),
             plugin_version=data.get("plugin_version"),
+            execution_contract=data.get("execution_contract"),
         )
         manifest.manifest_hash = _compute_manifest_hash(manifest)
         manifest.validate()
