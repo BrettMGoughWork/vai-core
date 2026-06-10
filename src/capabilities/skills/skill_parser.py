@@ -47,6 +47,52 @@ def parse_skill_file(path: str, registry: PrimitiveRegistry) -> dict[str, Any]:
         "inputs": data["inputs"],
         "outputs": data["outputs"],
         "primitives": resolved,
+        "steps": data.get("steps", []),
+    }
+
+
+def parse_skill_text(text: str, registry: PrimitiveRegistry) -> dict[str, Any]:
+    """Parse raw ``.skill.md`` content from a string (no file I/O).
+
+    This is the in-memory equivalent of ``parse_skill_file`` — it accepts
+    the full text of a ``.skill.md`` document rather than a file path.
+    Used by the agent-authored skill pipeline (PHASE 3.16).
+
+    Args:
+        text: Full content of a ``.skill.md`` file as a string.
+        registry: A ``PrimitiveRegistry`` used to resolve primitive names.
+
+    Returns:
+        A dict with keys ``name``, ``description``, ``inputs``, ``outputs``,
+        ``steps``, and ``primitives`` (a list of resolved ``PrimitiveBase`` instances).
+
+    Raises:
+        ValueError: If the text has invalid YAML front-matter, is missing
+                    required fields, or references an unknown primitive.
+    """
+    source = "<agent-authored>"
+    yaml_text = _extract_front_matter(text, source)
+
+    try:
+        data = yaml.safe_load(yaml_text)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid skill manifest: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"invalid skill manifest: YAML must be a mapping, got {type(data).__name__}"
+        )
+
+    _validate_required_fields(data, source)
+    resolved = _resolve_primitives(data["primitives"], registry, source)
+
+    return {
+        "name": data["name"],
+        "description": data["description"],
+        "inputs": data["inputs"],
+        "outputs": data["outputs"],
+        "primitives": resolved,
+        "steps": data.get("steps", []),
     }
 
 
