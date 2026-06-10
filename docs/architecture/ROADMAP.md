@@ -1460,17 +1460,17 @@ Versioned, stable registries ensure hot-reloading plugins does not violate S2's 
 
 The agent can author new `.skill.md` files, propose new primitives, and extend its own capability layer.
 
-3.16.1 — Skill authoring pipeline
+✅ 3.16.1 — Skill authoring pipeline
 - LLM writes `.skill.md` content; submitted to registry via validation gate
 
-3.16.2 — Safety checks
+✅ 3.16.2 — Safety checks
 - Validate all referenced primitives exist; input schemas are safe; no privilege escalation patterns
 - Reject skills that reference disallowed primitives or attempt to override system skills
 
-3.16.3 — Validation + embedding update
+✅ 3.16.3 — Validation + embedding update
 - Validated skills are registered and embedded; immediately discoverable by future S2 planning
 
-3.16.4 — Tests
+✅ 3.16.4 — Tests
 - Agent authors a valid skill, exercises it; validation rejects dangerous skills; authored skill appears in discovery results
 
 ---
@@ -1480,23 +1480,23 @@ The agent can author new `.skill.md` files, propose new primitives, and extend i
 
 Layered safety gates for agent-authored skills: structural, semantic, behavioural, and governance.
 
-3.17.1 — Structural safety
+✅ 3.17.1 — Structural safety
 - Validates: no recursive skill references, no unbounded loops, no dynamic primitive selection
 - Extends existing primitive-existence, schema, and privilege-escalation checks
 
-3.17.2 — Semantic safety
+✅ 3.17.2 — Semantic safety
 - Validator checks: skill description matches behaviour, no domain-policy bypass
 - Also checks: no chaining of high-risk primitives, no embedded user code
 
-3.17.3 — Behavioural safety
+✅ 3.17.3 — Behavioural safety
 - Run authored skill in sandbox with mock primitives and side-effect tracking
 - Reject on unexpected side-effects
 
-3.17.4 — Governance
+✅ 3.17.4 — Governance
 - Skill provenance (author, timestamp), versioning, optional signing
 - Quarantine until validated; approval workflow
 
-3.17.5 — Tests
+✅ 3.17.5 — Tests
 - Validator rejects recursive references, policy bypass, high-risk primitive chains
 - Sandbox captures unexpected side-effects
 - Quarantine/approval workflow exercised
@@ -1519,7 +1519,7 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 - `markdown.parse`, `html.parse`, `html.select`, `pdf.extracttext`
 - `csv.read`, `csv.write`
 
-✅ 3.18.3 — Test Harness & Schema Injection (COMPLETE)
+✅ 3.18.3 — Test Harness & Schema Injection
 - `tools/testing_harness/run_cycle.py` — single-cycle architecture verifier (moved from root)
 - `tools/testing_harness/e2e_harness.py` — end-to-end Prompt → LLM → Planner → Skills pipeline
 - Wires: PrimitiveRegistry (63 primitives) → CapabilitySkillRegistry (61 skills) → SkillRunner → S3Adapter → SubgoalPlanner
@@ -1532,10 +1532,10 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 - Known: `json.parse.skill.md` fails to load (inline Python step); `search.web.skill.md` fails (unknown primitive). Optional parameters with template defaults (e.g., ping `timeout`) cause interpolation failures when LLM omits them — pre-existing skill template issue.
 
 ✅ 3.18.3b — Harness Hardening
-- **Defaults audit:** ✅ Complete. Scanned all 63 skill manifests. Zero vulnerable manifests found — all `required: false` params in `{{key}}` templates have `default:` values. No fixes needed.
-- **Planner prompt hardening:** ✅ Complete. Expanded planner prompt in `subgoal_planner.py` with 3 additional rules: (1) explicit cross-step reference example with `{{key}}` format, (2) never use `{{step-N}}` pattern, (3) use descriptive step IDs. Previously already had prohibition against `$.steps[N]` JSONPath and `{"$ref": "..."}` objects.
-- **Whole-step reference resolution:** ✅ Complete. Added `{{step-N}}` fallback in all three template resolvers — `executor.py` (`_interpolate_args`), `repl_harness.py` (`_resolve_step_templates`), and `e2e_harness.py` (`_resolve_templates`). When a `{{step-N}}` token is matched and the key isn't found in resolved inputs, the fallback returns `json.dumps(resolved_inputs)`. Additionally, both harnesses now store `step-{i+1}` → `json.dumps(output)` in accumulated outputs after each step executes.
-- **Re-test:** ✅ All 4659 tests pass, 2 skipped (pre-existing), 0 critical/0 high architecture issues.
+- **Defaults audit:** Scanned all 63 skill manifests. Zero vulnerable manifests found — all `required: false` params in `{{key}}` templates have `default:` values. No fixes needed.
+- **Planner prompt hardening:** Expanded planner prompt in `subgoal_planner.py` with 3 additional rules: (1) explicit cross-step reference example with `{{key}}` format, (2) never use `{{step-N}}` pattern, (3) use descriptive step IDs. Previously already had prohibition against `$.steps[N]` JSONPath and `{"$ref": "..."}` objects.
+- **Whole-step reference resolution:** Added `{{step-N}}` fallback in all three template resolvers — `executor.py` (`_interpolate_args`), `repl_harness.py` (`_resolve_step_templates`), and `e2e_harness.py` (`_resolve_templates`). When a `{{step-N}}` token is matched and the key isn't found in resolved inputs, the fallback returns `json.dumps(resolved_inputs)`. Additionally, both harnesses now store `step-{i+1}` → `json.dumps(output)` in accumulated outputs after each step executes.
+- **Re-test:** All 4659 tests pass, 2 skipped (pre-existing), 0 critical/0 high architecture issues.
 
 ✅ 3.18.4 — Database Primitives (Safe CRUD)
 - `db.connect`, `db.query`, `db.insert`, `db.update`, `db.delete`
@@ -1810,6 +1810,7 @@ The guardrails that make Stratum 4 production‑safe.
 - Audit logging — every job, every primitive  
 - Secrets management — vault integration  
 - Isolation — sandboxing heavy tasks  
+- **Cross‑channel notification dispatch** — quarantine awareness for IDE, web, CLI, Slack surfaces.  (Deferred from 3.17.4; currently operators must poll `quarantine_list_pending()` manually.)  
 
 Outcome:  
 A secure, multi‑tenant‑capable runtime.

@@ -712,6 +712,22 @@ def main() -> None:
         skill_registry = CapabilitySkillRegistry(embedder=embedder)
         load_all_skills(skill_registry, prim_registry, embedder)
 
+        # ── Wire up SkillAuthor pipeline (3.17.5 capability discovery) ──
+        from src.capabilities.registry.skill_safety import SkillSafetyValidator
+        from src.capabilities.skills.author import SkillAuthor
+        from src.capabilities.primitives.stdlib.skill_author import set_author_pipeline
+
+        safety_validator = SkillSafetyValidator(
+            primitive_registry=prim_registry,
+            skill_registry=skill_registry,
+        )
+        author = SkillAuthor(
+            primitive_registry=prim_registry,
+            skill_registry=skill_registry,
+            safety_validator=safety_validator,
+        )
+        set_author_pipeline(author)
+
         runner = SkillRunner(registry=skill_registry, embedder=embedder)
         s3_adapter = S3Adapter(runner)
 

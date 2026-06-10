@@ -300,9 +300,24 @@ class TestSkillAuthor:
 
     def test_author_valid_skill(self, author, skill_registry):
         text = _make_skill_md_text()
-        skill = author.author_skill(text)
+        skill = author.author_skill(text, quarantine=False)
         assert skill.manifest.name == "agent-skill"
         assert skill_registry.get("agent-skill") is skill
+
+    def test_author_valid_skill_quarantined(self, author, skill_registry):
+        """Agent-authored skills go to quarantine by default."""
+        text = _make_skill_md_text()
+        skill = author.author_skill(text)  # quarantine=True by default
+        assert skill.manifest.name == "agent-skill"
+        # Not in active registry
+        assert skill_registry.get("agent-skill") is None
+        # In quarantine
+        pending = skill_registry.quarantine_list_pending()
+        assert len(pending) == 1
+        assert pending[0].skill.manifest.name == "agent-skill"
+        # Approve → now in registry
+        approved = skill_registry.quarantine_approve("agent-skill")
+        assert skill_registry.get("agent-skill") is approved
 
     def test_author_skill_with_disallowed_primitive(self, author):
         text = _make_skill_md_text(
@@ -328,11 +343,15 @@ class TestSkillAuthor:
             author.author_skill(text)
 
     def test_author_skill_discoverable(self, author, skill_registry):
-        """An authored skill appears in discovery results."""
+        """An authored skill appears in discovery after approval."""
         text = _make_skill_md_text(name="discover-me", description="Find the capital of France")
         author.author_skill(text)
-
-        # It should be in ordered_list.
+        # Not yet discoverable (quarantined)
+        skills = skill_registry.ordered_list()
+        names = [s.manifest.name for s in skills]
+        assert "discover-me" not in names
+        # Approve → now discoverable
+        skill_registry.quarantine_approve("discover-me")
         skills = skill_registry.ordered_list()
         names = [s.manifest.name for s in skills]
         assert "discover-me" in names
@@ -349,10 +368,18 @@ class TestSkillAuthor:
             author.author_skill(text)
 
     def test_author_multiple_skills(self, author, skill_registry):
-        """Multiple agent-authored skills can be registered."""
+        """Multiple agent-authored skills can be registered after approval."""
         for i in range(3):
             text = _make_skill_md_text(name=f"agent-skill-{i}")
             author.author_skill(text)
+        # All quarantined, none active
+        skills = skill_registry.ordered_list()
+        agent_skills = [s for s in skills if s.manifest.name.startswith("agent-skill")]
+        assert len(agent_skills) == 0
+        assert skill_registry.quarantine_count() == 3
+        # Approve all
+        for i in range(3):
+            skill_registry.quarantine_approve(f"agent-skill-{i}")
         skills = skill_registry.ordered_list()
         agent_skills = [s for s in skills if s.manifest.name.startswith("agent-skill")]
         assert len(agent_skills) == 3
@@ -379,10 +406,10 @@ class TestSkillAuthor:
         assert len(skill.manifest.manifest_hash) == 64
 
     def test_author_skill_duplicate_name_rejected(self, author):
-        """Registering the same skill name twice is rejected."""
+        """Registering the same skill name twice is rejected (quarantine path)."""
         text = _make_skill_md_text(name="duplicate-me")
-        author.author_skill(text)
-        with pytest.raises(ValueError, match="already registered"):
+        author.author_skill(text)  # goes to quarantine
+        with pytest.raises(ValueError, match="already in quarantine"):
             author.author_skill(text)
 
 
@@ -394,9 +421,15 @@ class TestAuthorIntegration:
     """Edge cases and integration scenarios for agent-authored skills."""
 
     def test_parse_skill_text_then_author(self, author, primitive_registry, skill_registry, safety):
-        """Full integration: parse raw text → validate → register."""
+        """Full integration: parse raw text → validate → quarantine → approve."""
         text = _make_skill_md_text(name="integration-test")
         skill = author.author_skill(text)
+        # Quarantined, not in active registry
+        assert skill_registry.get("integration-test") is None
+        assert skill_registry.quarantine_count() == 1
+        # Approve
+        approved = skill_registry.quarantine_approve("integration-test")
+        assert approved is skill
         retrieved = skill_registry.get("integration-test")
         assert retrieved is skill
         assert retrieved.manifest.name == "integration-test"

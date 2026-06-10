@@ -14,6 +14,11 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, Callable, List, Tuple
 
+from src.capabilities.registry.quarantine import (
+    ProvenanceRecord,
+    SkillQuarantine,
+    SkillQuarantineManager,
+)
 from src.capabilities.registry.skill_embeddings import _build_skill_text
 
 if TYPE_CHECKING:
@@ -27,6 +32,12 @@ class CapabilitySkillRegistry:
 
     PHASE 3.19.2: Accepts a ``SkillEmbedder`` so embeddings are
     pre-computed at registration time and stored on the skill objects.
+
+    PHASE 3.17.4: Agent-authored skills are quarantined by default.
+    Quarantined skills live in a separate ``SkillQuarantineManager``
+    and are invisible to ``get()``, ``find()``, ``find_semantic()``,
+    ``ordered_list()``, and ``list()``.  Call ``quarantine_approve()``
+    to promote a quarantined skill into the active registry.
     """
 
     def __init__(self, embedder: SkillEmbedder | None = None) -> None:
@@ -34,6 +45,7 @@ class CapabilitySkillRegistry:
         self._embeddings: dict[str, list[float]] = {}
         self._vector_store: VectorStore | None = None
         self._embedder: SkillEmbedder | None = embedder
+        self._quarantine: SkillQuarantineManager = SkillQuarantineManager()
 
     # ── Embedder management ──────────────────────────────────────────
 
@@ -150,10 +162,66 @@ class CapabilitySkillRegistry:
             self.remove(name)
         return len(to_remove)
 
+    # ── Quarantine & Governance (3.17.4) ───────────────────────────────
+
+    def quarantine_skill(
+        self,
+        skill: "CapabilitySkill",
+        provenance: ProvenanceRecord,
+        *,
+        reason: str = "agent-authored",
+    ) -> SkillQuarantine:
+        """Place *skill* into quarantine instead of the active registry.
+
+        Quarantined skills are invisible to discovery methods until
+        explicitly approved via ``quarantine_approve()``.
+        """
+        return self._quarantine.quarantine(skill, provenance, reason=reason)
+
+    def quarantine_list_pending(self) -> list[SkillQuarantine]:
+        """Return all quarantined skills awaiting governance review."""
+        return self._quarantine.list_pending()
+
+    def quarantine_list_all(self) -> list[SkillQuarantine]:
+        """Return all quarantined skills regardless of status."""
+        return self._quarantine.list_all()
+
+    def quarantine_get(self, name: str) -> SkillQuarantine | None:
+        """Get a quarantined skill by name, or ``None``."""
+        return self._quarantine.get(name)
+
+    def quarantine_count(self) -> int:
+        """Return the number of pending quarantined skills."""
+        return self._quarantine.count()
+
+    def quarantine_approve(self, name: str) -> "CapabilitySkill":
+        """Approve a quarantined skill and register it in the active registry.
+
+        The skill is removed from quarantine and registered via
+        ``register()`` (which handles auto-embedding if configured).
+        """
+        skill = self._quarantine.approve(name)
+        self.register(skill)
+        self._quarantine.remove(name)
+        return skill
+
+    def quarantine_reject(self, name: str, *, reason: str = "rejected by governance") -> None:
+        """Reject a quarantined skill.  The skill stays in quarantine
+        but is marked as rejected."""
+        self._quarantine.reject(name, reason=reason)
+
+    def quarantine_remove(self, name: str) -> None:
+        """Permanently remove a quarantined skill record."""
+        self._quarantine.remove(name)
+
+    # ── Discovery ──────────────────────────────────────────────────────
+
     def ordered_list(self) -> list["CapabilitySkill"]:
         """Return all skills sorted deterministically.
 
         Sort order: skill name → version → plugin name.
+
+        Quarantined skills are excluded.
         """
         from src.capabilities.registry.sorter import sorted_skills
         return sorted_skills(list(self._skills.values()))
