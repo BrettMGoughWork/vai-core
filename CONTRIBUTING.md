@@ -13,13 +13,7 @@ pip install -r requirements.txt
 pip install pytest
 ```
 
-If you use `uv`, this also works:
-
-```bash
-uv run --python 3.12 --with-requirements requirements.txt --with pytest --with python-dotenv python -m pytest -q
-```
-
-To run the runtime locally:
+To run the test suite:
 
 ```bash
 python main.py
