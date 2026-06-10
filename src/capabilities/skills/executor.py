@@ -70,29 +70,34 @@ class SkillExecutor:
     def _interpolate_args(
         args: dict[str, Any],
         inputs: dict[str, Any],
+        defaults: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Recursively resolve ``{{ key }}`` template tokens in *args* against *inputs*.
 
         Args:
             args: Step argument dict potentially containing template tokens.
             inputs: User‑supplied input values keyed by name.
+            defaults: Fallback values for optional keys not present in *inputs*.
 
         Returns:
-            A new dict with all ``{{ key }}`` tokens replaced by ``inputs[key]``.
+            A new dict with all ``{{ key }}`` tokens replaced by ``inputs[key]``
+            (or ``defaults[key]`` if the key is absent from *inputs*).
 
         Raises:
-            KeyError: If a referenced token key is not present in *inputs*.
+            KeyError: If a referenced token key is not present in *inputs* or *defaults*.
         """
+        resolved_inputs: dict[str, Any] = dict(defaults or {})
+        resolved_inputs.update(inputs)
 
         def _resolve(value: Any) -> Any:
             if isinstance(value, str):
                 def _replace(m: re.Match[str]) -> str:
                     key = m.group(1)
-                    if key not in inputs:
+                    if key not in resolved_inputs:
                         raise KeyError(
                             f"interpolation token '{{{{{key}}}}}' not found in inputs"
                         )
-                    return str(inputs[key])
+                    return str(resolved_inputs[key])
 
                 return _TEMPLATE_RE.sub(_replace, value)
             if isinstance(value, dict):
@@ -120,6 +125,12 @@ class SkillExecutor:
             ``SkillExecutionResult`` with per‑step results and overall status.
         """
         skill.validate_inputs(inputs)
+
+        defaults: dict[str, Any] = {}
+        if skill.input_schema:
+            for key, prop_def in skill.input_schema.items():
+                if isinstance(prop_def, dict) and "default" in prop_def:
+                    defaults[key] = prop_def["default"]
 
         step_results: list[PrimitiveResult] = []
 
@@ -158,7 +169,7 @@ class SkillExecutor:
             if primitive is None:
                 raise ValueError(f"unknown primitive: {call}")
 
-            result = primitive.execute(self._interpolate_args(args, inputs), context)
+            result = primitive.execute(self._interpolate_args(args, inputs, defaults), context)
             step_results.append(result)
 
             if result.status == "error":

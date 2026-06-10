@@ -15,6 +15,7 @@ inputs:
   timeout:
     type: number
     required: false
+    default: 5
 
 outputs:
   host:
