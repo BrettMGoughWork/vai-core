@@ -8,6 +8,7 @@ contract versioning for stability across releases.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
@@ -71,8 +72,10 @@ class AgentPlan:
         if not self.version:
             raise ValueError("version must be non-empty")
 
-        # Ensure subgoals is consistent: subgoal_id must be in subgoals
-        if self.subgoals and self.subgoal_id not in self.subgoals:
+        # Ensure subgoals is consistent: subgoal_id must appear in subgoals
+        if not self.subgoals:
+            object.__setattr__(self, "subgoals", [self.subgoal_id])
+        elif self.subgoal_id not in self.subgoals:
             object.__setattr__(self, "subgoals", [self.subgoal_id] + list(self.subgoals))
 
     # ── Serialization ──
@@ -132,10 +135,10 @@ class AgentPlan:
             segments=list(record.segments),
             intent=plan.intent,
             targetskillid=plan.targetskillid,
-            arguments=dict(plan.arguments),
+            arguments=copy.deepcopy(plan.arguments),
             reasoning_summary=plan.reasoning_summary,
             created_at=record.created_at,
-            metadata=dict(record.metadata),
+            metadata=copy.deepcopy(record.metadata),
             subgoals=subgoals if subgoals else [record.subgoal_id],
         )
 
