@@ -9,6 +9,20 @@ The actual execution of recovery actions is handled by Phase 2.3 (Recovery Execu
 from enum import Enum
 
 from .AgentError import AgentError
+from .primitive_errors import (
+    PrimitiveError,
+    PrimitiveExecutionError,
+    PrimitiveTimeout,
+    PrimitiveRetryableError,
+    PrimitiveNonRetryableError,
+    PrimitiveSideEffectError,
+    PrimitiveValidationError,
+    PrimitiveContractError,
+    PrimitivePrivilegeError,
+    PrimitiveEnvironmentError,
+    PrimitiveDependencyError,
+    PrimitiveNotFound,
+)
 
 
 class RecoveryAction(Enum):
@@ -84,5 +98,62 @@ def map_error_to_recovery(error: AgentError) -> RecoveryAction:
     elif error_type == "SemanticError":
         return RecoveryAction.CLARIFY
 
+    # --- Primitive Error Taxonomy (Phase 3.21.1) ---
+    # Dispatch on isinstance first (PrimitiveError subclasses carry retryable flag).
+    elif isinstance(error, PrimitiveError):
+        return _map_primitive_error(error)
+
     else:
         raise ValueError(f"Unknown error type: {error_type}")
+
+
+# ---------------------------------------------------------------------------
+# Primitive error recovery mapping
+# ---------------------------------------------------------------------------
+
+_PRIMITIVE_RETRY_TYPES = (
+    PrimitiveRetryableError,
+    PrimitiveTimeout,
+    PrimitiveDependencyError,
+)
+
+_PRIMITIVE_REPLAN_TYPES = (
+    PrimitiveNonRetryableError,
+    PrimitiveValidationError,
+    PrimitiveContractError,
+    PrimitiveNotFound,
+)
+
+_PRIMITIVE_ESCALATE_TYPES = (
+    PrimitiveSideEffectError,
+    PrimitivePrivilegeError,
+    PrimitiveEnvironmentError,
+)
+
+
+def _map_primitive_error(error: PrimitiveError) -> RecoveryAction:
+    """
+    Pure mapping from a PrimitiveError subtype to a RecoveryAction.
+
+    Mapping rationale:
+      - PrimitiveRetryableError / PrimitiveTimeout / PrimitiveDependencyError
+            → RETRY   (transient; retry with backoff)
+      - PrimitiveNonRetryableError / PrimitiveValidationError /
+        PrimitiveContractError / PrimitiveNotFound
+            → REPLAN  (plan step was wrong; rewrite required)
+      - PrimitiveSideEffectError / PrimitivePrivilegeError /
+        PrimitiveEnvironmentError
+            → ESCALATE (safety/environment issue; operator required)
+      - PrimitiveExecutionError (generic catch-all)
+            → RETRY if retryable=True, else REPLAN
+    """
+    if isinstance(error, _PRIMITIVE_RETRY_TYPES):
+        return RecoveryAction.RETRY
+    if isinstance(error, _PRIMITIVE_REPLAN_TYPES):
+        return RecoveryAction.REPLAN
+    if isinstance(error, _PRIMITIVE_ESCALATE_TYPES):
+        return RecoveryAction.ESCALATE
+    # PrimitiveExecutionError or any future subclass: defer to retryable flag
+    if error.retryable:
+        return RecoveryAction.RETRY
+    return RecoveryAction.REPLAN
