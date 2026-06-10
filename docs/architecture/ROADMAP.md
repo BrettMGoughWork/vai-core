@@ -1523,15 +1523,17 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 - `markdown.parse`, `html.parse`, `html.select`, `pdf.extracttext`
 - `csv.read`, `csv.write`
 
-🔧 3.18.3 — Test Harness (IN PROGRESS)
+✅ 3.18.3 — Test Harness & Schema Injection (COMPLETE)
 - `tools/testing_harness/run_cycle.py` — single-cycle architecture verifier (moved from root)
 - `tools/testing_harness/e2e_harness.py` — end-to-end Prompt → LLM → Planner → Skills pipeline
-- Wires: PrimitiveRegistry (29 primitives) → CapabilitySkillRegistry (21 skills) → SkillRunner → S3Adapter → SubgoalPlanner
+- Wires: PrimitiveRegistry (63 primitives) → CapabilitySkillRegistry (61 skills) → SkillRunner → S3Adapter → SubgoalPlanner
 - Backends: `--backend mock` (MockLLM) for plumbing tests, `--backend real_llm` (deepseek-chat) for live E2E
 - Validates: skill discovery (semantic embedding search), plan generation (intent + target skill + steps), skill execution via SkillRunner
-- Fixed: `targetskillid` priority — LLM step capability now drives execution (discovery is a hint, not a command). See `subgoal_planner.py` lines 143‑151.
-- Known: `json.parse.skill.md` fails to load (inline Python step unsupported by SkillManifest); `_simple_embedding_fn` is non‑semantic (character‑bucket hash) → LLM may select hallucinated capability names for step execution (→ "NoneType has no attribute run"); semantic embeddings deferred to PHASE 3.19
-- TODO: fix `json.parse.skill.md` Python‑step support; improve real‑LLM skill selection prompt quality; add more comprehensive integration test scenarios
+- Schema injection: skill input schemas flow S3→S2→planner automatically. `_build_system_prompt()` injects top-10 discovered skills with their input schemas. LLM correctly names skills (`stdlib.echo`) and populates per-step `inputs` (e.g., `{"value": "hello world"}`).
+- `_describe_schema()` handles both JSON Schema format and flat manifest format (`{"param": {"type": "str", "required": true}}`).
+- `targetskillid` priority: LLM step capability drives execution; discovery is a semantic hint.
+- Mock backend: 2/2 steps execute with correct per-step inputs. Real LLM: correctly plans and executes `stdlib.echo`, `stdlib.net.ping` (host/port inferred), multi-step plans with distinct per-step inputs.
+- Known: `json.parse.skill.md` fails to load (inline Python step); `search.web.skill.md` fails (unknown primitive). Optional parameters with template defaults (e.g., ping `timeout`) cause interpolation failures when LLM omits them — pre-existing skill template issue.
 
 ✅ 3.18.4 — Database Primitives (Safe CRUD)
 - `db.connect`, `db.query`, `db.insert`, `db.update`, `db.delete`
@@ -1551,15 +1553,15 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 ✅ 3.18.8 — System & Environment Primitives
 - `sys.envget`, `sys.envlist`, `sys.timenow`, `sys.uuid`, `sys.tempfile`
 
-3.18.9 — Process & Execution Primitives
+✅ 3.18.9 — Process & Execution Primitives
 - `proc.exec`, `proc.execsafe`, `proc.kill`, `proc.ps`
 - (Optional; many runtimes omit for safety.)
 
-3.18.10 — Compression & Encoding
+✅ 3.18.10 — Compression & Encoding
 - `zip.extract`, `zip.create`, `gzip.compress`, `gzip.decompress`
 - `base64.encode`, `base64.decode`
 
-3.18.11 — Tests
+✅ 3.18.11 — Tests
 - Each primitive exercised end-to-end via SkillExecutor
 - Category-level conformance suites (file, data, network, web, text, db, sys, proc, compression)
 
