@@ -3,16 +3,22 @@ repl_harness.py — REPL test harness for the Release 0.1 S2 pipeline (2.18.6)
 ===========================================================================
 
 A stdin loop that accepts user prompts, runs the full S2 pipeline
-(plan → detect → repair), and remembers conversation context across turns.
+(plan → validate → repair → execute), and remembers conversation
+context across turns.
+
+Two-part output:
+  1. Plan creation & diagnostics (unchanged)
+  2. Skill execution results (each step, output on success, error on failure)
 
 This is the primary manual testing interface for Release 0.1→1.0.
 
 Usage:
-    python tools/testing_harness/repl_harness.py
-    python tools/testing_harness/repl_harness.py --mock   # deterministic, no LLM
+    python -m tools.testing_harness.repl_harness
+    python -m tools.testing_harness.repl_harness --mock       # deterministic, no LLM
+    python -m tools.testing_harness.repl_harness --no-execute # plan-only, skip execution
 
 Commands (type at the `s2>` prompt):
-    <any text>     — plan it, detect breakages, repair if needed
+    <any text>     — plan it, validate, repair, then execute
     :history       — show conversation history
     :plans         — list all generated plans
     :context       — show current conversation context
@@ -38,6 +44,8 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
+from tools.testing_harness.e2e_harness import load_all_primitives, load_all_skills
+
 from src.core.memory.governance.memory_governance import MemoryGovernance
 from src.core.memory.subgoal_memory import SubgoalMemory
 from src.core.memory.segment_memory import SegmentMemory
@@ -51,7 +59,7 @@ from src.core.memory.repair.plan_repair import PlanRepair
 from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
 from src.core.planning.agent_planner import AgentPlanner
 from src.core.planning.models.plan import Plan
-from src.core.llm.mock_llm import MockLLM
+from src.stratum2.s3_adapter import S3Adapter, S2SkillCallRequest
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -60,7 +68,7 @@ SEP = "=" * 72
 PROMPT = "s2> "
 HELP_TEXT = """
 Commands:
-  <any text>     — plan it, detect breakages, repair if needed
+  <any text>     — plan → validate → repair → execute
   :history       — show conversation history
   :plans         — list all generated plans
   :context       — show current conversation context
@@ -199,22 +207,29 @@ def run_s2_pipeline(
         created_at=subgoal.created_at,
     )
 
-    # ── 3. Breakage detection ──
+    # ── 3. Look up actual segments from governance ──
+    real_segments_by_id: dict = {}
+    segm_snapshot = governance._segment_memory.snapshot() if hasattr(governance, '_segment_memory') else None
+    if segm_snapshot:
+        for rec in segm_snapshot.records:
+            real_segments_by_id[rec.segment_id] = rec
+
+    # ── 4. Breakage detection ──
     breakage_report = repair.detect_breakages(
         plan_record=plan_record,
-        real_segments_by_id={},
+        real_segments_by_id=real_segments_by_id,
         regenerated_ids=set(),
         subgoals_by_id={subgoal_id: subgoal_record},
         drift_events=[],
         now=_now_ms(),
     )
 
-    # ── 4. Repair (if not clean) ──
+    # ── 5. Repair (if not clean) ──
     repair_outcome = None
     if not breakage_report.is_clean:
         repair_outcome = repair.repair(
             plan_record=plan_record,
-            real_segments_by_id={},
+            real_segments_by_id=real_segments_by_id,
             subgoals_by_id={subgoal_id: subgoal_record},
             drift_events=[],
             now=_now_ms(),
@@ -292,6 +307,171 @@ def _display_result(result: Dict[str, Any]) -> None:
     print(SEP)
 
 
+# ── Plan execution (Part 2) ──────────────────────────────────────────────────
+
+
+def _execute_plan_steps(
+    plan_id: str,
+    plan_memory: PlanMemory,
+    governance: MemoryGovernance,
+    s3_adapter: S3Adapter,
+    user_prompt: str = "",
+) -> Dict[str, Any]:
+    """Execute the steps of a generated plan via S3Adapter.
+
+    Returns a dict with success, steps, outputs, errors, elapsed_ms.
+    """
+    import re as _re
+
+    t0 = time.perf_counter()
+    result: Dict[str, Any] = {
+        "success": False,
+        "steps": [],
+        "outputs": [],
+        "errors": [],
+        "elapsed_ms": 0,
+    }
+
+    plan_record = plan_memory.get_record(plan_id)
+    if plan_record is None:
+        result["errors"].append("Plan record not found")
+        return result
+
+    # ── Extract segment steps ──
+    segment_ids = plan_memory.get_segments(plan_id)
+    if not segment_ids:
+        # No segments — try executing the plan itself as a single skill call
+        if plan_record.targetskillid:
+            result["steps"].append({
+                "description": plan_record.intent or plan_record.targetskillid,
+                "skill": plan_record.targetskillid,
+                "inputs": plan_record.arguments or {},
+            })
+        else:
+            result["errors"].append("No segments and no target skill in plan")
+            return result
+    else:
+        for seg_id in segment_ids:
+            seg = governance.get_segment(seg_id)
+            if seg is None:
+                result["errors"].append(f"Segment {seg_id[:16]}... not found")
+                continue
+            step_ids = seg.context.get("step_ids", [])
+            capabilities = seg.context.get("capabilities", [])
+            step_inputs_list = seg.context.get("step_inputs", [])
+            for i, step_desc in enumerate(seg.steps):
+                result["steps"].append({
+                    "description": step_desc,
+                    "skill": capabilities[i] if i < len(capabilities) else plan_record.targetskillid,
+                    "inputs": step_inputs_list[i] if i < len(step_inputs_list) else {},
+                    "step_id": step_ids[i] if i < len(step_ids) else f"step-{i}",
+                })
+
+    # ── Execute each step ──
+    accumulated: Dict[str, Any] = {}
+    for i, step in enumerate(result["steps"]):
+        skill_name = step.get("skill", plan_record.targetskillid)
+        # Per-step inputs take precedence; fall back to plan-level arguments; then user prompt
+        raw_inputs = step.get("inputs") or plan_record.arguments or {}
+        if not raw_inputs and user_prompt:
+            raw_inputs = {
+                "prompt": user_prompt,
+                "data": user_prompt,
+                "text": user_prompt,
+                "content": user_prompt,
+                "input": user_prompt,
+                "query": user_prompt,
+                "message": user_prompt,
+            }
+
+        # Resolve {{key}} forward-references from previous step outputs
+        if i > 0 and accumulated:
+            raw_inputs = _resolve_step_templates(raw_inputs, accumulated)
+
+        step_inputs = {**accumulated, **raw_inputs}
+
+        s2_request = S2SkillCallRequest(
+            skill_name=skill_name,
+            arguments=step_inputs,
+            request_id=f"repl-{plan_id[:8]}-step-{i}",
+            context={},
+        )
+
+        step_result: Dict[str, Any] = {
+            "index": i,
+            "description": step.get("description", f"step-{i}"),
+            "skill": skill_name,
+            "success": False,
+            "output": None,
+            "error": None,
+        }
+
+        try:
+            s2_result = s3_adapter.call_skill(s2_request)
+            step_result["success"] = s2_result.success
+            step_result["output"] = s2_result.output
+            step_result["error"] = s2_result.error
+            if s2_result.success and isinstance(s2_result.output, dict):
+                accumulated.update(s2_result.output)
+        except Exception as exc:
+            step_result["error"] = str(exc)
+
+        result["outputs"].append(step_result)
+
+    result["success"] = all(r["success"] for r in result["outputs"]) if result["outputs"] else False
+    result["elapsed_ms"] = int((time.perf_counter() - t0) * 1000)
+    return result
+
+
+def _resolve_step_templates(value: Any, sources: Dict[str, Any]) -> Any:
+    """Resolve '{{key}}' tokens in *value* against *sources*."""
+    import re as _re
+
+    if isinstance(value, str):
+        m = _re.match(r"^\{\{\s*(\w+)\s*\}\}$", value)
+        if m and m.group(1) in sources:
+            return sources[m.group(1)]
+        return _re.sub(
+            r"\{\{\s*(\w+)\s*\}\}",
+            lambda m: str(sources[m.group(1)]) if m.group(1) in sources else m.group(0),
+            value,
+        )
+    if isinstance(value, dict):
+        return {k: _resolve_step_templates(v, sources) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_resolve_step_templates(v, sources) for v in value]
+    return value
+
+
+def _display_execution(exec_result: Dict[str, Any]) -> None:
+    """Display skill execution results."""
+    print(SEP)
+    print("  EXECUTION RESULTS")
+    print(SEP)
+    if exec_result["errors"]:
+        for e in exec_result["errors"]:
+            print(f"  [ERROR] {e}")
+    if not exec_result["outputs"]:
+        print("  (no steps executed)")
+    else:
+        for r in exec_result["outputs"]:
+            status = "[OK]" if r["success"] else "[FAIL]"
+            desc = r.get("description", "")[:80]
+            skill = r.get("skill", "?")
+            print(f"  {status} [{skill}] {desc}")
+            if r["output"] is not None:
+                output_str = json.dumps(r["output"], default=str)
+                if len(output_str) > 200:
+                    output_str = output_str[:200] + "..."
+                print(f"       output: {output_str}")
+            if r["error"]:
+                print(f"       error: {r['error']}")
+    status = "[OK] ALL STEPS PASSED" if exec_result["success"] else "[!] SOME STEPS FAILED"
+    print(f"\n  {status}")
+    print(f"  Execution time: {exec_result['elapsed_ms']}ms")
+    print(SEP)
+
+
 # ── REPL ─────────────────────────────────────────────────────────────────────
 
 
@@ -301,8 +481,14 @@ def repl_loop(
     planner: AgentPlanner,
     repair: PlanRepair,
     plan_memory: PlanMemory,
+    s3_adapter: S3Adapter | None = None,
+    execute: bool = True,
 ) -> None:
-    """Run the REPL loop until the user quits."""
+    """Run the REPL loop until the user quits.
+
+    Args:
+        execute: If False, skip skill execution (plan-only mode).
+    """
 
     print(SEP)
     print("  vai-core S2 REPL Test Harness")
@@ -353,6 +539,19 @@ def repl_loop(
         try:
             result = run_s2_pipeline(line, ctx, governance, planner, repair, plan_memory)
             _display_result(result)
+
+            # ── Part 2: Execute the plan ──
+            if execute and s3_adapter is not None:
+                plan_id = result["plan"].plan_id
+                exec_result = _execute_plan_steps(
+                    plan_id, plan_memory, governance, s3_adapter, line,
+                )
+                _display_execution(exec_result)
+                # Store execution result in turn history
+                if ctx.turns:
+                    ctx.turns[-1]["execution"] = exec_result
+            elif not execute:
+                print("  (execution skipped via --no-execute)")
         except Exception as exc:
             print(f"\n  Error: {exc}")
 
@@ -368,7 +567,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--mock", action="store_true",
-        help="Use MockLLM (deterministic, default). Use without --mock for real LLM.",
+        help="Use MockLLM (deterministic). Use without --mock for real LLM.",
+    )
+    parser.add_argument(
+        "--no-execute", action="store_true",
+        help="Skip skill execution — plan + validate + repair only.",
     )
     args = parser.parse_args()
 
@@ -379,19 +582,48 @@ def main() -> None:
     dm = DriftMemory()
     governance = MemoryGovernance(sm, segm, pm, dm)
 
-    if args.mock or True:  # default to mock for safety
-        planner = AgentPlanner(llm=MockLLM(), plan_memory=pm)
+    if args.mock:
+        from src.core.llm.mock_llm import MockLLM
+        llm = MockLLM()
+        model = "mock"
     else:
-        from src.core.planning.s1_contract.s1_real_client import ENABLE_REAL_LLM
-        ENABLE_REAL_LLM = True  # noqa: F841 — deliberately set
-        # Use real LLM-backed ChatProvider
-        from src.core.planning.s1_contract.s1_client import call_s1_backend
-        raise NotImplementedError("Real LLM backend not yet wired for REPL harness")
+        from src.core.llm.llm_factory import factory
+        provider = os.environ.get("LLM_PROVIDER", "deepseek")
+        model = os.environ.get("LLM_MODEL", "deepseek-chat")
+        llm = factory.create(provider, model)
+
+    # ── Wire up skill execution (PrimitiveRegistry → SkillRegistry → SkillRunner → S3Adapter) ──
+    s3_adapter: S3Adapter | None = None
+    if not args.no_execute:
+        from src.capabilities.registry.primitive_registry import PrimitiveRegistry
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.local_provider import LocalEmbeddingProvider
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+        from src.capabilities.runtime.skill_runner import SkillRunner
+
+        # Use real embeddings for real LLM, mock for mock
+        if args.mock:
+            provider = MockEmbeddingProvider(dimensions=8)
+        else:
+            provider = LocalEmbeddingProvider(model="all-MiniLM-L6-v2", dimensions=384)
+        embedder = SkillEmbedder(provider=provider)
+
+        prim_registry = PrimitiveRegistry()
+        load_all_primitives(prim_registry)
+
+        skill_registry = CapabilitySkillRegistry(embedder=embedder)
+        load_all_skills(skill_registry, prim_registry, embedder)
+
+        runner = SkillRunner(registry=skill_registry, embedder=embedder)
+        s3_adapter = S3Adapter(runner)
+
+    planner = AgentPlanner(llm=llm, plan_memory=pm, model=model, s3_adapter=s3_adapter)
 
     repair = PlanRepair()
     ctx = ConversationContext()
 
-    repl_loop(ctx, governance, planner, repair, pm)
+    repl_loop(ctx, governance, planner, repair, pm, s3_adapter=s3_adapter, execute=not args.no_execute)
 
     print(f"\nDone.  {len(ctx.turns)} turn(s) processed.")
 

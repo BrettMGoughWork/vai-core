@@ -71,7 +71,8 @@ async def resolve_capability_with_fallback(
         # No embedder configured or search failed → no fallback possible
         return None
 
-    if results:
+    _MIN_SIMILARITY = 0.35  # reject matches too dissimilar to the query
+    if results and results[0][1] >= _MIN_SIMILARITY:
         return results[0][0]  # top-match skill
 
     return None
