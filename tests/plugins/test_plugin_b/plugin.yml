@@ -1,0 +1,6 @@
+name: "test-plugin-b"
+version: "2.0"
+description: "Test plugin B for hot-reload tests"
+primitives: []
+skills:
+  - echo_b.skill.md

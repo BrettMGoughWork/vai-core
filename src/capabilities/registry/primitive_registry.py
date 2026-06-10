@@ -43,6 +43,27 @@ class PrimitiveRegistry:
             raise KeyError(f"Primitive '{name}' is not registered")
         del self._primitives[name]
 
+    def remove_by_plugin(self, plugin_name: str) -> int:
+        """Remove all primitives originating from *plugin_name*.
+
+        Returns the number of primitives removed.
+        """
+        to_remove = [
+            name for name, p in self._primitives.items()
+            if getattr(p, "plugin_name", None) == plugin_name
+        ]
+        for name in to_remove:
+            del self._primitives[name]
+        return len(to_remove)
+
+    def ordered_list(self) -> list[PrimitiveBase]:
+        """Return all primitives sorted deterministically.
+
+        Sort order: primitive name → version → plugin name.
+        """
+        from src.capabilities.registry.sorter import sorted_primitives
+        return sorted_primitives(list(self._primitives.values()))
+
     def find(self, query: str) -> list[dict]:
         """Search primitives by *name* and *description*, returning scored results.
 

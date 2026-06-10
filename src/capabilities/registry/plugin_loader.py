@@ -31,6 +31,7 @@ import yaml
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.registry.plugin_schema import PluginManifest
+from src.capabilities.registry.snapshot import SnapshotManager
 from src.capabilities.skills.manifest import SkillManifest
 from src.capabilities.skills.skill import CapabilitySkill
 
@@ -50,6 +51,7 @@ class PluginLoader:
         self._prim_registry = prim_registry
         self._skill_registry = skill_registry
         self._loaded: dict[str, _LoadedPlugin] = {}
+        self._snapshot_manager = SnapshotManager()
         # Persist paths of unloaded plugins so reload_plugin works after explicit unload.
         self._reloadable_paths: dict[str, str] = {}
 
@@ -116,6 +118,8 @@ class PluginLoader:
                 py_file = _resolve_primitive_file(primitives_dir, stem)
                 instances = _load_primitives_from_file(py_file, manifest.name)
                 for inst in instances:
+                    inst.plugin_name = manifest.name
+                    inst.plugin_version = manifest.version
                     self._prim_registry.register(inst.name, inst)
                     primitive_names.append(inst.name)
 
@@ -129,6 +133,8 @@ class PluginLoader:
                     continue  # already loaded above
                 instances = _load_primitives_from_file(py_file, manifest.name)
                 for inst in instances:
+                    inst.plugin_name = manifest.name
+                    inst.plugin_version = manifest.version
                     self._prim_registry.register(inst.name, inst)
                     primitive_names.append(inst.name)
 
@@ -144,6 +150,8 @@ class PluginLoader:
                     )
                 name = _load_skill_from_file(
                     skill_file, self._prim_registry, self._skill_registry,
+                    plugin_name=manifest.name,
+                    plugin_version=manifest.version,
                 )
                 skill_names.append(name)
 
@@ -155,6 +163,8 @@ class PluginLoader:
                 try:
                     name = _load_skill_from_file(
                         skill_file, self._prim_registry, self._skill_registry,
+                        plugin_name=manifest.name,
+                        plugin_version=manifest.version,
                     )
                     skill_names.append(name)
                 except Exception:
@@ -168,6 +178,7 @@ class PluginLoader:
             plugin_path=str(plugin_path),
         )
 
+        self._capture_snapshot()
         return manifest.name
 
     def load_all(self, plugins_dir: str) -> list[str]:
@@ -217,6 +228,7 @@ class PluginLoader:
             self._prim_registry.remove(prim_name)
 
         del self._loaded[plugin_name]
+        self._capture_snapshot()
 
     def reload_plugin(self, plugin_name: str) -> str:
         """Unload and then reload a plugin from its recorded path.
@@ -240,6 +252,16 @@ class PluginLoader:
         if plugin_path is None:
             raise KeyError(f"Plugin '{plugin_name}' is not currently loaded")
         return self.load_plugin(plugin_path)
+
+    def _capture_snapshot(self) -> None:
+        """Capture a deterministic registry snapshot after state change."""
+        skills = self._skill_registry.ordered_list()
+        # Primitives sorted by name for deterministic ordering
+        primitives = sorted(
+            self._prim_registry.list(),
+            key=lambda p: p.name,
+        )
+        self._snapshot_manager.capture(skills, primitives)
 
     def list_loaded(self) -> list[str]:
         """Return sorted list of currently loaded plugin names."""
@@ -335,6 +357,8 @@ def _load_skill_from_file(
     skill_file: Path,
     prim_registry: PrimitiveRegistry,
     skill_registry: CapabilitySkillRegistry,
+    plugin_name: str | None = None,
+    plugin_version: str | None = None,
 ) -> str:
     """Parse a .skill.md file and register it.  Returns the skill name."""
     raw_text = skill_file.read_text(encoding="utf-8")
@@ -344,6 +368,8 @@ def _load_skill_from_file(
         raise ValueError(
             f"Invalid skill manifest in {skill_file}: YAML must be a mapping"
         )
+    data["plugin_name"] = plugin_name
+    data["plugin_version"] = plugin_version
     manifest = SkillManifest.from_dict(data)
     skill = CapabilitySkill.from_manifest(manifest, prim_registry)
     skill_registry.register(skill)
