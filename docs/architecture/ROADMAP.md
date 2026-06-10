@@ -1647,32 +1647,37 @@ Add a fallback path:
 
 Goal: Provide continuity across episodes within a session using the semantic memory and repair learning systems already built in S2. This phase is pure S2 logic with no cross‑stratum dependencies.
 
-3.20.1 — ProjectMemory
+✅ 3.20.1 — ProjectMemory
 Store:
 - recurring goals  
 - preferred skills  
 - known bad patterns  
 - domain policies  
 
-3.20.2 — UserProfile memory
+✅ 3.20.2 — UserProfile memory
 Store:
 - preferences  
 - constraints  
 - behavioural patterns  
 
-3.20.3 — Episode boundaries
+✅ 3.20.3 — Episode boundaries
 Define:
 - episode start  
 - episode end  
 - summarisation  
 - compaction  
 
-3.20.4 — Tests
+✅ 3.20.4 — Tests
 - episode summarisation  
 - project‑scoped memory retrieval  
 - cross‑episode plan shaping  
 
 > **Deferred to S4/S5**: Persistence (previously 3.20.4) and identity integration (previously 3.20.5) are scoped to future S4 and S5 phases when those strata are built. See PHASE 4.x (Continuity Persistence) and PHASE 5.x (Identity & Persona Integration).
+
+## PHASE 3.21 - Refinement
+
+3.21.1 - Error handling
+
 
 ---
 

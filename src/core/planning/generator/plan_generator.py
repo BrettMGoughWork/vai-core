@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from src.core.planning.validators.cognitive_normaliser import normalise_cognitive_structure
 from src.core.planning.models.step_state import StepState
 from src.core.memory.semantic_memory_types import SemanticMemoryRecord
+from src.core.memory.project_memory import ProjectMemory
 
 from src.core.planning.validators.plan_validators import (
     validate_plan_prompt_structure,
@@ -70,9 +71,11 @@ class PlanGenerator:
         self,
         capabilities: Dict[str, Any],
         memory_index: Optional[Any] = None,
+        project_memory: Optional[ProjectMemory] = None,
     ):
         self.capabilities = capabilities
         self._memory_index = memory_index  # SemanticMemoryIndex or None
+        self._project_memory = project_memory  # ProjectMemory or None
 
     # ------------------------------------------------------------------
     # Public API
@@ -96,51 +99,60 @@ class PlanGenerator:
 
     def get_strategy_context(self, state: StepState, k: int = 5) -> StrategyContext:
         """
-        Query the semantic memory index for strategy hints relevant to the
-        given StepState.
+        Build strategy hints from the semantic memory index and project memory.
 
-        Returns an empty StrategyContext when no index is configured.
+        - SemanticMemoryIndex provides episode-level subgoal history (2.16.3).
+        - ProjectMemory provides cross-episode preferred skills and bad patterns (3.20).
+
+        Returns an empty StrategyContext when neither source is configured.
         """
-        if self._memory_index is None:
-            return StrategyContext()
-
-        topics = self._extract_query_topics(state)
-        entities = self._extract_query_entities(state)
-        capabilities = self._extract_query_capabilities(state)
-
-        # Find similar subgoals (historical successes and failures)
-        similar = self._memory_index.find_similar_subgoals(
-            topics=topics,
-            entities=entities,
-            capability_patterns=capabilities,
-            k=k,
-        )
-
-        if not similar:
-            return StrategyContext()
-
         preferred: List[str] = []
         avoid: List[str] = []
         successful_patterns: List[str] = []
         drift_risks: List[str] = []
-
         success_count = 0
         failure_count = 0
+        total = 0
 
-        for record in similar:
-            caps = list(record.capability_patterns)
-            if record.outcome in ("success", "partial_success"):
-                success_count += 1
-                preferred.extend(caps)
-                if caps:
-                    successful_patterns.append("→".join(caps))
-            else:
-                failure_count += 1
-                avoid.extend(caps)
-                if caps:
-                    drift_risks.append("→".join(caps))
+        # --- Semantic memory index (episode-level history) ---
+        if self._memory_index is not None:
+            topics = self._extract_query_topics(state)
+            entities = self._extract_query_entities(state)
+            capabilities = self._extract_query_capabilities(state)
 
-        total = len(similar)
+            similar = self._memory_index.find_similar_subgoals(
+                topics=topics,
+                entities=entities,
+                capability_patterns=capabilities,
+                k=k,
+            )
+
+            for record in similar:
+                caps = list(record.capability_patterns)
+                if record.outcome in ("success", "partial_success"):
+                    success_count += 1
+                    preferred.extend(caps)
+                    if caps:
+                        successful_patterns.append("→".join(caps))
+                else:
+                    failure_count += 1
+                    avoid.extend(caps)
+                    if caps:
+                        drift_risks.append("→".join(caps))
+
+            total = len(similar)
+
+        # --- Project memory (cross-episode continuity, 3.20) ---
+        if self._project_memory is not None:
+            for skill in self._project_memory.preferred_skills():
+                preferred.append(skill.capability_name)
+            for bad in self._project_memory.known_bad_patterns():
+                avoid.append(bad.capability_pattern)
+                drift_risks.append(bad.capability_pattern)
+
+        if not preferred and not avoid and total == 0:
+            return StrategyContext()
+
         confidence = success_count / total if total > 0 else 0.0
 
         # Deduplicate while preserving first-seen order

@@ -60,7 +60,7 @@ When an LLM agent authors a new skill at runtime, the skill passes through a mul
 3. **Behavioural Sandbox** — the skill executes in a thread‑isolated sandbox with mock primitives. Only safe behaviour passes.
 4. **Quarantine** — skills that pass layers 1-3 are placed in **quarantine**, not the active registry. Quarantined skills are invisible to discovery (`get`, `find`, `find_semantic`, `ordered_list`).
 
-**⚠️ Human governance step required.** A quarantined skill will **never** execute until a human (or automated governance agent) explicitly approves it via `registry.quarantine_approve(name)`. There is currently no cross‑channel notification to alert a human that a skill is waiting for review — this is deferred to Stratum 4. Until then, operators must poll `registry.quarantine_list_pending()` or check the quarantine manually.
+**⚠️ Human governance step required.** A quarantined skill will **never** execute until a human (or automated governance agent) explicitly approves it via `python -m tools.quarantine_cli approve`. There is currently no cross‑channel notification to alert a human that a skill is waiting for review — this is deferred to Stratum 4. Until then, operators must poll `python -m tools.quarantine_cli list` or check the quarantine manually.
 
 Repository Layout
 
