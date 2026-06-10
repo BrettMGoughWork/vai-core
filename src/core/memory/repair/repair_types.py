@@ -8,6 +8,37 @@ from src.core.memory.plan_memory_types import PlanMemoryRecord
 
 
 @dataclass(frozen=True)
+class RepairStrategyContext:
+    """
+    Deterministic repair strategy hints derived from SemanticMemoryIndex lookups.
+
+    These hints inform repair decision-making without introducing randomness,
+    LLM calls, or non-deterministic behaviour.
+
+    Same shape as PlanGenerator.StrategyContext for consistency across S2
+    memory-aware components.
+    """
+
+    preferred_capabilities: Tuple[str, ...] = ()
+    """Capability patterns associated with historically successful subgoals."""
+
+    avoid_capabilities: Tuple[str, ...] = ()
+    """Capability patterns linked to drift / failure outcomes."""
+
+    successful_patterns: Tuple[str, ...] = ()
+    """Full capability chains that have succeeded before."""
+
+    drift_risks: Tuple[str, ...] = ()
+    """Capability chains that are drift-prone."""
+
+    confidence: float = 0.0
+    """Deterministic confidence [0.0, 1.0] derived from historical evidence volume."""
+
+    matches: int = 0
+    """Number of similar historical records that informed this context."""
+
+
+@dataclass(frozen=True)
 class BreakageError:
     """
     A structural error that prevents the plan from being valid.
@@ -174,6 +205,8 @@ class RepairOutcome:
     errors:                   Human-readable failure reasons when success=False.
     attempts:                 Number of repair cycles executed.
     budget_used:              Number of repair actions consumed.
+    strategy_context:         Repair strategy hints from semantic memory (2.16.4).
+                              None when no memory index is configured.
     """
     success: bool
     repaired_plan: Optional[PlanMemoryRecord]
@@ -182,3 +215,4 @@ class RepairOutcome:
     errors: Tuple[str, ...]
     attempts: int
     budget_used: int
+    strategy_context: Optional[RepairStrategyContext] = None

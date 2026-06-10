@@ -11,6 +11,8 @@ from src.core.memory.segment_memory_types import SegmentMemoryRecord
 from src.core.memory.plan_memory_types import PlanMemoryRecord
 from src.core.memory.drift_memory_types import DriftEvent
 from src.core.memory.repair.repair_types import (
+    DriftFlag,
+    InvalidLink,
     PlanBreakageReport,
     RepairPlan,
     RepairOutcome,
@@ -610,3 +612,377 @@ class TestMsToIso:
     def test_zero_ms(self):
         result = _ms_to_iso(0)
         assert "1970" in result
+
+
+# ---------------------------------------------------------------------------
+# 2.16.4 — Memory-aware repair tests
+# ---------------------------------------------------------------------------
+
+from src.core.memory.semantic_memory_index import SemanticMemoryIndex
+from src.core.memory.semantic_memory_types import SemanticMemoryRecord
+from src.core.memory.repair.repair_types import (
+    BreakageError,
+    RepairStrategyContext,
+)
+
+
+def _make_sem_record(
+    record_id: str = "sem-001",
+    memory_type: str = "subgoal",
+    source_id: str = "sg-1",
+    topics: tuple = (),
+    entities: tuple = (),
+    capability_patterns: tuple = (),
+    outcome: str = "unknown",
+    created_at: int = 1000,
+) -> SemanticMemoryRecord:
+    return SemanticMemoryRecord(
+        record_id=record_id,
+        memory_type=memory_type,
+        source_id=source_id,
+        topics=topics,
+        entities=entities,
+        capability_patterns=capability_patterns,
+        embedding_vector=None,
+        outcome=outcome,
+        metadata={},
+        created_at=created_at,
+    )
+
+
+class TestRepairStrategyContextDefault:
+    """RepairStrategyContext defaults to empty/zero values."""
+
+    def test_defaults(self):
+        ctx = RepairStrategyContext()
+        assert ctx.preferred_capabilities == ()
+        assert ctx.avoid_capabilities == ()
+        assert ctx.successful_patterns == ()
+        assert ctx.drift_risks == ()
+        assert ctx.confidence == 0.0
+        assert ctx.matches == 0
+
+
+class TestGetRepairContextWithoutIndex:
+    """get_repair_context() returns empty context when no index is configured."""
+
+    def test_no_index_returns_empty(self):
+        repair = PlanRepair()
+        plan = make_plan()
+        breakage = PlanBreakageReport(
+            plan_id="plan-1",
+            errors=(),
+            warnings=(),
+            missing_segments=(),
+            invalid_links=(),
+            drift_flags=(),
+            timestamp_issues=(),
+            governance_violations=(),
+        )
+        ctx = repair.get_repair_context(plan, breakage)
+        assert ctx == RepairStrategyContext()
+        assert ctx.matches == 0
+
+
+class TestGetRepairContextWithIndex:
+    """get_repair_context() returns populated context when index has matching records."""
+
+    @staticmethod
+    def _build_index() -> SemanticMemoryIndex:
+        idx = SemanticMemoryIndex()
+        # Successful subgoal with matching capability patterns
+        idx.add(_make_sem_record(
+            record_id="sem-s-1",
+            memory_type="subgoal",
+            source_id="sg-1",
+            topics=("do something", "skill-a"),
+            entities=("plan-1", "sg-1"),
+            capability_patterns=("REGENERATE_SEGMENT", "RECONSTRUCT_CHAIN"),
+            outcome="success",
+            created_at=1000,
+        ))
+        # Failed subgoal
+        idx.add(_make_sem_record(
+            record_id="sem-s-2",
+            memory_type="subgoal",
+            source_id="sg-2",
+            topics=("do something", "skill-a"),
+            entities=("plan-2", "sg-2"),
+            capability_patterns=("QUARANTINE_SEGMENT",),
+            outcome="failure",
+            created_at=2000,
+        ))
+        # Drift record
+        idx.add(_make_sem_record(
+            record_id="sem-d-1",
+            memory_type="drift",
+            source_id="drift-1",
+            topics=("do something", "timeout"),
+            entities=("plan-1", "sg-1"),
+            capability_patterns=("RECONSTRUCT_CHAIN",),
+            outcome="failure",
+            created_at=3000,
+        ))
+        return idx
+
+    def test_returns_populated_context_with_matching_index(self):
+        idx = self._build_index()
+        repair = PlanRepair(memory_index=idx)
+
+        plan = make_plan(plan_id="plan-1", subgoal_id="sg-1")
+        breakage = PlanBreakageReport(
+            plan_id="plan-1",
+            errors=(BreakageError("MISSING_SEGMENT", "seg-1", {}),),
+            warnings=(),
+            missing_segments=("seg-1",),
+            invalid_links=(),
+            drift_flags=(),
+            timestamp_issues=(),
+            governance_violations=(),
+        )
+
+        ctx = repair.get_repair_context(plan, breakage)
+        assert ctx.matches > 0
+        assert "REGENERATE_SEGMENT" in ctx.preferred_capabilities or "RECONSTRUCT_CHAIN" in ctx.preferred_capabilities
+        # The failure record should contribute to avoid_capabilities
+        assert len(ctx.avoid_capabilities) > 0
+        assert ctx.confidence >= 0.0
+
+    def test_returns_empty_with_no_matching_records(self):
+        idx = SemanticMemoryIndex()
+        # Add a record with completely unrelated topics
+        idx.add(_make_sem_record(
+            record_id="sem-u-1",
+            memory_type="subgoal",
+            source_id="sg-99",
+            topics=("unrelated",),
+            entities=("other-plan",),
+            capability_patterns=("OTHER_ACTION",),
+            outcome="success",
+        ))
+        repair = PlanRepair(memory_index=idx)
+        plan = make_plan(plan_id="plan-1", subgoal_id="sg-1")
+        breakage = PlanBreakageReport(
+            plan_id="plan-1",
+            errors=(BreakageError("MISSING_SEGMENT", "seg-1", {}),),
+            warnings=(),
+            missing_segments=("seg-1",),
+            invalid_links=(),
+            drift_flags=(),
+            timestamp_issues=(),
+            governance_violations=(),
+        )
+        ctx = repair.get_repair_context(plan, breakage)
+        # Should return empty because no topics/entities match
+        assert ctx.matches == 0
+
+
+class TestRepairWithMemoryIndex:
+    """repair() includes strategy_context in RepairOutcome when index is configured."""
+
+    def test_repair_outcome_includes_strategy_context(self):
+        idx = SemanticMemoryIndex()
+        idx.add(_make_sem_record(
+            record_id="sem-s-1",
+            memory_type="subgoal",
+            source_id="sg-1",
+            topics=("do something", "skill-a"),
+            entities=("plan-ok", "sg-1"),
+            capability_patterns=("REGENERATE_SEGMENT",),
+            outcome="success",
+        ))
+        repair = PlanRepair(memory_index=idx)
+        plan = make_plan(plan_id="plan-ok", subgoal_id="sg-1")
+        segments = {"seg-1": make_segment("seg-1")}
+        subgoals = {"sg-1": make_subgoal("sg-1")}
+
+        outcome = repair.repair(
+            plan_record=plan,
+            real_segments_by_id=segments,
+            subgoals_by_id=subgoals,
+            drift_events=[],
+            now=NOW,
+            repair_budget=5,
+            retry_limit=3,
+        )
+
+        assert outcome.success
+        assert outcome.strategy_context is not None
+        assert isinstance(outcome.strategy_context, RepairStrategyContext)
+
+    def test_repair_without_index_has_empty_strategy_context(self):
+        repair = PlanRepair()
+        plan = make_plan(plan_id="plan-ok", subgoal_id="sg-1")
+        segments = {"seg-1": make_segment("seg-1")}
+        subgoals = {"sg-1": make_subgoal("sg-1")}
+
+        outcome = repair.repair(
+            plan_record=plan,
+            real_segments_by_id=segments,
+            subgoals_by_id=subgoals,
+            drift_events=[],
+            now=NOW,
+            repair_budget=5,
+            retry_limit=3,
+        )
+
+        assert outcome.success
+        assert outcome.strategy_context is not None
+        assert outcome.strategy_context.matches == 0
+
+    def test_failure_outcome_still_includes_strategy_context(self):
+        idx = SemanticMemoryIndex()
+        repair = PlanRepair(memory_index=idx)
+        plan = make_plan(plan_id="plan-bad", subgoal_id="sg-missing")
+        segments: Dict[str, SegmentMemoryRecord] = {}
+        subgoals: Dict[str, SubgoalMemoryRecord] = {}
+
+        outcome = repair.repair(
+            plan_record=plan,
+            real_segments_by_id=segments,
+            subgoals_by_id=subgoals,
+            drift_events=[],
+            now=NOW,
+            repair_budget=1,
+            retry_limit=1,
+        )
+
+        assert not outcome.success
+        assert outcome.strategy_context is not None
+        # Even with no matching records, RepairStrategyContext is returned (empty)
+        assert outcome.strategy_context.matches == 0
+
+
+class TestExtractRepairTopics:
+    """_extract_repair_topics() extracts topics from plan and breakage data."""
+
+    def test_extracts_intent_and_skill(self):
+        plan = make_plan(plan_id="p1", subgoal_id="sg-1")
+        breakage = PlanBreakageReport(
+            plan_id="p1", errors=(), warnings=(), missing_segments=(),
+            invalid_links=(), drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        topics = PlanRepair._extract_repair_topics(plan, breakage)
+        assert "do something" in topics
+        assert "skill-a" in topics
+
+    def test_extracts_error_types(self):
+        plan = make_plan()
+        breakage = PlanBreakageReport(
+            plan_id="p1",
+            errors=(
+                BreakageError("MISSING_SEGMENT", "seg-1", {}),
+                BreakageError("BROKEN_PARENT_LINK", "seg-2", {}),
+            ),
+            warnings=(), missing_segments=(), invalid_links=(),
+            drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        topics = PlanRepair._extract_repair_topics(plan, breakage)
+        assert "MISSING_SEGMENT" in topics
+        assert "BROKEN_PARENT_LINK" in topics
+
+    def test_extracts_drift_signal_types(self):
+        plan = make_plan()
+        drift = DriftFlag(segment_id="seg-1", subgoal_id="sg-1", signal_type="timeout", confidence=0.9)
+        breakage = PlanBreakageReport(
+            plan_id="p1", errors=(), warnings=(), missing_segments=(),
+            invalid_links=(), drift_flags=(drift,), timestamp_issues=(), governance_violations=(),
+        )
+        topics = PlanRepair._extract_repair_topics(plan, breakage)
+        assert "timeout" in topics
+
+
+class TestExtractRepairEntities:
+    """_extract_repair_entities() extracts entity IDs from plan and breakage data."""
+
+    def test_extracts_plan_and_subgoal_ids(self):
+        plan = make_plan(plan_id="plan-1", subgoal_id="sg-1")
+        breakage = PlanBreakageReport(
+            plan_id="plan-1", errors=(), warnings=(), missing_segments=(),
+            invalid_links=(), drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        entities = PlanRepair._extract_repair_entities(plan, breakage)
+        assert "plan-1" in entities
+        assert "sg-1" in entities
+
+    def test_extracts_error_record_ids(self):
+        plan = make_plan()
+        breakage = PlanBreakageReport(
+            plan_id="p1",
+            errors=(BreakageError("MISSING_SEGMENT", "seg-42", {}),),
+            warnings=(), missing_segments=(), invalid_links=(),
+            drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        entities = PlanRepair._extract_repair_entities(plan, breakage)
+        assert "seg-42" in entities
+
+    def test_extracts_invalid_link_ids(self):
+        plan = make_plan()
+        link = InvalidLink(from_id="seg-a", to_id="seg-b", link_type="parent_child", reason="missing")
+        breakage = PlanBreakageReport(
+            plan_id="p1", errors=(), warnings=(), missing_segments=(),
+            invalid_links=(link,), drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        entities = PlanRepair._extract_repair_entities(plan, breakage)
+        assert "seg-a" in entities
+        assert "seg-b" in entities
+
+
+class TestExtractRepairCapabilities:
+    """_extract_repair_capabilities() maps breakage types to repair actions."""
+
+    def test_maps_missing_segment_to_regenerate(self):
+        breakage = PlanBreakageReport(
+            plan_id="p1",
+            errors=(BreakageError("MISSING_SEGMENT", "seg-1", {}),),
+            warnings=(), missing_segments=(), invalid_links=(),
+            drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        caps = PlanRepair._extract_repair_capabilities(breakage)
+        assert "REGENERATE_SEGMENT" in caps
+
+    def test_maps_broken_parent_to_reconstruct(self):
+        breakage = PlanBreakageReport(
+            plan_id="p1",
+            errors=(BreakageError("BROKEN_PARENT_LINK", "seg-2", {}),),
+            warnings=(), missing_segments=(), invalid_links=(),
+            drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        caps = PlanRepair._extract_repair_capabilities(breakage)
+        assert "RECONSTRUCT_CHAIN" in caps
+
+    def test_maps_subgoal_mismatch_to_quarantine(self):
+        breakage = PlanBreakageReport(
+            plan_id="p1",
+            errors=(BreakageError("SUBGOAL_MISMATCH", "seg-3", {}),),
+            warnings=(), missing_segments=(), invalid_links=(),
+            drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        caps = PlanRepair._extract_repair_capabilities(breakage)
+        assert "QUARANTINE_SEGMENT" in caps
+
+    def test_maps_missing_subgoal_to_redecompose(self):
+        breakage = PlanBreakageReport(
+            plan_id="p1",
+            errors=(BreakageError("MISSING_SUBGOAL", "sg-missing", {}),),
+            warnings=(), missing_segments=(), invalid_links=(),
+            drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        caps = PlanRepair._extract_repair_capabilities(breakage)
+        assert "REDECOMPOSE_SUBGOAL" in caps
+
+    def test_deduplicates_duplicate_action_types(self):
+        breakage = PlanBreakageReport(
+            plan_id="p1",
+            errors=(
+                BreakageError("MISSING_SEGMENT", "seg-1", {}),
+                BreakageError("BROKEN_PARENT_LINK", "seg-2", {}),
+                BreakageError("MISSING_SEGMENT", "seg-3", {}),
+            ),
+            warnings=(), missing_segments=(), invalid_links=(),
+            drift_flags=(), timestamp_issues=(), governance_violations=(),
+        )
+        caps = PlanRepair._extract_repair_capabilities(breakage)
+        # REGENERATE_SEGMENT should appear only once
+        assert caps.count("REGENERATE_SEGMENT") == 1
+        assert "RECONSTRUCT_CHAIN" in caps
