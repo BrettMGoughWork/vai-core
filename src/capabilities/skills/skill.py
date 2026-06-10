@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from src.capabilities.skills.manifest import SkillManifest
+from src.capabilities.skills.execution_contract import SkillExecutionContract
 
 if TYPE_CHECKING:
     from src.capabilities.primitives.base import PrimitiveBase
@@ -54,6 +55,13 @@ class CapabilitySkill:
     only for discovery fallback when the LLM fails to name a capability.
     """
 
+    execution_contract: SkillExecutionContract | None = None
+    """Execution semantics contract (Phase 3.21.2).
+
+    Declares timeout, retry policy, atomicity, compensation steps, and
+    side-effect budgets.  None means the executor uses its own defaults.
+    """
+
     @classmethod
     def from_manifest(
         cls,
@@ -73,6 +81,8 @@ class CapabilitySkill:
             ValueError: If the manifest fails validation, any primitive name
                         is unknown, or a schema is invalid.
         """
+        from src.capabilities.skills.execution_contract import SkillExecutionContract
+
         manifest.validate()
 
         primitives: dict[str, PrimitiveBase] = {}
@@ -88,11 +98,18 @@ class CapabilitySkill:
         cls._validate_schema(input_schema, "input")
         cls._validate_schema(output_schema, "output")
 
+        execution_contract: SkillExecutionContract | None = None
+        if manifest.execution_contract is not None:
+            execution_contract = SkillExecutionContract.from_dict(
+                manifest.execution_contract
+            )
+
         return cls(
             manifest=manifest,
             primitives=primitives,
             input_schema=input_schema,
             output_schema=output_schema,
+            execution_contract=execution_contract,
         )
 
     def validate_inputs(self, data: dict[str, Any]) -> None:

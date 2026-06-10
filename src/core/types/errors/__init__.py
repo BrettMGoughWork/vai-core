@@ -26,6 +26,16 @@ from .primitive_errors import (
     PrimitiveNotFound,
     ALL_PRIMITIVE_ERROR_TYPES,
 )
+from .planner_errors import (
+    PlannerError,
+    PlanInvalid,
+    PlanAmbiguous,
+    PlanMissingCapabilities,
+    PlanUnsafe,
+    PlanExecutionFailed,
+    PlanDegraded,
+    ALL_PLANNER_ERROR_TYPES,
+)
 from .recovery import (
     RecoveryAction,
     map_error_to_recovery,
@@ -60,4 +70,13 @@ __all__ = [
     "PrimitiveDependencyError",
     "PrimitiveNotFound",
     "ALL_PRIMITIVE_ERROR_TYPES",
+    # Planner Error Semantics (3.21.3)
+    "PlannerError",
+    "PlanInvalid",
+    "PlanAmbiguous",
+    "PlanMissingCapabilities",
+    "PlanUnsafe",
+    "PlanExecutionFailed",
+    "PlanDegraded",
+    "ALL_PLANNER_ERROR_TYPES",
 ]

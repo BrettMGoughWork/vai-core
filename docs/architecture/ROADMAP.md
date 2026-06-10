@@ -1676,9 +1676,55 @@ Define:
 
 ## PHASE 3.21 - Refinement
 
-3.21.1 - Error handling
+✅ 3.21.1 — Primitive Error Taxonomy
 
+Hierarchy (src/core/types/errors/primitive_errors.py):
+Execution: 
+- PrimitiveExecutionError (generic catch-all, retryable=caller),
+- PrimitiveTimeout (retryable)
+- PrimitiveRetryableError (transient, retryable),
+- PrimitiveNonRetryableError (deterministic failure), 
+- PrimitiveSideEffectError (unexpected mutation → abort+escalate)
 
+Validation: 
+- PrimitiveValidationError (schema mismatch → replan),
+- PrimitiveContractError (pre/post-condition violation → replan or escalate)
+
+Privilege & Safety: 
+- PrimitivePrivilegeError (unauthorised op → abort+escalate)
+
+Environment & Dependency: 
+- PrimitiveEnvironmentError (missing config → escalate),
+- PrimitiveDependencyError (upstream failure, retryable)
+- PrimitiveNotFound (registry miss → semantic search + replan)
+
+All 11 types inherit PrimitiveError(AgentError, Exception) — raisable, planner-compatible, LLM-parsable.
+map_error_to_recovery() extended: retryable types → RETRY, validation/contract/not-found → REPLAN,
+side-effect/privilege/environment → ESCALATE. retryable flag on every error; subclasses set safe defaults,
+callers may override.
+
+✅ 3.21.2 - Skill Execution Semantics
+Defined 
+- `SkillExecutionContract` (frozen dataclass) with: `timeout_seconds`, `cancellable`
+- `SkillRetryPolicy` (max_attempts, backoff_factor, retryable_error_types) 
+- `atomicity` (best_effort / checkpoint / all_or_nothing)
+- `SkillCompensationStep` (undo steps for all-or-nothing)
+- `SkillSideEffectBudget` (max_mutations / file_writes / network_calls), `step_failure_policy`, `allow_parallel_steps`, `allow_step_skip` Added `from_dict()` for manifest round-tripping
+Wired `execution_contract` field into `CapabilitySkill` and `SkillManifest.from_dict()`
+
+✅ 3.21.3 - Planner Error Semantics
+Defined 
+- `PlannerError(AgentError, Exception)` base + 6 subtypes: `PlanInvalid` (→ REPLAN) 
+- `PlanAmbiguous` (→ CLARIFY)
+- `PlanMissingCapabilities` (→ REPLAN, carries `missing_capabilities` tuple)
+- `PlanUnsafe` (→ ESCALATE, carries `violated_rule`)
+- `PlanExecutionFailed` (→ RETRY if retryable else REPLAN, carries `failed_step`)
+- `PlanDegraded` (→ RETRY, carries `fallback_used`)
+Extended `map_error_to_recovery()` with `_map_planner_error()`
+Exported `ALL_PLANNER_ERROR_TYPES`
+
+✅ 3.21.4 - Capability Graph Consistency
+`CapabilityGraphChecker` (pure read-only): `check_dangling_primitives()`, `check_dangling_skills(referenced)`, `check_schema_drift(baseline_primitives)`, `check_privilege_drift(baseline_privileges)`, `check_capability_cycles()` (DFS on skill→skill deps), `check_plugin_unload_safety(plugin_name)`. Returns `GraphConsistencyReport` (frozen, `is_clean`, `violations_by_kind()`). `ConsistencyViolation` frozen dataclass with 6 kind constants.
 ---
 
 🚀 Release 0.2 — "Extensible Agent"
