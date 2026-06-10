@@ -746,7 +746,7 @@ Stabilise and version:
 - contract stability across versions  
 
 ### PHASE 2.16 — Semantic Memory v2
-Depends On: PHASE 2.4, PHASE 2.8, PHASE 3.19
+Depends On: PHASE 2.4, PHASE 2.8, PHASE 2.15, PHASE 3.19
 
 Goal: Introduce meaning‑aware memory structures that improve planning, repair, and reflection.  
 S2 remains pure — embeddings are computed in S3 and provided to S2.
@@ -786,7 +786,8 @@ Repair engine consults SemanticMemoryIndex to:
 Depends On: PHASE 2.10, PHASE 2.16
 
 Goal: Move from reactive repair to adaptive repair.  
-S2 learns from past repair outcomes using deterministic rules.
+S2 learns from past repair outcomes using deterministic rules.  
+**Scope guard**: Counterfactual and pattern recognition use only deterministic frequency‑based rules (e.g., action X succeeded ≥80% → promote; action Y failed ≥3× → demote). No LLM reasoning. If deterministic rules prove insufficient, defer 2.17.3‑4 to a future phase.
 
 2.17.1 — RepairMemory store
 Record:
@@ -802,21 +803,50 @@ Deterministic policy:
 - avoid actions with repeated failures  
 - respect repair budgets  
 
-2.17.3 — Counterfactual repair
+2.17.3 — Counterfactual repair (deterministic only)
 Record alternative actions when repair fails:
 - alternative skills  
 - alternative segment shapes  
 - alternative decompositions  
+Apply frequency‑based scoring — no LLM reasoning.
 
-2.17.4 — Pattern recognition
+2.17.4 — Pattern recognition (deterministic only)
 Detect repeated drift → repeated fix → stable policy:
-- promote successful patterns  
-- demote failing patterns  
+- promote successful patterns (≥80% success rate)  
+- demote failing patterns (≥3 consecutive failures)  
+All thresholds determined by frequency counts, not semantic analysis.
 
 2.17.5 — Tests
 - repair policy determinism  
 - repair outcome learning  
-- counterfactual correctness  
+- counterfactual correctness
+
+### PHASE 2.18 — Release 1 Integration & Hardening
+Depends On: PHASE 2.15, PHASE 2.16, PHASE 2.17
+
+Goal: Wire all S2 components end‑to‑end, freeze the Release 1 surface area, and validate against live LLM + S3 adapter before declaring Release 1.
+
+2.18.1 — Integration test suite
+- Full plan‑execute‑repair loop across multi‑subgoal prompts  
+- Cross‑component boundary validation (Planner → Executor → Repair)  
+- Deterministic replay tests (record‑and‑replay for known goals)  
+
+2.18.2 — Contract freeze
+- Lock AgentPlan / StepSpec schema versions at v1.0  
+- Lock S2→S3 execution contract at v1.0  
+- Document all frozen contracts in `docs/contracts/`  
+
+2.18.3 — Performance baseline
+- Measure end‑to‑end latency for representative multi‑step plans  
+- Establish SLOs: plan generation < Tₚ, execution < Tₑ, repair < Tᵣ  
+- No optimisation — just measurement  
+
+2.18.4 — Release 1 sign‑off checklist
+- All S2 contract tests pass  
+- All S2 integration tests pass  
+- All manual LLM tests pass (3 representative prompts, documented)  
+- `ENABLE_REAL_LLM` kill‑switch honoured at all entry points  
+- No regressions in S1 or S3 pipeline  
 
 ---
 
@@ -1596,50 +1626,38 @@ Add a fallback path:
 - [ ] Invalid `EmbeddingConfig` error handling test.
 - [ ] `find_semantic` exact k boundary test (k=1, k=0, k > available).
 
-### PHASE 3.20 — Long‑Horizon Continuity
+### PHASE 3.20 — Episode Continuity (S2 Logic)
 *Depends On*: PHASE 2.16, PHASE 2.17, PHASE 3.19  
-(Moved out of Release 1 — requires S4 persistence and S5 agent identity.)
+(Moved out of Release 1 — requires 2.16 and 2.17 completion.)
 
-Goal: Provide continuity across episodes, projects, and sessions.  
-Split across S2 (logic) and S4/S5 (persistence + identity).
+Goal: Provide continuity across episodes within a session using the semantic memory and repair learning systems already built in S2. This phase is pure S2 logic with no cross‑stratum dependencies.
 
-3.20.1 — ProjectMemory (S2 logic)
+3.20.1 — ProjectMemory
 Store:
 - recurring goals  
 - preferred skills  
 - known bad patterns  
 - domain policies  
 
-3.20.2 — UserProfile memory (S2 logic)
+3.20.2 — UserProfile memory
 Store:
 - preferences  
 - constraints  
 - behavioural patterns  
 
-3.20.3 — Episode boundaries (S2 logic)
+3.20.3 — Episode boundaries
 Define:
 - episode start  
 - episode end  
 - summarisation  
 - compaction  
 
-3.20.4 — Continuity persistence (S4)
-Persist:
-- memory snapshots  
-- project context  
-- user profile  
-
-3.20.5 — Identity & persona integration (S5)
-Agent identity uses:
-- ProjectMemory  
-- UserProfile  
-- semantic memory  
-- repair learning  
-
-3.20.6 — Tests
+3.20.4 — Tests
 - episode summarisation  
 - project‑scoped memory retrieval  
 - cross‑episode plan shaping  
+
+> **Deferred to S4/S5**: Persistence (previously 3.20.4) and identity integration (previously 3.20.5) are scoped to future S4 and S5 phases when those strata are built. See PHASE 4.x (Continuity Persistence) and PHASE 5.x (Identity & Persona Integration).
 
 ---
 

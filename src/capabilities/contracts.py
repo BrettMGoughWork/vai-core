@@ -15,6 +15,14 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 
+S2_S3_CONTRACT_VERSION = "1.0"
+"""Current contract version for S2↔S3 boundary types (Phase 2.15.4).
+
+Bump this when the shape of SkillCallRequest or SkillResult changes
+in a way that breaks backward compatibility.
+"""
+
+
 @dataclass(frozen=True)
 class SkillCallRequest:
     """Request from S2 to S3 to execute a skill."""
@@ -23,6 +31,7 @@ class SkillCallRequest:
     arguments: Dict[str, Any] = field(default_factory=dict)
     request_id: str = ""
     context: Dict[str, Any] = field(default_factory=dict)
+    contract_version: str = S2_S3_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
         if not self.skill_name:
@@ -33,6 +42,8 @@ class SkillCallRequest:
             raise ValueError("request_id must be non-empty")
         if not isinstance(self.context, dict):
             raise ValueError("context must be a dict")
+        if not self.contract_version:
+            raise ValueError("contract_version must be non-empty")
 
 
 @dataclass(frozen=True)
@@ -43,6 +54,7 @@ class SkillResult:
     success: bool
     output: Dict[str, Any] | None = None
     error: str | None = None
+    contract_version: str = S2_S3_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
         if (self.output is None) == (self.error is None):
@@ -51,6 +63,8 @@ class SkillResult:
             )
         if not self.request_id:
             raise ValueError("request_id must be non-empty")
+        if not self.contract_version:
+            raise ValueError("contract_version must be non-empty")
 
 
 @dataclass(frozen=True)
