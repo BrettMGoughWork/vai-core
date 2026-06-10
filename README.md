@@ -6,6 +6,30 @@ It’s built around a small set of stable concepts — models, capabilities, ski
 
 The core idea is simple: give LLMs structured jobs, not free rein. The runtime forces clean JSON output, mediates all external calls through a strict capability system, and bakes in safety, observability, and self-healing by default.
 
+---
+
+## 🚀 Primary Interface (REPL)
+
+**Right now, the project is driven through a single interactive REPL.** As the system matures toward channels, ingress, transport, and control planes, this REPL will remain the development cockpit — a direct line into the S2 planner, skill execution, and breakage repair loop.
+
+### Start the REPL
+
+```
+# Real LLM (default — set LLM_PROVIDER + LLM_MODEL env vars)
+python -m tools.testing_harness.repl_harness
+
+# Mock LLM (deterministic, no API calls)
+python -m tools.testing_harness.repl_harness --mock
+```
+
+### What it does
+
+Each turn at the `s2>` prompt runs the full pipeline: **plan → breakage detection → repair → execute skills**. The plan, breakage report, repair outcome, and skill execution results are all displayed inline. Conversation context is remembered across turns — prior prompts and assistant outputs feed back to the LLM on each request.
+
+Type `:help` inside the REPL to see all commands.
+
+---
+
 ### Dependencies
 
 **LLM**: Set `DEEPSEEK_API_KEY` (or configure another provider in `config/config.yaml`).
@@ -19,7 +43,8 @@ The core idea is simple: give LLMs structured jobs, not free rein. The runtime f
 | Mock (tests) | `mock` | No dependencies, returns deterministic zero-vectors |
 
 **Search**: See `search:` block in `config/config.yaml`. Tavily requires `TAVILY_API_KEY`, DuckDuckGo is keyless.
-Core Concepts  
+
+Core Concepts
   
 Models — pure data shapes. Everything the system moves around is strongly typed.  
 Capabilities — declare what the agent can do (read files, make requests, etc), without giving it direct access.  
@@ -107,27 +132,7 @@ Options:
     --backend         "real_llm" (default) or "mock" (deterministic MockLLM)
     --json            Output machine-readable JSON instead of formatted text
 
-### S2 REPL Harness (`tools/testing_harness/repl_harness.py`)
-
-An interactive REPL (Read-Eval-Print Loop) that accepts user prompts, runs the full S2 pipeline (plan → detect breakages → repair), and remembers conversation context across turns. This is the primary manual testing interface for Release 0.1→1.0.
-
-Usage:
-    # Start the REPL with MockLLM (deterministic, no API calls)
-    python tools/testing_harness/repl_harness.py --mock
-
-    # Start the REPL (same — defaults to mock for safety)
-    python tools/testing_harness/repl_harness.py
-
-REPL Commands (type at the `s2>` prompt):
-    <any text>       Plan it, detect breakages, repair if needed
-    :history         Show conversation history
-    :plans           List all generated plans
-    :context         Show current conversation context
-    :clear           Reset conversation context
-    :help            Show help text
-    :quit / :exit    Exit the REPL
-
-Each turn runs: create subgoal → plan generation → breakage detection → repair (if not clean). The full plan, breakage report, and repair outcome are displayed after each turn.
+Each turn runs: create subgoal → plan generation → breakage detection → repair (if not clean) → execute skills. The full plan, breakage report, repair outcome, and skill execution results are displayed after each turn.
 
 
 ### Statistical Conformance Runner (`tests/statistical/`)

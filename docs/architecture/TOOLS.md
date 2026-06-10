@@ -141,14 +141,17 @@ python tools/testing_harness/signal_harness.py < signals.json
 
 ### `repl_harness.py`
 
-Interactive REPL (read-eval-print loop) for the full S2 pipeline: **plan → breakage detection → repair**. Remembers conversation context across turns. Primary manual testing interface for Release 0.1→1.0.
+Interactive REPL (read-eval-print loop) for the full S2 pipeline: **plan → breakage detection → repair → execute**. Remembers conversation context across turns (prior prompts and execution outputs are fed back to the LLM). Primary manual testing interface for Release 0.1→1.0.
 
 ```
-# Start with MockLLM (deterministic, default)
-python tools/testing_harness/repl_harness.py --mock
+# Start with real LLM (default; set LLM_PROVIDER + LLM_MODEL env vars)
+python -m tools.testing_harness.repl_harness
 
-# Or just:
-python tools/testing_harness/repl_harness.py
+# Plan-only mode — skip skill execution
+python -m tools.testing_harness.repl_harness --no-execute
+
+# Start with MockLLM (deterministic, no API calls)
+python -m tools.testing_harness.repl_harness --mock
 ```
 
 REPL commands: `<prompt>` (run pipeline), `:history`, `:plans`, `:context`, `:clear`, `:help`, `:quit`

@@ -124,16 +124,73 @@ class ConversationContext:
         self.turns.clear()
         self.subgoal_counter = 0
 
+    def build_conversation_prefix(self) -> str:
+        """Build conversation history text to prepend to the LLM prompt.
+
+        Reuses existing turn data (prompts + execution outputs) so the
+        planner can see what was said and done in prior turns.  This
+        keeps the S2 planner interface unchanged — history is embedded
+        directly in the goal string passed to plan_for_subgoal.
+        """
+        if not self.turns:
+            return ""
+
+        parts = ["Previous conversation:", ""]
+        for i, t in enumerate(self.turns):
+            parts.append(f"  User: {t['prompt']}")
+            # Extract the assistant's textual response from execution output
+            exec_data = t.get("execution")
+            if exec_data and isinstance(exec_data, dict) and exec_data.get("steps"):
+                outputs = []
+                for step in exec_data["steps"]:
+                    skill_name = step.get("skill", "?")
+                    if step.get("ok") and step.get("output"):
+                        try:
+                            res = json.loads(step["output"])
+                            if isinstance(res, dict):
+                                # Pick the first non-empty string value
+                                for v in res.values():
+                                    if isinstance(v, str) and v.strip():
+                                        outputs.append(v)
+                                        break
+                        except (json.JSONDecodeError, TypeError):
+                            outputs.append(step["output"])
+                    elif step.get("error"):
+                        outputs.append(f"(error: {step['error']})")
+                if outputs:
+                    parts.append(f"  Assistant: {outputs[0]}")
+            else:
+                parts.append(f"  Assistant: (executed plan {t.get('plan_id', '?')}: {t.get('plan_intent', '?')})")
+            parts.append("")
+        return "\n".join(parts)
+
     def summary(self) -> str:
         if not self.turns:
             return "(no turns yet)"
         lines = [f"{len(self.turns)} turn(s):"]
         for i, t in enumerate(self.turns):
-            lines.append(
-                f"  [{i + 1}] {t['prompt'][:60]}"
-                f" => {t['plan_id'] or '?'}"
-                f" ({t['elapsed_ms']}ms)"
-            )
+            plan_id = t.get('plan_id') or '?'
+            intent = t.get('plan_intent') or ''
+            skill = t.get('target_skill') or ''
+            lines.append(f"  [{i + 1}] {t['prompt'][:60]}")
+            lines.append(f"       plan={plan_id} intent='{intent}' skill={skill}")
+            exec_data = t.get("execution")
+            if exec_data and isinstance(exec_data, dict) and exec_data.get("steps"):
+                for step in exec_data["steps"]:
+                    status = "OK" if step.get("ok") else "FAIL"
+                    skill_name = step.get("skill", "?")
+                    if step.get("output"):
+                        try:
+                            res = json.loads(step["output"])
+                            if isinstance(res, dict):
+                                for v in res.values():
+                                    if isinstance(v, str) and v.strip():
+                                        lines.append(f"       [{status}] {skill_name}: {v[:80]}")
+                                        break
+                        except (json.JSONDecodeError, TypeError):
+                            lines.append(f"       [{status}] {skill_name}: {step['output'][:80]}")
+                    elif step.get("error"):
+                        lines.append(f"       [{status}] {skill_name}: {step['error'][:80]}")
         return "\n".join(lines)
 
 
@@ -166,9 +223,14 @@ def run_s2_pipeline(
     t0 = time.perf_counter()
 
     subgoal_id = ctx.next_subgoal_id()
+
+    # ── Build conversation-rich goal ──
+    history = ctx.build_conversation_prefix()
+    goal = f"{history}\n  Current request: {prompt}" if history else prompt
+
     subgoal = Subgoal(
         subgoal_id=subgoal_id,
-        goal=prompt,
+        goal=goal,
         context={"source": "repl", "turn": len(ctx.turns)},
         metadata={"timestamp": _now_iso()},
         state=SubgoalLifecycleState.CREATED,
@@ -179,7 +241,7 @@ def run_s2_pipeline(
     # ── 1. Plan generation ──
     agent_plan = planner.plan(
         subgoal_id=subgoal_id,
-        goal=prompt,
+        goal=goal,
         governance=governance,
         timestamp=_now_iso(),
     )
@@ -524,6 +586,7 @@ def repl_loop(
                 print(json.dumps({
                     "turns": len(ctx.turns),
                     "next_subgoal": ctx.next_subgoal_id(),
+                    "history": ctx.build_conversation_prefix() or "(no history)",
                 }, indent=2))
                 # undo the counter bump from displaying context
                 ctx.subgoal_counter -= 1
