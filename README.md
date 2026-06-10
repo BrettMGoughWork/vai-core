@@ -45,19 +45,31 @@ Type `:help` inside the REPL to see all commands.
 **Search**: See `search:` block in `config/config.yaml`. Tavily requires `TAVILY_API_KEY`, DuckDuckGo is keyless.
 
 Core Concepts
-  
-Models — pure data shapes. Everything the system moves around is strongly typed.  
-Capabilities — declare what the agent can do (read files, make requests, etc), without giving it direct access.  
-Skills — small, focused behaviours that combine prompts, guardrails, and logic on top of capabilities.  
-Safety Substrate — the runtime’s guardrails. It controls execution, handles panics, manages degraded modes, and keeps things stable.  
+   
+*Models* — pure data shapes. Everything the system moves around is strongly typed.  
+*Capabilities* — declare what the agent can do (read files, make requests, etc), without giving it direct access.  
+*Skills* — small, focused behaviours that combine prompts, guardrails, and logic on top of capabilities.  
+*Safety Substrate* — the runtime’s guardrails. It controls execution, handles panics, manages degraded modes, and keeps things stable.  
+
+### Agent-Authored Skills & Quarantine
+
+When an LLM agent authors a new skill at runtime, the skill passes through a multi-layer safety pipeline before it can be used:
+
+1. **Structural Safety** — recursive self-references, unbounded loops, and dynamic primitive selection are rejected.
+2. **Semantic Safety** — misleading descriptions, high-risk primitive chains, and embedded code blocks are audited.
+3. **Behavioural Sandbox** — the skill executes in a thread‑isolated sandbox with mock primitives. Only safe behaviour passes.
+4. **Quarantine** — skills that pass layers 1-3 are placed in **quarantine**, not the active registry. Quarantined skills are invisible to discovery (`get`, `find`, `find_semantic`, `ordered_list`).
+
+**⚠️ Human governance step required.** A quarantined skill will **never** execute until a human (or automated governance agent) explicitly approves it via `registry.quarantine_approve(name)`. There is currently no cross‑channel notification to alert a human that a skill is waiting for review — this is deferred to Stratum 4. Until then, operators must poll `registry.quarantine_list_pending()` or check the quarantine manually.
 
 Repository Layout
 
 src/core/ — core types and contracts  
 src/capabilities/primitives/ — reusable building blocks  
 src/capabilities/skills/ — reusable agent behaviours  
+src/capabilities/registry/ — skill registry, safety validators, quarantine manager  
 src/stratum2/ — planning and execution (Stratum 2)  
-docs/architecture/ — deep technical docs  
+docs/architecture/ — deep technical docs
 
 
 

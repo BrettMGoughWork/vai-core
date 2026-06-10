@@ -1,5 +1,5 @@
 """
-Agent-authored skill safety validator (Phase 3.16.2).
+Agent-authored skill safety validator (Phase 3.16.2 / 3.17.1).
 
 Layered safety gates for skills authored by the agent at runtime.
 Reuses existing validation infrastructure where possible, adds
@@ -9,6 +9,9 @@ agent-authored-specific checks:
 - System skill override protection
 - Privilege escalation detection
 - Schema safety
+- Recursive self-reference detection (3.17.1)
+- Unbounded loop detection (3.17.1)
+- Dynamic primitive selection prevention (3.17.1)
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.capabilities.registry.primitive_registry import PrimitiveRegistry
     from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+    from src.capabilities.registry.skill_semantic_safety import SkillSemanticSafetyValidator
     from src.capabilities.skills.skill import CapabilitySkill
 
 
@@ -60,6 +64,7 @@ class SkillSafetyValidator:
         primitive_registry: PrimitiveRegistry,
         skill_registry: CapabilitySkillRegistry,
         disallowed_primitives: set[str] | None = None,
+        semantic_validator: "SkillSemanticSafetyValidator | None" = None,
     ) -> None:
         self._primitive_registry = primitive_registry
         self._skill_registry = skill_registry
@@ -68,6 +73,7 @@ class SkillSafetyValidator:
             if disallowed_primitives is not None
             else DEFAULT_DISALLOWED_PRIMITIVES
         )
+        self._semantic_validator = semantic_validator
 
     @property
     def disallowed_primitives(self) -> set[str]:
@@ -99,6 +105,20 @@ class SkillSafetyValidator:
 
         # 6. No circular references
         errors.extend(self._check_circular_refs(skill))
+
+        # 7. No recursive self-references (3.17.1)
+        errors.extend(self._check_recursive_refs(skill))
+
+        # 8. No unbounded loops (3.17.1)
+        errors.extend(self._check_loop_termination(skill))
+
+        # 9. No dynamic primitive selection (3.17.1)
+        errors.extend(self._check_static_primitives(skill))
+
+        # 10. Semantic safety checks (3.17.2) — composed validator
+        if self._semantic_validator is not None:
+            semantic_result = self._semantic_validator.validate(skill)
+            errors.extend(semantic_result.errors)
 
         return SafetyResult(passed=len(errors) == 0, errors=errors)
 
@@ -193,3 +213,99 @@ class SkillSafetyValidator:
         except ValueError as exc:
             return [str(exc)]
         return []
+
+    # ── 3.17.1 Structural safety checks ──────────────────────────────────
+
+    def _check_recursive_refs(self, skill: CapabilitySkill) -> list[str]:
+        """Check the skill does not reference itself in any step.
+
+        Scans all step values (``call``, ``args``, ``return``, ``python``) for
+        the skill's own name, which would indicate a self-referencing loop.
+        """
+        errors: list[str] = []
+        own_name = skill.manifest.name
+
+        for i, step in enumerate(skill.manifest.steps):
+            # Check the call target
+            call = step.get("call")
+            if call is not None and own_name in str(call):
+                errors.append(
+                    f"step[{i}] calls '{call}' which references the skill's "
+                    f"own name '{own_name}' — recursive self-reference detected"
+                )
+
+            # Check args/with values
+            args = step.get("args") or step.get("with", {})
+            args_str = str(args)
+            if own_name in args_str:
+                errors.append(
+                    f"step[{i}] args contain reference to skill's own name "
+                    f"'{own_name}' — recursive self-reference detected"
+                )
+
+            # Check return value
+            ret = step.get("return")
+            if ret is not None and own_name in str(ret):
+                errors.append(
+                    f"step[{i}] return value references the skill's own name "
+                    f"'{own_name}' — recursive self-reference detected"
+                )
+
+        return errors
+
+    def _check_loop_termination(self, skill: CapabilitySkill) -> list[str]:
+        """Check steps do not contain unbounded loop constructs.
+
+        Rejects explicit loop control-flow patterns (``while``, ``goto``,
+        ``loop`` keys) that could cause unbounded execution.
+        """
+        errors: list[str] = []
+        _UNBOUNDED_KEYS = {"while", "goto", "loop", "repeat", "forever"}
+
+        for i, step in enumerate(skill.manifest.steps):
+            for key in _UNBOUNDED_KEYS:
+                if key in step:
+                    errors.append(
+                        f"step[{i}] contains '{key}' key — unbounded loop "
+                        f"constructs are not allowed in agent-authored skills"
+                    )
+
+            # Also check python blocks for while True patterns
+            python_code = step.get("python")
+            if python_code is not None:
+                code_str = str(python_code)
+                if "while True" in code_str or "while 1" in code_str:
+                    errors.append(
+                        f"step[{i}] python block contains unbounded loop "
+                        f"('while True') — not allowed in agent-authored skills"
+                    )
+
+        return errors
+
+    def _check_static_primitives(self, skill: CapabilitySkill) -> list[str]:
+        """Check all primitive calls use static string literals.
+
+        Dynamic primitive selection (e.g. ``"{{ target }}"`` as a call
+        target) is prohibited because it allows runtime redirection to
+        arbitrary primitives, bypassing the declared primitive set.
+        """
+        errors: list[str] = []
+
+        for i, step in enumerate(skill.manifest.steps):
+            call = step.get("call")
+            if call is None:
+                continue
+            if not isinstance(call, str):
+                errors.append(
+                    f"step[{i}] call target must be a string literal, "
+                    f"got {type(call).__name__}"
+                )
+                continue
+            # Template tokens like "{{ something }}" indicate dynamic selection
+            if "{{" in call:
+                errors.append(
+                    f"step[{i}] call target '{call}' uses dynamic template — "
+                    f"primitive selection must be static in agent-authored skills"
+                )
+
+        return errors

@@ -149,6 +149,22 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         from src.capabilities.runtime.skill_runner import SkillRunner
         from src.stratum2.s3_adapter import S3Adapter
 
+        # ── Wire up SkillAuthor pipeline (3.17.5 capability discovery) ──
+        from src.capabilities.registry.skill_safety import SkillSafetyValidator
+        from src.capabilities.skills.author import SkillAuthor
+        from src.capabilities.primitives.stdlib.skill_author import set_author_pipeline
+
+        safety_validator = SkillSafetyValidator(
+            primitive_registry=prim_registry,
+            skill_registry=skill_registry,
+        )
+        author = SkillAuthor(
+            primitive_registry=prim_registry,
+            skill_registry=skill_registry,
+            safety_validator=safety_validator,
+        )
+        set_author_pipeline(author)
+
         runner = SkillRunner(registry=skill_registry, embedder=embedder)
         s3_adapter = S3Adapter(runner)
 

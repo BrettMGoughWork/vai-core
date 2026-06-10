@@ -53,28 +53,38 @@ class SkillAuthor:
         *,
         plugin_name: str = "agent",
         plugin_version: str = "0.1.0",
+        skip_sandbox: bool = False,
+        quarantine: bool = True,
     ) -> CapabilitySkill:
-        """Parse, validate, and register an agent-authored skill.
+        """Parse, validate, sandbox, and register an agent-authored skill.
 
         This is the complete pipeline:
 
         1. Parse ``raw_text`` into a ``SkillManifest``.
         2. Build a ``CapabilitySkill`` with resolved primitives.
-        3. Run through ``SkillSafetyValidator``.
-        4. Register in ``CapabilitySkillRegistry`` (auto-embeds if
-           embedder is configured).
-        5. Optionally capture a registry snapshot for hot-reload.
+        3. Run through ``SkillSafetyValidator`` (structural + semantic).
+        4. Execute in ``SkillSandbox`` with mock primitives (3.17.3).
+        5a. If ``quarantine=True`` (default): place in quarantine for
+            human governance approval.
+        5b. If ``quarantine=False``: register directly in the active
+            registry (auto-embeds if embedder is configured).
+        6. Optionally capture a registry snapshot for hot-reload.
 
         Args:
             raw_text: Full text content of a ``.skill.md`` file.
             plugin_name: Origin label for this skill (default ``"agent"``).
             plugin_version: Version string for provenance tracking.
+            skip_sandbox: If ``True``, skip the behavioural sandbox check
+                          (useful for trusted hand-authored skills).
+            quarantine: If ``True`` (default), route to quarantine instead
+                        of direct registration.  Agent-authored skills
+                        should always be quarantined.
 
         Returns:
-            The fully registered ``CapabilitySkill``.
+            The fully built ``CapabilitySkill`` (may be quarantined).
 
         Raises:
-            ValueError: If parsing, validation, or safety checks fail.
+            ValueError: If parsing, validation, safety, or sandbox checks fail.
         """
         # ── 1. Parse ───────────────────────────────────────────────────
         from src.capabilities.skills.skill_parser import parse_skill_text
@@ -118,10 +128,41 @@ class SkillAuthor:
                 + "; ".join(result.errors)
             )
 
-        # ── 5. Register ────────────────────────────────────────────────
-        self._skill_registry.register(skill)
+        # ── 5. Behavioural sandbox (3.17.3) ─────────────────────────────
+        if not skip_sandbox:
+            from src.capabilities.skills.sandbox import SkillSandbox
 
-        # ── 6. Snapshot (if available) ─────────────────────────────────
+            sandbox = SkillSandbox(self._primitive_registry)
+            test_inputs = SkillSandbox.generate_mock_inputs(skill.input_schema)
+            sandbox_report = sandbox.run(skill, test_inputs)
+            if not sandbox_report.passed:
+                warning_detail = "; ".join(sandbox_report.warnings)
+                raise ValueError(
+                    f"Skill '{skill.manifest.name}' failed sandbox: {warning_detail}"
+                )
+
+        # ── 6. Register or quarantine ────────────────────────────────────
+        if quarantine:
+            from datetime import datetime, timezone
+
+            from src.capabilities.registry.quarantine import ProvenanceRecord
+
+            safety_errors = result.errors if not result.passed else []
+            provenance = ProvenanceRecord(
+                author=plugin_name,
+                created_at=datetime.now(timezone.utc),
+                plugin_name=plugin_name,
+                plugin_version=plugin_version,
+                sandbox_passed=not skip_sandbox,  # False if skipped
+                safety_errors=safety_errors,
+            )
+            self._skill_registry.quarantine_skill(
+                skill, provenance, reason="agent-authored"
+            )
+        else:
+            self._skill_registry.register(skill)
+
+        # ── 7. Snapshot (if available) ─────────────────────────────────
         self._capture_snapshot()
 
         return skill
