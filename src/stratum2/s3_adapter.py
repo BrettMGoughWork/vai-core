@@ -63,6 +63,8 @@ class S2DiscoveredSkill:
     score: float = 0.0
     input_schema: dict[str, Any] | None = None
     """Optional input schema describing required parameters (Phase 3.18.3)."""
+    output_schema: dict[str, Any] | None = None
+    """Optional output schema describing produced keys and types (Phase 3.18.3b)."""
 
 
 @dataclass(frozen=True)
@@ -143,6 +145,7 @@ class S3Adapter:
                 description=sk.description,
                 score=sk.score,
                 input_schema=sk.input_schema,
+                output_schema=sk.output_schema,
             )
             for sk in s3.skills
         ]

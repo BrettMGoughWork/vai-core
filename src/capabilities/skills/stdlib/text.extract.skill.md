@@ -15,9 +15,11 @@ inputs:
   flags:
     type: number
     required: false
+    default: 0
   group:
     type: any
     required: false
+    default: ~
 
 outputs:
   matches:

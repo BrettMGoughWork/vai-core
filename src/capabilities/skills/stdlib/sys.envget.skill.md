@@ -12,6 +12,7 @@ inputs:
   default:
     type: string
     required: false
+    default: ""
 
 outputs:
   key:

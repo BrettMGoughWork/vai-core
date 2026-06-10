@@ -12,9 +12,11 @@ inputs:
   timeout:
     type: number
     required: false
+    default: 30
   headers:
     type: object
     required: false
+    default: {}
 
 outputs:
   status_code:

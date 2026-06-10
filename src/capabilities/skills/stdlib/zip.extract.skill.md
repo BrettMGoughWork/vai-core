@@ -12,6 +12,7 @@ inputs:
   destination:
     type: string
     required: false
+    default: "."
 
 outputs:
   extracted_to:

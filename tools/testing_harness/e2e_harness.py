@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import importlib
 import json
-
+import re
 import os
 import sys
 import time
@@ -336,11 +336,50 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         except Exception:
             pass  # config not available — primitives use their defaults
 
+        accumulated_outputs: dict[str, Any] = {}
+
+        # Simple template resolver for forward-reference resolution
+        def _resolve_templates(value: Any, sources: dict[str, Any], parent_key: str = "") -> Any:
+            """Resolve '{{key}}' tokens, '$ref' references, and JSONPath-like strings
+            in *value* against *sources* (accumulated outputs from previous steps)."""
+            if isinstance(value, str):
+                # 1. Bare {{key}} token → return raw source value
+                m = re.match(r"^\{\{\s*(\w+)\s*\}\}$", value)
+                if m and m.group(1) in sources:
+                    return sources[m.group(1)]
+                # 2. Embedded {{key}} tokens → stringify
+                value = re.sub(
+                    r"\{\{\s*(\w+)\s*\}\}",
+                    lambda m: str(sources[m.group(1)]) if m.group(1) in sources else m.group(0),
+                    value,
+                )
+                # 3. JSONPath-like reference (e.g., "$.steps[0].result", "$.steps[0].output")
+                #    If the parent_key exists in sources, return its value
+                if value.startswith("$.") and parent_key and parent_key in sources:
+                    return sources[parent_key]
+                return value
+            if isinstance(value, dict):
+                # Handle $ref references to previous step outputs
+                ref = value.get("$ref")
+                if ref is not None and isinstance(ref, str) and len(value) == 1:
+                    if parent_key and parent_key in sources:
+                        return sources[parent_key]
+                    return sources
+                return {k: _resolve_templates(v, sources, parent_key=k) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_resolve_templates(v, sources) for v in value]
+            return value
+
         for i, step in enumerate(result.plan_steps):
             skill_name = result.target_skill if i == 0 else step.get("capability", result.target_skill)
             description = step.get("description", f"step-{i}")
             # Per-step inputs take precedence; fall back to plan-level arguments
-            step_inputs = step.get("inputs") or plan_record.arguments or {}
+            raw_inputs = step.get("inputs") or plan_record.arguments or {}
+            # Resolve forward-references to previous step outputs
+            if i > 0 and accumulated_outputs:
+                raw_inputs = _resolve_templates(raw_inputs, accumulated_outputs)
+            # Merge previous outputs as defaults (step inputs override via template resolution)
+            step_inputs = {**accumulated_outputs, **raw_inputs}
 
             _out(f"\n  [{i+1}/{len(result.plan_steps)}] {description}")
             _out(f"       skill: {skill_name}")
@@ -366,6 +405,8 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
 
                 if s2_result.success:
                     _out(f"       [OK] success  output={json.dumps(s2_result.output, default=str)[:120]}")
+                    if s2_result.output and isinstance(s2_result.output, dict):
+                        accumulated_outputs.update(s2_result.output)
                 else:
                     _out(f"       [FAIL] error={s2_result.error}")
             except Exception as exc:

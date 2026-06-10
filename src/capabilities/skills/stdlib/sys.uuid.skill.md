@@ -9,15 +9,19 @@ inputs:
   version:
     type: number
     required: false
+    default: 4
   format:
     type: string
     required: false
+    default: "standard"
   namespace:
     type: string
     required: false
+    default: ""
   name:
     type: string
     required: false
+    default: ""
 
 outputs:
   uuid:

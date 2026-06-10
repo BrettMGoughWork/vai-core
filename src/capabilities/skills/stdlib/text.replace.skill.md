@@ -18,6 +18,7 @@ inputs:
   count:
     type: number
     required: false
+    default: -1
 
 outputs:
   text:

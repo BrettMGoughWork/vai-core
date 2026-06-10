@@ -9,9 +9,11 @@ inputs:
   data:
     type: string
     required: false
+    default: ""
   file:
     type: string
     required: false
+    default: ""
 
 outputs:
   encoded:

@@ -9,15 +9,19 @@ inputs:
   suffix:
     type: string
     required: false
+    default: ""
   prefix:
     type: string
     required: false
+    default: ""
   directory:
     type: string
     required: false
+    default: ""
   content:
     type: string
     required: false
+    default: ""
 
 outputs:
   path:

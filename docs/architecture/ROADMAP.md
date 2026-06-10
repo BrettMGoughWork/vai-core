@@ -704,26 +704,26 @@ A binary checklist for flipping the switch:
 - No S2 state mutation on invalid S1 responses  
 - All manual tests pass against live LLM  
 
-### PHASE 2.15 — Multi‑Step Planner Activation (End‑to‑End Wiring)
+### PHASE 2.15 — Planner Contract Hardening
+Depends On: PHASE 2.4, PHASE 2.8, PHASE 2.13
 
-Goal: Expose the full hierarchical planner (multi‑subgoal, multi‑segment, multi‑cycle) as a single deterministic entrypoint. No new reasoning logic — only activation and contract hardening.
+Goal: Formalise and freeze the planning and execution contracts used by S2, S3, and future S4 workers. No new planning logic — this is schema hardening and boundary definition.
 
-2.15.1 — AgentPlan schema
-Define a stable, versioned schema for the full plan:
+2.15.1 — AgentPlan schema (versioned)
+Define a stable, versioned schema for full plans:
 - subgoals  
 - segments  
-- targetskillid  
-- expected output shape  
-- success criteria  
+- expected outputs  
 - failure modes  
+- metadata  
 
-2.15.2 — StepSpec schema
-Define a deterministic step contract:
+2.15.2 — StepSpec schema (versioned)
+Define deterministic step contract:
 - intent  
 - args  
 - expected_output  
 - target_skill (optional)  
-- fallbacks (optional)  
+- fallback strategies (optional)  
 
 2.15.3 — Unified planning entrypoint
 Expose AgentPlanner.plan(goal) that:
@@ -732,92 +732,81 @@ Expose AgentPlanner.plan(goal) that:
 - validates via PlanValidator  
 - returns a complete AgentPlan  
 
-2.15.4 — Execution contract
-Define the S2→S3 execution contract for each step:
+2.15.4 — Freeze S2→S3 execution contract
+Stabilise and version:
 - SkillCallRequest  
 - SkillResult  
-- SegmentMemoryRecord  
+- segment execution metadata  
 
-2.15.5 — Deterministic cycle activation
-AgentLoopV2 runs:
-1. plan  
-2. execute  
-3. reflect  
-4. repair  
-5. memory update  
-6. next cycle  
+(This already exists in S3Adapter; this phase freezes it.)
 
-2.15.6 — Tests
-- multi‑subgoal plan generation  
-- multi‑segment execution  
-- deterministic cycle transitions  
-- stable plan shapes across runs  
+2.15.5 — Tests
+- multi‑subgoal plan shapes  
+- multi‑segment plan shapes  
+- contract stability across versions  
 
----
+### PHASE 2.16 — Semantic Memory v2
+Depends On: PHASE 2.4, PHASE 2.8, PHASE 3.19
 
-### PHASE 2.16 — Semantic Memory v2 (Meaning‑Aware Memory)
-*Depends On*: PHASE 2.4, PHASE 2.8
-
-Goal: Extend memory beyond structural stores into semantic, queryable knowledge that improves planning, repair, and reflection.
+Goal: Introduce meaning‑aware memory structures that improve planning, repair, and reflection.  
+S2 remains pure — embeddings are computed in S3 and provided to S2.
 
 2.16.1 — Semantic memory record schema
-Extend SubgoalMemory, SegmentMemory, PlanMemory with:
+Extend memory records with:
 - topics  
 - entities  
 - capability patterns  
-- outcome classification (success/partial/failure)  
+- embedding vectors (precomputed by S3)  
+- outcome classification  
 
-2.16.2 — SemanticMemoryIndex
-Pure S2 component:
-- index memory records by semantic fields  
-- support queries:  
-  - “similar subgoals”  
-  - “similar drift patterns”  
-  - “successful past strategies”  
+2.16.2 — SemanticMemoryIndex (pure S2)
+Implement a deterministic index supporting:
+- similar subgoal lookup  
+- similar drift lookup  
+- similar capability‑chain lookup  
+- historical outcome retrieval  
 
 2.16.3 — Memory‑aware planning
-PlanGenerator consults SemanticMemoryIndex:
-- bias toward historically successful skills  
-- avoid historically drift‑prone patterns  
-- deterministic scoring rules  
+PlanGenerator consults SemanticMemoryIndex to:
+- bias toward historically successful strategies  
+- avoid drift‑prone patterns  
+- apply deterministic scoring  
 
 2.16.4 — Memory‑aware repair
-Repair engine consults SemanticMemoryIndex:
-- prefer repair actions that previously succeeded  
-- avoid actions that repeatedly failed  
+Repair engine consults SemanticMemoryIndex to:
+- prefer historically successful repair actions  
+- avoid repeated failures  
 
 2.16.5 — Tests
-- semantic lookup determinism  
+- deterministic semantic lookup  
 - memory‑aware plan shaping  
 - memory‑aware repair selection  
-- cross‑episode consistency  
 
----
+### PHASE 2.17 — Repair Learning Layer
+Depends On: PHASE 2.10, PHASE 2.16
 
-### PHASE 2.17 — Repair Learning Layer (Beyond Structural Repair)
-*Depends On*: PHASE 2.10
-
-Goal: Move from “repair the structure” to “learn from repairs” using historical outcomes.
+Goal: Move from reactive repair to adaptive repair.  
+S2 learns from past repair outcomes using deterministic rules.
 
 2.17.1 — RepairMemory store
 Record:
 - drift type  
 - chosen repair action  
 - outcome  
-- cost (steps/time)  
+- cost  
 - recurrence  
 
 2.17.2 — RepairPolicy engine
 Deterministic policy:
-- given drift classification + context  
-- choose repair action using RepairMemory statistics  
-- respect repair budget  
+- choose repair actions based on historical success  
+- avoid actions with repeated failures  
+- respect repair budgets  
 
 2.17.3 — Counterfactual repair
-Record “what would have worked better” when repair fails:
-- alternative skill  
-- alternative segment shape  
-- alternative plan decomposition  
+Record alternative actions when repair fails:
+- alternative skills  
+- alternative segment shapes  
+- alternative decompositions  
 
 2.17.4 — Pattern recognition
 Detect repeated drift → repeated fix → stable policy:
@@ -828,44 +817,6 @@ Detect repeated drift → repeated fix → stable policy:
 - repair policy determinism  
 - repair outcome learning  
 - counterfactual correctness  
-- regression tests across episodes  
-
----
-
-### PHASE 2.18 — Long‑Horizon Continuity (Projects, Episodes, Identity)
-
-Goal: Give the agent persistent identity and continuity across long‑running tasks (e.g., your repo), without violating S2 purity.
-
-2.18.1 — ProjectMemory
-Per‑project memory:
-- recurring goals  
-- preferred skills  
-- known bad patterns  
-- domain policies  
-
-2.18.2 — UserProfile memory
-Store:
-- preferences (determinism, safety, tool choices)  
-- constraints  
-- behavioural patterns  
-
-2.18.3 — Episode boundaries
-Define:
-- episode start  
-- episode end  
-- summarisation rules  
-- memory compaction  
-
-2.18.4 — Cross‑episode learning
-Use ProjectMemory + SemanticMemoryIndex to:
-- bias planning  
-- bias repair  
-- bias skill selection  
-
-2.18.5 — Tests
-- episode summarisation  
-- project‑scoped memory retrieval  
-- cross‑episode plan shaping  
 
 ---
 
@@ -1535,6 +1486,12 @@ Expands the MVP stdlib to a comprehensive, well-organised standard library acros
 - Mock backend: 2/2 steps execute with correct per-step inputs. Real LLM: correctly plans and executes `stdlib.echo`, `stdlib.net.ping` (host/port inferred), multi-step plans with distinct per-step inputs.
 - Known: `json.parse.skill.md` fails to load (inline Python step); `search.web.skill.md` fails (unknown primitive). Optional parameters with template defaults (e.g., ping `timeout`) cause interpolation failures when LLM omits them — pre-existing skill template issue.
 
+🔄 3.18.3b — Harness Hardening (IN PROGRESS)
+- **Defaults audit:** Scan all skill manifests for `required: false` inputs referenced in `{{key}}` templates but lacking `default:` values. Without defaults, LLM omission of optional parameters causes `KeyError` during template interpolation. Fix each identified manifest.
+- **Planner prompt hardening:** Add instruction to planner LLM prompt requiring `{{key}}` format exclusively for inter-step output references. Currently the LLM sometimes uses `$.steps[N].output` JSONPath or `{"$ref": "step-1.output"}` — the executor handles these but `_resolve_templates()` only resolves them from `accumulated_outputs` when the parent key exists in outputs. Standardizing on `{{key}}` eliminates ambiguity.
+- **Whole-step reference resolution:** Verify that when the LLM references a prior step's full output (e.g., `{{step-1}}`), the bare token resolver in `executor.py` correctly replaces it with the stringified accumulated output.
+- **Re-test multi-step prompts** after hardening to confirm all 4 prompts pass cleanly with no raw `$.steps[N]` strings in output.
+
 ✅ 3.18.4 — Database Primitives (Safe CRUD)
 - `db.connect`, `db.query`, `db.insert`, `db.update`, `db.delete`
 - `db.listtables`, `db.describetable`
@@ -1638,6 +1595,51 @@ Add a fallback path:
 **[LOW]**
 - [ ] Invalid `EmbeddingConfig` error handling test.
 - [ ] `find_semantic` exact k boundary test (k=1, k=0, k > available).
+
+### PHASE 3.20 — Long‑Horizon Continuity
+*Depends On*: PHASE 2.16, PHASE 2.17, PHASE 3.19  
+(Moved out of Release 1 — requires S4 persistence and S5 agent identity.)
+
+Goal: Provide continuity across episodes, projects, and sessions.  
+Split across S2 (logic) and S4/S5 (persistence + identity).
+
+3.20.1 — ProjectMemory (S2 logic)
+Store:
+- recurring goals  
+- preferred skills  
+- known bad patterns  
+- domain policies  
+
+3.20.2 — UserProfile memory (S2 logic)
+Store:
+- preferences  
+- constraints  
+- behavioural patterns  
+
+3.20.3 — Episode boundaries (S2 logic)
+Define:
+- episode start  
+- episode end  
+- summarisation  
+- compaction  
+
+3.20.4 — Continuity persistence (S4)
+Persist:
+- memory snapshots  
+- project context  
+- user profile  
+
+3.20.5 — Identity & persona integration (S5)
+Agent identity uses:
+- ProjectMemory  
+- UserProfile  
+- semantic memory  
+- repair learning  
+
+3.20.6 — Tests
+- episode summarisation  
+- project‑scoped memory retrieval  
+- cross‑episode plan shaping  
 
 ---
 

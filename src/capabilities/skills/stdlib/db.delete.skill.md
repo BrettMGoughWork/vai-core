@@ -12,6 +12,7 @@ inputs:
   where:
     type: object
     required: false
+    default: {}
 
 outputs:
   deleted:

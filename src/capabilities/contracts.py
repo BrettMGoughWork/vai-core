@@ -78,6 +78,10 @@ class DiscoveredSkill:
     """Optional input schema describing required parameters and their types.
     Populated from ``CapabilitySkill.input_schema`` when discovery is run
     for schema‑aware planning (Phase 3.18.3)."""
+    output_schema: dict[str, Any] | None = None
+    """Optional output schema describing the keys and types the skill produces.
+    Populated from ``CapabilitySkill.output_schema`` when discovery is run
+    for schema‑aware planning (Phase 3.18.3b)."""
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.score <= 1.0):

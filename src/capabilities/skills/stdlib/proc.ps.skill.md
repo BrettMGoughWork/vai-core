@@ -9,9 +9,11 @@ inputs:
   name_filter:
     type: string
     required: false
+    default: ""
   limit:
     type: integer
     required: false
+    default: 0
 
 outputs:
   processes:

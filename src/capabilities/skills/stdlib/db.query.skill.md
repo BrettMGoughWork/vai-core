@@ -12,6 +12,7 @@ inputs:
   params:
     type: list
     required: false
+    default: []
 
 outputs:
   rows:
