@@ -71,8 +71,11 @@ def _build_system_prompt(skills: list[S2DiscoveredSkill] | None = None) -> str:
         '- "inputs" MUST include all required parameters for the chosen capability.\n'
         '- Infer "inputs" values from the user\'s goal text. Example: if the user says "echo hello world" and the capability requires a parameter named "value", then inputs = {"value": "hello world"}. If the user says "ping example.com" and the capability requires "host", then inputs = {"host": "example.com"}.\n'
         '- MULTI-STEP: When the user\'s goal contains sequencing words like "then", "and then", "after that", or "finally", you MUST split the work into one step per clause. Do NOT combine multiple sequential actions into a single step.\n'
-        "- When a step needs output from a previous step, you MUST use a key EXACTLY as listed in that capability's Outputs field. NEVER invent or guess key names. If step 1's capability Outputs are {\"datetime\": \"string\", \"timestamp\": \"number\"}, valid refs are \"{{datetime}}\" or \"{{timestamp}}\" — NOT \"{{time}}\", \"{{result}}\", or anything not explicitly listed. For example, if step 1 uses \"stdlib.text.split\" whose Outputs include \"parts\" (type: list), and step 2 needs those parts, write \"{{parts}}\".\n"
-        '- NEVER use "$.steps[N]" JSONPath expressions or {"$ref": "..."} objects to reference prior-step outputs. Use only the "{{key}}" template format with the actual output key name.\n'
+        "- CROSS-STEP REFERENCES: When a step needs output from a previous step, you MUST reference the EXACT output key name using the \"{{key}}\" template format. Look at the Outputs field of the prior step's capability to find valid key names. For example, if step 1 uses \"stdlib.text.split\" whose Outputs are {\"parts\": \"list\", \"count\": \"number\"} and step 2 needs the split parts, write {{\"chunks\": \"{{parts}}\"}}. If step 2 needs both parts and count: {{\"chunks\": \"{{parts}}\", \"total\": \"{{count}}\"}}. NEVER invent key names — only use keys explicitly listed in the capability's Outputs.\n"
+        '- NEVER use "$.steps[N]" JSONPath expressions to reference prior-step outputs.\n'
+        '- NEVER use {"$ref": "..."} objects to reference prior-step outputs.\n'
+        '- NEVER use "{{step-1}}", "{{step-2}}", or any {{step-N}} pattern to reference prior-step outputs. Always reference the SPECIFIC output key name (e.g., "{{value}}", "{{text}}", "{{result}}").\n'
+        '- Use descriptive step IDs (e.g., "fetch-data", "parse-html") rather than generic IDs like "step-1".\n'
         '- Return ONLY the JSON object, no other text, no markdown fences.'
     )
 

@@ -9,6 +9,7 @@ objects, and returns a ``SkillResult``.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -118,26 +119,35 @@ class SkillExecutor:
                 return bool(raw)
             return raw
 
+        # Regex for whole-step references like {{step-1}}, {{step-2}}, etc.
+        _STEP_REF_RE = re.compile(r"^step-\d+$")
+
         def _resolve(value: Any) -> Any:
             if isinstance(value, str):
                 # Bare token: "{{ key }}" → return cast raw value
                 m = _TEMPLATE_RE.match(value)
                 if m:
                     key = m.group(1)
-                    if key not in resolved_inputs:
-                        raise KeyError(
-                            f"interpolation token '{{{{{key}}}}}' not found in inputs"
-                        )
-                    return _cast(key, resolved_inputs[key])
+                    if key in resolved_inputs:
+                        return _cast(key, resolved_inputs[key])
+                    # Fallback: {{step-N}} → stringified accumulated inputs
+                    if _STEP_REF_RE.match(key):
+                        return json.dumps(resolved_inputs, default=str)
+                    raise KeyError(
+                        f"interpolation token '{{{{{key}}}}}' not found in inputs"
+                    )
 
                 # Embedded tokens: "prefix {{key}} suffix" → stringify
                 def _replace(m: re.Match[str]) -> str:
                     key = m.group(1)
-                    if key not in resolved_inputs:
-                        raise KeyError(
-                            f"interpolation token '{{{{{key}}}}}' not found in inputs"
-                        )
-                    return str(resolved_inputs[key])
+                    if key in resolved_inputs:
+                        return str(resolved_inputs[key])
+                    # Fallback: {{step-N}} → stringified accumulated inputs
+                    if _STEP_REF_RE.match(key):
+                        return json.dumps(resolved_inputs, default=str)
+                    raise KeyError(
+                        f"interpolation token '{{{{{key}}}}}' not found in inputs"
+                    )
 
                 return _ANY_TEMPLATE_RE.sub(_replace, value)
             if isinstance(value, dict):

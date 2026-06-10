@@ -489,6 +489,8 @@ def _execute_plan_steps(
             step_result["error"] = s2_result.error
             if s2_result.success and isinstance(s2_result.output, dict):
                 accumulated.update(s2_result.output)
+                # Store per-step output for {{step-N}} fallback references
+                accumulated[f"step-{i+1}"] = json.dumps(s2_result.output, default=str)
         except Exception as exc:
             step_result["error"] = str(exc)
 
@@ -499,17 +501,34 @@ def _execute_plan_steps(
     return result
 
 
+_STEP_REF_RE = re.compile(r"^step-\d+$")
+
 def _resolve_step_templates(value: Any, sources: Dict[str, Any]) -> Any:
-    """Resolve '{{key}}' tokens in *value* against *sources*."""
+    """Resolve '{{key}}' tokens in *value* against *sources*.
+
+    Supports:
+      - ``{{output_key}}`` → raw value from prior step outputs
+      - ``{{step-N}}`` → JSON-stringified accumulated outputs (fallback)
+    """
     import re as _re
 
     if isinstance(value, str):
-        m = _re.match(r"^\{\{\s*(\w+)\s*\}\}$", value)
-        if m and m.group(1) in sources:
-            return sources[m.group(1)]
+        m = _re.match(r"^\{\{\s*([\w-]+)\s*\}\}$", value)
+        if m:
+            key = m.group(1)
+            if key in sources:
+                return sources[key]
+            # Fallback: {{step-N}} → stringified accumulated outputs
+            if _STEP_REF_RE.match(key):
+                return json.dumps(sources, default=str)
+            return value
         return _re.sub(
-            r"\{\{\s*(\w+)\s*\}\}",
-            lambda m: str(sources[m.group(1)]) if m.group(1) in sources else m.group(0),
+            r"\{\{\s*([\w-]+)\s*\}\}",
+            lambda m: (
+                str(sources[m.group(1)]) if m.group(1) in sources
+                else json.dumps(sources, default=str) if _STEP_REF_RE.match(m.group(1))
+                else m.group(0)
+            ),
             value,
         )
     if isinstance(value, dict):
