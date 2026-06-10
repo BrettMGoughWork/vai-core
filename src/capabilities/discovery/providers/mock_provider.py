@@ -19,6 +19,10 @@ def _simple_embedding_fn(text: str, dimensions: int = 8) -> list[float]:
     Test files that previously duplicated this should import or call
     ``MockEmbeddingProvider._simple_embedding_fn`` instead.
     """
+    if dimensions < 0:
+        raise ValueError(f"dimensions must be non-negative, got {dimensions}")
+    if dimensions == 0:
+        return []
     vec = [0.0] * dimensions
     for ch in text:
         idx = ord(ch) % dimensions

@@ -178,6 +178,7 @@ class EmbeddingConfig:
             provider=data.get("provider", "mock"),
             model=data.get("model", "text-embedding-3-small"),
             dimensions=data.get("dimensions", 1536),
+            api_key_env=data.get("api_key_env"),
         )
 
 
