@@ -177,3 +177,36 @@ class TestVectorStoreUpdate:
         store = VectorStore()
         with pytest.raises(ValueError, match="missing"):
             store.update("missing", [1.0, 0.0])
+
+
+class TestVectorStoreKBoundary:
+    """PHASE 3.19.7: k boundary tests for VectorStore.search()."""
+
+    @pytest.fixture
+    def store(self) -> VectorStore:
+        store = VectorStore()
+        store.add([1.0, 0.0, 0.0], {"name": "skill.a"})
+        store.add([0.0, 1.0, 0.0], {"name": "skill.b"})
+        store.add([0.0, 0.0, 1.0], {"name": "skill.c"})
+        return store
+
+    def test_k_zero_returns_empty(self, store: VectorStore) -> None:
+        """k=0 returns an empty list."""
+        results = store.search([1.0, 0.0, 0.0], k=0)
+        assert results == []
+
+    def test_k_one_returns_exactly_one(self, store: VectorStore) -> None:
+        """k=1 returns exactly 1 result."""
+        results = store.search([1.0, 0.0, 0.0], k=1)
+        assert len(results) == 1
+        assert results[0][0]["name"] == "skill.a"
+
+    def test_k_larger_than_store_returns_all(self, store: VectorStore) -> None:
+        """k > store size returns all available items."""
+        results = store.search([1.0, 0.0, 0.0], k=100)
+        assert len(results) == 3
+
+    def test_k_negative(self, store: VectorStore) -> None:
+        """Negative k returns empty (clamped to 0 by min(k, len))."""
+        results = store.search([1.0, 0.0, 0.0], k=-5)
+        assert results == []

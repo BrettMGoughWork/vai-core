@@ -1609,22 +1609,22 @@ Add a fallback path:
 - Registry rebuild preserves embeddings across hot‑reload.
 - Fallback wiring tests (`test_fallback.py`): 15 tests, all passing.
 
-### PHASE 3.19.7 — Remaining test gaps
+### PHASE 3.19.7 — Remaining test gaps  ✅ COMPLETE
 *Depends On*: PHASE 3.19.6
 
 **[HIGH]**
-- [ ] Vector store count assertion after N skill registrations.
-- [ ] Hot‑reload e2e test — re‑embed a skill, call `find_semantic`, verify updated results.
+- [x] Vector store count assertion after N skill registrations.
+- [x] Hot‑reload e2e test — re‑embed a skill, call `find_semantic`, verify updated results.
 
 **[MEDIUM]**
-- [ ] Real provider `embed()` call test (integration scope).
-- [ ] `config.yaml` → `EmbeddingConfig` parse chain test.
-- [ ] Cache isolation test — two `SkillEmbedder` instances with independent caches.
-- [ ] Cache‑under‑provider‑error test — verify cache survives embedding provider failure.
+- [x] Real provider `embed()` call test (integration scope).
+- [x] `config.yaml` → `EmbeddingConfig` parse chain test.
+- [x] Cache isolation test — two `SkillEmbedder` instances with independent caches.
+- [x] Cache‑under‑provider‑error test — verify cache survives embedding provider failure.
 
 **[LOW]**
-- [ ] Invalid `EmbeddingConfig` error handling test.
-- [ ] `find_semantic` exact k boundary test (k=1, k=0, k > available).
+- [x] Invalid `EmbeddingConfig` error handling test.
+- [x] `find_semantic` exact k boundary test (k=1, k=0, k > available).
 
 ### PHASE 3.20 — Episode Continuity (S2 Logic)
 *Depends On*: PHASE 2.16, PHASE 2.17, PHASE 3.19  

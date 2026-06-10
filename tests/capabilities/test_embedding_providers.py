@@ -243,3 +243,190 @@ class TestCacheBypass:
         """SkillEmbedder raises if neither config nor provider is given."""
         with pytest.raises(ValueError, match="requires either a config"):
             SkillEmbedder()
+
+
+class TestConfigParseChain:
+    """PHASE 3.19.7: config.yaml → EmbeddingConfig parse chain."""
+
+    def test_from_yaml_with_openai_config(self) -> None:
+        """Parse a YAML-style dict with openai provider."""
+        data = {
+            "provider": "openai",
+            "model": "text-embedding-3-large",
+            "dimensions": 3072,
+            "api_key_env": "CUSTOM_KEY",
+        }
+        config = EmbeddingConfig.from_yaml(data)
+        assert config is not None
+        assert config.provider == "openai"
+        assert config.model == "text-embedding-3-large"
+        assert config.dimensions == 3072
+        assert config.api_key_env == "CUSTOM_KEY"
+
+    def test_from_yaml_with_local_config(self) -> None:
+        """Parse a YAML-style dict with local provider."""
+        data = {
+            "provider": "local",
+            "model": "all-MiniLM-L6-v2",
+            "dimensions": 384,
+        }
+        config = EmbeddingConfig.from_yaml(data)
+        assert config is not None
+        assert config.provider == "local"
+        assert config.model == "all-MiniLM-L6-v2"
+        assert config.dimensions == 384
+        assert config.api_key_env is None
+
+    def test_from_yaml_with_mock_config(self) -> None:
+        """Parse a YAML-style dict with mock provider."""
+        data = {
+            "provider": "mock",
+            "model": "mock-model",
+            "dimensions": 64,
+        }
+        config = EmbeddingConfig.from_yaml(data)
+        assert config is not None
+        assert config.provider == "mock"
+        assert config.dimensions == 64
+
+    def test_from_yaml_none_returns_none(self) -> None:
+        """from_yaml(None) returns None."""
+        assert EmbeddingConfig.from_yaml(None) is None
+
+    def test_from_yaml_empty_dict_returns_none(self) -> None:
+        """from_yaml({}) returns None."""
+        assert EmbeddingConfig.from_yaml({}) is None
+
+    def test_from_yaml_partial_uses_defaults(self) -> None:
+        """Partial config uses built-in defaults for missing keys."""
+        config = EmbeddingConfig.from_yaml({"provider": "local"})
+        assert config is not None
+        assert config.provider == "local"
+        assert config.model == "text-embedding-3-small"  # default
+        assert config.dimensions == 1536  # default
+        assert config.api_key_env is None  # default
+
+    def test_from_yaml_defaults_when_missing_dimensions(self) -> None:
+        """Dimensions default to 1536 when not specified."""
+        config = EmbeddingConfig.from_yaml({"provider": "openai"})
+        assert config is not None
+        assert config.dimensions == 1536
+
+    def test_from_yaml_handles_api_key_env_none(self) -> None:
+        """api_key_env defaults to None when not provided."""
+        config = EmbeddingConfig.from_yaml({"provider": "mock", "dimensions": 256})
+        assert config is not None
+        assert config.api_key_env is None
+
+    def test_embedder_from_config_chain(self) -> None:
+        """Full chain: from_yaml → SkillEmbedder creates correct provider."""
+        yaml_data = {"provider": "mock", "model": "mock-v2", "dimensions": 128}
+        config = EmbeddingConfig.from_yaml(yaml_data)
+        assert config is not None
+
+        embedder = SkillEmbedder(config=config)
+        assert isinstance(embedder._provider, MockEmbeddingProvider)
+        assert embedder.dimensions == 128
+
+
+class TestInvalidConfigHandling:
+    """PHASE 3.19.7: Invalid EmbeddingConfig error handling."""
+
+    def test_unknown_provider_in_config_raises_at_embedder(self) -> None:
+        """Unknown provider name raises when SkillEmbedder creates the provider."""
+        config = EmbeddingConfig(
+            provider="nonexistent-provider",
+            model="some-model",
+            dimensions=768,
+        )
+        with pytest.raises(ValueError, match="Unknown embedding provider"):
+            SkillEmbedder(config=config)
+
+    def test_from_yaml_with_unknown_provider_creates_config(self) -> None:
+        """from_yaml accepts any provider string (validation deferred to factory)."""
+        data = {"provider": "custom-future-provider", "dimensions": 512}
+        config = EmbeddingConfig.from_yaml(data)
+        assert config is not None
+        assert config.provider == "custom-future-provider"
+
+    def test_config_with_zero_dimensions(self) -> None:
+        """Zero dimensions is allowed at config level (provider validates)."""
+        config = EmbeddingConfig(provider="mock", dimensions=0)
+        assert config.dimensions == 0
+        # mock provider accepts any dimension
+        embedder = SkillEmbedder(config=config)
+        assert embedder.dimensions == 0
+        result = embedder.embed("test")
+        assert result == []  # 0-dimension vector is empty
+
+    def test_config_with_negative_dimensions(self) -> None:
+        """Negative dimensions is allowed at config level (provider may reject)."""
+        config = EmbeddingConfig(provider="mock", dimensions=-1)
+        assert config.dimensions == -1
+
+
+class TestRealProviderEmbed:
+    """PHASE 3.19.7: Real provider embed() integration tests.
+
+    These tests call actual embedding providers and are skipped
+    when no API key or local model is available.
+    """
+
+    @pytest.mark.integration
+    def test_openai_embed_call(self) -> None:
+        """Real OpenAI embed() call — requires OPENAI_API_KEY env var."""
+        import os
+        if not os.environ.get("OPENAI_API_KEY"):
+            pytest.skip("OPENAI_API_KEY not set")
+
+        provider = OpenAIEmbeddingProvider(
+            model="text-embedding-3-small",
+            dimensions=1536,
+        )
+        result = provider.embed("test vector for semantic search")
+        assert isinstance(result, list)
+        assert len(result) == 1536
+        assert all(isinstance(x, float) for x in result)
+        # Non-trivial: not all zeros
+        assert any(abs(x) > 1e-6 for x in result)
+
+    @pytest.mark.integration
+    def test_openai_deterministic_same_input(self) -> None:
+        """Same input to OpenAI produces near-identical embeddings."""
+        import os
+        if not os.environ.get("OPENAI_API_KEY"):
+            pytest.skip("OPENAI_API_KEY not set")
+
+        provider = OpenAIEmbeddingProvider(
+            model="text-embedding-3-small",
+            dimensions=1536,
+        )
+        r1 = provider.embed("consistent test input")
+        r2 = provider.embed("consistent test input")
+        # OpenAI embeddings are deterministic for the same input
+        assert len(r1) == len(r2)
+        # Cosine similarity between runs should be > 0.99
+        dot = sum(a * b for a, b in zip(r1, r2))
+        norm1 = sum(a * a for a in r1) ** 0.5
+        norm2 = sum(b * b for b in r2) ** 0.5
+        similarity = dot / (norm1 * norm2) if norm1 > 0 and norm2 > 0 else 0.0
+        assert similarity > 0.99, f"Expected near-identical embeddings, got cos={similarity:.4f}"
+
+    @pytest.mark.integration
+    def test_local_embed_call(self) -> None:
+        """Real local embed() call via sentence-transformers."""
+        import importlib
+        try:
+            importlib.import_module("sentence_transformers")
+        except ImportError:
+            pytest.skip("sentence-transformers not installed")
+
+        provider = LocalEmbeddingProvider(
+            model="all-MiniLM-L6-v2",
+            dimensions=384,
+        )
+        result = provider.embed("test semantic search query")
+        assert isinstance(result, list)
+        assert len(result) == 384
+        assert all(isinstance(x, float) for x in result)
+        assert any(abs(x) > 1e-6 for x in result)

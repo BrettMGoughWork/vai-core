@@ -199,8 +199,8 @@ class TestPlanTargetSkillIdUsesFirstSkill:
         plan_id = planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         record = pm.get_latest_for_subgoal(SG_ID)
-        # LLM capability "echo" wins over discovery "json.validate"
-        assert record.targetskillid == "echo"
+        # LLM capability "stdlib.echo" wins over discovery "json.validate"
+        assert record.targetskillid == "stdlib.echo"
 
         snap = seg_mem.snapshot()
         segment = snap.records[0]

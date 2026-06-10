@@ -181,3 +181,195 @@ class TestBuildQueryEmbedding:
     def test_missing_embedding_fn_raises(self) -> None:
         with pytest.raises(ValueError, match="missing embedding_fn"):
             build_query_embedding("query", {})
+
+
+# ---------------------------------------------------------------------------
+# Vector store count & hot-reload e2e (PHASE 3.19.7)
+# ---------------------------------------------------------------------------
+
+class TestVectorStoreCountAfterRegistrations:
+    """PHASE 3.19.7: Vector store count matches N registered skills."""
+
+    def test_empty_registry_has_empty_vector_store(self) -> None:
+        """Registry with no skills → vector store length 0."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        registry = CapabilitySkillRegistry()
+        store = VectorStore()
+        registry.set_vector_store(store)
+        assert len(store) == 0
+
+    def test_vector_store_count_matches_registration_count(self) -> None:
+        """After N registrations (with auto‑embedding), vector store has length N."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        registry = CapabilitySkillRegistry()
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8), cache_enabled=False)
+        registry.set_embedder(embedder)
+
+        store = VectorStore()
+        registry.set_vector_store(store)
+
+        # register() auto‑generates embedding when embedder is set
+        registry.register(_make_skill("skill.alpha", "alphabetical operations"))
+        registry.register(_make_skill("skill.beta", "beta testing utilities"))
+        registry.register(_make_skill("skill.gamma", "gamma ray processing"))
+
+        assert len(store) == 3
+
+    def test_vector_store_increases_per_registration(self) -> None:
+        """Vector store length increases by 1 after each register() with embedder."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        registry = CapabilitySkillRegistry()
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8), cache_enabled=False)
+        registry.set_embedder(embedder)
+
+        store = VectorStore()
+        registry.set_vector_store(store)
+
+        store_before = len(store)
+        registry.register(_make_skill("single", "only one"))
+        assert len(store) == store_before + 1
+
+    def test_clear_vector_store_resets_count(self) -> None:
+        """Clearing the vector store resets count to 0."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        registry = CapabilitySkillRegistry()
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8), cache_enabled=False)
+        registry.set_embedder(embedder)
+
+        store = VectorStore()
+        registry.set_vector_store(store)
+
+        registry.register(_make_skill("temp", "temporary"))
+        assert len(store) == 1
+
+        store.clear()
+        assert len(store) == 0
+
+
+class TestHotReloadE2E:
+    """PHASE 3.19.7: End-to-end hot-reload: reembed → find_semantic."""
+
+    def test_reembed_updates_vector_store_entry(self) -> None:
+        """After reembed, the vector store entry is updated (same skill, no count change)."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        registry = CapabilitySkillRegistry()
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8), cache_enabled=False)
+        registry.set_embedder(embedder)
+
+        store = VectorStore()
+        registry.set_vector_store(store)
+
+        # register() auto‑generates embedding → already in vector store
+        registry.register(_make_skill("refreshable", "initial description"))
+
+        # Verify skill can be found
+        results = registry.find_semantic("initial description", k=1)
+        assert len(results) == 1
+        assert results[0][0].manifest.name == "refreshable"
+        initial_score = results[0][1]
+
+        # Re-embed (no text change → score should be identical)
+        registry.reembed("refreshable")
+        assert len(store) == 1  # count unchanged
+
+        results_after = registry.find_semantic("initial description", k=1)
+        assert len(results_after) == 1
+        assert results_after[0][1] == pytest.approx(initial_score)
+
+    def test_reembed_all_works_across_multiple_skills(self) -> None:
+        """reembed_all() updates embeddings for all registered skills."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        registry = CapabilitySkillRegistry()
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8), cache_enabled=False)
+        registry.set_embedder(embedder)
+
+        store = VectorStore()
+        registry.set_vector_store(store)
+
+        registry.register(_make_skill("skill.one", "first skill"))
+        registry.register(_make_skill("skill.two", "second skill"))
+        assert len(store) == 2
+
+        # reembed_all should not change count
+        registry.reembed_all()
+        assert len(store) == 2
+
+        # Both skills still findable
+        r1 = registry.find_semantic("first skill", k=1)
+        r2 = registry.find_semantic("second skill", k=1)
+        assert r1[0][0].manifest.name == "skill.one"
+        assert r2[0][0].manifest.name == "skill.two"
+
+    def test_reembed_after_skill_text_changes(self) -> None:
+        """Reembed after modifying skill manifest updates search results."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        registry = CapabilitySkillRegistry()
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8), cache_enabled=False)
+        registry.set_embedder(embedder)
+
+        store = VectorStore()
+        registry.set_vector_store(store)
+
+        skill = _make_skill("morphable", "database operations")
+        registry.register(skill)
+
+        # Search for "file" should not match well initially
+        results_before = registry.find_semantic("file system operations", k=1)
+        score_before = results_before[0][1] if results_before else 0.0
+
+        # Modify skill's description to be about file operations
+        skill.manifest.description = "file system and disk operations"
+        registry.reembed("morphable")
+
+        results_after = registry.find_semantic("file system operations", k=1)
+        score_after = results_after[0][1] if results_after else 0.0
+
+        # After reembed, score should be different
+        assert score_after != pytest.approx(score_before, abs=1e-3)
+
+    def test_hot_reload_preserves_registry_count(self) -> None:
+        """Hot-reload (reembed) does not change skill count in registry or vector store."""
+        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
+        from src.capabilities.discovery.vector_store import VectorStore
+        from src.capabilities.discovery.embedder import SkillEmbedder
+        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+
+        registry = CapabilitySkillRegistry()
+        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8), cache_enabled=False)
+        registry.set_embedder(embedder)
+
+        store = VectorStore()
+        registry.set_vector_store(store)
+
+        registry.register(_make_skill("persistent", "unchanging skill"))
+        assert len(registry.list()) == 1
+        assert len(store) == 1
+
+        registry.reembed("persistent")
+        assert len(registry.list()) == 1
+        assert len(store) == 1
