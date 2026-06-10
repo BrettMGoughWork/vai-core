@@ -1674,6 +1674,11 @@ Define:
 
 > **Deferred to S4/S5**: Persistence (previously 3.20.4) and identity integration (previously 3.20.5) are scoped to future S4 and S5 phases when those strata are built. See PHASE 4.x (Continuity Persistence) and PHASE 5.x (Identity & Persona Integration).
 
+## PHASE 3.21 - Refinement
+
+3.21.1 - Error handling
+
+
 ---
 
 🚀 Release 0.2 — "Extensible Agent"
