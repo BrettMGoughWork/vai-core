@@ -74,6 +74,10 @@ class DiscoveredSkill:
     name: str
     description: str
     score: float = 0.0
+    input_schema: dict[str, Any] | None = None
+    """Optional input schema describing required parameters and their types.
+    Populated from ``CapabilitySkill.input_schema`` when discovery is run
+    for schema‑aware planning (Phase 3.18.3)."""
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.score <= 1.0):

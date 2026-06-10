@@ -15,9 +15,11 @@ inputs:
   timeout:
     type: integer
     required: false
+    default: 30
   cwd:
     type: string
     required: false
+    default: "."
 
 outputs:
   stdout:

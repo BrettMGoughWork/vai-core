@@ -209,9 +209,14 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
         from src.capabilities.discovery.embedder import SkillEmbedder
         from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
+        from src.capabilities.discovery.providers.local_provider import LocalEmbeddingProvider
 
-        # Create embedder FIRST so skills embed at registration (3.19.2)
-        embedder = SkillEmbedder(provider=MockEmbeddingProvider(dimensions=8))
+        # Use real embeddings for real_llm, mock for mock tests
+        if backend == "real_llm":
+            provider = LocalEmbeddingProvider(model="all-MiniLM-L6-v2", dimensions=384)
+        else:
+            provider = MockEmbeddingProvider(dimensions=8)
+        embedder = SkillEmbedder(provider=provider)
         skill_registry = CapabilitySkillRegistry(embedder=embedder)
         skill_count = load_all_skills(skill_registry, prim_registry, embedder=embedder)
         _out(f"  Loaded: {skill_count} skills")
@@ -296,12 +301,17 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
             seg = governance.get_segment(segment_ids[0])
             if seg is not None:
                 result.discovered_skills = seg.skills or []
+                seg_step_ids = seg.context.get("step_ids", [])
+                seg_capabilities = seg.context.get("capabilities", [])
+                seg_inputs = seg.context.get("step_inputs", [])
                 result.plan_steps = [
-                    {"id": sid, "description": desc}
-                    for sid, desc in zip(
-                        seg.context.get("step_ids", []),
-                        seg.steps,
-                    )
+                    {
+                        "id": seg_step_ids[i] if i < len(seg_step_ids) else f"step-{i}",
+                        "description": seg.steps[i],
+                        "capability": seg_capabilities[i] if i < len(seg_capabilities) else "",
+                        "inputs": seg_inputs[i] if i < len(seg_inputs) else {},
+                    }
+                    for i in range(len(seg.steps))
                 ]
 
         _out(f"  Plan ID:     {plan_id[:32]}...")
@@ -329,13 +339,15 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         for i, step in enumerate(result.plan_steps):
             skill_name = result.target_skill if i == 0 else step.get("capability", result.target_skill)
             description = step.get("description", f"step-{i}")
+            # Per-step inputs take precedence; fall back to plan-level arguments
+            step_inputs = step.get("inputs") or plan_record.arguments or {}
 
             _out(f"\n  [{i+1}/{len(result.plan_steps)}] {description}")
             _out(f"       skill: {skill_name}")
 
             s2_request = S2SkillCallRequest(
                 skill_name=skill_name,
-                arguments=plan_record.arguments if i == 0 else {},
+                arguments=step_inputs,
                 request_id=f"e2e-{plan_id[:8]}-step-{i}",
                 context=runtime_context,
             )

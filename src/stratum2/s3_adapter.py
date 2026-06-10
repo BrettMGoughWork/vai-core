@@ -61,6 +61,8 @@ class S2DiscoveredSkill:
     name: str
     description: str
     score: float = 0.0
+    input_schema: dict[str, Any] | None = None
+    """Optional input schema describing required parameters (Phase 3.18.3)."""
 
 
 @dataclass(frozen=True)
@@ -136,7 +138,12 @@ class S3Adapter:
     ) -> S2DiscoveryResult:
         """Convert an S3 ``SkillDiscoveryResult`` to an S2-native form."""
         s2_skills = [
-            S2DiscoveredSkill(name=sk.name, description=sk.description, score=sk.score)
+            S2DiscoveredSkill(
+                name=sk.name,
+                description=sk.description,
+                score=sk.score,
+                input_schema=sk.input_schema,
+            )
             for sk in s3.skills
         ]
         s2_query = S2DiscoveryQuery(

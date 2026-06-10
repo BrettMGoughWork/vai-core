@@ -16,17 +16,19 @@ from typing import Any, Dict, List, Optional
 MOCK_PLAN_RESPONSE: Dict[str, Any] = {
     "plan": {
         "subgoal": "verify-architecture",
-        "arguments": {"value": "hello from mock"},
+        "arguments": {},
         "steps": [
             {
                 "id": "s1",
                 "description": "Validate architecture.json",
-                "capability": "echo"
+                "capability": "stdlib.echo",
+                "inputs": {"value": "hello from mock step 1"}
             },
             {
                 "id": "s2",
                 "description": "Verify loop termination conditions",
-                "capability": "echo"
+                "capability": "stdlib.echo",
+                "inputs": {"value": "hello from mock step 2"}
             }
         ]
     }

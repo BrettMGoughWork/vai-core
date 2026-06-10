@@ -12,6 +12,7 @@ inputs:
   timeout:
     type: integer
     required: false
+    default: 30
 
 outputs:
   stdout:
