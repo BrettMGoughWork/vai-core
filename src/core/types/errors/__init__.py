@@ -11,6 +11,21 @@ from .LLMError import LLMError
 from .SystemError import SystemError
 from .ToolError import ToolError
 from .ValidationError import ValidationError
+from .primitive_errors import (
+    PrimitiveError,
+    PrimitiveExecutionError,
+    PrimitiveTimeout,
+    PrimitiveRetryableError,
+    PrimitiveNonRetryableError,
+    PrimitiveSideEffectError,
+    PrimitiveValidationError,
+    PrimitiveContractError,
+    PrimitivePrivilegeError,
+    PrimitiveEnvironmentError,
+    PrimitiveDependencyError,
+    PrimitiveNotFound,
+    ALL_PRIMITIVE_ERROR_TYPES,
+)
 from .recovery import (
     RecoveryAction,
     map_error_to_recovery,
@@ -31,4 +46,18 @@ __all__ = [
     "MappingError",
     "PlanningError",
     "map_error_to_recovery",
+    # Primitive Error Taxonomy (3.21.1)
+    "PrimitiveError",
+    "PrimitiveExecutionError",
+    "PrimitiveTimeout",
+    "PrimitiveRetryableError",
+    "PrimitiveNonRetryableError",
+    "PrimitiveSideEffectError",
+    "PrimitiveValidationError",
+    "PrimitiveContractError",
+    "PrimitivePrivilegeError",
+    "PrimitiveEnvironmentError",
+    "PrimitiveDependencyError",
+    "PrimitiveNotFound",
+    "ALL_PRIMITIVE_ERROR_TYPES",
 ]
