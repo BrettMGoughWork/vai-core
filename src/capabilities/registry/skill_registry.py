@@ -137,6 +137,27 @@ class CapabilitySkillRegistry:
             except (KeyError, ValueError):
                 pass
 
+    def remove_by_plugin(self, plugin_name: str) -> int:
+        """Remove all skills originating from *plugin_name*.
+
+        Returns the number of skills removed.
+        """
+        to_remove = [
+            name for name, s in self._skills.items()
+            if getattr(s.manifest, "plugin_name", None) == plugin_name
+        ]
+        for name in to_remove:
+            self.remove(name)
+        return len(to_remove)
+
+    def ordered_list(self) -> list["CapabilitySkill"]:
+        """Return all skills sorted deterministically.
+
+        Sort order: skill name → version → plugin name.
+        """
+        from src.capabilities.registry.sorter import sorted_skills
+        return sorted_skills(list(self._skills.values()))
+
     def list(
         self, filter: Callable[["CapabilitySkill"], bool] | None = None
     ) -> list["CapabilitySkill"]:

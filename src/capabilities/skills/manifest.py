@@ -1,12 +1,18 @@
 """
-Skill manifest dataclass (Phase 3.3.2).
+Skill manifest dataclass (Phase 3.3.2 / 3.15.2).
 
 Defines a structured, validated representation of a parsed .skill.md
 manifest — metadata, primitive references, input schema, and ordered
 execution steps.  File parsing is handled separately by skill_parser.py.
+
+PHASE 3.15.2: Added ``plugin_name``, ``plugin_version``, and
+``manifest_hash`` for stable embedding IDs and registry snapshots.
 """
 
 from __future__ import annotations
+
+import hashlib
+import json
 
 from dataclasses import dataclass, field
 from typing import Any
@@ -30,6 +36,15 @@ class SkillManifest:
 
     steps: list[dict[str, Any]] = field(default_factory=list)
     """Ordered list of execution steps."""
+
+    plugin_name: str | None = None
+    """Owning plugin name, or ``None`` for stdlib skills (3.15)."""
+
+    plugin_version: str | None = None
+    """Owning plugin version, or ``None`` for stdlib skills (3.15)."""
+
+    manifest_hash: str | None = None
+    """SHA-256 of canonical skill definition (3.15.2 — stable embedding IDs)."""
 
     def validate(self) -> None:
         """Validate all fields, step structure, and primitive references.
@@ -109,6 +124,26 @@ class SkillManifest:
             primitives=data.get("primitives", []),
             inputs=data.get("inputs", {}),
             steps=data.get("steps", []),
+            plugin_name=data.get("plugin_name"),
+            plugin_version=data.get("plugin_version"),
         )
+        manifest.manifest_hash = _compute_manifest_hash(manifest)
         manifest.validate()
         return manifest
+
+
+def _compute_manifest_hash(manifest: SkillManifest) -> str:
+    """Compute a stable SHA-256 hash of the skill's canonical definition.
+
+    Only the skill-intrinsic fields are hashed — plugin_name and
+    plugin_version are excluded so the hash is stable regardless of
+    which plugin provides the skill.
+    """
+    canonical: dict[str, Any] = {
+        "name": manifest.name,
+        "description": manifest.description,
+        "primitives": sorted(manifest.primitives),
+        "steps": manifest.steps,
+    }
+    json_bytes = json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(json_bytes).hexdigest()

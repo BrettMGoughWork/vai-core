@@ -1432,23 +1432,23 @@ Users can drop in new primitives and skills with no code changes. Hot-loadable.
 
 Versioned, stable registries ensure hot-reloading plugins does not violate S2's determinism invariants.
 
-3.15.1 — Stable registry ordering
+✅ 3.15.1 — Stable registry ordering
 - Sort by skill name → version → plugin name
 - Guarantees deterministic iteration order across reloads
 
-3.15.2 — Stable embedding IDs
+✅ 3.15.2 — Stable embedding IDs
 - Hash of skill name + version + manifest hash
 - Embedding IDs remain stable across reloads
 
-3.15.3 — Registry snapshots
+✅ 3.15.3 — Registry snapshots
 - On plugin change: compute new snapshot, freeze it, expose snapshot ID to S2
 - S2 uses snapshot ID for deterministic planning
 
-3.15.4 — Hot-reload flow
+✅ 3.15.4 — Hot-reload flow
 - Load plugin → rebuild registry → compute snapshot → freeze → notify S2
 - S2 can continue with old snapshot or switch at a safe boundary
 
-3.15.5 — Tests
+✅ 3.15.5 — Tests
 - Same plugin set produces identical snapshot IDs
 - Snapshot stability across registry rebuilds
 - S2 snapshot selection and boundary switching

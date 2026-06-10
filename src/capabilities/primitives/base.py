@@ -46,6 +46,8 @@ class PrimitiveBase(ABC):
         name: str = "",
         description: str = "",
         primitive_type: PrimitiveType | None = None,
+        plugin_name: str | None = None,
+        plugin_version: str | None = None,
     ) -> None:
         # Resolve from class-level attributes when not passed explicitly
         # (supports the zero-boilerplate plugin-author pattern where
@@ -61,6 +63,12 @@ class PrimitiveBase(ABC):
             cls, "primitive_type", PrimitiveType.PYTHON
         )
         """Runtime type: ``python``, ``cli``, or ``mcp``."""
+
+        self.plugin_name: str | None = plugin_name
+        """Owning plugin name, or ``None`` for stdlib primitives (3.15)."""
+
+        self.plugin_version: str | None = plugin_version
+        """Owning plugin version, or ``None`` for stdlib primitives (3.15)."""
 
     @abstractmethod
     def validate_args(self, args: dict) -> None:
