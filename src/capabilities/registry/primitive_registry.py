@@ -33,6 +33,16 @@ class PrimitiveRegistry:
             return list(self._primitives.values())
         return [p for p in self._primitives.values() if filter(p)]
 
+    def remove(self, name: str) -> None:
+        """Remove a primitive from the registry.
+
+        Raises:
+            KeyError: If *name* is not registered.
+        """
+        if name not in self._primitives:
+            raise KeyError(f"Primitive '{name}' is not registered")
+        del self._primitives[name]
+
     def find(self, query: str) -> list[dict]:
         """Search primitives by *name* and *description*, returning scored results.
 

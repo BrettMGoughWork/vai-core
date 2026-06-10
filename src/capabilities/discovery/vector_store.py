@@ -90,6 +90,19 @@ class VectorStore:
                 return
         raise ValueError(f"No vector entry for name {name!r}")
 
+    def remove(self, name: str) -> None:
+        """Remove a single vector entry identified by metadata ``"name"``.
+
+        Raises:
+            ValueError: If no entry with the given *name* exists.
+        """
+        for i, meta in enumerate(self._metadata):
+            if meta.get("name") == name:
+                del self._vectors[i]
+                del self._metadata[i]
+                return
+        raise ValueError(f"No vector entry for name {name!r}")
+
     def clear(self) -> None:
         """Remove all stored vectors."""
         self._vectors.clear()

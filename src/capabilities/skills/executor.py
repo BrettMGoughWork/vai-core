@@ -158,6 +158,48 @@ class SkillExecutor:
 
         return _resolve(dict(args))
 
+    @staticmethod
+    def _interpolate_value(
+        value: str,
+        inputs: dict[str, Any],
+        step_results: list[PrimitiveResult],
+    ) -> str:
+        """Resolve ``{{key}}`` tokens in *value* against *inputs* and prior results.
+
+        ``{{N}}`` references resolve to the data of ``step_results[N]``.
+        Named references like ``{{result.value}}`` resolve from the last result.
+        """
+        _STEP_REF_RE = re.compile(r"^\d+$")
+
+        def _resolve_token(m: re.Match[str]) -> str:
+            key = m.group(1)
+            # {{N}} → step_results[N]
+            if _STEP_REF_RE.match(key):
+                idx = int(key)
+                if idx < len(step_results):
+                    sr = step_results[idx]
+                    return str(sr.data.get("value", sr.data))
+            # {{result}} or {{result.X}} → last result
+            if key.startswith("result"):
+                parts = key.split(".", 1)
+                if step_results:
+                    last = step_results[-1]
+                    if len(parts) == 1:
+                        return str(last.data.get("value", last.data))
+                    field = parts[1]
+                    return str(last.data.get(field, ""))
+            # {{key}} → inputs
+            if key in inputs:
+                return str(inputs[key])
+            # {{step-N}} → stringified accumulated inputs
+            if key.startswith("step-"):
+                return json.dumps(inputs, default=str)
+            raise KeyError(
+                f"interpolation token '{{{{{key}}}}}' not found in inputs"
+            )
+
+        return _ANY_TEMPLATE_RE.sub(_resolve_token, value)
+
     def execute(
         self,
         skill: CapabilitySkill,
@@ -188,9 +230,24 @@ class SkillExecutor:
             on_error: str | None = step.get("on_error")
             has_python = "python" in step
             has_call = "call" in step
+            has_return = "return" in step
 
             if has_python and has_call:
                 raise ValueError("step must not contain both 'python' and 'call'")
+
+            # ── return step ── (terminal: emit final output)
+            if has_return:
+                return_val = self._interpolate_value(
+                    step["return"], inputs, step_results,
+                )
+                step_results.append(
+                    PrimitiveResult(status="success", data={"value": return_val})
+                )
+                return SkillExecutionResult(
+                    status="success",
+                    results=step_results,
+                )
+
             if has_python:
                 try:
                     data = self._execute_python_block(step["python"], inputs)
@@ -213,7 +270,8 @@ class SkillExecutor:
                 raise ValueError("Invalid step: must contain 'call' or 'python'")
 
             call: str = step["call"]
-            args: dict[str, Any] = step.get("args", {})
+            # Accept both "args" and "with" as the argument bag for a call step.
+            args: dict[str, Any] = step.get("args") or step.get("with", {})
 
             primitive = skill.primitives.get(call)
             if primitive is None:
