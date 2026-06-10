@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.core.types.hashing import stable_hash
 from src.core.memory.subgoal_memory_types import SubgoalMemoryRecord
@@ -26,6 +26,7 @@ from src.core.memory.repair.repair_types import (
     RepairPlan,
     RepairedSegmentRecord,
     RepairOutcome,
+    RepairStrategyContext,
 )
 
 
@@ -101,7 +102,17 @@ class PlanRepair:
 
     No LLM calls. No semantic inference. No content generation.
     All repairs are structural, auditable, and reversible.
+
+    When a SemanticMemoryIndex is provided (PHASE 2.16.4), the repair engine
+    consults semantic memory to enrich repair outcomes with strategy context
+    derived from historically successful and failed repair patterns.
     """
+
+    def __init__(
+        self,
+        memory_index: Optional[Any] = None,
+    ) -> None:
+        self._memory_index = memory_index  # SemanticMemoryIndex or None
 
     # ------------------------------------------------------------------
     # 1. Detection
@@ -333,6 +344,99 @@ class PlanRepair:
         )
 
     # ------------------------------------------------------------------
+    # 2.6. Memory-aware repair context (PHASE 2.16.4)
+    # ------------------------------------------------------------------
+
+    def get_repair_context(
+        self,
+        plan_record: PlanMemoryRecord,
+        breakage: PlanBreakageReport,
+        k: int = 5,
+    ) -> RepairStrategyContext:
+        """
+        Query the semantic memory index for repair strategy hints relevant to
+        the plan and its detected breakages.
+
+        Returns an empty RepairStrategyContext when no index is configured.
+        """
+        if self._memory_index is None:
+            return RepairStrategyContext()
+
+        topics = self._extract_repair_topics(plan_record, breakage)
+        entities = self._extract_repair_entities(plan_record, breakage)
+        capabilities = self._extract_repair_capabilities(breakage)
+
+        # Find similar subgoals for historical success/failure patterns
+        similar_subgoals = self._memory_index.find_similar_subgoals(
+            topics=topics,
+            entities=entities,
+            capability_patterns=capabilities,
+            k=k,
+        )
+
+        # Find similar drifts for failure-prone patterns
+        similar_drifts = self._memory_index.find_similar_drifts(
+            topics=topics,
+            entities=entities,
+            capability_patterns=capabilities,
+            k=k,
+        )
+
+        all_records = list(similar_subgoals) + list(similar_drifts)
+        if not all_records:
+            return RepairStrategyContext()
+
+        preferred: List[str] = []
+        avoid: List[str] = []
+        successful_patterns: List[str] = []
+        drift_risks: List[str] = []
+
+        success_count = 0
+        failure_count = 0
+
+        for record in similar_subgoals:
+            caps = list(record.capability_patterns)
+            if record.outcome in ("success", "partial_success"):
+                success_count += 1
+                preferred.extend(caps)
+                if caps:
+                    successful_patterns.append("→".join(caps))
+            else:
+                failure_count += 1
+                avoid.extend(caps)
+                if caps:
+                    drift_risks.append("→".join(caps))
+
+        for record in similar_drifts:
+            caps = list(record.capability_patterns)
+            failure_count += 1
+            avoid.extend(caps)
+            if caps:
+                drift_risks.append("→".join(caps))
+
+        total = len(all_records)
+        confidence = success_count / total if total > 0 else 0.0
+
+        # Deduplicate while preserving first-seen order
+        def _dedup(seq: List[str]) -> Tuple[str, ...]:
+            seen: set = set()
+            result: List[str] = []
+            for item in seq:
+                if item not in seen:
+                    seen.add(item)
+                    result.append(item)
+            return tuple(result)
+
+        return RepairStrategyContext(
+            preferred_capabilities=_dedup(preferred),
+            avoid_capabilities=_dedup(avoid),
+            successful_patterns=_dedup(successful_patterns),
+            drift_risks=_dedup(drift_risks),
+            confidence=confidence,
+            matches=total,
+        )
+
+    # ------------------------------------------------------------------
     # 3. Segment regeneration
     # ------------------------------------------------------------------
 
@@ -389,6 +493,9 @@ class PlanRepair:
 
         Returned RepairOutcome.repaired_plan is None on failure.
         Regenerated segment placeholders are always returned for caller visibility.
+
+        When a memory index is configured, RepairOutcome.strategy_context contains
+        semantic-memory-derived repair hints (PHASE 2.16.4).
         """
         if repair_budget <= 0:
             raise ValueError(f"repair_budget must be > 0, got {repair_budget}")
@@ -401,6 +508,17 @@ class PlanRepair:
         accumulated_actions: List[RepairAction] = []
         budget_used = 0
         seen_fingerprints: Set[str] = set()
+
+        # Compute strategy context once from the initial breakage report (2.16.4)
+        initial_breakage = self.detect_breakages(
+            working_plan,
+            working_segments,
+            set(),
+            subgoals_by_id,
+            drift_events,
+            now,
+        )
+        strategy_ctx = self.get_repair_context(plan_record, initial_breakage)
 
         for attempt in range(1, retry_limit + 1):
             breakage = self.detect_breakages(
@@ -421,6 +539,7 @@ class PlanRepair:
                     errors=(),
                     attempts=attempt,
                     budget_used=budget_used,
+                    strategy_context=strategy_ctx,
                 )
 
             fp = _breakage_fingerprint(breakage)
@@ -433,6 +552,7 @@ class PlanRepair:
                     errors=("Circular repair loop detected — breakage state unchanged after repair",),
                     attempts=attempt,
                     budget_used=budget_used,
+                    strategy_context=strategy_ctx,
                 )
             seen_fingerprints.add(fp)
 
@@ -447,6 +567,7 @@ class PlanRepair:
                     errors=("No actionable repairs available for remaining breakages",),
                     attempts=attempt,
                     budget_used=budget_used,
+                    strategy_context=strategy_ctx,
                 )
 
             n_actions = len(repair_plan.actions)
@@ -462,6 +583,7 @@ class PlanRepair:
                     ),
                     attempts=attempt,
                     budget_used=budget_used,
+                    strategy_context=strategy_ctx,
                 )
 
             # Apply all actions for this cycle
@@ -493,6 +615,7 @@ class PlanRepair:
             errors=() if success else ("Retry limit exhausted with breakages remaining",),
             attempts=retry_limit,
             budget_used=budget_used,
+            strategy_context=strategy_ctx,
         )
 
     # ------------------------------------------------------------------
@@ -559,3 +682,84 @@ class PlanRepair:
                 working_segments.pop(seg_id, None)
 
         return working_plan, working_segments, new_regenerated
+
+    # ------------------------------------------------------------------
+    # Internal: extraction helpers for memory-aware repair (2.16.4)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_repair_topics(
+        plan_record: PlanMemoryRecord,
+        breakage: PlanBreakageReport,
+    ) -> List[str]:
+        """
+        Deterministic extraction of topic-like terms from plan data and breakage report.
+
+        Uses plan intent, skill id, breakage error types, and drift signal types.
+        No NLP, no randomness.
+        """
+        topics: List[str] = []
+        if plan_record.intent and plan_record.intent.strip():
+            topics.append(plan_record.intent.strip())
+        if plan_record.targetskillid and plan_record.targetskillid.strip():
+            topics.append(plan_record.targetskillid.strip())
+        # Add breakage error types as topics (e.g. "MISSING_SEGMENT")
+        for error in breakage.errors:
+            topics.append(error.error_type)
+        # Add drift signal types
+        for drift in breakage.drift_flags:
+            topics.append(drift.signal_type)
+        return topics
+
+    @staticmethod
+    def _extract_repair_entities(
+        plan_record: PlanMemoryRecord,
+        breakage: PlanBreakageReport,
+    ) -> List[str]:
+        """
+        Deterministic extraction of entity-like terms from plan and breakage data.
+
+        Uses plan_id, subgoal_id, affected segment IDs, and missing segment IDs.
+        """
+        entities: List[str] = [plan_record.plan_id, plan_record.subgoal_id]
+        for error in breakage.errors:
+            if error.record_id not in entities:
+                entities.append(error.record_id)
+        for seg_id in breakage.missing_segments:
+            if seg_id not in entities:
+                entities.append(seg_id)
+        for link in breakage.invalid_links:
+            if link.from_id not in entities:
+                entities.append(link.from_id)
+            if link.to_id not in entities:
+                entities.append(link.to_id)
+        return entities
+
+    @staticmethod
+    def _extract_repair_capabilities(
+        breakage: PlanBreakageReport,
+    ) -> List[str]:
+        """
+        Deterministic extraction of repair-action types as capability-like terms.
+
+        Maps breakage errors to their corresponding repair action types, which
+        serve as capability patterns for semantic memory lookups.
+        """
+        caps: List[str] = []
+
+        # Map error types to their standard repair actions
+        action_map = {
+            "MISSING_SEGMENT": "REGENERATE_SEGMENT",
+            "BROKEN_PARENT_LINK": "RECONSTRUCT_CHAIN",
+            "SUBGOAL_MISMATCH": "QUARANTINE_SEGMENT",
+            "MISSING_SUBGOAL": "REDECOMPOSE_SUBGOAL",
+        }
+
+        seen: Set[str] = set()
+        for error in breakage.errors:
+            action = action_map.get(error.error_type)
+            if action and action not in seen:
+                seen.add(action)
+                caps.append(action)
+
+        return caps
