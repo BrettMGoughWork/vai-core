@@ -107,6 +107,28 @@ Options:
     --backend         "real_llm" (default) or "mock" (deterministic MockLLM)
     --json            Output machine-readable JSON instead of formatted text
 
+### S2 REPL Harness (`tools/testing_harness/repl_harness.py`)
+
+An interactive REPL (Read-Eval-Print Loop) that accepts user prompts, runs the full S2 pipeline (plan → detect breakages → repair), and remembers conversation context across turns. This is the primary manual testing interface for Release 0.1→1.0.
+
+Usage:
+    # Start the REPL with MockLLM (deterministic, no API calls)
+    python tools/testing_harness/repl_harness.py --mock
+
+    # Start the REPL (same — defaults to mock for safety)
+    python tools/testing_harness/repl_harness.py
+
+REPL Commands (type at the `s2>` prompt):
+    <any text>       Plan it, detect breakages, repair if needed
+    :history         Show conversation history
+    :plans           List all generated plans
+    :context         Show current conversation context
+    :clear           Reset conversation context
+    :help            Show help text
+    :quit / :exit    Exit the REPL
+
+Each turn runs: create subgoal → plan generation → breakage detection → repair (if not clean). The full plan, breakage report, and repair outcome are displayed after each turn.
+
 
 ### Statistical Conformance Runner (`tests/statistical/`)
 

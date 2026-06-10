@@ -139,6 +139,20 @@ Deterministic, stdin-driven CLI for end-to-end validation of the full drift-to-r
 python tools/testing_harness/signal_harness.py < signals.json
 ```
 
+### `repl_harness.py`
+
+Interactive REPL (read-eval-print loop) for the full S2 pipeline: **plan → breakage detection → repair**. Remembers conversation context across turns. Primary manual testing interface for Release 0.1→1.0.
+
+```
+# Start with MockLLM (deterministic, default)
+python tools/testing_harness/repl_harness.py --mock
+
+# Or just:
+python tools/testing_harness/repl_harness.py
+```
+
+REPL commands: `<prompt>` (run pipeline), `:history`, `:plans`, `:context`, `:clear`, `:help`, `:quit`
+
 ---
 
 ## Custom Utilities (`tools/custom/`)
@@ -166,6 +180,7 @@ All tools follow these principles:
 - Run `ci_architecture_check.py` before opening a PR.
 - Run the fetch harness to verify HTTP pipeline health after changes to the fetch subsystem.
 - Use `e2e_harness.py` to validate the full S3 → S2 → S1 boundary before releases.
+- Use `repl_harness.py` for interactive manual testing of the S2 plan-detect-repair pipeline.
 - Use `run_cycle.py` for focused debugging of a single LLM interaction.
 - Treat violations as signals, not suggestions.
 - Extend tooling when patterns become repetitive.

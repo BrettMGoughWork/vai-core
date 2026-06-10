@@ -12,8 +12,9 @@ The policy engine ranks repair actions for a given drift type using:
 Rules (applied in order):
   1. Actions with ≥3 consecutive failures are demoted to the end.
   2. Actions with ≥80% success rate are promoted to the front.
-  3. Actions with no history keep their original position.
-  4. Ties are broken by original order.
+  3. Actions neither promoted nor demoted keep their original position.
+  4. Promoted actions are further sorted by descending success rate.
+  5. Ties are broken by original order.
 
 All ranking is deterministic — no LLM, no randomness, no I/O.
 """
@@ -69,7 +70,7 @@ def rank_actions(
         elif success_rate >= policy.success_threshold:
             score = 2.0 + success_rate  # Promoted above all others
         else:
-            score = success_rate  # 0.0 to 0.79 — keeps original relative order
+            score = 0.0  # Neutral — preserves original relative order
 
         ranked.append((action, score, i))
 
