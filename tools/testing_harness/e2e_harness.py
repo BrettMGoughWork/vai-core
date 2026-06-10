@@ -263,18 +263,34 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         accumulated_outputs: dict[str, Any] = {}
 
         # Simple template resolver for forward-reference resolution
+        _STEP_REF_RE = re.compile(r"^step-\d+$")
+
         def _resolve_templates(value: Any, sources: dict[str, Any], parent_key: str = "") -> Any:
-            """Resolve '{{key}}' tokens, '$ref' references, and JSONPath-like strings
-            in *value* against *sources* (accumulated outputs from previous steps)."""
+            """Resolve '{{key}}' tokens, fallback '{{step-N}}' references, and
+            legacy '$ref' / JSONPath-like strings against *sources* (accumulated
+            outputs from previous steps)."""
             if isinstance(value, str):
                 # 1. Bare {{key}} token → return raw source value
-                m = re.match(r"^\{\{\s*(\w+)\s*\}\}$", value)
-                if m and m.group(1) in sources:
-                    return sources[m.group(1)]
+                m = re.match(r"^\{\{\s*([\w-]+)\s*\}\}$", value)
+                if m:
+                    key = m.group(1)
+                    if key in sources:
+                        return sources[key]
+                    # Fallback: {{step-N}} → stringified accumulated outputs
+                    if _STEP_REF_RE.match(key):
+                        return json.dumps(sources, default=str)
+                    return value
                 # 2. Embedded {{key}} tokens → stringify
+                def _replacer(m: re.Match[str]) -> str:
+                    key = m.group(1)
+                    if key in sources:
+                        return str(sources[key])
+                    if _STEP_REF_RE.match(key):
+                        return json.dumps(sources, default=str)
+                    return m.group(0)
                 value = re.sub(
-                    r"\{\{\s*(\w+)\s*\}\}",
-                    lambda m: str(sources[m.group(1)]) if m.group(1) in sources else m.group(0),
+                    r"\{\{\s*([\w-]+)\s*\}\}",
+                    _replacer,
                     value,
                 )
                 # 3. JSONPath-like reference (e.g., "$.steps[0].result", "$.steps[0].output")
@@ -331,6 +347,8 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
                     _out(f"       [OK] success  output={json.dumps(s2_result.output, default=str)[:120]}")
                     if s2_result.output and isinstance(s2_result.output, dict):
                         accumulated_outputs.update(s2_result.output)
+                        # Store per-step output for {{step-N}} fallback references
+                        accumulated_outputs[f"step-{i+1}"] = json.dumps(s2_result.output, default=str)
                 else:
                     _out(f"       [FAIL] error={s2_result.error}")
             except Exception as exc:
