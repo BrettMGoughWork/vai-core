@@ -12,8 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Literal
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class PrimitiveType(str, Enum):
     """The runtime type of a primitive."""
 
@@ -22,6 +24,7 @@ class PrimitiveType(str, Enum):
     MCP = "mcp"
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 @dataclass
 class PrimitiveResult:
     """

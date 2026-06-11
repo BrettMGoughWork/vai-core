@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from src.execution.engine import execute_tool
-from src.core.types.result import CoreResult
+from src.runtime.engine import execute_tool
+from src.strategy.types.result import CoreResult
 from src.capabilities.primitives.base import PrimitiveBase
 
 
@@ -109,7 +109,7 @@ def test_execute_tool_with_multiple_args():
 
 def test_execute_tool_handles_validation_errors():
     """execute_tool catches and returns ValidationError as CoreResult."""
-    from src.core.types.errors import ValidationError
+    from src.strategy.types.errors import ValidationError
 
     mock_skill = MagicMock()
     mock_skill.output_schema = None

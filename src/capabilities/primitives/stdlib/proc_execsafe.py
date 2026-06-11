@@ -19,6 +19,7 @@ _DEFAULT_BLOCKED_COMMANDS: set[str] = {
 }
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class ProcExecSafePrimitive(PrimitiveBase):
     """Execute a command with safety constraints (blocklist, timeout, cwd)."""
 
@@ -86,6 +87,7 @@ class ProcExecSafePrimitive(PrimitiveBase):
 
         # Delegate to proc.exec (which expects 'cmd', not 'command')
         from src.capabilities.primitives.stdlib.proc_exec import ProcExecPrimitive
+from src.strategy.types.validation import deadcode_ignore
         exec_primitive = ProcExecPrimitive()
         # proc.exec only uses 'cmd' and 'timeout'; cwd is not supported by proc.exec
         exec_args: dict[str, Any] = {"cmd": command if isinstance(command, str) else subprocess.list2cmdline(command)}

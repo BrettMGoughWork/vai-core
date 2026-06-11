@@ -16,8 +16,10 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from src.capabilities.primitives.types import PrimitiveType, PrimitiveResult
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class PrimitiveBase(ABC):
     """
     Abstract base class for all S3 primitives.

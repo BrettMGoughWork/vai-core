@@ -1,7 +1,10 @@
 from __future__ import annotations
 from typing import Any, Dict
 
+from src.strategy.types.validation.deadcode_markers import deadcode_ignore
 
+
+@deadcode_ignore(reason="Defined as part of error taxonomy, used via type field")
 class SemanticValidationError(Exception):
     pass
 

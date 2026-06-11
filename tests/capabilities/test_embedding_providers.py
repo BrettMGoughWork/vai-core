@@ -16,7 +16,7 @@ from src.capabilities.discovery.providers.base import EmbeddingProvider
 from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
 from src.capabilities.discovery.providers.openai_provider import OpenAIEmbeddingProvider
 from src.capabilities.discovery.providers.local_provider import LocalEmbeddingProvider
-from src.core.state.config import EmbeddingConfig
+from src.strategy.state.config import EmbeddingConfig
 
 
 class TestMockProvider:

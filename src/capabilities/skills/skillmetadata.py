@@ -1,2 +1,2 @@
 # Re-exported from domain layer for backward compatibility.
-from src.core.types.skill import SkillMetadata  # noqa: F401
+from src.strategy.types.skill import SkillMetadata  # noqa: F401

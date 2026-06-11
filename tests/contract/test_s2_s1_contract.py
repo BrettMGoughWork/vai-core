@@ -17,14 +17,14 @@ import json
 
 import pytest
 
-from src.core.planning.s1_contract.types import (
+from src.strategy.planning.s1_contract.types import (
     PromptRequest,
     PromptResponse,
     ToolCallRequest,
     ToolCallResult,
     S1Error,
 )
-from src.core.planning.s1_contract.validators import (
+from src.strategy.planning.s1_contract.validators import (
     validate_prompt_request,
     validate_prompt_response,
     validate_tool_call_request,
@@ -33,8 +33,8 @@ from src.core.planning.s1_contract.validators import (
     validate_prompt_request_detailed,
     validate_prompt_response_detailed,
 )
-from src.core.planning.s1_contract.s2_to_s1_adapter import build_prompt_request
-from src.core.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response
+from src.strategy.planning.s1_contract.s2_to_s1_adapter import build_prompt_request
+from src.strategy.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Synthetic S2 state helpers

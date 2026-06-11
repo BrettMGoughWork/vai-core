@@ -30,12 +30,12 @@ from src.capabilities.skills.executor import SkillExecutor
 from tests.capabilities.skills.test_executor import SuccessPrimitive
 from src.capabilities.skills.manifest import SkillManifest
 from src.capabilities.skills.skill import CapabilitySkill
-from src.core.memory.segment_memory import SegmentMemory
-from src.core.planning.dispatch.plan_executor import PlanExecutor
-from src.core.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
-from src.core.planning.models.plan import Plan
-from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
-from src.core.types.step_result import StepResult
+from src.strategy.memory.segment_memory import SegmentMemory
+from src.strategy.planning.dispatch.plan_executor import PlanExecutor
+from src.strategy.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
+from src.strategy.planning.models.plan import Plan
+from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
+from src.strategy.types.step_result import StepResult
 from src.stratum2.s3_adapter import (
     S2DiscoveredSkill,
     S2DiscoveryQuery,

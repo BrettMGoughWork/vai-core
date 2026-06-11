@@ -23,28 +23,28 @@ from typing import Dict, Any, List
 
 import pytest
 
-from src.core.planning.agent_loop.agent_loop_v3 import (
+from src.strategy.planning.agent_loop.agent_loop import (
     AgentExecutionState,
     AgentFullTrace,
     AgentLoopResult,
     run_agent_loop,
 )
-from src.core.planning.s1_contract.types import (
+from src.strategy.planning.s1_contract.types import (
     PromptRequest,
     PromptResponse,
     S1Error,
 )
-from src.core.planning.s1_contract.s2_to_s1_adapter import (
+from src.strategy.planning.s1_contract.s2_to_s1_adapter import (
     build_prompt_request,
     validate_s2_to_s1,
     validate_s2_to_s1_detailed,
 )
-from src.core.planning.s1_contract.s1_to_s2_adapter import (
+from src.strategy.planning.s1_contract.s1_to_s2_adapter import (
     parse_prompt_response,
     validate_s1_to_s2,
 )
-from src.core.planning.s1_contract.s1_client import call_s1_backend
-from src.core.planning.s1_contract.validators import (
+from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.strategy.planning.s1_contract.validators import (
     validate_prompt_request,
     validate_prompt_response,
 )

@@ -23,21 +23,21 @@ from typing import Dict, Any
 
 import pytest
 
-from src.core.planning.s1_contract.types import (
+from src.strategy.planning.s1_contract.types import (
     PromptRequest,
     PromptResponse,
     S1Error,
 )
-from src.core.planning.s1_contract.s1_client import call_s1_backend
-from src.core.planning.s1_contract.s1_real_client import (
+from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.strategy.planning.s1_contract.s1_real_client import (
     ENABLE_REAL_LLM,
     S1RealLLMError,
     call_llm,
 )
-from src.core.planning.s1_contract.s1_response_validator import (
+from src.strategy.planning.s1_contract.s1_response_validator import (
     validate_llm_response,
 )
-from src.core.planning.s1_contract.validators import (
+from src.strategy.planning.s1_contract.validators import (
     validate_prompt_request,
     validate_prompt_response,
 )

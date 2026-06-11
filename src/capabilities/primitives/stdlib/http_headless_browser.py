@@ -17,6 +17,7 @@ from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 _playwright_available: bool
 try:
     from playwright.sync_api import (
+from src.strategy.types.validation import deadcode_ignore
         Error as PwError,
         TimeoutError as PwTimeoutError,
         sync_playwright,
@@ -87,6 +88,7 @@ def _classify_pw_exception(exc: Exception) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class HttpHeadlessBrowserPrimitive(PrimitiveBase):
     """Headless browser HTTP GET with JS execution and DOM rendering."""
 

@@ -9,6 +9,7 @@ from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class ProcPsPrimitive(PrimitiveBase):
     """List running processes on the system."""
 
@@ -51,6 +52,7 @@ class ProcPsPrimitive(PrimitiveBase):
                         processes.append({"pid": parts[-1].strip(), "name": parts[-2].strip()})
             else:
                 import subprocess
+from src.strategy.types.validation import deadcode_ignore
                 result = subprocess.run(
                     ["ps", "-eo", "pid,comm,args", "--no-headers"],
                     capture_output=True, text=True, timeout=10,

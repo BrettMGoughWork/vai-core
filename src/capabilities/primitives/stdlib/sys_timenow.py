@@ -10,6 +10,7 @@ from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class SysTimeNowPrimitive(PrimitiveBase):
     """Get the current system time in various formats."""
 
@@ -42,6 +43,7 @@ class SysTimeNowPrimitive(PrimitiveBase):
         now = time.time()
         if tz:
             import zoneinfo
+from src.strategy.types.validation import deadcode_ignore
             try:
                 dt = datetime.fromtimestamp(now, tz=zoneinfo.ZoneInfo(tz))
             except Exception:

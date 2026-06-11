@@ -7,8 +7,10 @@ import time
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class NetDnsLookupPrimitive(PrimitiveBase):
     """Resolve a hostname to IP addresses using getaddrinfo."""
 

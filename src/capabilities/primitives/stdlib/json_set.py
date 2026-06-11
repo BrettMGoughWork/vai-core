@@ -7,8 +7,10 @@ import json
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class JsonSetPrimitive(PrimitiveBase):
     """Set a key on a JSON object, returning the modified object."""
 

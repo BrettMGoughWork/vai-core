@@ -1,11 +1,11 @@
 import pytest
-from src.core.types.errors import ValidationError
-from src.core.planning.models.plan import Plan as RealPlan
-from src.core.types.errors.plan_errors import (
+from src.strategy.types.errors import ValidationError
+from src.strategy.planning.models.plan import Plan as RealPlan
+from src.strategy.types.errors.plan_errors import (
     PlanStructureError,
     ForbiddenCapabilityError, PlanSafetyError
 )
-from src.core.planning.validators.plan_validator import PlanValidator
+from src.strategy.planning.validators.plan_validator import PlanValidator
 
 # Test double: adds to_dict for compatibility without polluting the real Plan class
 class PlanTestDouble(RealPlan):
@@ -85,12 +85,12 @@ def test_plan_purity_error_on_capability_output():
     Purity is enforced on capability outputs, not on PlanValidator.
     This test creates a dummy capability that returns a forbidden key in its output.
     """
-    from src.core.planning.dispatch.plan_executor import PlanExecutor
-    from src.core.types.errors.ValidationError import ValidationError
-    from src.core.planning.models.plan_state import PlanState
-    from src.core.planning.models.step_state import StepState
-    from src.core.types.step_result import StepResult
-    from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
+    from src.strategy.planning.dispatch.plan_executor import PlanExecutor
+    from src.strategy.types.errors.ValidationError import ValidationError
+    from src.strategy.planning.models.plan_state import PlanState
+    from src.strategy.planning.models.step_state import StepState
+    from src.strategy.types.step_result import StepResult
+    from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
 
     class DummyCapability:
         def execute(self, arguments):
@@ -101,7 +101,7 @@ def test_plan_purity_error_on_capability_output():
             self.core_step = type("CoreStep", (), {"capabilities": {"dummy": {}}})()
         def dispatch(self, plan, plan_state=None):
             # Always return a successful StepState and forbidden output
-            from src.core.planning.models.step_state import StepStatus
+            from src.strategy.planning.models.step_state import StepStatus
             return StepState(
                 step_id="dummy",
                 parent_id=None,

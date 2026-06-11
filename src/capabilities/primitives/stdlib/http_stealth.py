@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover
 
 try:
     from playwright_stealth import Stealth
+from src.strategy.types.validation import deadcode_ignore
 
     _stealth_available = True
 except ImportError:  # pragma: no cover
@@ -164,6 +165,7 @@ def _build_screen_metrics() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class HttpStealthPrimitive(PrimitiveBase):
     """Stealth browser HTTP GET with fingerprint masking and human-like timing."""
 

@@ -12,7 +12,7 @@ from src.capabilities.search.provider_registry import ProviderRegistry, Registry
 from src.capabilities.search.providers._base import SearchProviderError, SearchResult
 from src.capabilities.search.providers.duckduckgo import DuckDuckGoProvider
 from src.capabilities.search.providers.tavily import TavilyProvider
-from src.core.state.config import ProviderConfig, SearchConfig
+from src.strategy.state.config import ProviderConfig, SearchConfig
 
 
 # ── Test helpers ──────────────────────────────────────────────────────────

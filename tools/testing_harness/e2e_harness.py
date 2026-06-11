@@ -126,6 +126,12 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         from src.capabilities.registry.primitive_registry import PrimitiveRegistry
         prim_registry = PrimitiveRegistry()
         prim_count = load_all_primitives(prim_registry)
+
+        # Wire up external primitive loaders (CLI, MCP) — ready when config provided
+        from src.capabilities.registry.loaders import load_external_loaders
+
+        prim_count += load_external_loaders(prim_registry)
+
         _out(f"{MINOR} PRIMITIVES {MINOR}")
         _out(f"  Loaded: {prim_count} primitives")
 
@@ -169,11 +175,11 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         s3_adapter = S3Adapter(runner)
 
         # ── 4. Wire up MemoryGovernance ──────────────────────────────────
-        from src.core.memory.segment_memory import SegmentMemory
-        from src.core.memory.subgoal_memory import SubgoalMemory
-        from src.core.memory.plan_memory import PlanMemory
-        from src.core.memory.drift_memory import DriftMemory
-        from src.core.memory.governance.memory_governance import MemoryGovernance
+        from src.strategy.memory.segment_memory import SegmentMemory
+        from src.strategy.memory.subgoal_memory import SubgoalMemory
+        from src.strategy.memory.plan_memory import PlanMemory
+        from src.strategy.memory.drift_memory import DriftMemory
+        from src.strategy.memory.governance.memory_governance import MemoryGovernance
 
         segment_memory = SegmentMemory()
         subgoal_memory = SubgoalMemory()
@@ -185,22 +191,22 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
 
         # ── 5. Wire up LLM ───────────────────────────────────────────────
         if backend == "mock":
-            from src.core.llm.mock_llm import MockLLM
+            from src.strategy.llm.mock_llm import MockLLM
             llm = MockLLM()
             model = "mock"
         else:
-            from src.core.llm.llm_factory import factory
+            from src.strategy.llm.llm_factory import factory
             provider = os.environ.get("LLM_PROVIDER", "deepseek")
             model = os.environ.get("LLM_MODEL", "deepseek-chat")
             llm = factory.create(provider, model)
 
         # ── 6. Wire up SubgoalPlanner ────────────────────────────────────
-        from src.core.planning.generator.subgoal_planner import SubgoalPlanner
+        from src.strategy.planning.generator.subgoal_planner import SubgoalPlanner
         planner = SubgoalPlanner(llm=llm, model=model, s3_adapter=s3_adapter)
 
         # ── 7. Register subgoal + generate plan ──────────────────────────
-        from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
-        from src.core.types.hashing import stable_hash
+        from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
+        from src.strategy.types.hashing import stable_hash
 
         subgoal_id = stable_hash({"prompt": prompt, "harness": "e2e"})
         timestamp = "2025-01-01T00:00:00Z"
@@ -268,7 +274,7 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         # Build runtime context with search config for primitives (PHASE 3.13.2)
         runtime_context: dict = {}
         try:
-            from src.core.config.loader import Config
+            from src.strategy.config.loader import Config
             cfg = Config("config/config.yaml")
             search_cfg = cfg.get("search")
             if search_cfg is not None and search_cfg.enabled:

@@ -7,8 +7,10 @@ import os
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class FileReadrangePrimitive(PrimitiveBase):
     """Read a byte range from a file and return it as a UTF-8 string."""
 

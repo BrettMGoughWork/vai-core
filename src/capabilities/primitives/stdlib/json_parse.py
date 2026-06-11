@@ -6,8 +6,10 @@ import json
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class JsonParsePrimitive(PrimitiveBase):
     """Parse a JSON string into a Python object."""
 

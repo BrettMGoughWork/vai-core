@@ -14,7 +14,7 @@ from src.capabilities.skills.executor import SkillExecutor
 from src.capabilities.skills.manifest import SkillManifest
 from src.capabilities.skills.skill import CapabilitySkill
 from src.capabilities.skills.skill_parser import parse_skill_file
-from src.core.state.config import SearchProviderConfig
+from src.strategy.state.config import SearchProviderConfig
 
 
 @pytest.fixture

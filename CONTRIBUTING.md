@@ -26,7 +26,7 @@ Use existing folders and keep scope narrow.
 - `main.py`: runtime entrypoint and bootstrapping.
 - `config/`: model aliases and runtime config.
 - `src/core/`: agent loop, config, llm transport/providers, shared types, planning contracts.
-- `src/execution/`: execution engine and retry/safety runtime behavior.
+- `src/runtime/`: execution engine and retry/safety runtime behavior.
 - `src/governance/`: tool and policy guardrails.
 - `src/primitives/runtime`: tool specs, registry, schema generation, filtering/ranking.
 - `src/primitives/`: skill implementations.

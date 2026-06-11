@@ -1,5 +1,5 @@
-from src.core.state.config import AgentConfig, LoopPolicyConfig
-from src.core.types.capabilities import SkillCategory, SideEffect
+from src.strategy.state.config import AgentConfig, LoopPolicyConfig
+from src.strategy.types.capabilities import SkillCategory, SideEffect
 
 
 def test_loop_policy_defaults():

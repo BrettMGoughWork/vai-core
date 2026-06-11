@@ -1,0 +1,1 @@
+"""Tests for src.strategy.planning.segments."""

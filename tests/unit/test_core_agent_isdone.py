@@ -1,7 +1,7 @@
-from src.core.state.isdone import isdone
-from src.core.state.step_outcome import StepOutcome
-from src.core.state.state import ConversationState
-from src.core.state.config import AgentConfig, LoopPolicyConfig
+from src.strategy.state.isdone import isdone
+from src.strategy.state.step_outcome import StepOutcome
+from src.strategy.state.state import ConversationState
+from src.strategy.state.config import AgentConfig, LoopPolicyConfig
 
 
 def test_isdone_true_on_success():
