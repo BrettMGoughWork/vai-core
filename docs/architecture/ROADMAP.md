@@ -870,7 +870,7 @@ Goal: Wire all S2 components end‑to‑end, freeze the Release 0.1 surface area
 ## STRATUM 3 - Agent Runtime
 *Invariant*: Stratum 3 orchestrates agents, capabilities and external interfaces, but never performs long-horizon reasoning, planning, and execution itself. It delegates all reasoning to Stratum 2 and all action execution to Stratum 1.
 
-**Isolation rule**: All S3 code lives under `src/capabilities/` — completely isolated from S1 (`src/core/`) and S2 (`src/stratum2/`). S3 defines its own contracts using only standard Python types and never imports S1/S2 internals. Integration occurs via a thin adapter in S2's runtime that speaks S3's public contract.
+**Isolation rule**: All S3 code lives under `src/capabilities/` — completely isolated from S1 (`src/runtime/`) and S2 (`src/strategy/`). S3 defines its own contracts using only standard Python types and never imports S1/S2 internals. Integration occurs via a thin adapter in S2's planning layer that speaks S3's public contract.
 
 ---
 
@@ -1116,7 +1116,7 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 
 ### PHASE 3.8 — S2 ↔ S3 Integration (Thin Adapter + Bug Fixes) — 9/10 complete
 *Depends On*: PHASE 3.7
-*Design rule*: S3 (`src/capabilities/`) never imports S1/S2. Integration code lives in `src/stratum2/s3_adapter.py` as an adapter that speaks S3's public contract.
+*Design rule*: S3 (`src/capabilities/`) never imports S1/S2. Integration code lives in `src/strategy/planning/adapters/s3_adapter.py` as an adapter that speaks S3's public contract.
 *Note*: All S3 components (contracts, SkillRunner, SkillExecutor, S3Adapter) are built and tested via 26 integration tests. PlanExecutor is now wired into AgentLoopV2's main cycle via step 4.6 (3.8.10 ✅).
 
 ✅ 3.8.1 — Finalize boundary contracts
@@ -1142,7 +1142,7 @@ A minimal but powerful stdlib of primitives and skills to bootstrap the agent.
 - Must be deterministic, sandboxed, and clean up local namespace
 
 ✅ 3.8.5 — S3 adapter in S2 runtime
-- `src/stratum2/s3_adapter.py`: `discover_skills(query)`, `call_skill(request)`, handles contract translation S2-native ↔ S3 contract types
+- `src/strategy/planning/adapters/s3_adapter.py`: `discover_skills(query)`, `call_skill(request)`, handles contract translation S2-native ↔ S3 contract types
 - This is the ONLY file that imports from both S2 and S3
 
 ✅ 3.8.6 — Wire skill discovery into S2 planning
@@ -1741,8 +1741,7 @@ Refactor.1 - New folder structure
 
 ✅ Refactor.2 - Remove test warnings
 ✅ Refactor.3 - Reduce Medium, Low issues
-Refactor.4 - Cleanup documentation (readme, contributing, roadmap, tools, architecture)
-Refactor.5 - Capability Loaders (CLILoader, MCPLoader)
+Refactor.4 - Capability Loaders (CLILoader, MCPLoader)
   Extend capability discovery beyond Python stdlib primitives to support CLI and MCP primitives.
   CLILoader wraps local CLI tools as CapabilityPrimitive instances; MCPLoader connects to MCP servers and
   exposes their tools/skills as CapabilityPrimitive instances. Both abstract the calling mechanism so that

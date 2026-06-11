@@ -77,8 +77,8 @@ STRATUM_RULES: list[tuple[str, str]] = [
     # ── adapter ──
     ("agent/", "adapter"),
     ("agent\\", "adapter"),
-    ("stratum2/", "adapter"),
-    ("stratum2\\", "adapter"),
+    ("planning/adapters/", "adapter"),
+    ("planning\\adapters\\", "adapter"),
     # ── utility (catch-all for the rest) ──
     ("strategy/planning", "utility"),            # catch-all after specific sub-directories
     ("strategy\\planning", "utility"),

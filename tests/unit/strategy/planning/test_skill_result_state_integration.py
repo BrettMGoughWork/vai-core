@@ -23,7 +23,7 @@ from src.strategy.planning.models.plan import Plan
 from src.strategy.types.step_result import StepResult
 from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.strategy.planning.behavioural_delta import compute_behavioural_delta
-from src.stratum2.s3_adapter import S3Adapter, S2SkillCallRequest, S2SkillResult
+from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2SkillCallRequest, S2SkillResult
 
 
 # ── Helpers ───────────────────────────────────────────────────────────

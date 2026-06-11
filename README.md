@@ -51,6 +51,41 @@ Core Concepts
 *Skills* — small, focused behaviours that combine prompts, guardrails, and logic on top of capabilities.  
 *Safety Substrate* — the runtime’s guardrails. It controls execution, handles panics, manages degraded modes, and keeps things stable.  
 
+### Extending with CLI & MCP Primitives
+
+The capability system supports three kinds of primitives (Python, CLI, MCP).
+Python primitives are auto-discovered; CLI and MCP primitives are loaded from
+config via the external loaders.
+
+**Register CLI primitives** — pass a ``cli_config`` dict to ``load_all_primitives``:
+
+```python
+from src.capabilities.primitives.stdlib import load_all_primitives
+from src.capabilities.registry.primitive_registry import PrimitiveRegistry
+
+registry = PrimitiveRegistry()
+count = load_all_primitives(registry, cli_config={
+    "my-tool": {"command": "my-tool", "description": "Does something useful"},
+})
+```
+
+**Register MCP primitives** — pass an ``mcp_config`` dict:
+
+```python
+count = load_all_primitives(registry, mcp_config={
+    "my-server": {
+        "command": "npx",
+        "args": ["@myserver/mcp-server"],
+        "env": {"API_KEY": "..."},
+    },
+})
+```
+
+Each entry creates a ``CLIPrimitive`` or ``MCPPrimitive`` instance and registers
+it by name in the ``PrimitiveRegistry`` alongside the auto-discovered stdlib
+primitives. Skills can then reference these primitives by name the same way
+they reference any Python primitive.
+
 ### Agent-Authored Skills & Quarantine
 
 When an LLM agent authors a new skill at runtime, the skill passes through a multi-layer safety pipeline before it can be used:
@@ -64,11 +99,12 @@ When an LLM agent authors a new skill at runtime, the skill passes through a mul
 
 Repository Layout
 
-src/core/ — core types and contracts  
-src/capabilities/primitives/ — reusable building blocks  
+src/strategy/ — planning, types, contracts, runtime orchestration  
+src/capabilities/primitives/ — reusable building blocks (Python, CLI, MCP)  
 src/capabilities/skills/ — reusable agent behaviours  
-src/capabilities/registry/ — skill registry, safety validators, quarantine manager  
-src/stratum2/ — planning and execution (Stratum 2)  
+src/capabilities/registry/ — primitive & skill registries, loaders, safety validators, quarantine  
+src/runtime/ — agent-host communication, TUI, memory substrate  
+src/strategy/planning/adapters/ — S2→S3 boundary adapter  
 docs/architecture/ — deep technical docs
 
 

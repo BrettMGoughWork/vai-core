@@ -24,7 +24,7 @@ from src.strategy.memory.subgoal_memory import SubgoalMemory
 from src.strategy.planning.generator.subgoal_planner import SubgoalPlanner
 from src.strategy.types.hashing import stable_hash
 from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
-from src.stratum2.s3_adapter import S2DiscoveryQuery, S2DiscoveryResult, S2DiscoveredSkill
+from src.strategy.planning.adapters.s3_adapter import S2DiscoveryQuery, S2DiscoveryResult, S2DiscoveredSkill
 
 NOW_MS = int(time.time() * 1000)
 TIMESTAMP = datetime.fromtimestamp(NOW_MS / 1000.0, tz=timezone.utc).isoformat()

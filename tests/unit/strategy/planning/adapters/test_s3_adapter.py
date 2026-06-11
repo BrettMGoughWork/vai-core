@@ -12,7 +12,7 @@ from src.capabilities.contracts import (
     SkillDiscoveryResult,
     SkillResult,
 )
-from src.stratum2.s3_adapter import (
+from src.strategy.planning.adapters.s3_adapter import (
     S2DiscoveredSkill,
     S2DiscoveryQuery,
     S2DiscoveryResult,

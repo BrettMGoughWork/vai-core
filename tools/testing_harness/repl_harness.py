@@ -60,7 +60,7 @@ from src.strategy.memory.repair.plan_repair import PlanRepair
 from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
 from src.strategy.planning.agent_planner import AgentPlanner
 from src.strategy.planning.models.plan import Plan
-from src.stratum2.s3_adapter import S3Adapter, S2SkillCallRequest
+from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2SkillCallRequest
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -708,11 +708,6 @@ def main() -> None:
 
         prim_registry = PrimitiveRegistry()
         load_all_primitives(prim_registry)
-
-        # Wire up external primitive loaders (CLI, MCP) — ready when config provided
-        from src.capabilities.registry.loaders import load_external_loaders
-
-        load_external_loaders(prim_registry)
 
         skill_registry = CapabilitySkillRegistry(embedder=embedder)
         load_all_skills(skill_registry, prim_registry, embedder)

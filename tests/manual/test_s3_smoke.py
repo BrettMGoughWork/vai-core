@@ -72,7 +72,7 @@ from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.strategy.types.plan_segment import PlanSegment
 from src.strategy.types.step_result import StepResult
 from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
-from src.stratum2.s3_adapter import S3Adapter, S2DiscoveryQuery, S2SkillCallRequest
+from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2DiscoveryQuery, S2SkillCallRequest
 
 
 # ══════════════════════════════════════════════════════════════════════════════
