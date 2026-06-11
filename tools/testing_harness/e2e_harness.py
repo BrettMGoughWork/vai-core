@@ -127,11 +127,6 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         prim_registry = PrimitiveRegistry()
         prim_count = load_all_primitives(prim_registry)
 
-        # Wire up external primitive loaders (CLI, MCP) — ready when config provided
-        from src.capabilities.registry.loaders import load_external_loaders
-
-        prim_count += load_external_loaders(prim_registry)
-
         _out(f"{MINOR} PRIMITIVES {MINOR}")
         _out(f"  Loaded: {prim_count} primitives")
 

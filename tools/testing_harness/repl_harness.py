@@ -709,11 +709,6 @@ def main() -> None:
         prim_registry = PrimitiveRegistry()
         load_all_primitives(prim_registry)
 
-        # Wire up external primitive loaders (CLI, MCP) — ready when config provided
-        from src.capabilities.registry.loaders import load_external_loaders
-
-        load_external_loaders(prim_registry)
-
         skill_registry = CapabilitySkillRegistry(embedder=embedder)
         load_all_skills(skill_registry, prim_registry, embedder)
 
