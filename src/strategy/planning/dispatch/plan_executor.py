@@ -13,7 +13,7 @@ from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.strategy.planning.models.plan import Plan
 from src.strategy.planning.safety.purity_enforcer import enforce_cognitive_purity
 from src.strategy.planning.behavioural_delta import compute_behavioural_delta
-from src.stratum2.s3_adapter import S3Adapter, S2SkillCallRequest
+from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2SkillCallRequest
 
 if TYPE_CHECKING:
     from src.strategy.memory.segment_memory import SegmentMemory

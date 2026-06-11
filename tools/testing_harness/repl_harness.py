@@ -60,7 +60,7 @@ from src.strategy.memory.repair.plan_repair import PlanRepair
 from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
 from src.strategy.planning.agent_planner import AgentPlanner
 from src.strategy.planning.models.plan import Plan
-from src.stratum2.s3_adapter import S3Adapter, S2SkillCallRequest
+from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2SkillCallRequest
 
 
 # ── Constants ────────────────────────────────────────────────────────────────

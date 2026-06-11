@@ -68,7 +68,7 @@ src/core/ — core types and contracts
 src/capabilities/primitives/ — reusable building blocks  
 src/capabilities/skills/ — reusable agent behaviours  
 src/capabilities/registry/ — skill registry, safety validators, quarantine manager  
-src/stratum2/ — planning and execution (Stratum 2)  
+src/strategy/planning/adapters/ — S2→S3 boundary adapter  
 docs/architecture/ — deep technical docs
 
 

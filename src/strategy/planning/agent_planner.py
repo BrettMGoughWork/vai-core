@@ -16,7 +16,7 @@ from src.strategy.planning.contracts.agent_plan import AgentPlan
 from src.strategy.planning.generator.subgoal_planner import SubgoalPlanner
 from src.strategy.planning.segments.manager import PlanSegmentManager
 from src.strategy.planning.subgoals.manager import SubgoalManager
-from src.stratum2.s3_adapter import S3Adapter
+from src.strategy.planning.adapters.s3_adapter import S3Adapter
 
 
 class AgentPlanner:

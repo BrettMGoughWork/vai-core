@@ -70,7 +70,7 @@ tools/                  # Developer tooling and enforcement scripts
   code_analysers/           
     shared/             # S1 - Shared analyser utilities
     stratum1/           # S1 - S1 invariant enforcement (strict, foundational rules)
-    stratum2/           # S2 - S2 invariant enforcement (higher-level guarantees)
+    planning/adapters/  # S2→S3 boundary adapter
 
 ---
 
@@ -234,7 +234,7 @@ Fundamental building blocks for the agent system.
     - `stratum1/`  
       CLI tools enforcing **S1 invariants** (low-level architecture rules).
 
-    - `stratum2/`  
+    - `planning/adapters/`  
       CLI tools enforcing **S2 invariants** (higher-level architectural constraints).
 
 ---

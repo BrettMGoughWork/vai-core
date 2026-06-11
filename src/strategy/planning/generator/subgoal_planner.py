@@ -21,7 +21,7 @@ from src.strategy.planning.models.plan import Plan
 from src.strategy.planning.segments.manager import PlanSegmentManager
 from src.strategy.types.hashing import stable_hash
 from src.strategy.types.plan_segment import PlanSegment
-from src.stratum2.s3_adapter import S3Adapter, S2DiscoveryQuery, S2DiscoveredSkill
+from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2DiscoveryQuery, S2DiscoveredSkill
 
 def _build_system_prompt(skills: list[S2DiscoveredSkill] | None = None) -> str:
     """Build a dynamic system prompt, optionally listing available skills and their input/output schemas.

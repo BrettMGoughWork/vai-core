@@ -153,7 +153,7 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
 
         # ── 3. Wire up SkillRunner → S3Adapter ───────────────────────────
         from src.capabilities.runtime.skill_runner import SkillRunner
-        from src.stratum2.s3_adapter import S3Adapter
+        from src.strategy.planning.adapters.s3_adapter import S3Adapter
 
         # ── Wire up SkillAuthor pipeline (3.17.5 capability discovery) ──
         from src.capabilities.registry.skill_safety import SkillSafetyValidator
@@ -269,7 +269,7 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         # ── 9. Execute plan steps via S3Adapter ──────────────────────────
         _out(f"\n{MINOR} SKILL EXECUTION {MINOR}")
 
-        from src.stratum2.s3_adapter import S2SkillCallRequest
+        from src.strategy.planning.adapters.s3_adapter import S2SkillCallRequest
 
         # Build runtime context with search config for primitives (PHASE 3.13.2)
         runtime_context: dict = {}
