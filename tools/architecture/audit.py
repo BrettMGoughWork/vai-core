@@ -12,7 +12,7 @@ Checks:
 
 Idempotent — always overwrites the output file.
 Usage:
-    python tools/dictionary/audit.py
+    python tools/architecture/audit.py
 """
 
 from __future__ import annotations
@@ -175,7 +175,7 @@ def find_invariant_violations(classes: list[dict]) -> list[dict]:
 
     I1 — Domain must be pure: no infrastructure or adapter imports.
     I2 — Infrastructure must not import from adapter.
-    I3 — Stratum 1 (utility/infra/adapter) must not contain long-horizon reasoning keywords.
+    # I3 removed — naming-based stratum checks produced false positives for S2 planning classes.
     I4 — Cognitive outputs (domain/utility planning) must not embed tool/LLM keys.
     I5 — Utility classes with fan_out > 10 are stratum violations (doing too much).
     I6 — Test classes must not live in src/.
@@ -185,7 +185,6 @@ def find_invariant_violations(classes: list[dict]) -> list[dict]:
     # Forbidden import fragments per stratum (by path/package fragments in imports)
     INFRA_FRAGMENTS   = {"llm", "transport", "telemetry", "observability"}
     ADAPTER_FRAGMENTS = {"agent", "dispatcher"}
-    REASONING_KEYWORDS = {"plan", "reason", "cognit", "stratum2", "llm_call"}
     TOOL_LLM_KEYS = {"tool", "tool_name", "tool_calls", "model", "prompt", "temperature"}
 
     for cls in classes:
@@ -224,24 +223,6 @@ def find_invariant_violations(classes: list[dict]) -> list[dict]:
                             "fan_out": cls["fan_out"],
                         })
                         break
-
-        # I3: Stratum 1 (utility) must not contain long-horizon reasoning
-        if stratum == "utility":
-            name_lower = cls["name"].lower()
-            for kw in REASONING_KEYWORDS:
-                if kw in name_lower:
-                    issues.append({
-                        "severity": "medium",
-                        "category": "invariant",
-                        "title": f"I3 — Utility class `{cls['name']}` has reasoning keyword `{kw}` in name",
-                        "detail": (
-                            f"`{cls['name']}` in `{file}`. Stratum 1 must be reactive and deterministic. "
-                            f"Reasoning/planning logic belongs in Stratum 2 (domain)."
-                        ),
-                        "fan_in": cls["fan_in"],
-                        "fan_out": cls["fan_out"],
-                    })
-                    break
 
         # I5: utility class with very high fan_out (doing too much)
         if stratum == "utility" and cls["fan_out"] > 12:
@@ -407,7 +388,7 @@ def find_skill_manifest_violations(data: dict[str, Any]) -> list[dict]:
 def find_registry_violations(classes: list[dict]) -> list[dict]:
     """S3 I9 — Registry invariants.
 
-    - Registry modules must live under src/capabilities/registry/ or src/core/types/
+    - Registry modules must live under src/capabilities/registry/ or src/strategy/types/
     - Must define: PrimitiveRegistry, SkillRegistry
     - Registries must not import S1 (utility/infrastructure/adapter) modules.
       Domain imports are allowed for shared types.
@@ -427,11 +408,11 @@ def find_registry_violations(classes: list[dict]) -> list[dict]:
         return issues
 
     # Check for PrimitiveRegistry and SkillRegistry
-    # These may live in src/capabilities/registry/ OR src/core/types/
+    # These may live in src/capabilities/registry/ OR src/strategy/types/
     registry_class_names = {
         c["name"] for c in classes
         if c["file"].startswith("src/capabilities/registry/")
-        or c["file"].startswith("src/core/types/registry")
+        or c["file"].startswith("src/strategy/types/registry")
     }
     required = {"PrimitiveRegistry", "SkillRegistry"}
     missing_classes = required - registry_class_names

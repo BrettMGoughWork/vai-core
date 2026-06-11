@@ -11,6 +11,7 @@ from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class ProcKillPrimitive(PrimitiveBase):
     """Kill a running process by PID."""
 
@@ -46,6 +47,7 @@ class ProcKillPrimitive(PrimitiveBase):
             if sys.platform == "win32":
                 # On Windows, use TerminateProcess via ctypes
                 import ctypes
+from src.strategy.types.validation import deadcode_ignore
                 kernel32 = ctypes.windll.kernel32
                 handle = kernel32.OpenProcess(1, False, pid)  # PROCESS_TERMINATE
                 if not handle:

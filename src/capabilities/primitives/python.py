@@ -13,8 +13,10 @@ from typing import Any, Callable
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveType, PrimitiveResult
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class PythonPrimitive(PrimitiveBase):
     """A primitive backed by a Python callable."""
 

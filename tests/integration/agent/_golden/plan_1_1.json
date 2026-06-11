@@ -98,6 +98,84 @@
               "status": "no_drift",
               "streak": 0
             },
+            "drift_pipeline": {
+              "arbitration": {
+                "action": "none",
+                "metadata": {
+                  "budget_exhausted": {
+                    "cycle": false,
+                    "global": false,
+                    "plan": false,
+                    "subgoal": false
+                  },
+                  "budget_trigger": null,
+                  "categories": [],
+                  "confidence": 0.0,
+                  "confidence_tier": "low",
+                  "dominant_category": null,
+                  "severity": "minor",
+                  "usage": {
+                    "cycle": 0,
+                    "global": 0,
+                    "plan": 0,
+                    "subgoal": 0
+                  }
+                },
+                "reason": "No drift detected \u2014 no action required."
+              },
+              "budget_state": {
+                "config": {
+                  "max_cycle": 5,
+                  "max_global": 50,
+                  "max_plan": 20,
+                  "max_subgoal": 10
+                },
+                "usage_cycle": 0,
+                "usage_global": 0,
+                "usage_plan": 0,
+                "usage_subgoal": 0
+              },
+              "classification": {
+                "categories": [],
+                "confidence": 0.0,
+                "reasons": [],
+                "severity": "minor",
+                "status": "no_drift",
+                "streak": 0
+              },
+              "confirmation": {
+                "confidence": 0.0,
+                "confirmed": false,
+                "history": [
+                  {
+                    "categories": [],
+                    "confidence": 0.0,
+                    "reasons": [],
+                    "severity": "minor",
+                    "status": "no_drift",
+                    "streak": 0
+                  }
+                ],
+                "hysteresis": 0.0,
+                "severity": "minor",
+                "streak": 0
+              },
+              "recovery": {
+                "action": "none",
+                "confidence": 0.0,
+                "hysteresis": 0.0,
+                "reasons": [
+                  "severity=minor",
+                  "confidence=0.0000",
+                  "streak=0",
+                  "hysteresis=0.0000",
+                  "action=none"
+                ],
+                "severity": "minor",
+                "streak": 0
+              },
+              "signals": []
+            },
             "requires_replan": false
           }
         ],
@@ -226,6 +304,92 @@
               "status": "no_drift",
               "streak": 0
             },
+            "drift_pipeline": {
+              "arbitration": {
+                "action": "none",
+                "metadata": {
+                  "budget_exhausted": {
+                    "cycle": false,
+                    "global": false,
+                    "plan": false,
+                    "subgoal": false
+                  },
+                  "budget_trigger": null,
+                  "categories": [],
+                  "confidence": 0.0,
+                  "confidence_tier": "low",
+                  "dominant_category": null,
+                  "severity": "minor",
+                  "usage": {
+                    "cycle": 0,
+                    "global": 0,
+                    "plan": 0,
+                    "subgoal": 0
+                  }
+                },
+                "reason": "No drift detected \u2014 no action required."
+              },
+              "budget_state": {
+                "config": {
+                  "max_cycle": 5,
+                  "max_global": 50,
+                  "max_plan": 20,
+                  "max_subgoal": 10
+                },
+                "usage_cycle": 0,
+                "usage_global": 0,
+                "usage_plan": 0,
+                "usage_subgoal": 0
+              },
+              "classification": {
+                "categories": [],
+                "confidence": 0.0,
+                "reasons": [],
+                "severity": "minor",
+                "status": "no_drift",
+                "streak": 0
+              },
+              "confirmation": {
+                "confidence": 0.0,
+                "confirmed": false,
+                "history": [
+                  {
+                    "categories": [],
+                    "confidence": 0.0,
+                    "reasons": [],
+                    "severity": "minor",
+                    "status": "no_drift",
+                    "streak": 0
+                  },
+                  {
+                    "categories": [],
+                    "confidence": 0.0,
+                    "reasons": [],
+                    "severity": "minor",
+                    "status": "no_drift",
+                    "streak": 0
+                  }
+                ],
+                "hysteresis": 0.0,
+                "severity": "minor",
+                "streak": 0
+              },
+              "recovery": {
+                "action": "none",
+                "confidence": 0.0,
+                "hysteresis": 0.0,
+                "reasons": [
+                  "severity=minor",
+                  "confidence=0.0000",
+                  "streak=0",
+                  "hysteresis=0.0000",
+                  "action=none"
+                ],
+                "severity": "minor",
+                "streak": 0
+              },
+              "signals": []
+            },
             "requires_replan": false
           }
         ],
@@ -302,6 +466,84 @@
         "status": "no_drift",
         "streak": 0
       },
+      "drift_pipeline": {
+        "arbitration": {
+          "action": "none",
+          "metadata": {
+            "budget_exhausted": {
+              "cycle": false,
+              "global": false,
+              "plan": false,
+              "subgoal": false
+            },
+            "budget_trigger": null,
+            "categories": [],
+            "confidence": 0.0,
+            "confidence_tier": "low",
+            "dominant_category": null,
+            "severity": "minor",
+            "usage": {
+              "cycle": 0,
+              "global": 0,
+              "plan": 0,
+              "subgoal": 0
+            }
+          },
+          "reason": "No drift detected \u2014 no action required."
+        },
+        "budget_state": {
+          "config": {
+            "max_cycle": 5,
+            "max_global": 50,
+            "max_plan": 20,
+            "max_subgoal": 10
+          },
+          "usage_cycle": 0,
+          "usage_global": 0,
+          "usage_plan": 0,
+          "usage_subgoal": 0
+        },
+        "classification": {
+          "categories": [],
+          "confidence": 0.0,
+          "reasons": [],
+          "severity": "minor",
+          "status": "no_drift",
+          "streak": 0
+        },
+        "confirmation": {
+          "confidence": 0.0,
+          "confirmed": false,
+          "history": [
+            {
+              "categories": [],
+              "confidence": 0.0,
+              "reasons": [],
+              "severity": "minor",
+              "status": "no_drift",
+              "streak": 0
+            }
+          ],
+          "hysteresis": 0.0,
+          "severity": "minor",
+          "streak": 0
+        },
+        "recovery": {
+          "action": "none",
+          "confidence": 0.0,
+          "hysteresis": 0.0,
+          "reasons": [
+            "severity=minor",
+            "confidence=0.0000",
+            "streak=0",
+            "hysteresis=0.0000",
+            "action=none"
+          ],
+          "severity": "minor",
+          "streak": 0
+        },
+        "signals": []
+      },
       "index": 0,
       "level": "subgoal",
       "requires_replan": false
@@ -332,6 +574,92 @@
         "status": "no_drift",
         "streak": 0
       },
+      "drift_pipeline": {
+        "arbitration": {
+          "action": "none",
+          "metadata": {
+            "budget_exhausted": {
+              "cycle": false,
+              "global": false,
+              "plan": false,
+              "subgoal": false
+            },
+            "budget_trigger": null,
+            "categories": [],
+            "confidence": 0.0,
+            "confidence_tier": "low",
+            "dominant_category": null,
+            "severity": "minor",
+            "usage": {
+              "cycle": 0,
+              "global": 0,
+              "plan": 0,
+              "subgoal": 0
+            }
+          },
+          "reason": "No drift detected \u2014 no action required."
+        },
+        "budget_state": {
+          "config": {
+            "max_cycle": 5,
+            "max_global": 50,
+            "max_plan": 20,
+            "max_subgoal": 10
+          },
+          "usage_cycle": 0,
+          "usage_global": 0,
+          "usage_plan": 0,
+          "usage_subgoal": 0
+        },
+        "classification": {
+          "categories": [],
+          "confidence": 0.0,
+          "reasons": [],
+          "severity": "minor",
+          "status": "no_drift",
+          "streak": 0
+        },
+        "confirmation": {
+          "confidence": 0.0,
+          "confirmed": false,
+          "history": [
+            {
+              "categories": [],
+              "confidence": 0.0,
+              "reasons": [],
+              "severity": "minor",
+              "status": "no_drift",
+              "streak": 0
+            },
+            {
+              "categories": [],
+              "confidence": 0.0,
+              "reasons": [],
+              "severity": "minor",
+              "status": "no_drift",
+              "streak": 0
+            }
+          ],
+          "hysteresis": 0.0,
+          "severity": "minor",
+          "streak": 0
+        },
+        "recovery": {
+          "action": "none",
+          "confidence": 0.0,
+          "hysteresis": 0.0,
+          "reasons": [
+            "severity=minor",
+            "confidence=0.0000",
+            "streak=0",
+            "hysteresis=0.0000",
+            "action=none"
+          ],
+          "severity": "minor",
+          "streak": 0
+        },
+        "signals": []
+      },
       "index": 1,
       "level": "subgoal",
       "requires_replan": false
@@ -343,6 +671,37 @@
       "cycle": 0,
       "memory_snapshot": {
         "drift_memory": {},
+        "drift_pipeline": {
+          "budget_state": {
+            "config": {
+              "max_cycle": 5,
+              "max_global": 50,
+              "max_plan": 20,
+              "max_subgoal": 10
+            },
+            "usage_cycle": 0,
+            "usage_global": 0,
+            "usage_plan": 0,
+            "usage_subgoal": 0
+          },
+          "confirmation": {
+            "confidence": 0.0,
+            "confirmed": false,
+            "history": [
+              {
+                "categories": [],
+                "confidence": 0.0,
+                "reasons": [],
+                "severity": "minor",
+                "status": "no_drift",
+                "streak": 0
+              }
+            ],
+            "hysteresis": 0.0,
+            "severity": "minor",
+            "streak": 0
+          }
+        },
         "reflection_memory": {},
         "repair_memory": {}
       }
@@ -351,6 +710,45 @@
       "cycle": 1,
       "memory_snapshot": {
         "drift_memory": {},
+        "drift_pipeline": {
+          "budget_state": {
+            "config": {
+              "max_cycle": 5,
+              "max_global": 50,
+              "max_plan": 20,
+              "max_subgoal": 10
+            },
+            "usage_cycle": 0,
+            "usage_global": 0,
+            "usage_plan": 0,
+            "usage_subgoal": 0
+          },
+          "confirmation": {
+            "confidence": 0.0,
+            "confirmed": false,
+            "history": [
+              {
+                "categories": [],
+                "confidence": 0.0,
+                "reasons": [],
+                "severity": "minor",
+                "status": "no_drift",
+                "streak": 0
+              },
+              {
+                "categories": [],
+                "confidence": 0.0,
+                "reasons": [],
+                "severity": "minor",
+                "status": "no_drift",
+                "streak": 0
+              }
+            ],
+            "hysteresis": 0.0,
+            "severity": "minor",
+            "streak": 0
+          }
+        },
         "reflection_memory": {},
         "repair_memory": {}
       }
@@ -629,6 +1027,84 @@
             "status": "no_drift",
             "streak": 0
           },
+          "drift_pipeline": {
+            "arbitration": {
+              "action": "none",
+              "metadata": {
+                "budget_exhausted": {
+                  "cycle": false,
+                  "global": false,
+                  "plan": false,
+                  "subgoal": false
+                },
+                "budget_trigger": null,
+                "categories": [],
+                "confidence": 0.0,
+                "confidence_tier": "low",
+                "dominant_category": null,
+                "severity": "minor",
+                "usage": {
+                  "cycle": 0,
+                  "global": 0,
+                  "plan": 0,
+                  "subgoal": 0
+                }
+              },
+              "reason": "No drift detected \u2014 no action required."
+            },
+            "budget_state": {
+              "config": {
+                "max_cycle": 5,
+                "max_global": 50,
+                "max_plan": 20,
+                "max_subgoal": 10
+              },
+              "usage_cycle": 0,
+              "usage_global": 0,
+              "usage_plan": 0,
+              "usage_subgoal": 0
+            },
+            "classification": {
+              "categories": [],
+              "confidence": 0.0,
+              "reasons": [],
+              "severity": "minor",
+              "status": "no_drift",
+              "streak": 0
+            },
+            "confirmation": {
+              "confidence": 0.0,
+              "confirmed": false,
+              "history": [
+                {
+                  "categories": [],
+                  "confidence": 0.0,
+                  "reasons": [],
+                  "severity": "minor",
+                  "status": "no_drift",
+                  "streak": 0
+                }
+              ],
+              "hysteresis": 0.0,
+              "severity": "minor",
+              "streak": 0
+            },
+            "recovery": {
+              "action": "none",
+              "confidence": 0.0,
+              "hysteresis": 0.0,
+              "reasons": [
+                "severity=minor",
+                "confidence=0.0000",
+                "streak=0",
+                "hysteresis=0.0000",
+                "action=none"
+              ],
+              "severity": "minor",
+              "streak": 0
+            },
+            "signals": []
+          },
           "requires_replan": false
         }
       ],
@@ -687,6 +1163,92 @@
             "signal_count": 0,
             "status": "no_drift",
             "streak": 0
+          },
+          "drift_pipeline": {
+            "arbitration": {
+              "action": "none",
+              "metadata": {
+                "budget_exhausted": {
+                  "cycle": false,
+                  "global": false,
+                  "plan": false,
+                  "subgoal": false
+                },
+                "budget_trigger": null,
+                "categories": [],
+                "confidence": 0.0,
+                "confidence_tier": "low",
+                "dominant_category": null,
+                "severity": "minor",
+                "usage": {
+                  "cycle": 0,
+                  "global": 0,
+                  "plan": 0,
+                  "subgoal": 0
+                }
+              },
+              "reason": "No drift detected \u2014 no action required."
+            },
+            "budget_state": {
+              "config": {
+                "max_cycle": 5,
+                "max_global": 50,
+                "max_plan": 20,
+                "max_subgoal": 10
+              },
+              "usage_cycle": 0,
+              "usage_global": 0,
+              "usage_plan": 0,
+              "usage_subgoal": 0
+            },
+            "classification": {
+              "categories": [],
+              "confidence": 0.0,
+              "reasons": [],
+              "severity": "minor",
+              "status": "no_drift",
+              "streak": 0
+            },
+            "confirmation": {
+              "confidence": 0.0,
+              "confirmed": false,
+              "history": [
+                {
+                  "categories": [],
+                  "confidence": 0.0,
+                  "reasons": [],
+                  "severity": "minor",
+                  "status": "no_drift",
+                  "streak": 0
+                },
+                {
+                  "categories": [],
+                  "confidence": 0.0,
+                  "reasons": [],
+                  "severity": "minor",
+                  "status": "no_drift",
+                  "streak": 0
+                }
+              ],
+              "hysteresis": 0.0,
+              "severity": "minor",
+              "streak": 0
+            },
+            "recovery": {
+              "action": "none",
+              "confidence": 0.0,
+              "hysteresis": 0.0,
+              "reasons": [
+                "severity=minor",
+                "confidence=0.0000",
+                "streak=0",
+                "hysteresis=0.0000",
+                "action=none"
+              ],
+              "severity": "minor",
+              "streak": 0
+            },
+            "signals": []
           },
           "requires_replan": false
         }

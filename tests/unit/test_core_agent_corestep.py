@@ -1,12 +1,12 @@
 from unittest.mock import MagicMock, patch
 
-from src.core.state.config import AgentConfig
-from src.core.state.core_step_executor import core_step
-from src.core.state.step_outcome import StepOutcome
-from src.core.state.state import ConversationState
-from src.core.llm.types import CoreLLMResponse
-from src.core.types.capabilities import SkillCategory, SideEffect
-from src.core.types.result import CoreResult
+from src.strategy.state.config import AgentConfig
+from src.strategy.state.core_step_executor import core_step
+from src.strategy.state.step_outcome import StepOutcome
+from src.strategy.state.state import ConversationState
+from src.strategy.llm.types import CoreLLMResponse
+from src.strategy.types.capabilities import SkillCategory, SideEffect
+from src.strategy.types.result import CoreResult
 
 
 def _make_config() -> AgentConfig:
@@ -19,7 +19,7 @@ def _make_config() -> AgentConfig:
     )
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
 def test_core_step_returns_text_and_updates_state(mock_all_specs_for_agent):
     mock_all_specs_for_agent.return_value = []
     transport = MagicMock()
@@ -37,9 +37,9 @@ def test_core_step_returns_text_and_updates_state(mock_all_specs_for_agent):
     assert call_kwargs["tools"] == []
 
 
-@patch("src.core.state.core_step_executor.execute_with_retry")
-@patch("src.core.state.core_step_executor.select_tool")
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.execute_with_retry")
+@patch("src.strategy.state.core_step_executor.select_tool")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
 def test_core_step_executes_tool_and_appends_tool_history(
     mock_all_specs_for_agent, mock_select_tool, mock_execute_with_retry
 ):
@@ -63,9 +63,9 @@ def test_core_step_executes_tool_and_appends_tool_history(
     mock_execute_with_retry.assert_called_once_with(spec, {"text": "hi"})
 
 
-@patch("src.core.state.core_step_executor.execute_with_retry")
-@patch("src.core.state.core_step_executor.select_tool")
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.execute_with_retry")
+@patch("src.strategy.state.core_step_executor.select_tool")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
 def test_core_step_appends_error_history_when_tool_fails(
     mock_all_specs_for_agent, mock_select_tool, mock_execute_with_retry
 ):

@@ -20,15 +20,15 @@ from src.capabilities.skills.manifest import SkillManifest
 from src.capabilities.primitives.stdlib.echo import EchoPrimitive
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 from src.capabilities.discovery.providers.mock_provider import _simple_embedding_fn
-from src.core.llm.llm_factory import factory
+from src.strategy.llm.llm_factory import factory
 from src.stratum2.s3_adapter import S3Adapter
-from src.core.memory.segment_memory import SegmentMemory
-from src.core.memory.subgoal_memory import SubgoalMemory
-from src.core.memory.plan_memory import PlanMemory
-from src.core.memory.drift_memory import DriftMemory
-from src.core.memory.governance.memory_governance import MemoryGovernance
-from src.core.planning.generator.subgoal_planner import SubgoalPlanner
-from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.strategy.memory.segment_memory import SegmentMemory
+from src.strategy.memory.subgoal_memory import SubgoalMemory
+from src.strategy.memory.plan_memory import PlanMemory
+from src.strategy.memory.drift_memory import DriftMemory
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
+from src.strategy.planning.generator.subgoal_planner import SubgoalPlanner
+from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
 
 
 class _TestEmbedder:

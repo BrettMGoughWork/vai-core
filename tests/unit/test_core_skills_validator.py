@@ -1,7 +1,7 @@
 import pytest
 
 from src.capabilities.runtime.validator import validate_structural
-from src.core.types.errors import ValidationError
+from src.strategy.types.errors import ValidationError
 
 
 def test_validate_structural_accepts_valid_args():

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.types.fetch import FetchRequest, FetchResponse
-from src.core.types.fetch.response import _extract_cookies, _parse_set_cookie
+from src.strategy.types.fetch import FetchRequest, FetchResponse
+from src.strategy.types.fetch.response import _extract_cookies, _parse_set_cookie
 
 
 # =====================================================================

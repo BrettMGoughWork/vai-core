@@ -8,8 +8,10 @@ from typing import Any
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class EchoPrimitive(PrimitiveBase):
     """Return the input value unchanged — a pure, deterministic identity primitive."""
 

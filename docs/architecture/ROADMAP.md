@@ -1739,132 +1739,312 @@ Refactor.1 - New folder structure
   /src/platform (s4 concerns)
   /src/agent (s5 concerns)
 
-Refactor.2 - Remove test warnings
-Refactor.3 - Remove Medium, Low issues
+✅ Refactor.2 - Remove test warnings
+✅ Refactor.3 - Reduce Medium, Low issues
 Refactor.4 - Cleanup documentation (readme, contributing, roadmap, tools, architecture)
+Refactor.5 - Capability Loaders (CLILoader, MCPLoader)
+  Extend capability discovery beyond Python stdlib primitives to support CLI and MCP primitives.
+  CLILoader wraps local CLI tools as CapabilityPrimitive instances; MCPLoader connects to MCP servers and
+  exposes their tools/skills as CapabilityPrimitive instances. Both abstract the calling mechanism so that
+  S3's skill executor can invoke any primitive (Python, CLI, or MCP) through a uniform interface.
+  *Rationale*: These loaders were built alongside the existing PythonLoader but never wired into the
+  capability registry. Wiring them unlocks CLI tool access and MCP server integration without requiring
+  Python wrappers for each external tool.
 
 ---
 🚀 Release 1.0 - Basic Agent
 ---
 
-## STRATUM 4 — Distributed Runtime & System Infrastructure
+## STRATUM 4 — Platform Runtime
+*Invariants*: 
+- S4 must remain operational, deterministic, isolated, and free of cognitive logic.  
+- Platform stratum must be strictly isolated from other strata (S4 may orchestrate S1/S2/S3, but it must never reach into them)
+- Components within S4 should be isolated from each other where possible (each S4 subsystem should be independently testable, replaceable, and composable)
+- S4 orchestrates execution but never performs reasoning.  
 
-### PHASE 4.1 — FastAPI Ingress Layer
-The ingress layer becomes the single entry point for all external traffic.
-- FastAPI Gateway — request parsing, routing, session context  
-- Transport abstraction — unify HTTP, WS, CLI, webhook  
-- Authentication — API keys, tokens, service accounts  
-- Rate limiting — per‑user, per‑IP, per‑channel  
-- Ingress request envelope — normalize all inbound messages  
-- Ingress → Control Plane handoff  
+
+## PHASE 4.1 — Minimal Execution Path (MVP Runtime)
+Goal: Make the system run a single job end‑to‑end.
+
+4.1.1 — Gateway (Transport Boundary)
+- Define FastAPI app with a single POST /run endpoint.  
+- Accept raw JSON payload → validate → hand to channel normalizer.  
+- No channels, no WebSockets, no auth.
+
+4.1.2 — Channel Normalization (ChannelMessage v1)
+- Define ChannelMessage schema: {input, metadata, channel="cli"}.  
+- Implement CLI → ChannelMessage converter.  
+- Implement gateway → ChannelMessage converter.
+
+4.1.3 — Job Envelope (Job v1)
+- Define Job model: id, created_at, state, payload, result.  
+- Implement job creation from ChannelMessage.
+
+4.1.4 — In‑Memory Queue (Queue v1)
+- Implement simple FIFO queue.  
+- Push job into queue on /run.
+
+4.1.5 — Minimal Worker Loop (Worker v1)
+- Worker pops job → calls S1/S2/S3 adaptor → stores result.  
+- No concurrency, no retries, no lifecycle.
+
+4.1.6 — S1/S2/S3 Adaptor (Thin Boundary Layer)
+- Implement s2tos1adapter and s1tos2adapter.  
+- Ensure S4 never sees internal S2 structures.  
+- Ensure S2 never sees raw LLM/tool outputs.
+
+4.1.7 — Result Retrieval
+- Add GET /jobs/{id} endpoint.  
+- Return job result.
+
+4.1.8 — Logging & Tracing
+- Minimal logs: job created, job started, job finished.
 
 Outcome:  
-A stable, typed, authenticated gateway that feeds all work into the system.
+The system can run a single request → through S1/S2/S3 → return a result.
 
 ---
 
-### PHASE 4.2 — Queueing Layer & Job Model
-This is the backbone of Stratum 4: durable, observable, priority‑aware job orchestration.
+## PHASE 4.2 — Control Plane (State Machine v1)
+Goal: Introduce job lifecycle, state transitions, and basic orchestration.
 
-- Queue abstraction — Redis, SQS, or your own  
-- Job envelope — metadata, retries, deadlines, priority  
-- Priority queues — high/medium/low lanes  
-- DLQ — poison message handling  
-- Queue metrics — depth, throughput, latency  
-- Queue managers — balancing, draining, pausing  
+4.2.1 — Job State Machine
+- pending → running → succeeded/failed.  
+- Add state validation + transitions.
+
+4.2.2 — Control Plane Manager
+- Implement ControlPlane class to manage job lifecycle.  
+- Add job registry + state updates.
+
+4.2.3 — Error Handling v1
+- Wrap worker execution in try/except.  
+- Mark job as failed with structured error.
+
+4.2.4 — Timeouts v1
+- Add per‑job timeout.  
+- Mark job as failed if exceeded.
+
+4.2.5 — Control Plane Trace
+- Append state transitions to job trace.
 
 Outcome:  
-A durable, observable job pipeline that can feed workers at scale.
+Jobs now have lifecycle, state transitions, and structured failure.
 
 ---
 
-### PHASE 4.3 — Worker Pool & Execution Layer
-Workers become isolated, supervised, cancellable execution units.
+## PHASE 4.3 — Lifecycle & Hydration (ExecutionContext v1)
+Goal: Enable multi‑cycle execution (S2 reflection, drift, repair).
 
-- Worker pool — concurrency, scaling  
-- Worker supervisors — crash detection, restart policy  
-- Circuit breakers — isolate failing primitives  
-- Job cancellation — cooperative cancellation  
-- Timeouts — per‑job and per‑primitive  
-- Heavy workers — browser automation, long‑running tasks  
-- Worker metrics — CPU, memory, queue lag  
+4.3.1 — ExecutionContext Model
+- Define schema: cognitive state, last result, memory snapshot.  
+- Add serialization + hydration.
+
+4.3.2 — Checkpointing
+- Store ExecutionContext after each cycle.  
+- Worker loads context on resume.
+
+4.3.3 — Resume Tokens
+- Add resume token to job envelope.  
+- Worker uses token to continue multi‑cycle execution.
+
+4.3.4 — Multi‑Cycle Worker Loop
+- Worker runs:  
+  while not done: step → update context → checkpoint.
+
+4.3.5 — Lifecycle Trace
+- Add hydration/dehydration events to trace.
 
 Outcome:  
-A resilient execution layer capable of running light and heavy tasks safely.
+The runtime can execute multi‑step S2 reasoning loops.
 
 ---
 
-### PHASE 4.4 — Control Plane
-This is the “brain” of Stratum 4 — the orchestrator of orchestrators.
+## PHASE 4.4 — Reliability & Safety (Retries, Backoff, Poison Jobs)
+Goal: Make S4 robust under failure.
 
-- Task ledger — durable record of all jobs  
-- State machine — pending → running → success/failure  
-- Synchronization — locks, leases, coordination  
-- Backpressure — slow workers → slow ingress  
-- Scheduling decisions — which worker gets which job  
-- Retry policy — exponential backoff, jitter  
-- Control plane API — inspect, cancel, reprioritize  
+4.4.1 — Retry Policy
+- Per‑error‑type retry rules.  
+- Exponential backoff.
+
+4.4.2 — Poison Job Detection
+- Mark job as poison after N failures.  
+- Move to dead‑letter queue.
+
+4.4.3 — Worker Crash Recovery
+- Worker restarts job from last checkpoint.  
+- Ensure idempotency.
+
+4.4.4 — Panic Guard
+- Catch unexpected exceptions.  
+- Mark job failed safely.
+
+4.4.5 — Degraded Mode
+- Fallback to simpler execution if S1/S2 unstable.
 
 Outcome:  
-A central orchestrator that manages job lifecycle, scheduling, and system health.
+S4 becomes resilient to errors, crashes, and malformed inputs.
 
 ---
 
-### PHASE 4.5 — Lifecycle Management
-This is where tasks become first‑class citizens with full lifecycle semantics.
+## PHASE 4.5 — Concurrency & Worker Pool
+Goal: Support multiple workers and parallel execution.
 
-- Lifecycle hooks — before/after/cleanup  
-- Checkpoints — resumable tasks  
-- Hydration/dehydration — long‑running workflows  
-- Idempotency — safe retries  
-- Task cancellation — propagate signals to workers  
+4.5.1 — Worker Pool
+- Implement N workers.  
+- Configurable concurrency.
+
+4.5.2 — Thread/Process Isolation
+- Choose threads or processes.  
+- Ensure S1/S2 purity preserved.
+
+4.5.3 — Job Scheduling
+- FIFO or priority queue.  
+- Add scheduling policy.
+
+4.5.4 — Worker Heartbeats
+- Workers emit heartbeat events.  
+- Control plane monitors health.
+
+4.5.5 — Worker Crash Recovery
+- Restart crashed workers.  
+- Requeue in‑flight jobs.
 
 Outcome:  
-Tasks become durable, resumable, and safely retryable.
+S4 can run many jobs concurrently and safely.
 
 ---
 
-### PHASE 4.6 — Transport Layer
-Unifies all inbound/outbound communication channels.
+## PHASE 4.6 — Channels (CLI, Web, WebSocket, Webhooks)
+Goal: Add multiple ingress channels without changing S1–S3.
 
-- HTTP transport  
-- WebSocket transport  
-- CLI transport  
-- Webhook transport  
-- Transport envelope — unify message format  
-- Channel routing — map channels → workflows  
+4.6.1 — Channel Abstraction
+- Define Channel interface:  
+  receive(), normalize(), send().
+
+4.6.2 — CLI Channel
+- Local CLI → ChannelMessage.  
+- TUI optional.
+
+4.6.3 — Web Channel
+- Web UI → FastAPI → ChannelMessage.
+
+4.6.4 — WebSocket Channel
+- Real‑time streaming updates.  
+- Push job state changes.
+
+4.6.5 — Webhook Channel
+- Generic webhook adapter.  
+- Normalizes inbound POSTs.
+
+4.6.6 — Provider‑Specific Webhooks
+- WhatsApp  
+- Slack  
+- GitHub  
+- Jira  
+(each isolated in its own folder)
 
 Outcome:  
-A unified transport abstraction that supports multi‑channel agents.
+S4 can accept requests from any client or platform.
 
 ---
 
-### PHASE 4.7 — Heartbeat & System Health
-This is the “vital signs” layer.
+## PHASE 4.7 — Supervisors & Governance
+Goal: Add system‑level monitoring and self‑healing.
 
-- Heartbeat daemon — periodic system pings  
-- Worker heartbeat — detect dead workers  
-- Queue heartbeat — detect stuck queues  
-- Health checks — liveness, readiness, startup  
-- Alerting hooks — Slack, email, PagerDuty  
+4.7.1 — Supervisor Loop
+- Monitor worker pool.  
+- Restart unhealthy workers.
+
+4.7.2 — Queue Supervisor
+- Detect stuck jobs.  
+- Detect queue backpressure.
+
+4.7.3 — Control Plane Supervisor
+- Detect inconsistent job states.  
+- Auto‑repair or escalate.
+
+4.7.4 — System‑Level Alerts
+- Emit alerts to Slack/email.  
+- Structured alert payloads.
 
 Outcome:  
-A self‑monitoring system that detects failures before users do.
+S4 becomes self‑healing and production‑ready.
 
 ---
 
-### PHASE 4.8 — Security & Governance
-The guardrails that make Stratum 4 production‑safe.
+## PHASE 4.8 — Observability & Telemetry
+Goal: Add visibility into S4 behaviour.
 
-- AuthN/AuthZ — per‑channel, per‑user, per‑token  
-- Rate limiting — global + per‑tenant  
-- Audit logging — every job, every primitive  
-- Secrets management — vault integration  
-- Isolation — sandboxing heavy tasks  
-- **Cross‑channel notification dispatch** — quarantine awareness for IDE, web, CLI, Slack surfaces.  (Deferred from 3.17.4; currently operators must poll `quarantine_list_pending()` manually.)  
+4.8.1 — Metrics
+- Job counts  
+- Worker health  
+- Queue depth  
+- Execution time  
+- Drift/repair frequency
+
+4.8.2 — Logging
+- Structured logs  
+- Correlation IDs  
+- Trace IDs
+
+4.8.3 — Tracing
+- Per‑job trace  
+- Per‑cycle trace  
+- Per‑segment trace
+
+4.8.4 — Health Checks
+- Liveness  
+- Readiness  
+- Worker pool health
+
+4.8.5 — Observability Dashboard
+- Web UI or TUI  
+- Job list, worker list, traces, metrics
 
 Outcome:  
-A secure, multi‑tenant‑capable runtime.
+S4 becomes inspectable, debuggable, and diagnosable.
+
+---
+
+## PHASE 4.9 — Deployment, Packaging, and Hardening
+Goal: Make S4 shippable and maintainable.
+
+4.9.1 — Configuration System
+- env vars  
+- config files  
+- runtime overrides
+
+4.9.2 — Deployment Targets
+- local  
+- container  
+- cloud
+
+4.9.3 — Security Hardening
+- auth  
+- rate limiting  
+- input validation  
+- sandboxing
+
+4.9.4 — Release Checklist
+- invariants  
+- determinism  
+- safety  
+- performance  
+- concurrency  
+- channels  
+- observability  
+
+4.9.5 — Documentation
+- architecture  
+- API  
+- channels  
+- lifecycle  
+- control plane  
+- worker pool  
+
+Outcome:  
+S4 is production‑ready.
+
 
 ---
 🚀 Release 6 — "Multi-Agent System"

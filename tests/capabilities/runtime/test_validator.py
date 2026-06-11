@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from src.capabilities.runtime.validator import validate_structural, _validate_type
-from src.core.types.errors import ValidationError
+from src.strategy.types.errors import ValidationError
 
 
 # ---------------------------------------------------------------------------

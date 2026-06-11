@@ -17,6 +17,7 @@ from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 
 if TYPE_CHECKING:
     from src.capabilities.skills.author import SkillAuthor
+from src.strategy.types.validation import deadcode_ignore
 
 
 # ── Lazy pipeline wiring ──────────────────────────────────────────────────
@@ -38,6 +39,7 @@ def set_author_pipeline(author: SkillAuthor) -> None:
     _author_instance = author
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class SkillAuthorPrimitive(PrimitiveBase):
     """Expose ``SkillAuthor.author_skill()`` to the agent as a primitive.
 

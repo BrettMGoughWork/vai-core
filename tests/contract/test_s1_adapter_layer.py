@@ -10,7 +10,7 @@ Tests for:
 """
 
 import pytest
-from src.core.planning.s1_contract import (
+from src.strategy.planning.s1_contract import (
     PromptRequest,
     PromptResponse,
     ToolCallRequest,

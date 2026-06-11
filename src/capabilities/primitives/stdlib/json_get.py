@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class JsonGetPrimitive(PrimitiveBase):
     """Get a key from a JSON object."""
 

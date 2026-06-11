@@ -2,16 +2,16 @@
 
 from unittest.mock import MagicMock, patch
 
-from src.core.state.config import AgentConfig
-from src.core.state.core_step_executor import CoreStepExecutor
-from src.core.state.step_outcome import StepOutcome
-from src.core.state.state import ConversationState
-from src.core.llm.types import CoreLLMResponse
-from src.core.types.capabilities import SkillCategory, SideEffect
-from src.core.types.result import CoreResult
-from src.execution.degraded_mode import DegradedModeController
-from src.execution.retry.circuit_breaker import CircuitBreaker
-from src.execution.self_healing import SelfHealingController
+from src.strategy.state.config import AgentConfig
+from src.strategy.state.core_step_executor import CoreStepExecutor
+from src.strategy.state.step_outcome import StepOutcome
+from src.strategy.state.state import ConversationState
+from src.strategy.llm.types import CoreLLMResponse
+from src.strategy.types.capabilities import SkillCategory, SideEffect
+from src.strategy.types.result import CoreResult
+from src.runtime.degraded_mode import DegradedModeController
+from src.runtime.retry.circuit_breaker import CircuitBreaker
+from src.runtime.self_healing import SelfHealingController
 
 
 def _make_config() -> AgentConfig:
@@ -24,8 +24,8 @@ def _make_config() -> AgentConfig:
     )
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_records_success_on_text_response(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor records success when LLM returns text."""
     mock_all_specs_for_agent.return_value = []
@@ -41,8 +41,8 @@ def test_core_step_executor_records_success_on_text_response(mock_call_with_retr
     assert executor.degraded_mode.failure_count == 0
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_records_success_on_tool_execution(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor records success when tool executes successfully."""
     mock_all_specs_for_agent.return_value = [MagicMock()]
@@ -51,8 +51,8 @@ def test_core_step_executor_records_success_on_tool_execution(mock_call_with_ret
     state = ConversationState(input="start")
     executor = CoreStepExecutor(MagicMock(), _make_config())
     
-    with patch("src.core.state.core_step_executor.select_tool") as mock_select_tool, \
-         patch("src.core.state.core_step_executor.execute_with_retry") as mock_execute:
+    with patch("src.strategy.state.core_step_executor.select_tool") as mock_select_tool, \
+         patch("src.strategy.state.core_step_executor.execute_with_retry") as mock_execute:
         spec = MagicMock()
         spec.name = "echo"
         mock_select_tool.return_value = spec
@@ -66,8 +66,8 @@ def test_core_step_executor_records_success_on_tool_execution(mock_call_with_ret
         assert executor.circuit_breaker.failures.get("echo", 0) == 0
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_records_failure_on_llm_error(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor records failure when LLM call fails."""
     mock_all_specs_for_agent.return_value = []
@@ -84,8 +84,8 @@ def test_core_step_executor_records_failure_on_llm_error(mock_call_with_retry, m
     assert executor.degraded_mode.failure_count == 1
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_records_failure_on_tool_error(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor records failure and circuit breaker when tool fails."""
     mock_all_specs_for_agent.return_value = [MagicMock()]
@@ -93,8 +93,8 @@ def test_core_step_executor_records_failure_on_tool_error(mock_call_with_retry, 
     
     state = ConversationState(input="start")
     executor = CoreStepExecutor(MagicMock(), _make_config())
-    with patch("src.core.state.core_step_executor.select_tool") as mock_select_tool, \
-         patch("src.core.state.core_step_executor.execute_with_retry") as mock_execute:
+    with patch("src.strategy.state.core_step_executor.select_tool") as mock_select_tool, \
+         patch("src.strategy.state.core_step_executor.execute_with_retry") as mock_execute:
         spec = MagicMock()
         spec.name = "echo"
         mock_select_tool.return_value = spec
@@ -108,8 +108,8 @@ def test_core_step_executor_records_failure_on_tool_error(mock_call_with_retry, 
         assert executor.circuit_breaker.failures.get("echo", 0) == 1
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_checks_self_healing(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor checks self-healing threshold before processing."""
     mock_all_specs_for_agent.return_value = []
@@ -126,8 +126,8 @@ def test_core_step_executor_checks_self_healing(mock_call_with_retry, mock_all_s
     mock_call_with_retry.assert_not_called()
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_checks_circuit_breaker(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor respects circuit breaker for tools."""
     mock_all_specs_for_agent.return_value = [MagicMock()]
@@ -136,7 +136,7 @@ def test_core_step_executor_checks_circuit_breaker(mock_call_with_retry, mock_al
     state = ConversationState(input="start")
     executor = CoreStepExecutor(MagicMock(), _make_config())
     
-    with patch("src.core.state.core_step_executor.select_tool") as mock_select_tool:
+    with patch("src.strategy.state.core_step_executor.select_tool") as mock_select_tool:
         spec = MagicMock()
         spec.name = "echo"
         mock_select_tool.return_value = spec
@@ -152,8 +152,8 @@ def test_core_step_executor_checks_circuit_breaker(mock_call_with_retry, mock_al
         assert result.metadata.get("tool") == "echo"
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_accumulates_failures(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor accumulates failures correctly."""
     mock_all_specs_for_agent.return_value = [MagicMock()]
@@ -162,8 +162,8 @@ def test_core_step_executor_accumulates_failures(mock_call_with_retry, mock_all_
     state = ConversationState(input="start")
     executor = CoreStepExecutor(MagicMock(), _make_config())
     
-    with patch("src.core.state.core_step_executor.select_tool") as mock_select_tool, \
-         patch("src.core.state.core_step_executor.execute_with_retry") as mock_execute:
+    with patch("src.strategy.state.core_step_executor.select_tool") as mock_select_tool, \
+         patch("src.strategy.state.core_step_executor.execute_with_retry") as mock_execute:
         spec = MagicMock()
         spec.name = "echo"
         mock_select_tool.return_value = spec
@@ -177,8 +177,8 @@ def test_core_step_executor_accumulates_failures(mock_call_with_retry, mock_all_
         assert executor.self_healing.should_self_heal()
 
 
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_with_custom_controllers(mock_call_with_retry, mock_all_specs_for_agent):
     """Test that executor respects custom safety controllers."""
     mock_all_specs_for_agent.return_value = []
@@ -204,9 +204,9 @@ def test_core_step_executor_with_custom_controllers(mock_call_with_retry, mock_a
     assert executor.circuit_breaker is custom_breaker
 
 
-@patch("src.core.state.core_step_executor.classify_step")
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.classify_step")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_core_step_executor_panic_guard_catches_unexpected_errors(mock_call_with_retry, mock_all_specs_for_agent, mock_classify_step):
     """Test that panic guard catches unexpected exceptions from outside try/except blocks."""
     mock_all_specs_for_agent.return_value = []
@@ -224,9 +224,9 @@ def test_core_step_executor_panic_guard_catches_unexpected_errors(mock_call_with
     assert result.metadata.get("panic") is True
 
 
-@patch("src.core.state.core_step_executor.execute_with_retry")
-@patch("src.core.state.core_step_executor.SkillRegistry.all_specs_for_agent")
-@patch("src.core.state.core_step_executor.call_with_retry")
+@patch("src.strategy.state.core_step_executor.execute_with_retry")
+@patch("src.strategy.state.core_step_executor.SkillRegistry.all_specs_for_agent")
+@patch("src.strategy.state.core_step_executor.call_with_retry")
 def test_degraded_mode_active_disables_tool_execution(mock_call_with_retry, mock_all_specs_for_agent, mock_execute_with_retry):
     """When degraded mode is active, tool execution is blocked safely."""
     mock_all_specs_for_agent.return_value = [MagicMock()]

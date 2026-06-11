@@ -31,20 +31,20 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # ── S2 plan types ──────────────────────────────────────────────────────
-from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
-from src.core.types.plan_segment import PlanSegment
-from src.core.types.hashing import stable_hash
+from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.strategy.types.plan_segment import PlanSegment
+from src.strategy.types.hashing import stable_hash
 
 # ── S1 contract types & pipeline ───────────────────────────────────────
-from src.core.planning.s1_contract.types import PromptRequest, PromptResponse, S1Error
-from src.core.planning.s1_contract.s2_to_s1_adapter import build_prompt_request
-from src.core.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response
-from src.core.planning.s1_contract.s1_client import call_s1_backend
-from src.core.planning.s1_contract.validators import (
+from src.strategy.planning.s1_contract.types import PromptRequest, PromptResponse, S1Error
+from src.strategy.planning.s1_contract.s2_to_s1_adapter import build_prompt_request
+from src.strategy.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response
+from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.strategy.planning.s1_contract.validators import (
     validate_prompt_request,
     validate_prompt_response,
 )
-from src.core.planning.s1_contract import s1_real_client
+from src.strategy.planning.s1_contract import s1_real_client
 
 
 # ══════════════════════════════════════════════════════════════════════════

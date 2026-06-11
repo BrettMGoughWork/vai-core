@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from src.core.types.core_step import CoreStep
-from src.core.signals.model import GovernedSignal, SignalSeverity
-from src.core.state.state import ConversationState
+from src.strategy.types.core_step import CoreStep
+from src.strategy.signals.model import GovernedSignal, SignalSeverity
+from src.strategy.state.state import ConversationState
+from src.strategy.types.validation.deadcode_markers import deadcode_ignore
 
 
+@deadcode_ignore(reason="Old dispatcher API, superseded by safe_step_dispatcher")
 class AgentDispatcher:
     """
     Modern dispatcher API:

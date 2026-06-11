@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, TYPE_CHECKING
 
+from src.strategy.types.validation import deadcode_ignore
+
 if TYPE_CHECKING:
     from src.capabilities.skills.skill import CapabilitySkill as Skill
     from src.capabilities.metadata.capability_metadata import (
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
     )
 
 
+@deadcode_ignore(reason="Export dataclass for primitive metadata in semantic discovery results")
 @dataclass
 class PrimitiveMetadataExport:
     """Exported metadata for a single primitive."""
@@ -54,6 +57,7 @@ class PrimitiveMetadataExport:
         )
 
 
+@deadcode_ignore(reason="Return type for build_discovery_result, used via type annotation in discovery pipeline")
 @dataclass
 class SkillSearchResult:
     """A discovered skill returned during semantic search.

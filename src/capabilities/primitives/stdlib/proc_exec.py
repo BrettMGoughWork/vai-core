@@ -8,8 +8,10 @@ import subprocess
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class ProcExecPrimitive(PrimitiveBase):
     """Execute a shell command and return stdout, stderr, and exit code."""
 

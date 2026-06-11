@@ -16,9 +16,11 @@ import httpx
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
-from src.core.types.fetch.errors import classify_exception
+from src.strategy.types.fetch.errors import classify_exception
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class HttpSimpleFetchPrimitive(PrimitiveBase):
     """Perform an HTTP GET request returning status, body, headers, and elapsed time."""
 

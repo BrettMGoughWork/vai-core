@@ -10,13 +10,13 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Tuple
 
-from src.core.planning.agent_loop.agent_loop_v3 import (
+from src.strategy.planning.agent_loop.agent_loop import (
     AgentFullTrace,
     AgentLoopResult,
     run_agent_loop,
 )
-from src.core.types.plan_segment import PlanSegment
-from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.strategy.types.plan_segment import PlanSegment
+from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
 
 
 # ──────────────────────────────────────────────────────────────────────────────

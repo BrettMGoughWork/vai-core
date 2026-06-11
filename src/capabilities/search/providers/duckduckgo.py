@@ -13,7 +13,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.capabilities.search.providers._base import SearchProviderError, SearchResult
-from src.core.state.config import ProviderConfig
+from src.strategy.state.config import ProviderConfig
 
 
 class DuckDuckGoProvider:

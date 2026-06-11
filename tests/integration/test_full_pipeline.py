@@ -13,37 +13,37 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.llm.mock_llm import MockLLM
-from src.core.memory.governance.memory_governance import MemoryGovernance
-from src.core.memory.plan_memory import PlanMemory
-from src.core.memory.segment_memory import SegmentMemory
-from src.core.memory.subgoal_memory import SubgoalMemory
-from src.core.memory.drift_memory import DriftMemory
-from src.core.memory.plan_memory_types import PlanMemoryRecord
-from src.core.memory.segment_memory_types import SegmentMemoryRecord
-from src.core.memory.subgoal_memory_types import SubgoalMemoryRecord
-from src.core.memory.drift_memory_types import DriftEvent
-from src.core.memory.repair.plan_repair import PlanRepair
-from src.core.memory.repair.repair_types import (
+from src.strategy.llm.mock_llm import MockLLM
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
+from src.strategy.memory.plan_memory import PlanMemory
+from src.strategy.memory.segment_memory import SegmentMemory
+from src.strategy.memory.subgoal_memory import SubgoalMemory
+from src.strategy.memory.drift_memory import DriftMemory
+from src.strategy.memory.plan_memory_types import PlanMemoryRecord
+from src.strategy.memory.segment_memory_types import SegmentMemoryRecord
+from src.strategy.memory.subgoal_memory_types import SubgoalMemoryRecord
+from src.strategy.memory.drift_memory_types import DriftEvent
+from src.strategy.memory.repair.plan_repair import PlanRepair
+from src.strategy.memory.repair.repair_types import (
     BreakageError,
     DriftFlag,
     PlanBreakageReport,
     RepairAction,
     RepairPlan,
 )
-from src.core.planning.contracts.agent_plan import (
+from src.strategy.planning.contracts.agent_plan import (
     AgentPlan,
     CURRENT_CONTRACT_VERSION,
 )
-from src.core.planning.contracts.step_spec import (
+from src.strategy.planning.contracts.step_spec import (
     CURRENT_STEP_SPEC_VERSION,
 )
-from src.core.planning.agent_planner import AgentPlanner
-from src.core.types.errors.plan_errors import PlanExecutionError
-from src.core.types.step_result import StepResult
-from src.core.types.cognitive_step_outcome import CognitiveStepOutcome
-from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
-from src.core.types.hashing import stable_hash
+from src.strategy.planning.agent_planner import AgentPlanner
+from src.strategy.types.errors.plan_errors import PlanExecutionError
+from src.strategy.types.step_result import StepResult
+from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
+from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.strategy.types.hashing import stable_hash
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -267,7 +267,7 @@ class TestPlannerToExecutorBoundary:
         governance, pm = _make_governance()
         agent_plan = _create_plan(governance, pm)
 
-        from src.core.planning.models.plan import Plan
+        from src.strategy.planning.models.plan import Plan
         plan = Plan(
             intent=agent_plan.intent,
             targetskillid=agent_plan.targetskillid,
@@ -488,7 +488,7 @@ class TestRepairPlanIntegrity:
 
     def test_repair_strategy_context_structure(self):
         """RepairStrategyContext provides deterministic hints from semantic memory."""
-        from src.core.memory.repair.repair_types import RepairStrategyContext
+        from src.strategy.memory.repair.repair_types import RepairStrategyContext
 
         ctx = RepairStrategyContext(
             preferred_capabilities=("stdlib.echo",),

@@ -22,6 +22,7 @@ from src.capabilities.contracts import (
     SkillResult,
 )
 from src.capabilities.discovery.fallback import resolve_capability_with_fallback
+from src.capabilities.discovery.vector_store import VectorStore
 from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
 from src.capabilities.skills.executor import SkillExecutor
 
@@ -42,6 +43,7 @@ class SkillRunner:
         self,
         registry: Optional[CapabilitySkillRegistry] = None,
         embedder=None,
+        vector_store: VectorStore | None = None,
     ):
         self._registry: CapabilitySkillRegistry = (
             CapabilitySkillRegistry() if registry is None else registry
@@ -50,6 +52,8 @@ class SkillRunner:
         self._embedder = embedder  # SkillEmbedder | None (PHASE 3.19.1)
         if embedder is not None:
             self._registry.set_embedder(embedder)
+        if vector_store is not None:
+            self._registry.set_vector_store(vector_store)
 
     def execute(self, request: SkillCallRequest) -> SkillResult:
         """

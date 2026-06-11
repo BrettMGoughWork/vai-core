@@ -8,7 +8,7 @@ If any readiness condition is not met, this test fails.
 
 import pytest
 
-from src.core.planning.s1_contract.readiness import (
+from src.strategy.planning.s1_contract.readiness import (
     ReadinessResult,
     check_llm_on_readiness,
     render_readiness_status,

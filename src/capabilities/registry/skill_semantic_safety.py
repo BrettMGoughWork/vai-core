@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from src.strategy.types.validation import deadcode_ignore
+
 if TYPE_CHECKING:
     from src.capabilities.skills.skill import CapabilitySkill
 
@@ -61,6 +63,7 @@ FORBIDDEN_PYTHON_TOKENS: set[str] = {
 }
 
 
+@deadcode_ignore(reason="Semantic safety checks for agent-authored skills, used via composition in SkillSafetyValidator")
 class SkillSemanticSafetyValidator:
     """Validates semantic properties of agent-authored skills.
 

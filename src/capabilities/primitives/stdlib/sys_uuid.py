@@ -7,8 +7,10 @@ from typing import Any
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class SysUUIDPrimitive(PrimitiveBase):
     """Generate a UUID (v4 by default, v1/v3/v5 supported)."""
 

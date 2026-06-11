@@ -12,16 +12,16 @@ import json
 
 import pytest
 
-from src.core.planning.contracts.agent_plan import (
+from src.strategy.planning.contracts.agent_plan import (
     AgentPlan,
     CURRENT_CONTRACT_VERSION,
 )
-from src.core.planning.contracts.step_spec import (
+from src.strategy.planning.contracts.step_spec import (
     StepSpec,
     CURRENT_STEP_SPEC_VERSION,
 )
-from src.core.planning.models.plan import Plan
-from src.core.memory.plan_memory_types import PlanMemoryRecord
+from src.strategy.planning.models.plan import Plan
+from src.strategy.memory.plan_memory_types import PlanMemoryRecord
 from src.capabilities.contracts import (
     SkillCallRequest,
     SkillResult,
@@ -106,7 +106,7 @@ class TestAgentPlanShape:
 
     def test_status_default_pending(self):
         ap = make_agent_plan()
-        from src.core.planning.models.plan_state import PlanStatus
+        from src.strategy.planning.models.plan_state import PlanStatus
         assert ap.status == PlanStatus.PENDING
 
     def test_multi_subgoal_detection(self):

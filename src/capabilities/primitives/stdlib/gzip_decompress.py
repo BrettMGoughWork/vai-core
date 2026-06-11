@@ -10,6 +10,7 @@ from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class GzipDecompressPrimitive(PrimitiveBase):
     """Decompress a gzip file or base64-encoded gzip data."""
 
@@ -65,6 +66,7 @@ class GzipDecompressPrimitive(PrimitiveBase):
                 )
             else:
                 import base64
+from src.strategy.types.validation import deadcode_ignore
                 try:
                     compressed = base64.b64decode(args["data"])
                 except Exception:

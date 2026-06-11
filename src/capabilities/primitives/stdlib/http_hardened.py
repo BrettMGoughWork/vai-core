@@ -18,6 +18,7 @@ _curl_cffi_available: bool
 try:
     from curl_cffi.requests import Session
     from curl_cffi.requests.exceptions import (
+from src.strategy.types.validation import deadcode_ignore
         ConnectTimeout,
         ConnectionError as CurlConnectionError,
         DNSError,
@@ -111,6 +112,7 @@ def _classify_curl_exception(
 # ---------------------------------------------------------------------------
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class HttpHardenedFetchPrimitive(PrimitiveBase):
     """Hardened HTTP GET with anti-bot headers, retries, and cookie jar."""
 

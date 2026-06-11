@@ -8,7 +8,7 @@ import pytest
 
 from src.capabilities.primitives.stdlib.search import SearchPrimitive
 from src.capabilities.primitives.types import PrimitiveResult
-from src.core.state.config import SearchProviderConfig
+from src.strategy.state.config import SearchProviderConfig
 
 
 @pytest.fixture

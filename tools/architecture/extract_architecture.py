@@ -6,7 +6,7 @@ Produces docs/architecture.json conforming to the schema:
 
 Idempotent: always overwrites the output file.
 Usage:
-    python tools/dictionary/extract_architecture.py
+    python tools/architecture/extract_architecture.py
 """
 
 from __future__ import annotations
@@ -40,52 +40,53 @@ STRATUM_RULES: list[tuple[str, str]] = [
     ("primitives\\_dev", "test"),
     ("tools/", "test"),
     ("tools\\", "test"),
-    # capability (Stratum 3 — primitives, skills, registry, discovery)
+    # S3 — capability (primitives, skills, registry, discovery)
     ("capabilities/", "capability"),
     ("capabilities\\", "capability"),
-    # infrastructure
-    ("core/llm", "infrastructure"),
-    ("core\\llm", "infrastructure"),
-    ("core/planning/safety", "infrastructure"),
-    ("core\\planning\\safety", "infrastructure"),
-    ("core/planning/dispatch", "infrastructure"),
-    ("core\\planning\\dispatch", "infrastructure"),
+    # ── S1 — infrastructure ──
+    # Runtime
+    ("runtime/", "infrastructure"),
+    ("runtime\\", "infrastructure"),
+    # Strategy sub-packages (infrastructure)
+    ("strategy/llm", "infrastructure"),
+    ("strategy\\llm", "infrastructure"),
+    ("strategy/planning/safety", "infrastructure"),
+    ("strategy\\planning\\safety", "infrastructure"),
+    ("strategy/planning/dispatch", "infrastructure"),
+    ("strategy\\planning\\dispatch", "infrastructure"),
+    # MUST come before strategy/state (catch-all below)
+    ("strategy/state/config", "domain"),        # config dataclasses (EmbeddingConfig, SearchConfig, ...)
+    ("strategy\\state\\config", "domain"),
+    ("strategy/state", "infrastructure"),       # strategy/state/* (except config — matched above)
+    ("strategy\\state", "infrastructure"),
+    # Governance & platform services
     ("governance", "infrastructure"),
-    ("transport", "infrastructure"),
-    ("telemetry", "infrastructure"),
-    ("observability", "infrastructure"),
-    # domain
-    ("core/types", "domain"),
-    ("core\\types", "domain"),
-    ("core/state/config", "domain"),       # config dataclasses (EmbeddingConfig, SearchConfig, ...)
-    ("core\\state\\config", "domain"),
-    ("core/planning/models", "domain"),
-    ("core\\planning\\models", "domain"),
-    ("core/signals", "domain"),
-    ("core\\signals", "domain"),
-    ("primitives/runtime", "domain"),
-    ("primitives\\runtime", "domain"),
-    ("primitives/base", "domain"),
-    ("primitives\\base", "domain"),
-    ("primitives/builtin", "domain"),
-    ("primitives\\builtin", "domain"),
-    # adapter
+    ("platform/transport", "infrastructure"),
+    ("platform\\transport", "infrastructure"),
+    ("platform/telemetry", "infrastructure"),
+    ("platform\\telemetry", "infrastructure"),
+    ("platform/observability", "infrastructure"),
+    ("platform\\observability", "infrastructure"),
+    # ── S2 — domain ──
+    ("strategy/types", "domain"),
+    ("strategy\\types", "domain"),
+    ("strategy/planning/models", "domain"),
+    ("strategy\\planning\\models", "domain"),
+    ("strategy/signals", "domain"),
+    ("strategy\\signals", "domain"),
+    # ── adapter ──
     ("agent/", "adapter"),
     ("agent\\", "adapter"),
     ("stratum2/", "adapter"),
     ("stratum2\\", "adapter"),
-    ("tools/", "adapter"),
-    ("tools\\", "adapter"),
-    # utility (catch-all for src/)
-    ("execution", "infrastructure"),
-    ("core/state", "infrastructure"),
-    ("core\\state", "infrastructure"),
-    ("core/planning", "utility"),
-    ("core\\planning", "utility"),
-    ("core/config", "utility"),
-    ("core\\config", "utility"),
+    # ── utility (catch-all for the rest) ──
+    ("strategy/planning", "utility"),            # catch-all after specific sub-directories
+    ("strategy\\planning", "utility"),
+    ("strategy/config", "utility"),
+    ("strategy\\config", "utility"),
     ("policy", "utility"),
-    ("util", "utility"),
+    ("platform/util", "utility"),
+    ("platform\\util", "utility"),
 ]
 
 

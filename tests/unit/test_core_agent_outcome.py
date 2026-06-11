@@ -1,5 +1,5 @@
-from src.core.state.step_outcome import StepOutcome, classify_step
-from src.core.types.result import CoreResult
+from src.strategy.state.step_outcome import StepOutcome, classify_step
+from src.strategy.types.result import CoreResult
 
 
 def test_classify_step_fatal_for_errors():

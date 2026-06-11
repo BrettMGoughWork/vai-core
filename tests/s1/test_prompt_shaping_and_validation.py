@@ -15,21 +15,21 @@ from __future__ import annotations
 import json
 import pytest
 
-from src.core.planning.s1_contract.types import (
+from src.strategy.planning.s1_contract.types import (
     PromptRequest,
     PromptResponse,
     S1Error,
 )
-from src.core.planning.s1_contract.s1_prompt_builder import (
+from src.strategy.planning.s1_contract.s1_prompt_builder import (
     build_llm_prompt,
     RESPONSE_SCHEMA,
     SYSTEM_INSTRUCTION,
     VALID_EXAMPLE_NO_DRIFT,
     VALID_EXAMPLE_WITH_DRIFT,
 )
-from src.core.planning.s1_contract.s1_response_validator import validate_llm_response
-from src.core.planning.s1_contract.s1_to_s2_adapter import map_s1_error_to_agent_error
-from src.core.planning.s1_contract.s1_client import call_s1_backend
+from src.strategy.planning.s1_contract.s1_response_validator import validate_llm_response
+from src.strategy.planning.s1_contract.s1_to_s2_adapter import map_s1_error_to_agent_error
+from src.strategy.planning.s1_contract.s1_client import call_s1_backend
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -480,7 +480,7 @@ class TestFullPipeline:
 
     def test_full_simulation_pipeline(self):
         """S2 state → PromptRequest → simulation → valid PromptResponse."""
-        from src.core.planning.s1_contract.s2_to_s1_adapter import build_prompt_request
+        from src.strategy.planning.s1_contract.s2_to_s1_adapter import build_prompt_request
 
         req = build_prompt_request(
             agent_state={"goal": "test", "subgoals": []},
@@ -509,7 +509,7 @@ class TestFullPipeline:
 
     def test_parse_validated_response_into_s2(self):
         """Valid PromptResponse parses cleanly into S2 updates."""
-        from src.core.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response
+        from src.strategy.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response
 
         raw = json.dumps(_make_valid_output_dict())
         response = validate_llm_response(raw)

@@ -19,19 +19,19 @@ import statistics
 import time
 from typing import Any, Dict, List, Tuple
 
-from src.core.memory.governance.memory_governance import MemoryGovernance
-from src.core.memory.subgoal_memory import SubgoalMemory
-from src.core.memory.subgoal_memory_types import SubgoalMemoryRecord
-from src.core.memory.segment_memory import SegmentMemory
-from src.core.memory.plan_memory import PlanMemory
-from src.core.memory.drift_memory import DriftMemory
-from src.core.memory.drift_memory_types import DriftEvent
-from src.core.memory.repair.plan_repair import PlanRepair
-from src.core.memory.plan_memory_types import PlanMemoryRecord
-from src.core.memory.segment_memory_types import SegmentMemoryRecord
-from src.core.planning.agent_planner import AgentPlanner
-from src.core.planning.contracts.agent_plan import CURRENT_CONTRACT_VERSION
-from src.core.planning.models.plan import Plan
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
+from src.strategy.memory.subgoal_memory import SubgoalMemory
+from src.strategy.memory.subgoal_memory_types import SubgoalMemoryRecord
+from src.strategy.memory.segment_memory import SegmentMemory
+from src.strategy.memory.plan_memory import PlanMemory
+from src.strategy.memory.drift_memory import DriftMemory
+from src.strategy.memory.drift_memory_types import DriftEvent
+from src.strategy.memory.repair.plan_repair import PlanRepair
+from src.strategy.memory.plan_memory_types import PlanMemoryRecord
+from src.strategy.memory.segment_memory_types import SegmentMemoryRecord
+from src.strategy.planning.agent_planner import AgentPlanner
+from src.strategy.planning.contracts.agent_plan import CURRENT_CONTRACT_VERSION
+from src.strategy.planning.models.plan import Plan
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ def _make_governance(
 
 
 def _make_planner(pm: PlanMemory) -> AgentPlanner:
-    from src.core.llm.mock_llm import MockLLM
+    from src.strategy.llm.mock_llm import MockLLM
     return AgentPlanner(llm=MockLLM(), plan_memory=pm)
 
 
@@ -108,7 +108,7 @@ def bench_plan_generation(iterations: int) -> Dict[str, Any]:
     """Measure AgentPlanner.plan() latency."""
     sm, segm, pm, dm = _make_stores()
     governance = _make_governance(sm, segm, pm, dm)
-    from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+    from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
     sg = Subgoal(
         subgoal_id="sg-bench",
         goal="benchmark goal",
@@ -186,7 +186,7 @@ def bench_breakage_detection(iterations: int) -> Dict[str, Any]:
 
 def bench_contract_serialization(iterations: int) -> Dict[str, Any]:
     """Measure AgentPlan.to_dict() / from_dict() roundtrip latency."""
-    from src.core.planning.contracts.agent_plan import AgentPlan
+    from src.strategy.planning.contracts.agent_plan import AgentPlan
 
     plan = AgentPlan(
         plan_id="plan-bench",
@@ -217,7 +217,7 @@ def bench_end_to_end(iterations: int) -> Dict[str, Any]:
     repair = PlanRepair()
     sm, segm, pm, dm = _make_stores()
     governance = _make_governance(sm, segm, pm, dm)
-    from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+    from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
     sg = Subgoal(
         subgoal_id="sg-bench",
         goal="benchmark goal",

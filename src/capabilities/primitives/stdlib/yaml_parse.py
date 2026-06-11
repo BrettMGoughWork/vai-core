@@ -6,8 +6,10 @@ import yaml
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.strategy.types.validation import deadcode_ignore
 
 
+@deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
 class YamlParsePrimitive(PrimitiveBase):
     """Parse a YAML string into a Python object."""
 

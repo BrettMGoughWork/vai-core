@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Union
 import json
 
+from src.strategy.types.validation import deadcode_ignore
 
+
+@deadcode_ignore(reason="Metadata dataclass for primitives, used via type annotations in capability registry")
 @dataclass
 class PrimitiveMetadata:
     cost_latency: int

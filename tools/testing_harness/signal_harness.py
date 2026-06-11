@@ -22,31 +22,31 @@ import sys
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Union
 
-from src.core.planning.drift.unified_drift_types import (
+from src.strategy.planning.drift.unified_drift_types import (
     UnifiedDriftClassification,
     UnifiedDriftSignal,
 )
-from src.core.planning.drift.unified_drift_classifier import classify_unified_drift
-from src.core.planning.drift.repair_budget import (
+from src.strategy.planning.drift.unified_drift_classifier import classify_unified_drift
+from src.strategy.planning.drift.repair_budget import (
     RepairBudgetConfig,
     RepairBudgetState,
     apply_repair_budget,
     is_budget_exhausted,
 )
-from src.core.planning.drift.repair_arbitration import (
+from src.strategy.planning.drift.repair_arbitration import (
     ArbitrationDecision,
     decide_arbitration_action,
 )
-from src.core.planning.drift.repair_action_library import (
+from src.strategy.planning.drift.repair_action_library import (
     repair_drift_inconsistency,
     repair_plan,
     repair_segment,
     repair_subgoal,
 )
-from src.core.planning.models.plan import Plan
-from src.core.planning.models.plan_state import PlanState, PlanStatus
-from src.core.types.plan_segment import PlanSegment
-from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.strategy.planning.models.plan import Plan
+from src.strategy.planning.models.plan_state import PlanState, PlanStatus
+from src.strategy.types.plan_segment import PlanSegment
+from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -47,19 +47,19 @@ load_dotenv(override=True)
 from src.capabilities.primitives.stdlib import load_all_primitives
 from src.capabilities.skills.stdlib import load_all_skills
 
-from src.core.memory.governance.memory_governance import MemoryGovernance
-from src.core.memory.subgoal_memory import SubgoalMemory
-from src.core.memory.segment_memory import SegmentMemory
-from src.core.memory.plan_memory import PlanMemory
-from src.core.memory.drift_memory import DriftMemory
-from src.core.memory.subgoal_memory_types import SubgoalMemoryRecord
-from src.core.memory.segment_memory_types import SegmentMemoryRecord
-from src.core.memory.plan_memory_types import PlanMemoryRecord
-from src.core.memory.drift_memory_types import DriftEvent
-from src.core.memory.repair.plan_repair import PlanRepair
-from src.core.types.subgoal import Subgoal, SubgoalLifecycleState
-from src.core.planning.agent_planner import AgentPlanner
-from src.core.planning.models.plan import Plan
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
+from src.strategy.memory.subgoal_memory import SubgoalMemory
+from src.strategy.memory.segment_memory import SegmentMemory
+from src.strategy.memory.plan_memory import PlanMemory
+from src.strategy.memory.drift_memory import DriftMemory
+from src.strategy.memory.subgoal_memory_types import SubgoalMemoryRecord
+from src.strategy.memory.segment_memory_types import SegmentMemoryRecord
+from src.strategy.memory.plan_memory_types import PlanMemoryRecord
+from src.strategy.memory.drift_memory_types import DriftEvent
+from src.strategy.memory.repair.plan_repair import PlanRepair
+from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.strategy.planning.agent_planner import AgentPlanner
+from src.strategy.planning.models.plan import Plan
 from src.stratum2.s3_adapter import S3Adapter, S2SkillCallRequest
 
 
@@ -680,11 +680,11 @@ def main() -> None:
     governance = MemoryGovernance(sm, segm, pm, dm)
 
     if args.mock:
-        from src.core.llm.mock_llm import MockLLM
+        from src.strategy.llm.mock_llm import MockLLM
         llm = MockLLM()
         model = "mock"
     else:
-        from src.core.llm.llm_factory import factory
+        from src.strategy.llm.llm_factory import factory
         provider = os.environ.get("LLM_PROVIDER", "deepseek")
         model = os.environ.get("LLM_MODEL", "deepseek-chat")
         llm = factory.create(provider, model)
@@ -708,6 +708,11 @@ def main() -> None:
 
         prim_registry = PrimitiveRegistry()
         load_all_primitives(prim_registry)
+
+        # Wire up external primitive loaders (CLI, MCP) — ready when config provided
+        from src.capabilities.registry.loaders import load_external_loaders
+
+        load_external_loaders(prim_registry)
 
         skill_registry = CapabilitySkillRegistry(embedder=embedder)
         load_all_skills(skill_registry, prim_registry, embedder)
