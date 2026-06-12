@@ -12,21 +12,31 @@ from typing import Any
 from src.platform.transport.normalization import ChannelMessage
 
 
-def s2_to_s1_adapter(payload: ChannelMessage) -> dict[str, Any]:
+def s2_to_s1_adapter(
+    payload: ChannelMessage,
+    resume_token: str | None = None,
+) -> dict[str, Any]:
     """Transform a normalized channel message into an S1 request.
 
     S4 receives a ``ChannelMessage`` from the transport layer.  This function
     is the S4→S1 boundary: it produces the stable dict shape that the
     runtime stratum (S1) expects.
 
+    The optional ``resume_token`` is an opaque passthrough — S4 carries it
+    without interpretation.
+
     Returns:
-        A dict with ``type``, ``input``, and ``metadata`` keys.
+        A dict with ``type``, ``input``, ``metadata``, and optionally
+        ``resume_token`` keys.
     """
-    return {
+    request: dict[str, Any] = {
         "type": "s1_request",
         "input": payload.input,
         "metadata": payload.metadata,
     }
+    if resume_token is not None:
+        request["resume_token"] = resume_token
+    return request
 
 
 def s1_to_s2_adapter(raw_output: dict[str, Any]) -> dict[str, Any]:

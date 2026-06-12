@@ -1812,23 +1812,23 @@ The system can run a single request → through S1/S2/S3 → return a result.
 ## PHASE 4.2 — Control Plane (State Machine v1)
 Goal: Introduce job lifecycle, state transitions, and basic orchestration.
 
-4.2.1 — Job State Machine
+✅ 4.2.1 — Job State Machine
 - pending → running → succeeded/failed.  
 - Add state validation + transitions.
 
-4.2.2 — Control Plane Manager
+✅ 4.2.2 — Control Plane Manager
 - Implement ControlPlane class to manage job lifecycle.  
 - Add job registry + state updates.
 
-4.2.3 — Error Handling v1
+✅ 4.2.3 — Error Handling v1
 - Wrap worker execution in try/except.  
 - Mark job as failed with structured error.
 
-4.2.4 — Timeouts v1
+✅ 4.2.4 — Timeouts v1
 - Add per‑job timeout.  
 - Mark job as failed if exceeded.
 
-4.2.5 — Control Plane Trace
+✅ 4.2.5 — Control Plane Trace
 - Append state transitions to job trace.
 
 Outcome:  
@@ -1839,7 +1839,7 @@ Jobs now have lifecycle, state transitions, and structured failure.
 ## PHASE 4.3 — Lifecycle & Hydration (ExecutionContext v1)
 Goal: Enable multi‑cycle execution (S2 reflection, drift, repair).
 
-4.3.1 — ExecutionContext Model
+✅ 4.3.1 — ExecutionContext Model
 - Define schema: cognitive state, last result, memory snapshot.  
 - Add serialization + hydration.
 

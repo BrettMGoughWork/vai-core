@@ -162,15 +162,15 @@ def _test_state_machine() -> dict[str, Any]:
 
     # --- Valid transitions ---
     checks.append({
-        "check": "PENDING → RUNNING allowed",
+        "check": "PENDING -> RUNNING allowed",
         "passed": can_transition(JobState.PENDING, JobState.RUNNING),
     })
     checks.append({
-        "check": "RUNNING → SUCCEEDED allowed",
+        "check": "RUNNING -> SUCCEEDED allowed",
         "passed": can_transition(JobState.RUNNING, JobState.SUCCEEDED),
     })
     checks.append({
-        "check": "RUNNING → FAILED allowed",
+        "check": "RUNNING -> FAILED allowed",
         "passed": can_transition(JobState.RUNNING, JobState.FAILED),
     })
     checks.append({
@@ -189,9 +189,9 @@ def _test_state_machine() -> dict[str, Any]:
         (JobState.FAILED, JobState.SUCCEEDED),
     ]
     for cur, tgt in invalid_pairs:
-        key = f"invalid: {cur.value} → {tgt.value}"
+        key = f"invalid: {cur.value} -> {tgt.value}"
         checks.append({
-            "check": f"{cur.value} → {tgt.value} raises ValueError",
+            "check": f"{cur.value} -> {tgt.value} raises ValueError",
             "passed": _raises_value_error(transition, cur, tgt),
         })
 
@@ -205,7 +205,7 @@ def _test_state_machine() -> dict[str, Any]:
     return {"passed": passed, "checks": checks, "notes": []}
 
 
-@_scenario("control_plane", "ControlPlane lifecycle: register → running → succeeded/failed")
+@_scenario("control_plane", "ControlPlane lifecycle: register -> running -> succeeded/failed")
 def _test_control_plane() -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
@@ -222,12 +222,12 @@ def _test_control_plane() -> dict[str, Any]:
 
     # register_job
     cp.register_job(job)
-    checks.append({"check": "register_job saves to store", "passed": store.get(job.job_id) is job})
+    checks.append({"check": "register_job saves to store", "passed": store.get(job.job_id) == job})
     checks.append({"check": "job still PENDING after register", "passed": job.state is JobState.PENDING})
 
     # mark_running
     cp.mark_running(job)
-    checks.append({"check": "mark_running → RUNNING", "passed": job.state is JobState.RUNNING})
+    checks.append({"check": "mark_running -> RUNNING", "passed": job.state is JobState.RUNNING})
     checks.append({"check": "store updated after mark_running", "passed": store.get(job.job_id).state is JobState.RUNNING})
 
     # Registering a job that's already RUNNING must raise
@@ -238,7 +238,7 @@ def _test_control_plane() -> dict[str, Any]:
 
     # mark_succeeded
     cp.mark_succeeded(job, {"status": "ok"})
-    checks.append({"check": "mark_succeeded → SUCCEEDED", "passed": job.state is JobState.SUCCEEDED})
+    checks.append({"check": "mark_succeeded -> SUCCEEDED", "passed": job.state is JobState.SUCCEEDED})
     checks.append({"check": "result stored", "passed": job.result == {"status": "ok"}})
     checks.append({"check": "store has result", "passed": store.get(job.job_id).result == {"status": "ok"}})
 
@@ -247,7 +247,7 @@ def _test_control_plane() -> dict[str, Any]:
     cp.register_job(job2)
     cp.mark_running(job2)
     cp.mark_failed(job2, {"error_type": "ValueError", "message": "something went wrong"})
-    checks.append({"check": "mark_failed → FAILED", "passed": job2.state is JobState.FAILED})
+    checks.append({"check": "mark_failed -> FAILED", "passed": job2.state is JobState.FAILED})
     checks.append({"check": "error stored in result", "passed": job2.result == {"error_type": "ValueError", "message": "something went wrong"}})
 
     # Illegal direct transitions rejected
@@ -342,7 +342,7 @@ def _test_job_store() -> dict[str, Any]:
     checks.append({"check": "get missing job returns None", "passed": store.get("nope") is None})
 
     store.save(job)
-    checks.append({"check": "get saved job returns it", "passed": store.get(job.job_id) is job})
+    checks.append({"check": "get saved job returns it", "passed": store.get(job.job_id) == job})
     checks.append({"check": "len after save", "passed": len(store) == 1})
 
     # Overwrite
@@ -356,7 +356,7 @@ def _test_job_store() -> dict[str, Any]:
     return {"passed": passed, "checks": checks, "notes": []}
 
 
-@_scenario("worker_empty", "Worker.process_next() with empty queue → None")
+@_scenario("worker_empty", "Worker.process_next() with empty queue -> None")
 def _test_worker_empty() -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
@@ -462,7 +462,7 @@ def _test_logging() -> dict[str, Any]:
     return {"passed": passed, "checks": checks, "notes": []}
 
 
-@_scenario("end_to_end", "Full pipeline: normalize → create → queue → work → store → retrieve")
+@_scenario("end_to_end", "Full pipeline: normalize -> create -> queue -> work -> store -> retrieve")
 def _test_end_to_end() -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     notes: list[str] = []
@@ -481,7 +481,7 @@ def _test_end_to_end() -> dict[str, Any]:
     # 3. Save to store
     store = JobStore()
     store.save(job)
-    checks.append({"check": "job saved to store", "passed": store.get(job.job_id) is job})
+    checks.append({"check": "job saved to store", "passed": store.get(job.job_id) == job})
 
     # 4. Push to queue
     q = InMemoryQueue()
@@ -508,7 +508,7 @@ def _test_end_to_end() -> dict[str, Any]:
 
     # 7. Store still has the job
     retrieved = store.get(job.job_id)
-    checks.append({"check": "job retrievable from store after processing", "passed": retrieved is job})
+    checks.append({"check": "job retrievable from store after processing", "passed": retrieved == job})
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
@@ -587,6 +587,281 @@ def _test_gateway_get() -> dict[str, Any]:
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": []}
+
+
+@_scenario("execution_context", "ExecutionContext model, serialisation, and ControlPlane cycle tracing")
+def _test_execution_context() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+
+    from src.platform.runtime.execution_context import ExecutionContext
+    from src.platform.runtime.control_plane import ControlPlane
+    from src.platform.runtime.job import Job, create_job
+    from src.platform.runtime.job_store import JobStore
+    from src.platform.transport.normalization import ChannelMessage
+
+    # ExecutionContext default construction
+    ec = ExecutionContext()
+    checks.append({"check": "cognitive_state defaults to empty dict", "passed": ec.cognitive_state == {}})
+    checks.append({"check": "last_result defaults to None", "passed": ec.last_result is None})
+    checks.append({"check": "memory defaults to empty dict", "passed": ec.memory == {}})
+    checks.append({"check": "cycle_trace defaults to empty list", "passed": ec.cycle_trace == []})
+
+    # ExecutionContext serialisation round-trip
+    ec.cognitive_state = {"step": 1}
+    ec.last_result = {"output": "ok"}
+    ec.memory = {"buffer": "xyz"}
+    ec.cycle_trace.append({"event": "test", "timestamp": "now"})
+
+    d = ec.to_dict()
+    checks.append({"check": "to_dict returns dict", "passed": isinstance(d, dict)})
+    checks.append({"check": "to_dict preserves cognitive_state", "passed": d["cognitive_state"] == {"step": 1}})
+    checks.append({"check": "to_dict preserves last_result", "passed": d["last_result"] == {"output": "ok"}})
+    checks.append({"check": "to_dict preserves memory", "passed": d["memory"] == {"buffer": "xyz"}})
+    checks.append({"check": "to_dict preserves cycle_trace", "passed": len(d["cycle_trace"]) == 1})
+
+    ec2 = ExecutionContext.from_dict(d)
+    checks.append({"check": "from_dict restores ExecutionContext", "passed": isinstance(ec2, ExecutionContext)})
+    checks.append({"check": "round-trip preserves cognitive_state", "passed": ec2.cognitive_state == {"step": 1}})
+    checks.append({"check": "round-trip preserves last_result", "passed": ec2.last_result == {"output": "ok"}})
+
+    # ControlPlane initialises ExecutionContext on register
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    ch = ChannelMessage(input={"hello": "world"})
+    job = create_job(ch)
+    checks.append({"check": "new job has no execution_context", "passed": job.execution_context is None})
+
+    cp.register_job(job)
+    checks.append({"check": "register_job initialises execution_context", "passed": job.execution_context is not None})
+    checks.append({"check": "initial context has empty cycle_trace", "passed": len(job.execution_context.cycle_trace) == 0})
+
+    # append_cycle_trace
+    cp.append_cycle_trace(job, "cycle_start", {"payload": "test"})
+    checks.append({"check": "cycle_trace has 1 entry after append", "passed": len(job.execution_context.cycle_trace) == 1})
+    trace_entry = job.execution_context.cycle_trace[0]
+    checks.append({"check": "trace entry has event key", "passed": "event" in trace_entry})
+    checks.append({"check": "trace entry has timestamp key", "passed": "timestamp" in trace_entry})
+    checks.append({"check": "trace entry has payload key", "passed": "payload" in trace_entry})
+    checks.append({"check": "trace entry event matches", "passed": trace_entry["event"] == "cycle_start"})
+
+    # Persisted to store
+    stored = store.get(job.job_id)
+    checks.append({"check": "cycle_trace persisted in store", "passed": len(stored.execution_context.cycle_trace) == 1})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": []}
+
+
+@_scenario("checkpointing", "Checkpoint round-trip: serialise, store, hydrate, modify independently")
+def _test_checkpointing() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+
+    from src.platform.runtime.execution_context import ExecutionContext
+    from src.platform.runtime.control_plane import ControlPlane
+    from src.platform.runtime.job import Job, create_job
+    from src.platform.runtime.job_store import JobStore
+    from src.platform.transport.normalization import ChannelMessage
+
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+
+    # --- Job.save_checkpoint() ---
+    ch = ChannelMessage(input={"checkpoint": "test"})
+    job = create_job(ch)
+    cp.register_job(job)
+
+    cp.mark_running(job)
+    cp.mark_succeeded(job, {"output": "ok"})
+
+    checkpoint = job.save_checkpoint()
+    checks.append({"check": "save_checkpoint returns dict", "passed": isinstance(checkpoint, dict)})
+    checks.append({"check": "job.trace has state transition entries from mark_running/mark_succeeded",
+                   "passed": len(job.trace) > 0})
+
+    # --- Store.get() hydrates fresh ExecutionContext ---
+    job2 = create_job(ch)
+    cp.register_job(job2)
+    job2.execution_context.cognitive_state["cycle"] = 1
+
+    # Save modifies original context
+    cp.append_cycle_trace(job2, "cycle_start", {"t": 1})
+    checks.append({"check": "context persisted after append_cycle_trace",
+                   "passed": store.get(job2.job_id).execution_context is not None})
+
+    # Load a fresh copy — modifications to loaded copy should NOT affect store
+    loaded = store.get(job2.job_id)
+    loaded.execution_context.cognitive_state["modified"] = True
+    checks.append({"check": "loaded copy is independent from stored original",
+                   "passed": "modified" not in store.get(job2.job_id).execution_context.cognitive_state})
+
+    # --- Checkpoint round-trip with full lifecycle ---
+    job3 = create_job(ch)
+    cp.register_job(job3)
+    cp.mark_running(job3)
+    cp.mark_succeeded(job3, {"result": "done"})
+    cp.append_cycle_trace(job3, "cycle_end", {"status": "succeeded"})
+
+    loaded3 = store.get(job3.job_id)
+    checks.append({"check": "full lifecycle checkpoint preserves execution_context",
+                   "passed": loaded3.execution_context is not None})
+    checks.append({"check": "loaded execution_context has cycle_trace entry from append_cycle_trace",
+                   "passed": len(loaded3.execution_context.cycle_trace) >= 1})
+    checks.append({"check": "loaded execution_context has state_transition trace in job.trace",
+                   "passed": len(loaded3.trace) >= 2})
+
+    # --- Edge: save_checkpoint when context is None (before register) ---
+    job4 = Job(payload=ChannelMessage(input={}))
+    empty_checkpoint = job4.save_checkpoint()
+    checks.append({"check": "save_checkpoint with no context returns empty dict",
+                   "passed": empty_checkpoint == {}})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": []}
+
+
+@_scenario("resume_tokens", "Resume token generation, lifecycle, and opaque passthrough via adapter")
+def _test_resume_tokens() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+
+    from src.platform.runtime.tokens import new_resume_token
+    from src.platform.runtime.control_plane import ControlPlane
+    from src.platform.runtime.job import Job, create_job
+    from src.platform.runtime.job_store import JobStore
+    from src.platform.transport.normalization import ChannelMessage
+    from src.platform.adapter.adapter import s2_to_s1_adapter
+
+    # --- new_resume_token() ---
+    t1 = new_resume_token()
+    checks.append({"check": "new_resume_token returns a string", "passed": isinstance(t1, str)})
+    checks.append({"check": "token is non-empty", "passed": len(t1) > 0})
+
+    t2 = new_resume_token()
+    checks.append({"check": "consecutive tokens are unique", "passed": t1 != t2})
+
+    # --- ControlPlane.issue_resume_token() ---
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    ch = ChannelMessage(input={"token": "test"})
+    job = create_job(ch)
+    cp.register_job(job)
+
+    checks.append({"check": "resume_token is None after register", "passed": job.resume_token is None})
+
+    cp.issue_resume_token(job)
+    checks.append({"check": "issue_resume_token sets resume_token", "passed": job.resume_token is not None})
+    checks.append({"check": "resume_token is a string after issue", "passed": isinstance(job.resume_token, str)})
+
+    first_token = job.resume_token
+
+    # --- issue_resume_token persists to store ---
+    stored = store.get(job.job_id)
+    checks.append({"check": "resume_token persisted in store", "passed": stored is not None and stored.resume_token == first_token})
+
+    # --- issue_resume_token generates a new token each call ---
+    cp.issue_resume_token(job)
+    checks.append({"check": "second issue generates different token", "passed": job.resume_token != first_token})
+
+    # --- mark_succeeded issues a new token ---
+    job2 = create_job(ch)
+    cp.register_job(job2)
+    cp.issue_resume_token(job2)
+    token_before = job2.resume_token
+    cp.mark_running(job2)
+    cp.mark_succeeded(job2, {"output": "ok"})
+    checks.append({"check": "mark_succeeded issues new resume_token", "passed": job2.resume_token != token_before})
+    checks.append({"check": "token after mark_succeeded is not None", "passed": job2.resume_token is not None})
+
+    # --- mark_failed issues a new token ---
+    job3 = create_job(ch)
+    cp.register_job(job3)
+    cp.issue_resume_token(job3)
+    token_before3 = job3.resume_token
+    cp.mark_running(job3)
+    cp.mark_failed(job3, {"error_type": "TestError", "message": "intentional"})
+    checks.append({"check": "mark_failed issues new resume_token", "passed": job3.resume_token != token_before3})
+    checks.append({"check": "token after mark_failed is not None", "passed": job3.resume_token is not None})
+
+    # --- token is opaque passthrough via adapter ---
+    msg = ChannelMessage(input={"hello": "adapter"})
+    s1_req = s2_to_s1_adapter(msg, resume_token=t1)
+    checks.append({"check": "adapter includes resume_token in request", "passed": s1_req.get("resume_token") == t1})
+    checks.append({"check": "adapter preserves other keys", "passed": s1_req["type"] == "s1_request" and s1_req["input"] == {"hello": "adapter"}})
+
+    # --- adapter without token ---
+    s1_req2 = s2_to_s1_adapter(msg)
+    checks.append({"check": "adapter without token omits resume_token key", "passed": "resume_token" not in s1_req2})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": []}
+
+
+@_scenario("multi_cycle", "Multi-cycle Worker loop: ExecutionContext, checkpointing, resume tokens, cycle traces")
+def _test_multi_cycle() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    from src.platform.runtime.control_plane import ControlPlane
+    from src.platform.runtime.execution_context import ExecutionContext
+    from src.platform.runtime.job import create_job
+    from src.platform.runtime.job_store import JobStore
+
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    q = InMemoryQueue()
+    w = Worker(queue=q, control_plane=cp)
+
+    ch = ChannelMessage(input={"multi": "cycle"})
+    job = create_job(ch)
+    store.save(job)
+    q.push(job)
+
+    # Process through multi-cycle loop
+    result = w.process_next()
+    checks.append({"check": "process_next returns job", "passed": result is job})
+    checks.append({"check": "state is succeeded", "passed": result is not None and result.state == "succeeded"})
+    checks.append({"check": "result is populated", "passed": result is not None and result.result is not None})
+
+    if result and result.result:
+        checks.append({"check": "result type is s2_result", "passed": result.result.get("type") == "s2_result"})
+        notes.append(f"Result: {result.result}")
+
+    # Lifecycle trace events on job.trace
+    life_events = [e["event"] for e in job.trace]
+    checks.append({"check": "hydrate event in job.trace", "passed": "hydrate_execution_context" in life_events})
+    checks.append({"check": "dehydrate events in job.trace", "passed": "dehydrate_execution_context" in life_events})
+    notes.append(f"Lifecycle trace events: {life_events}")
+
+    # Execution context was hydrated during the loop
+    checks.append({"check": "execution_context exists after cycle", "passed": job.execution_context is not None})
+
+    if job.execution_context is not None:
+        checks.append({"check": "cycle_trace has entries", "passed": len(job.execution_context.cycle_trace) > 0})
+        notes.append(f"Cycle trace entries: {len(job.execution_context.cycle_trace)}")
+
+        # Each pair of entries should be cycle_start + cycle_end
+        events = [e["event"] for e in job.execution_context.cycle_trace]
+        checks.append({"check": "first event is cycle_start", "passed": events[0] == "cycle_start"})
+        checks.append({"check": "last event is cycle_end", "passed": events[-1] == "cycle_end"})
+
+    # Resume token was issued
+    checks.append({"check": "resume_token set after processing", "passed": job.resume_token is not None})
+
+    # Checkpoint persisted to store
+    stored = store.get(job.job_id)
+    checks.append({"check": "job persisted in store", "passed": stored is not None})
+    if stored is not None and stored.execution_context is not None:
+        checks.append({"check": "cycle_trace persisted in store", "passed": len(stored.execution_context.cycle_trace) > 0})
+
+    # Queue drained
+    checks.append({"check": "queue drained after processing", "passed": len(q) == 0})
+
+    # --- Multi-cycle with simulated multiple cycles ---
+    # Create a second job where execute_job_payload returns done=False on first call
+    # (simulate by injecting a custom execute via a test subclass or manually looping)
+    notes.append("Verifying multi-cycle loop completes after one cycle (done=True from stub)")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
 
 
 # ---- Runner ---------------------------------------------------------------
