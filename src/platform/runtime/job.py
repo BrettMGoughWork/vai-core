@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from src.platform.runtime.job_state import JobState
 from src.platform.transport.normalization import ChannelMessage
 
 
@@ -22,24 +23,24 @@ class Job(BaseModel):
     Fields:
         job_id:     UUID v4 string, generated at creation.
         created_at: Timezone-aware UTC timestamp of creation.
-        state:      Current lifecycle state (``"pending"``, ``"running"``,
-                    ``"completed"``, ``"failed"``).
+        state:      Current lifecycle state via ``JobState`` enum.
         payload:    The ``ChannelMessage`` that triggered this job.
         result:     Optional output dict, populated after execution.
     """
 
     job_id: str = Field(default_factory=lambda: str(uuid4()))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    state: str = "pending"
+    state: JobState = JobState.PENDING
     payload: ChannelMessage
     result: dict[str, Any] | None = None
+    trace: list[dict] = Field(default_factory=list)
 
 
 def create_job(channel_message: ChannelMessage) -> Job:
     """Create a new ``Job`` from a ``ChannelMessage``.
 
     Generates a UUID4 ``job_id`` and UTC ``created_at`` timestamp.
-    The job starts in ``"pending"`` state with ``result=None``.
+    The job starts in ``JobState.PENDING`` with ``result=None``.
 
     Args:
         channel_message: The normalized inbound message.
@@ -50,7 +51,7 @@ def create_job(channel_message: ChannelMessage) -> Job:
     return Job(
         job_id=str(uuid4()),
         created_at=datetime.now(timezone.utc),
-        state="pending",
+        state=JobState.PENDING,
         payload=channel_message,
         result=None,
     )

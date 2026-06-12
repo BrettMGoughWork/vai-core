@@ -25,21 +25,21 @@ def run(payload: dict[str, Any]) -> dict[str, str]:
     """Accept a job request and return a ``job_id``.
 
     The payload must be a JSON object (dict).  It is normalized via
-    ``gateway_to_channel_message``, wrapped in a ``Job``, saved to the
-    job store, and pushed onto the in-memory queue.
+    ``gateway_to_channel_message``, wrapped in a ``Job``, registered via the
+    ``ControlPlane``, and pushed onto the in-memory queue.
     """
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Payload must be a JSON object")
 
     channel_msg = gateway_to_channel_message(payload)
 
-    # Create a Job (new model) for job_store persistence and logging
-    from src.platform.runtime import create_job  # lazy: break circular import
-    from src.platform.runtime.job_store import job_store  # lazy: break circular import
+    # Lazy imports to break the circular dependency chain
     from src.platform.observability.logging import log_job_created
+    from src.platform.runtime import create_job
+    from src.platform.runtime.control_plane import control_plane
 
     job = create_job(channel_msg)
-    job_store.save(job)
+    control_plane.register_job(job)
     log_job_created(job)
 
     job_queue.push(job)
