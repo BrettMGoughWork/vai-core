@@ -1886,13 +1886,13 @@ Goal: Make S4 robust under failure.
 - Fallback to simpler execution if S1/S2 unstable.
 - ⚠️ Runtime semantics still a stub — safe fallback output format, escalation path, and recovery trigger deferred to S4.7.5.
 
-⬜ 4.4.6 — Worker Pipeline Abstraction
+✅ 4.4.6 — Worker Pipeline Abstraction
 - Refactor process_next() into a composable stage pipeline.
 - Each choke (crash recovery, poison, idempotency, degraded, retry, panic) becomes a PipelineStage with evaluate() → Decision.
 - Preserves evaluation order invariant without procedural entanglement.
 - Keeps the worker lean as S4.5–S4.8 add more stages.
 
-⬜ 4.4.7 — Subsystem Unit Tests
+✅ 4.4.7 — Subsystem Unit Tests
 - Add parameterized unit tests for all 5 pure-logic evaluators:
   RetryPolicy, PoisonDetector, CrashRecovery, PanicGuard, DegradedMode.
 - Harness remains the primary integration validation tool.
