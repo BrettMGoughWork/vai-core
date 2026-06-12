@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class RetryDecision:
-    """Returned by RetryPolicy.evaluate() — pure data, no logic."""
+    """Returned by PlatformRetryPolicy.evaluate() — pure data, no logic."""
 
     should_retry: bool
     delay_seconds: float | None
@@ -15,7 +15,7 @@ class RetryDecision:
 
 @dataclass(frozen=True)
 class RetryContext:
-    """Input to RetryPolicy.evaluate() — current attempt and error type."""
+    """Input to PlatformRetryPolicy.evaluate() — current attempt and error type."""
 
     attempt: int
     error_type: str
@@ -37,8 +37,8 @@ DEFAULT_RETRY_RULES: dict[str, dict] = {
 }
 
 
-class RetryPolicy:
-    """Deterministic retry policy. Pure logic — no IO, no sleeping."""
+class PlatformRetryPolicy:
+    """Deterministic retry policy for the platform runtime. Pure logic — no IO, no sleeping."""
 
     def __init__(self, rules: dict[str, dict]):
         self.rules = rules
@@ -57,5 +57,5 @@ class RetryPolicy:
         return RetryDecision(should_retry=True, delay_seconds=delay)
 
 
-def default_retry_policy() -> RetryPolicy:
-    return RetryPolicy(DEFAULT_RETRY_RULES)
+def default_retry_policy() -> PlatformRetryPolicy:
+    return PlatformRetryPolicy(DEFAULT_RETRY_RULES)

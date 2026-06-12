@@ -150,6 +150,26 @@ class ControlPlane:
         self.save_checkpoint(job)
         self.issue_resume_token(job)
 
+    def mark_poison(self, job: Job, reason: str) -> None:
+        """Transition job to ``POISON`` (terminal), attach reason, and persist.
+
+        A poison job has exceeded the maximum consecutive failure threshold
+        and must NOT be retried.  The caller (Worker) is responsible for
+        moving the job to the dead-letter queue.
+
+        Args:
+            job:    The job to mark as poison.
+            reason: Human-readable explanation (e.g. "Exceeded 5 failures").
+
+        Raises:
+            ValueError: If the current state does not allow the transition.
+        """
+        old = job.state
+        job.state = transition(job.state, JobState.POISON)
+        job.result = {"error": reason, "poison": True}
+        self._append_trace(job, old, JobState.POISON)
+        self.save_checkpoint(job)
+
     # ------------------------------------------------------------------
     # Cycle trace
     # ------------------------------------------------------------------

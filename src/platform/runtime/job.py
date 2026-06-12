@@ -39,6 +39,10 @@ class Job(BaseModel):
     trace: list[dict] = Field(default_factory=list)
     execution_context: ExecutionContext | None = None
     resume_token: str | None = None
+    failure_count: int = 0
+    consecutive_failures: int = 0
+    panic_count: int = 0
+    crash_count: int = 0
 
     # ------------------------------------------------------------------
     # Checkpoint helpers
