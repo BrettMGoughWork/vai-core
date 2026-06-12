@@ -7,6 +7,10 @@ scheduling, no concurrency.
 
 S4.5.4: The control plane also tracks worker heartbeats via an embedded
 :class:`~src.platform.runtime.heartbeat.control_plane.HeartbeatMonitor`.
+
+S4 Supervisor: The control plane optionally hosts a
+:class:`~src.platform.supervisor.supervisor_loop.SupervisorLoop` that
+monitors worker health and manages lifecycle.
 """
 
 from __future__ import annotations
@@ -23,6 +27,10 @@ from src.platform.runtime.job import Job
 from src.platform.runtime.job_state import JobState, transition
 from src.platform.runtime.job_store import JobStore, job_store as _default_store
 from src.platform.runtime.tokens import new_resume_token
+from src.platform.supervisor.supervisor_loop import (
+    SupervisorLoop,
+    WorkerHeartbeat,
+)
 
 # ---------------------------------------------------------------------------
 # Stratum‑4 isolation: no imports from S1/S2/S3, no queue, no adapter.
@@ -43,6 +51,7 @@ class ControlPlane:
         self,
         job_store: JobStore | None = None,
         heartbeat_timeout: float | None = None,
+        supervisor_loop: SupervisorLoop | None = None,
     ) -> None:
         self.job_store = job_store if job_store is not None else _default_store
         self.heartbeat_monitor: HeartbeatMonitor | None = (
@@ -50,6 +59,7 @@ class ControlPlane:
             if heartbeat_timeout is not None
             else None
         )
+        self.supervisor_loop: SupervisorLoop | None = supervisor_loop
 
     # ------------------------------------------------------------------
     # Heartbeat integration (S4.5.4)
@@ -73,6 +83,37 @@ class ControlPlane:
         if self.heartbeat_monitor is None:
             return None
         return self.heartbeat_monitor.update(event, now=now)
+
+    def accept_worker_heartbeat(
+        self,
+        worker_id: str,
+        status: str = "healthy",
+        job_id: str | None = None,
+        now: float | None = None,
+    ) -> None:
+        """Forward a worker heartbeat to the SupervisorLoop (if configured).
+
+        This is a convenience wrapper that constructs a
+        :class:`WorkerHeartbeat` and feeds it to the supervisor.
+
+        Args:
+            worker_id: The emitting worker.
+            status:    ``"healthy"``, ``"degraded"``, or ``"unresponsive"``.
+            job_id:    Optional job being processed.
+            now:       Current timestamp; defaults to :func:`time.time`.
+        """
+        if self.supervisor_loop is None:
+            return
+        import time as _time
+
+        ts = now if now is not None else _time.time()
+        hb = WorkerHeartbeat(
+            worker_id=worker_id,
+            timestamp=ts,
+            status=status,
+            job_id=job_id,
+        )
+        self.supervisor_loop.collect_heartbeat(hb)
 
     # ------------------------------------------------------------------
     # Resume token helpers

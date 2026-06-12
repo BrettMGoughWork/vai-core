@@ -77,6 +77,10 @@ from src.platform.runtime.safety.degraded_mode import (
     DegradedContext,
     DegradedDecision,
     DegradedMode,
+    SafeFallbackOutput,
+    SignalState,
+    WorkerDegradedEvent,
+    WorkerRecoveredEvent,
     default_degraded_mode,
 )
 from src.platform.runtime.channels import (
@@ -92,6 +96,33 @@ from src.platform.runtime.channels import (
     register_websocket_channel,
 )
 from src.platform.runtime.gateway_entrypoint import process_channel_input
+from src.platform.supervisor.supervisor_loop import (
+    SupervisorConfig,
+    SupervisorDecision,
+    SupervisorEscalation,
+    SupervisorLoop,
+    WorkerHealth,
+    WorkerHeartbeat,
+    WorkerRestartEvent,
+)
+from src.platform.supervisor.queue_supervisor import (
+    QueueSupervisor,
+    QueueSupervisorConfig,
+    QueueSupervisorDecision,
+    QueueMetrics,
+    StuckJobEvent,
+    QueueBackpressureEvent,
+    QueueSupervisorEscalation,
+)
+from src.platform.supervisor.control_plane_supervisor import (
+    AutoRepairEvent,
+    ControlPlaneEscalation,
+    ControlPlaneSupervisor,
+    ControlPlaneSupervisorConfig,
+    ControlPlaneSupervisorDecision,
+    InconsistencyEvent,
+    JobStateSnapshot,
+)
 
 # ---- Helpers ---------------------------------------------------------------
 
@@ -1476,7 +1507,7 @@ def _test_degraded_mode_pure_logic() -> dict[str, Any]:
     ))
     checks.append({"check": "retry exhausted → degraded", "passed": d.enter_degraded is True})
     if d.reason:
-        checks.append({"check": "retry exhausted reason set", "passed": "Retry" in d.reason})
+        checks.append({"check": "retry exhausted reason set", "passed": "retry" in d.reason.lower()})
 
     # --- Consecutive failures threshold ---
     d = dm.evaluate(DegradedContext(
@@ -1594,14 +1625,287 @@ def _test_degraded_mode_in_worker() -> dict[str, Any]:
             checks.append({"check": "state is SUCCEEDED (fallback)",
                            "passed": result.state == JobState.SUCCEEDED})
             if result.result is not None:
-                checks.append({"check": "result has fallback flag",
-                               "passed": result.result.get("fallback") is True})
+                checks.append({"check": "result has fallback_action",
+                               "passed": result.result.get("fallback_action") is not None})
+                checks.append({"check": "result status is degraded",
+                               "passed": result.result.get("status") == "degraded"})
                 checks.append({"check": "result has reason",
                                "passed": result.result.get("reason") is not None})
             notes.append(f"Result state: {result.state.value}")
             notes.append(f"Result: {result.result}")
     finally:
         worker_mod.execute_job_payload = _original
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("degraded_mode_fallback_schema",
+           "SafeFallbackOutput schema compliance and serialisation")
+def _test_degraded_mode_fallback_schema() -> dict[str, Any]:
+    """SafeFallbackOutput schema produces all required fields with correct structure."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # --- Schema fields ---
+    fb = SafeFallbackOutput(
+        reason="test_reason",
+        detail="Test detail message",
+        job_id="job-001",
+        fallback_action="short_circuit_and_acknowledge",
+        recovery_hint="Recovery requires 5 stable cycles.",
+    )
+    checks.append({"check": "status is 'degraded'", "passed": fb.status == "degraded"})
+    checks.append({"check": "reason is set", "passed": fb.reason == "test_reason"})
+    checks.append({"check": "detail is set", "passed": fb.detail == "Test detail message"})
+    checks.append({"check": "job_id is set", "passed": fb.job_id == "job-001"})
+    checks.append({"check": "fallback_action is set", "passed": fb.fallback_action == "short_circuit_and_acknowledge"})
+    checks.append({"check": "recovery_hint is set", "passed": fb.recovery_hint == "Recovery requires 5 stable cycles."})
+
+    # --- to_dict / from_dict round-trip ---
+    d = fb.to_dict()
+    checks.append({"check": "to_dict returns dict with all 6 keys",
+                   "passed": len(d) == 6 and "status" in d and "reason" in d})
+    checks.append({"check": "to_dict values match dataclass",
+                   "passed": d["reason"] == "test_reason" and d["status"] == "degraded"})
+
+    fb2 = SafeFallbackOutput.from_dict(d)
+    checks.append({"check": "from_dict round-trip preserves status",
+                   "passed": fb2.status == fb.status})
+    checks.append({"check": "from_dict round-trip preserves reason",
+                   "passed": fb2.reason == fb.reason})
+    checks.append({"check": "from_dict round-trip preserves job_id",
+                   "passed": fb2.job_id == fb.job_id})
+    checks.append({"check": "from_dict round-trip preserves fallback_action",
+                   "passed": fb2.fallback_action == fb.fallback_action})
+
+    # --- Default construction ---
+    fb3 = SafeFallbackOutput()
+    checks.append({"check": "default status is 'degraded'", "passed": fb3.status == "degraded"})
+    checks.append({"check": "default reason is empty", "passed": fb3.reason == ""})
+
+    # --- from_dict with empty dict ---
+    fb4 = SafeFallbackOutput.from_dict({})
+    checks.append({"check": "from_dict({}) defaults status", "passed": fb4.status == "degraded"})
+    checks.append({"check": "from_dict({}) defaults reason", "passed": fb4.reason == ""})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("degraded_mode_escalation",
+           "WorkerDegradedEvent escalation schema and DegradedMode escalation")
+def _test_degraded_mode_escalation() -> dict[str, Any]:
+    """WorkerDegradedEvent schema and that DegradedMode produces escalation events."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # --- Escalation event schema ---
+    ev = WorkerDegradedEvent(
+        worker_id="w-42",
+        job_id="job-007",
+        severity="high",
+        timestamp="2025-01-01T00:00:00Z",
+        reason="consecutive_failures_exceeded",
+    )
+    checks.append({"check": "event type is 'worker_degraded'",
+                   "passed": ev.event == "worker_degraded"})
+    checks.append({"check": "severity is 'high'", "passed": ev.severity == "high"})
+    checks.append({"check": "worker_id preserved", "passed": ev.worker_id == "w-42"})
+    checks.append({"check": "job_id preserved", "passed": ev.job_id == "job-007"})
+    checks.append({"check": "timestamp preserved",
+                   "passed": ev.timestamp == "2025-01-01T00:00:00Z"})
+    checks.append({"check": "reason preserved",
+                   "passed": ev.reason == "consecutive_failures_exceeded"})
+
+    # --- to_dict round-trip ---
+    d = ev.to_dict()
+    checks.append({"check": "escalation to_dict has 6 keys",
+                   "passed": len(d) == 6})
+    checks.append({"check": "escalation to_dict includes event key",
+                   "passed": d.get("event") == "worker_degraded"})
+
+    # --- DegradedMode.evaluate() produces escalation event ---
+    dm = default_degraded_mode(worker_id="test-worker")
+    ctx = DegradedContext(
+        consecutive_failures=3, panic_count=0, crash_count=0,
+        retry_exhausted=False, job_id="job-esc-1",
+    )
+    decision = dm.evaluate(ctx)
+    checks.append({"check": "degraded decision produces escalation_event",
+                   "passed": decision.escalation_event is not None})
+    if decision.escalation_event:
+        ee = decision.escalation_event
+        checks.append({"check": "escalation reason matches decision reason",
+                       "passed": ee.reason == decision.reason})
+        checks.append({"check": "escalation includes worker_id",
+                       "passed": ee.worker_id == "test-worker"})
+        checks.append({"check": "escalation includes job_id",
+                       "passed": ee.job_id == "job-esc-1"})
+        checks.append({"check": "escalation has non-empty timestamp",
+                       "passed": len(ee.timestamp) > 0})
+        notes.append(f"Escalation event: {ee.to_dict()}")
+
+    # --- Recovered event schema ---
+    rev = WorkerRecoveredEvent(worker_id="w-42", stability_window=5)
+    checks.append({"check": "recovery event type is 'worker_recovered'",
+                   "passed": rev.event == "worker_recovered"})
+    checks.append({"check": "recovery to_dict preserves stability_window",
+                   "passed": rev.to_dict().get("stability_window") == 5})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("degraded_mode_recovery",
+           "Recovery trigger logic — all gates must be green")
+def _test_degraded_mode_recovery() -> dict[str, Any]:
+    """DegradedMode.check_recovery() returns correct decisions for signal states."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    dm = default_degraded_mode(worker_id="recovery-test")
+
+    # Helper: a context with already_degraded=True and the given signal_state
+    def _ctx(sig: SignalState | None = None) -> DegradedContext:
+        return DegradedContext(
+            consecutive_failures=0, panic_count=0, crash_count=0,
+            retry_exhausted=False, signal_state=sig,
+            already_degraded=True, job_id="recovery-1",
+        )
+
+    # --- Not degraded → no-op ---
+    d = dm.check_recovery(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=0,
+        retry_exhausted=False, already_degraded=False,
+    ))
+    checks.append({"check": "not degraded → no recovery needed",
+                   "passed": d.enter_degraded is False and d.recovery_event is None})
+
+    # --- No signal state → stay degraded ---
+    d = dm.check_recovery(_ctx(None))
+    checks.append({"check": "no signals → stay degraded",
+                   "passed": d.enter_degraded is True and d.currently_degraded is True})
+
+    # --- Gate 1: S1 not stable ---
+    sig = SignalState(s1_stable=False, s1_stable_cycles=0)
+    d = dm.check_recovery(_ctx(sig))
+    checks.append({"check": "S1 unstable → stay degraded",
+                   "passed": d.enter_degraded is True})
+
+    # --- Gate 1: S1 stable but not enough cycles ---
+    sig = SignalState(s1_stable=True, s1_stable_cycles=3)
+    # Default recovery_stable_cycles is 5, so 3 < 5 → stay degraded
+    d = dm.check_recovery(_ctx(sig))
+    checks.append({"check": "S1 stable < N cycles → stay degraded",
+                   "passed": d.enter_degraded is True})
+
+    # --- Gate 2: S2 not stable ---
+    sig = SignalState(s1_stable=True, s1_stable_cycles=10, s2_stable=False)
+    d = dm.check_recovery(_ctx(sig))
+    checks.append({"check": "S2 unstable → stay degraded",
+                   "passed": d.enter_degraded is True})
+
+    # --- Gate 3: S3 not stable ---
+    sig = SignalState(s1_stable=True, s1_stable_cycles=10, s2_stable=True, s3_stable=False)
+    d = dm.check_recovery(_ctx(sig))
+    checks.append({"check": "S3 unstable → stay degraded",
+                   "passed": d.enter_degraded is True})
+
+    # --- Gate 4: Critical errors in window ---
+    sig = SignalState(
+        s1_stable=True, s1_stable_cycles=10, s2_stable=True, s3_stable=True,
+        new_critical_errors=1,
+    )
+    d = dm.check_recovery(_ctx(sig))
+    checks.append({"check": "critical errors → stay degraded",
+                   "passed": d.enter_degraded is True})
+
+    # --- Gate 4: Recent error timestamp ---
+    sig = SignalState(
+        s1_stable=True, s1_stable_cycles=10, s2_stable=True, s3_stable=True,
+        new_critical_errors=0, last_error_timestamp=time.time(),
+    )
+    d = dm.check_recovery(_ctx(sig))
+    checks.append({"check": "recent error → stay degraded",
+                   "passed": d.enter_degraded is True})
+
+    # --- All gates green → recovery ---
+    sig = SignalState(
+        s1_stable=True, s1_stable_cycles=10, s2_stable=True, s3_stable=True,
+        new_critical_errors=0, last_error_timestamp=0.0,
+    )
+    d = dm.check_recovery(_ctx(sig))
+    checks.append({"check": "all green → recovery possible",
+                   "passed": d.enter_degraded is False})
+    checks.append({"check": "recovery event emitted",
+                   "passed": d.recovery_event is not None})
+    if d.recovery_event:
+        checks.append({"check": "recovery event is worker_recovered",
+                       "passed": d.recovery_event.event == "worker_recovered"})
+        checks.append({"check": "recovery has worker_id",
+                       "passed": d.recovery_event.worker_id == "recovery-test"})
+        checks.append({"check": "recovery has stability_window",
+                       "passed": d.recovery_event.stability_window == dm.recovery_stable_cycles})
+        notes.append(f"Recovery event: {d.recovery_event.to_dict()}")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("degraded_mode_behavioural_contract",
+           "Behavioural contract enforcement — allowed vs forbidden operations")
+def _test_degraded_mode_behavioural_contract() -> dict[str, Any]:
+    """DegradedMode class methods enforce the behavioural contract."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # --- Forbidden ops ---
+    FORBIDDEN = ["retry", "backoff", "tool_call", "multi_step_reasoning",
+                 "agentic_behaviour", "external_api_call", "state_mutation",
+                 "job_completion_attempt"]
+
+    for op in FORBIDDEN:
+        checks.append({"check": f"'{op}' is forbidden",
+                       "passed": DegradedMode.is_op_forbidden(op)})
+        checks.append({"check": f"'{op}' is not allowed",
+                       "passed": not DegradedMode.is_op_allowed(op)})
+
+    # --- Allowed ops ---
+    ALLOWED = ["produce_fallback_output", "emit_escalation_event",
+               "wait_for_recovery_signals", "maintain_heartbeat",
+               "maintain_isolation"]
+
+    for op in ALLOWED:
+        checks.append({"check": f"'{op}' is allowed",
+                       "passed": DegradedMode.is_op_allowed(op)})
+        checks.append({"check": f"'{op}' is not forbidden",
+                       "passed": not DegradedMode.is_op_forbidden(op)})
+
+    # --- validate_behaviour ---
+    violations = DegradedMode.validate_behaviour([
+        "produce_fallback_output",
+        "tool_call",
+        "maintain_heartbeat",
+        "retry",
+    ])
+    checks.append({"check": "validate_behaviour returns forbidden ops",
+                   "passed": len(violations) == 2})
+    checks.append({"check": "tool_call is detected",
+                   "passed": "tool_call" in violations})
+    checks.append({"check": "retry is detected",
+                   "passed": "retry" in violations})
+
+    # --- No violations ---
+    clean = DegradedMode.validate_behaviour(list(ALLOWED))
+    checks.append({"check": "all allowed → no violations",
+                   "passed": len(clean) == 0})
+
+    # --- Unknown ops are not forbidden (not explicitly forbidden) ---
+    checks.append({"check": "unknown op is not forbidden",
+                   "passed": not DegradedMode.is_op_forbidden("unknown_op")})
+    checks.append({"check": "unknown op is not allowed",
+                   "passed": not DegradedMode.is_op_allowed("unknown_op")})
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
@@ -2017,6 +2321,1176 @@ def _test_channels() -> dict[str, Any]:
         checks.append({"check": "WebhookEvent immutable", "passed": False})
     except Exception:
         checks.append({"check": "WebhookEvent immutable", "passed": True})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+# =============================================================================
+# Supervisor Loop scenarios
+# =============================================================================
+
+
+@_scenario("supervisor_health_evaluation",
+           "SupervisorLoop evaluates healthy / degraded / unresponsive workers")
+def _test_supervisor_health_evaluation() -> dict[str, Any]:
+    """Supervisor §2 — Worker Health Model.
+
+    Tests: healthy heartbeat, degraded status, unresponsive timeout,
+    unknown worker (no heartbeat), edge-case at exact timeout boundary.
+    """
+    checks: list[dict[str, Any]] = []
+
+    cfg = SupervisorConfig(heartbeat_timeout=10.0)
+    loop = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+
+    # 1. No heartbeats — workers are unknown (no health status)
+    h = loop.evaluate_health("worker-0", now=0.0)
+    checks.append({"check": "unknown worker → unresponsive",
+                   "passed": h.status == "unresponsive"
+                             and h.reason == "No heartbeat ever received"
+                             and h.worker_id == "worker-0"})
+
+    # 2. Healthy heartbeat within timeout
+    loop.collect_heartbeat(WorkerHeartbeat(
+        worker_id="worker-1", timestamp=0.0, status="healthy"))
+    h = loop.evaluate_health("worker-1", now=5.0)
+    checks.append({"check": "recent heartbeat → healthy",
+                   "passed": h.status == "healthy"
+                             and h.last_seen == 0.0
+                             and h.worker_id == "worker-1"})
+
+    # 3. Degraded status in heartbeat
+    loop.collect_heartbeat(WorkerHeartbeat(
+        worker_id="worker-2", timestamp=0.0, status="degraded"))
+    h = loop.evaluate_health("worker-2", now=3.0)
+    checks.append({"check": "degraded heartbeat → degraded",
+                   "passed": h.status == "degraded"
+                             and h.reason == "Worker reported degraded status"
+                             and h.worker_id == "worker-2"})
+
+    # 4. Heartbeat timeout exceeded — unresponsive
+    loop.collect_heartbeat(WorkerHeartbeat(
+        worker_id="worker-3", timestamp=0.0, status="healthy"))
+    h = loop.evaluate_health("worker-3", now=15.0)
+    checks.append({"check": "stale heartbeat → unresponsive",
+                   "passed": h.status == "unresponsive"
+                             and "timeout" in (h.reason or "")
+                             and h.worker_id == "worker-3"})
+
+    # 5. Exact timeout boundary — still healthy (timeout is strict >)
+    loop.collect_heartbeat(WorkerHeartbeat(
+        worker_id="worker-4", timestamp=0.0, status="healthy"))
+    h = loop.evaluate_health("worker-4", now=10.0)
+    checks.append({"check": "heartbeat at exact timeout → healthy (no >)",
+                   "passed": h.status == "healthy"
+                             and h.worker_id == "worker-4"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": []}
+
+
+@_scenario("supervisor_restart_semantics",
+           "SupervisorLoop restart decisions: new IDs, clean state, event emission")
+def _test_supervisor_restart_semantics() -> dict[str, Any]:
+    """Supervisor §3 — Restart Semantics.
+
+    Tests: unresponsive worker triggers restart, new worker ID is unique,
+    old worker removed from tracking, restart event schema is correct.
+    """
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    clock = iter([0.0, 15.0, 15.0]).__next__
+    cfg = SupervisorConfig(heartbeat_timeout=10.0, pool_concurrency=2)
+    loop = SupervisorLoop(config=cfg, clock=clock)
+
+    # Register heartbeats for two workers (avoid "worker-N" naming as
+    # _fresh_worker_id also generates "worker-N" starting at 0)
+    loop.collect_heartbeat(WorkerHeartbeat(
+        worker_id="w-0", timestamp=0.0, status="healthy"))
+    loop.collect_heartbeat(WorkerHeartbeat(
+        worker_id="w-1", timestamp=0.0, status="healthy"))
+
+    # Evaluate at t=15 — both are stale
+    decision = loop.evaluate(
+        now=15.0,
+        active_worker_ids={"w-0", "w-1"},
+    )
+
+    # 1. Both unhealthy — 2 restarts scheduled
+    checks.append({"check": "two stale workers → two restarts",
+                   "passed": len(decision.restarts) >= 2})
+
+    # 2. Restart event has new worker ID (not empty)
+    restarts = [r for r in decision.restarts if r.old_worker_id]
+    if restarts:
+        ev = restarts[0]
+        checks.append({"check": "restart event has old_worker_id",
+                       "passed": ev.old_worker_id != ""})
+        checks.append({"check": "restart event has new_worker_id",
+                       "passed": ev.new_worker_id != ""})
+        checks.append({"check": "old and new IDs differ",
+                       "passed": ev.old_worker_id != ev.new_worker_id})
+        checks.append({"check": "restart event has reason",
+                       "passed": ev.reason != ""})
+        checks.append({"check": "restart event has ISO timestamp",
+                       "passed": "T" in ev.timestamp})
+        notes.append(f"Restart: {ev.old_worker_id} -> {ev.new_worker_id} ({ev.reason})")
+
+    # 3. Old worker removed from tracking
+    hb_old = loop.get_heartbeat("w-0")
+    checks.append({"check": "old worker removed from heartbeat tracking",
+                   "passed": hb_old is None})
+
+    # 4. Fresh worker IDs are monotonically increasing
+    id1 = loop._fresh_worker_id()
+    id2 = loop._fresh_worker_id()
+    checks.append({"check": "fresh worker IDs are unique",
+                   "passed": id1 != id2})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("supervisor_escalation",
+           "SupervisorLoop escalates when restart thresholds exceeded")
+def _test_supervisor_escalation() -> dict[str, Any]:
+    """Supervisor §5 — Escalation Rules.
+
+    Tests: burst restart (more than max_restarts in restart_window),
+    single worker restarted too many times.
+    """
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # ------------------------------------------------------------------
+    # 1. Burst restart escalation
+    # ------------------------------------------------------------------
+    # Heartbeat collected at t=0, evaluate at incrementing timestamps
+    # so elapsed always exceeds heartbeat_timeout (0.1s)
+    cfg = SupervisorConfig(
+        heartbeat_timeout=0.1,   # immediate timeout (elapsed must be > 0.1)
+        max_restarts=2,          # low threshold for test
+        restart_window=60.0,
+        max_worker_restarts=10,
+        pool_concurrency=1,
+    )
+    loop = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+
+    # Run 5 evaluate cycles — each collects a heartbeat at t=0 then
+    # evaluates at t=10 so elapsed=10 > 0.1 → worker restarted
+    for i in range(5):
+        loop.collect_heartbeat(WorkerHeartbeat(
+            worker_id="w-0", timestamp=0.0, status="healthy"))
+        decision = loop.evaluate(
+            now=10.0,
+            active_worker_ids={"w-0"},
+        )
+        # In cycles 1–2: restarts happen but within max_restarts
+        # In cycle 3+: recent_count(3) > max_restarts(2) → escalation
+
+    has_burst_esc = any(
+        "burst" in e.reason.lower()
+        for e in decision.escalations
+    )
+    checks.append({"check": "burst restart escalation emitted",
+                   "passed": has_burst_esc})
+    if has_burst_esc:
+        burst_esc = [e for e in decision.escalations
+                     if "burst" in e.reason.lower()][0]
+        notes.append(f"Burst escalation: {burst_esc.reason}")
+
+    # 2. Escalation event schema
+    for esc in decision.escalations:
+        checks.append({"check": "escalation has event type",
+                       "passed": esc.event == "supervisor_escalation"})
+        checks.append({"check": "escalation has critical severity",
+                       "passed": esc.severity == "critical"})
+        checks.append({"check": "escalation has ISO timestamp",
+                       "passed": "T" in esc.timestamp})
+        checks.append({"check": "escalation has reason",
+                       "passed": esc.reason != ""})
+
+    # ------------------------------------------------------------------
+    # 3. Single-worker repeated restart escalation
+    # ------------------------------------------------------------------
+    loop2_cfg = SupervisorConfig(max_worker_restarts=2)
+    loop2 = SupervisorLoop(config=loop2_cfg, clock=lambda: 0.0)
+    loop2.collect_heartbeat(WorkerHeartbeat(
+        worker_id="worker-x", timestamp=0.0, status="healthy"))
+    # Exhaust restart limit by faking internal counter
+    loop2._worker_restart_counts["worker-x"] = 5
+    escs = loop2._check_escalation(timestamp=0.0)
+    has_worker_esc = any(
+        "worker-x" in e.reason
+        for e in escs
+    )
+    checks.append({"check": "single worker restart limit escalation",
+                   "passed": has_worker_esc})
+    if has_worker_esc:
+        notes.append("Per-worker restart escalation detected")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("supervisor_pool_maintenance",
+           "SupervisorLoop ensures pool size matches concurrency")
+def _test_supervisor_pool_maintenance() -> dict[str, Any]:
+    """Supervisor §3.4–3.6 — Pool size enforcement.
+
+    Tests: pool under capacity triggers worker creation, capacity match
+    is reported correctly, empty pool creates fill events.
+    """
+    checks: list[dict[str, Any]] = []
+
+    cfg = SupervisorConfig(
+        heartbeat_timeout=30.0,
+        pool_concurrency=3,
+    )
+    loop = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+
+    # 1. Pool at full capacity — all healthy
+    for wid in ["worker-0", "worker-1", "worker-2"]:
+        loop.collect_heartbeat(WorkerHeartbeat(
+            worker_id=wid, timestamp=0.0, status="healthy"))
+
+    decision = loop.evaluate(
+        now=0.0,
+        active_worker_ids={"worker-0", "worker-1", "worker-2"},
+    )
+    checks.append({"check": "full pool → pool_full=True",
+                   "passed": decision.pool_full})
+
+    # 2. Pool under capacity — missing worker
+    loop2 = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+    loop2.collect_heartbeat(WorkerHeartbeat(
+        worker_id="worker-0", timestamp=0.0, status="healthy"))
+
+    decision2 = loop2.evaluate(
+        now=0.0,
+        active_worker_ids={"worker-0"},
+    )
+    checks.append({"check": "under-capacity pool → pool_full=False",
+                   "passed": not decision2.pool_full})
+    checks.append({"check": "under-capacity creates restart events",
+                   "passed": len(decision2.restarts) > 0})
+
+    # 3. No active_worker_ids — pool_full based on heartbeat count
+    loop3 = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+    for wid in ["worker-0", "worker-1"]:
+        loop3.collect_heartbeat(WorkerHeartbeat(
+            worker_id=wid, timestamp=0.0, status="healthy"))
+
+    decision3 = loop3.evaluate(now=0.0, active_worker_ids=None)
+    checks.append({"check": "no active_worker_ids → pool_full=False (2 < 3)",
+                   "passed": not decision3.pool_full})
+
+    # 4. active_unhealthy count is correct
+    loop4 = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+    loop4.collect_heartbeat(WorkerHeartbeat(
+        worker_id="degraded-0", timestamp=0.0, status="degraded"))
+    loop4.collect_heartbeat(WorkerHeartbeat(
+        worker_id="healthy-0", timestamp=0.0, status="healthy"))
+
+    decision4 = loop4.evaluate(
+        now=0.0,
+        active_worker_ids={"degraded-0", "healthy-0"},
+    )
+    checks.append({"check": "active_unhealthy counts degraded workers",
+                   "passed": decision4.active_unhealthy == 1})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": []}
+
+
+@_scenario("supervisor_behavioural_contract",
+           "SupervisorLoop behavioural contract enforcement")
+def _test_supervisor_behavioural_contract() -> dict[str, Any]:
+    """Supervisor §6 — Behavioural Contract.
+
+    Tests: supervisor produces safe, structured output; does NOT execute
+    job logic; does NOT mutate job state; is deterministic.
+    """
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    cfg = SupervisorConfig(heartbeat_timeout=10.0, pool_concurrency=2)
+    loop = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+
+    # 1. Decision is a SupervisorDecision
+    decision = loop.evaluate(
+        now=0.0,
+        active_worker_ids={"worker-0", "worker-1"},
+    )
+    checks.append({"check": "evaluate returns SupervisorDecision",
+                   "passed": isinstance(decision, SupervisorDecision)})
+
+    # 2. Decision has expected fields
+    checks.append({"check": "decision has restarts list",
+                   "passed": isinstance(decision.restarts, list)})
+    checks.append({"check": "decision has escalations list",
+                   "passed": isinstance(decision.escalations, list)})
+    checks.append({"check": "decision has health_map",
+                   "passed": isinstance(decision.health_map, dict)})
+    checks.append({"check": "decision has pool_full",
+                   "passed": isinstance(decision.pool_full, bool)})
+    checks.append({"check": "decision has pool_worker_ids",
+                   "passed": isinstance(decision.pool_worker_ids, set)})
+
+    # 3. Deterministic: same inputs → same outputs
+    loop2 = SupervisorLoop(config=cfg, clock=lambda: 0.0)
+    loop2.collect_heartbeat(WorkerHeartbeat(
+        worker_id="w1", timestamp=0.0, status="healthy"))
+    loop2.collect_heartbeat(WorkerHeartbeat(
+        worker_id="w2", timestamp=0.0, status="healthy"))
+
+    d1 = loop2.evaluate(now=5.0, active_worker_ids={"w1", "w2"})
+    d2 = loop2.evaluate(now=5.0, active_worker_ids={"w1", "w2"})
+    checks.append({"check": "deterministic: same decision for same inputs",
+                   "passed": len(d1.restarts) == len(d2.restarts)
+                             and d1.pool_full == d2.pool_full})
+    notes.append(f"Run 1: {len(d1.restarts)} restarts, pool_full={d1.pool_full}")
+    notes.append(f"Run 2: {len(d2.restarts)} restarts, pool_full={d2.pool_full}")
+
+    # 4. Restart event is properly structured (if any exist)
+    if decision.restarts:
+        ev = decision.restarts[0]
+        checks.append({"check": "restart event is WorkerRestartEvent",
+                       "passed": isinstance(ev, WorkerRestartEvent)})
+        checks.append({"check": "restart event to_dict works",
+                       "passed": isinstance(ev.to_dict(), dict)
+                                 and "old_worker_id" in ev.to_dict()})
+
+    # 5. Escalation event is properly structured
+    if decision.escalations:
+        ev = decision.escalations[0]
+        checks.append({"check": "escalation event is SupervisorEscalation",
+                       "passed": isinstance(ev, SupervisorEscalation)})
+        checks.append({"check": "escalation to_dict works",
+                       "passed": isinstance(ev.to_dict(), dict)
+                                 and "event" in ev.to_dict()})
+
+    # 6. WorkerRestartEvent: default is a frozen dataclass
+    default_restart = WorkerRestartEvent()
+    checks.append({"check": "default restart event has correct event type",
+                   "passed": default_restart.event == "worker_restarted"})
+
+    # 7. SupervisorEscalation: default is a frozen dataclass
+    default_esc = SupervisorEscalation()
+    checks.append({"check": "default escalation has correct event type",
+                   "passed": default_esc.event == "supervisor_escalation"})
+    checks.append({"check": "default escalation has critical severity",
+                   "passed": default_esc.severity == "critical"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("queue_stuck_job_detection", "Queue Supervisor §2 — Stuck job detection")
+def _test_queue_stuck_job_detection() -> dict[str, Any]:
+    """Queue Supervisor stuck job detection — queued timeout, processing timeout,
+    ack timeout, and healthy boundary cases."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    cfg = QueueSupervisorConfig(
+        max_processing_time_ms=10.0,
+        max_queue_age_ms=10.0,
+        ack_timeout_ms=5.0,
+    )
+    qs = QueueSupervisor(config=cfg)
+
+    # 1. Queued job exceeded max queue age → stuck
+    metrics = QueueMetrics(
+        queue_length=2,
+        queued_jobs=[("j1", 0.005), ("j2", 15.0)],  # j2 stuck (15s > 10ms)
+        in_flight_jobs=[],
+    )
+    d = qs.evaluate(metrics, now=0.0)
+    stuck_ids = {s.job_id for s in d.stuck_jobs}
+    checks.append({"check": "queued job beyond max_queue_age is stuck",
+                   "passed": "j2" in stuck_ids})
+    checks.append({"check": "queued job within limit is not stuck",
+                   "passed": "j1" not in stuck_ids})
+    notes.append(f"Stuck jobs (queued test): {stuck_ids}")
+
+    # 2. In-flight job exceeded max processing time → stuck
+    metrics2 = QueueMetrics(
+        queue_length=1,
+        queued_jobs=[],
+        in_flight_jobs=[("j3", 0.003), ("j4", 20.0)],  # j4 stuck
+    )
+    d2 = qs.evaluate(metrics2, now=0.0)
+    stuck_ids2 = {s.job_id for s in d2.stuck_jobs}
+    checks.append({"check": "in-flight job beyond max_processing_time is stuck",
+                   "passed": "j4" in stuck_ids2})
+    checks.append({"check": "in-flight job within limit is not stuck",
+                   "passed": "j3" not in stuck_ids2})
+
+    # 3. Ack timeout — in-flight job not acknowledged
+    metrics3 = QueueMetrics(
+        queue_length=1,
+        queued_jobs=[],
+        in_flight_jobs=[("j5", 6.0)],  # 6s > 5ms ack timeout → stuck
+    )
+    d3 = qs.evaluate(metrics3, now=0.0)
+    stuck_ids3 = {s.job_id for s in d3.stuck_jobs}
+    checks.append({"check": "in-flight job exceeding ack timeout is stuck",
+                   "passed": "j5" in stuck_ids3})
+
+    # 4. StuckJobEvent has correct schema
+    if d3.stuck_jobs:
+        ev = d3.stuck_jobs[0]
+        checks.append({"check": "stuck event has correct event type",
+                       "passed": ev.event == "job_stuck"})
+        checks.append({"check": "stuck event to_dict works",
+                       "passed": isinstance(ev.to_dict(), dict)
+                                 and "job_id" in ev.to_dict()})
+
+    # 5. Empty metrics → no stuck jobs
+    d4 = qs.evaluate(QueueMetrics(), now=0.0)
+    checks.append({"check": "empty metrics produce no stuck jobs",
+                   "passed": len(d4.stuck_jobs) == 0})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("queue_backpressure", "Queue Supervisor §3 — Backpressure detection")
+def _test_queue_backpressure() -> dict[str, Any]:
+    """Queue Supervisor backpressure detection — length threshold,
+    age threshold, enqueue/dequeue rate ratio, and clean state."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    cfg = QueueSupervisorConfig(
+        backpressure_queue_length_threshold=3,
+        backpressure_avg_age_ms=100.0,
+    )
+    qs = QueueSupervisor(config=cfg)
+
+    # 1. Queue length exceeds threshold → backpressure
+    metrics = QueueMetrics(
+        queue_length=5,
+        queued_jobs=[("j1", 0.001)],
+        in_flight_jobs=[],
+    )
+    d = qs.evaluate(metrics, now=0.0)
+    checks.append({"check": "queue length > threshold triggers backpressure",
+                   "passed": d.has_backpressure})
+    notes.append(f"BP (length test): {d.has_backpressure}")
+
+    # 2. Average job age exceeds threshold → backpressure
+    metrics2 = QueueMetrics(
+        queue_length=2,
+        queued_jobs=[("j1", 0.1), ("j2", 0.15)],  # avg = 0.125s = 125ms > 100ms
+        in_flight_jobs=[],
+    )
+    d2 = qs.evaluate(metrics2, now=0.0)
+    checks.append({"check": "avg job age > threshold triggers backpressure",
+                   "passed": d2.has_backpressure})
+
+    # 3. Enqueue/dequeue rate ratio > 1.5 → backpressure
+    metrics3 = QueueMetrics(
+        queue_length=1,
+        queued_jobs=[("j1", 0.001)],
+        in_flight_jobs=[],
+        enqueue_rate=10.0,
+        dequeue_rate=5.0,  # ratio = 2.0 > 1.5
+    )
+    d3 = qs.evaluate(metrics3, now=0.0)
+    checks.append({"check": "enqueue/dequeue ratio > 1.5 triggers backpressure",
+                   "passed": d3.has_backpressure})
+
+    # 4. Clean state (low length, low age, balanced rates) → no backpressure
+    metrics4 = QueueMetrics(
+        queue_length=1,
+        queued_jobs=[("j1", 0.001)],
+        in_flight_jobs=[],
+        enqueue_rate=5.0,
+        dequeue_rate=5.0,  # ratio = 1.0
+    )
+    d4 = qs.evaluate(metrics4, now=0.0)
+    checks.append({"check": "clean state has no backpressure",
+                   "passed": not d4.has_backpressure})
+
+    # 5. Backpressure event schema
+    if d.has_backpressure:
+        bp_event = d.backpressure_events[0]
+        checks.append({"check": "backpressure event is QueueBackpressureEvent",
+                       "passed": isinstance(bp_event, QueueBackpressureEvent)})
+        checks.append({"check": "backpressure to_dict works",
+                       "passed": isinstance(bp_event.to_dict(), dict)
+                                 and "event" in bp_event.to_dict()
+                                 and bp_event.to_dict()["event"] == "queue_backpressure"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("queue_escalation", "Queue Supervisor §5 — Escalation rules")
+def _test_queue_escalation() -> dict[str, Any]:
+    """Queue Supervisor escalation rules — stuck job threshold,
+    consecutive backpressure, critical queue length, critical job age."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    cfg = QueueSupervisorConfig(
+        max_processing_time_ms=10.0,
+        max_queue_age_ms=10.0,
+        critical_stuck_job_threshold=2,
+        backpressure_consecutive_intervals=3,
+        critical_queue_length=50,
+        critical_job_age_ms=5000.0,
+        backpressure_queue_length_threshold=3,
+    )
+    qs = QueueSupervisor(config=cfg)
+
+    # 1. Stuck job count exceeds threshold → escalation
+    metrics = QueueMetrics(
+        queue_length=3,
+        queued_jobs=[("j1", 15.0), ("j2", 20.0), ("j3", 25.0)],  # 3 stuck
+        in_flight_jobs=[],
+    )
+    d = qs.evaluate(metrics, now=0.0)
+    esc_reasons = [e.reason for e in d.escalations]
+    checks.append({"check": "stuck job escalation when count exceeds threshold",
+                   "passed": any("stuck" in r.lower() for r in esc_reasons)})
+    notes.append(f"Escalation reasons: {esc_reasons}")
+
+    # 2. Backpressure persists for N consecutive intervals → escalation
+    qs2 = QueueSupervisor(config=cfg)
+    for i in range(cfg.backpressure_consecutive_intervals + 1):
+        m = QueueMetrics(
+            queue_length=10,  # high length → backpressure
+            queued_jobs=[("j1", 0.001)],
+            in_flight_jobs=[],
+        )
+        d_step = qs2.evaluate(m, now=float(i))
+        if i == cfg.backpressure_consecutive_intervals:
+            esc_reasons2 = [e.reason for e in d_step.escalations]
+            checks.append({"check": "sustained backpressure triggers escalation",
+                           "passed": any("backpressure" in r.lower() for r in esc_reasons2)})
+            notes.append(f"BP consecutive escalation reasons: {esc_reasons2}")
+
+    # 3. Critical queue length → escalation
+    metrics3 = QueueMetrics(
+        queue_length=100,  # exceeds critical 50
+        queued_jobs=[("j1", 0.001)],
+        in_flight_jobs=[],
+    )
+    d3 = qs.evaluate(metrics3, now=0.0)
+    # Fresh qs so previous state is gone; critical length triggers directly
+    qs3 = QueueSupervisor(config=cfg)
+    d3 = qs3.evaluate(metrics3, now=0.0)
+    tests_passed = any("queue_length" in e.reason for e in d3.escalations)
+    # fallback: check critical_queue_length
+    if not tests_passed:
+        tests_passed = any("critical" in e.reason.lower() for e in d3.escalations)
+    checks.append({"check": "critical queue length triggers escalation",
+                   "passed": tests_passed})
+
+    # 4. Critical job age → escalation
+    metrics4 = QueueMetrics(
+        queue_length=1,
+        queued_jobs=[("j1", 10.0)],  # 10s = 10000ms > 5000ms critical
+        in_flight_jobs=[],
+    )
+    qs4 = QueueSupervisor(config=cfg)
+    d4 = qs4.evaluate(metrics4, now=0.0)
+    esc_reasons4 = [e.reason for e in d4.escalations]
+    checks.append({"check": "critical job age triggers escalation",
+                   "passed": any("age" in r for r in esc_reasons4)})
+
+    # 5. Escalation event schema
+    if d.escalations:
+        ev = d.escalations[0]
+        checks.append({"check": "escalation event is QueueSupervisorEscalation",
+                       "passed": isinstance(ev, QueueSupervisorEscalation)})
+        checks.append({"check": "escalation to_dict works",
+                       "passed": isinstance(ev.to_dict(), dict)
+                                 and "event" in ev.to_dict()
+                                 and ev.to_dict()["event"] == "queue_supervisor_escalation"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("queue_behavioural_contract", "Queue Supervisor §6 — Behavioural contract")
+def _test_queue_behavioural_contract() -> dict[str, Any]:
+    """Queue Supervisor behavioural contract — read-only, deterministic,
+    structured output, no retries, no state mutation, no worker interaction."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    cfg = QueueSupervisorConfig(max_processing_time_ms=10.0, max_queue_age_ms=10.0)
+    qs = QueueSupervisor(config=cfg)
+
+    # 1. Decision is a QueueSupervisorDecision
+    d = qs.evaluate(QueueMetrics(), now=0.0)
+    checks.append({"check": "evaluate returns QueueSupervisorDecision",
+                   "passed": isinstance(d, QueueSupervisorDecision)})
+
+    # 2. Decision has expected fields (read-only diagnostic)
+    checks.append({"check": "decision has stuck_jobs list",
+                   "passed": isinstance(d.stuck_jobs, list)})
+    checks.append({"check": "decision has backpressure_events list",
+                   "passed": isinstance(d.backpressure_events, list)})
+    checks.append({"check": "decision has escalations list",
+                   "passed": isinstance(d.escalations, list)})
+    checks.append({"check": "decision has has_backpressure bool",
+                   "passed": isinstance(d.has_backpressure, bool)})
+    checks.append({"check": "decision has queue_length",
+                   "passed": isinstance(d.queue_length, int)})
+    checks.append({"check": "decision has avg_job_age_ms",
+                   "passed": isinstance(d.avg_job_age_ms, float)})
+
+    # 3. No side effects — evaluating twice with same inputs gives same outputs
+    metrics = QueueMetrics(
+        queue_length=5,
+        queued_jobs=[("j1", 20.0)],
+        in_flight_jobs=[],
+    )
+    d1 = qs.evaluate(metrics, now=0.0)
+    d2 = qs.evaluate(metrics, now=0.0)
+    checks.append({"check": "deterministic: same inputs produce same decision",
+                   "passed": len(d1.stuck_jobs) == len(d2.stuck_jobs)
+                             and d1.has_backpressure == d2.has_backpressure
+                             and len(d1.escalations) == len(d2.escalations)})
+
+    # 4. No retry-like behaviour or state mutation in decision output
+    notes.append(f"stuck_jobs={len(d1.stuck_jobs)} (diagnostic only, no retries)")
+    notes.append(f"backpressure={d1.has_backpressure} (signal only, no corrective action)")
+
+    # 5. Default event structures
+    default_stuck = StuckJobEvent()
+    checks.append({"check": "default StuckJobEvent has correct event type",
+                   "passed": default_stuck.event == "job_stuck"})
+    checks.append({"check": "default StuckJobEvent has empty job_id",
+                   "passed": default_stuck.job_id == ""})
+
+    default_bp = QueueBackpressureEvent()
+    checks.append({"check": "default QueueBackpressureEvent has correct event",
+                   "passed": default_bp.event == "queue_backpressure"})
+
+    default_esc = QueueSupervisorEscalation()
+    checks.append({"check": "default escalation has correct event",
+                   "passed": default_esc.event == "queue_supervisor_escalation"})
+    checks.append({"check": "default escalation has critical severity",
+                   "passed": default_esc.severity == "critical"})
+
+    # 6. Empty metrics → deterministic safe decision
+    d_empty = qs.evaluate(QueueMetrics(), now=0.0)
+    checks.append({"check": "empty metrics yields no stuck jobs",
+                   "passed": len(d_empty.stuck_jobs) == 0})
+    checks.append({"check": "empty metrics yields no backpressure",
+                   "passed": not d_empty.has_backpressure})
+    checks.append({"check": "empty metrics yields no escalations",
+                   "passed": len(d_empty.escalations) == 0})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("queue_integration", "Queue Supervisor — Full integration cycle")
+def _test_queue_integration() -> dict[str, Any]:
+    """Queue Supervisor integration — configure, run evaluation cycle,
+    detect stuck jobs, backpressure, and escalation in a realistic scenario."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    cfg = QueueSupervisorConfig(
+        max_processing_time_ms=50.0,
+        max_queue_age_ms=30.0,
+        ack_timeout_ms=20.0,
+        backpressure_queue_length_threshold=10,
+        backpressure_avg_age_ms=500.0,
+        critical_stuck_job_threshold=3,
+        backpressure_consecutive_intervals=2,
+        critical_queue_length=50,
+        critical_job_age_ms=2000.0,
+        backpressure_enqueue_dequeue_ratio=1.5,
+    )
+    qs = QueueSupervisor(config=cfg)
+
+    # Cycle 1: healthy state — short queue, fast jobs
+    m1 = QueueMetrics(
+        queue_length=2,
+        queued_jobs=[("j1", 0.005), ("j2", 0.010)],
+        in_flight_jobs=[("j3", 0.020)],
+        enqueue_rate=5.0,
+        dequeue_rate=5.0,
+    )
+    d1 = qs.evaluate(m1, now=0.0)
+    checks.append({"check": "cycle 1: no stuck jobs in healthy state",
+                   "passed": len(d1.stuck_jobs) == 0})
+    checks.append({"check": "cycle 1: no backpressure in healthy state",
+                   "passed": not d1.has_backpressure})
+    checks.append({"check": "cycle 1: no escalation in healthy state",
+                   "passed": len(d1.escalations) == 0})
+
+    # Cycle 2: stuck jobs — queued job expired
+    m2 = QueueMetrics(
+        queue_length=2,
+        queued_jobs=[("j4", 0.005), ("j5", 40.0)],  # j5 > 30ms max_queue_age
+        in_flight_jobs=[],
+    )
+    d2 = qs.evaluate(m2, now=1.0)
+    stuck_ids = {s.job_id for s in d2.stuck_jobs}
+    checks.append({"check": "cycle 2: j5 stuck (queued > max_queue_age)",
+                   "passed": "j5" in stuck_ids})
+    checks.append({"check": "cycle 2: j4 not stuck",
+                   "passed": "j4" not in stuck_ids})
+    notes.append(f"Cycle 2 stuck: {stuck_ids}")
+
+    # Cycle 3: in-flight job exceeds processing time
+    m3 = QueueMetrics(
+        queue_length=1,
+        queued_jobs=[],
+        in_flight_jobs=[("j6", 60.0)],  # 60ms > 50ms max_processing_time
+    )
+    d3 = qs.evaluate(m3, now=2.0)
+    stuck_ids3 = {s.job_id for s in d3.stuck_jobs}
+    checks.append({"check": "cycle 3: j6 stuck (in-flight > processing time)",
+                   "passed": "j6" in stuck_ids3})
+
+    # Cycle 4: severe backpressure (high queue + high age + rate imbalance)
+    m4 = QueueMetrics(
+        queue_length=15,
+        queued_jobs=[("j7", 0.600), ("j8", 0.700), ("j9", 0.800)],  # avg 700ms > 500ms
+        in_flight_jobs=[],
+        enqueue_rate=20.0,
+        dequeue_rate=5.0,  # ratio = 4.0
+    )
+    d4 = qs.evaluate(m4, now=3.0)
+    checks.append({"check": "cycle 4: high queue triggers backpressure",
+                   "passed": d4.has_backpressure})
+    if d4.backpressure_events:
+        bp = d4.backpressure_events[0]
+        checks.append({"check": "cycle 4: backpressure event has correct event type",
+                       "passed": bp.event == "queue_backpressure"})
+
+    # Cycle 5: sustained backpressure triggers escalation
+    m5 = QueueMetrics(
+        queue_length=15,
+        queued_jobs=[("j7", 0.600)],
+        in_flight_jobs=[],
+        enqueue_rate=20.0,
+        dequeue_rate=5.0,
+    )
+    d5 = qs.evaluate(m5, now=4.0)
+    checks.append({"check": "cycle 5: sustained backpressure (count >= 2)",
+                   "passed": d5.has_backpressure})
+
+    # Check for escalation from sustained backpressure
+    # (qs has been accumulating consecutive backpressure across cycles 4-5)
+    esc_reasons = [e.reason for e in d5.escalations]
+    notes.append(f"Cycle 5 escalation reasons: {esc_reasons}")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+# ---- Control Plane Supervisor scenarios -----------------------------------
+
+
+@_scenario(
+    "control_plane_state_detection",
+    "Control Plane Supervisor §2 — Inconsistent job state detection",
+)
+def _() -> dict:
+    checks: list[dict] = []
+    notes: list[str] = []
+    cps = ControlPlaneSupervisor(config=ControlPlaneSupervisorConfig())
+    active_workers = {"w-1", "w-2", "w-3"}
+
+    # Check 1: S2 queued but S3 assigned to a worker
+    snap1 = JobStateSnapshot(
+        job_id="j1", s2_state="queued", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d1 = cps.evaluate([snap1], active_workers, now=1000.0)
+    checks.append({"check": "S2 queued + S3 assigned → inconsistency",
+                   "passed": len(d1.inconsistencies) == 1})
+    if d1.inconsistencies:
+        checks.append({"check": "reason mentions S2 queued but S3 assigned",
+                       "passed": "assigned" in d1.inconsistencies[0].reason})
+
+    # Check 2: S2 processing but no worker claims it
+    snap2 = JobStateSnapshot(
+        job_id="j2", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d2 = cps.evaluate([snap2], active_workers, now=1001.0)
+    checks.append({"check": "S2 processing + no S4 worker → inconsistency",
+                   "passed": len(d2.inconsistencies) == 1})
+    if d2.inconsistencies:
+        checks.append({"check": "reason mentions S2 processing but no worker",
+                       "passed": "no worker" in d2.inconsistencies[0].reason})
+
+    # Check 3: S2 processing but multiple S4 workers
+    snap3 = JobStateSnapshot(
+        job_id="j3", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=("w-1", "w-2"),
+    )
+    d3 = cps.evaluate([snap3], active_workers, now=1002.0)
+    checks.append({"check": "S2 processing + multiple S4 workers → inconsistency",
+                   "passed": len(d3.inconsistencies) == 1})
+    if d3.inconsistencies:
+        checks.append({"check": "reason mentions multiple workers",
+                       "passed": "workers claim" in d3.inconsistencies[0].reason})
+
+    # Check 4: S2 succeeded/failed but S3 still holds
+    snap4 = JobStateSnapshot(
+        job_id="j4", s2_state="succeeded", s3_has_job=True, s3_worker_id=None,
+        s4_worker_ids=(),
+    )
+    d4 = cps.evaluate([snap4], active_workers, now=1003.0)
+    checks.append({"check": "S2 succeeded + S3 still holds → inconsistency",
+                   "passed": len(d4.inconsistencies) == 1})
+    if d4.inconsistencies:
+        checks.append({"check": "reason mentions S3 still holds",
+                       "passed": "S3 still holds" in d4.inconsistencies[0].reason})
+
+    # Check 5: S3 assigned to nonexistent worker
+    snap5 = JobStateSnapshot(
+        job_id="j5", s2_state="queued", s3_has_job=True, s3_worker_id="w-dead",
+        s4_worker_ids=(),
+    )
+    d5 = cps.evaluate([snap5], active_workers, now=1004.0)
+    checks.append({"check": "S3 assigned to nonexistent worker → inconsistency",
+                   "passed": len(d5.inconsistencies) == 1})
+    if d5.inconsistencies:
+        checks.append({"check": "reason mentions nonexistent worker",
+                       "passed": "nonexistent" in d5.inconsistencies[0].reason})
+
+    # Check 6: S4 claims job but S2 says queued
+    snap6 = JobStateSnapshot(
+        job_id="j6", s2_state="queued", s3_has_job=False, s3_worker_id=None,
+        s4_worker_ids=("w-1",),
+    )
+    d6 = cps.evaluate([snap6], active_workers, now=1005.0)
+    checks.append({"check": "S4 claims job + S2 queued → inconsistency",
+                   "passed": len(d6.inconsistencies) == 1})
+    if d6.inconsistencies:
+        checks.append({"check": "reason mentions S4 claims but S2 queued",
+                       "passed": "S4 claims" in d6.inconsistencies[0].reason})
+
+    # Check 7: Consistent state → no inconsistency
+    snap7 = JobStateSnapshot(
+        job_id="j7", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=("w-1",),
+    )
+    d7 = cps.evaluate([snap7], active_workers, now=1006.0)
+    checks.append({"check": "Consistent S2/S3/S4 → no inconsistency",
+                   "passed": len(d7.inconsistencies) == 0})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario(
+    "control_plane_auto_repair",
+    "Control Plane Supervisor §3 — Deterministic auto-repair",
+)
+def _() -> dict:
+    checks: list[dict] = []
+    notes: list[str] = []
+
+    # --- Test with repair enabled ---
+    cps = ControlPlaneSupervisor(config=ControlPlaneSupervisorConfig(repair_enabled=True))
+
+    # Repair 2+3: S2 processing, no S4 worker → reset to queued
+    snap1 = JobStateSnapshot(
+        job_id="j1", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d1 = cps.evaluate([snap1], {"w-1"}, now=2000.0)
+    checks.append({"check": "S2 processing + no worker → auto-repair emitted",
+                   "passed": len(d1.auto_repairs) == 1})
+    checks.append({"check": "j1 is in repaired set",
+                   "passed": "j1" in d1.repaired_job_ids})
+    if d1.auto_repairs:
+        r1 = d1.auto_repairs[0]
+        checks.append({"check": "old_state = processing, new_state = queued",
+                       "passed": r1.old_state == "processing" and r1.new_state == "queued"})
+        checks.append({"check": "reason mentions resetting to queued",
+                       "passed": "resetting to queued" in r1.reason})
+        checks.append({"check": "event type is job_auto_repaired",
+                       "passed": r1.event == "job_auto_repaired"})
+
+    # Repair 4: S2 succeeded, S3 still holds → remove from scheduler
+    snap2 = JobStateSnapshot(
+        job_id="j2", s2_state="succeeded", s3_has_job=True, s3_worker_id=None,
+        s4_worker_ids=(),
+    )
+    d2 = cps.evaluate([snap2], set(), now=2001.0)
+    checks.append({"check": "S2 succeeded + S3 holds → auto-repair emitted",
+                   "passed": len(d2.auto_repairs) == 1})
+    if d2.auto_repairs:
+        r2 = d2.auto_repairs[0]
+        checks.append({"check": "old_state = new_state = succeeded (no S2 change)",
+                       "passed": r2.old_state == "succeeded" and r2.new_state == "succeeded"})
+        checks.append({"check": "reason mentions removing from scheduler",
+                       "passed": "removing from scheduler" in r2.reason})
+
+    # --- Test with repair disabled ---
+    cps_no = ControlPlaneSupervisor(config=ControlPlaneSupervisorConfig(repair_enabled=False))
+    snap3 = JobStateSnapshot(
+        job_id="j3", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d3 = cps_no.evaluate([snap3], {"w-1"}, now=2002.0)
+    checks.append({"check": "Repair disabled → no auto-repair events",
+                   "passed": len(d3.auto_repairs) == 0})
+
+    # Consistent job should not trigger repair
+    snap4 = JobStateSnapshot(
+        job_id="j4", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=("w-1",),
+    )
+    d4 = cps.evaluate([snap4], {"w-1"}, now=2003.0)
+    checks.append({"check": "Consistent job → no auto-repair",
+                   "passed": len(d4.auto_repairs) == 0})
+
+    # AutoRepairEvent to_dict() schema check
+    r = d1.auto_repairs[0]
+    rd = r.to_dict()
+    checks.append({"check": "AutoRepairEvent.to_dict() has expected keys",
+                   "passed": all(k in rd for k in
+                                 ("event", "job_id", "old_state", "new_state", "timestamp", "reason"))})
+    checks.append({"check": "AutoRepairEvent.to_dict() event matches",
+                   "passed": rd["event"] == "job_auto_repaired"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario(
+    "control_plane_escalation",
+    "Control Plane Supervisor §4 — Escalation rules",
+)
+def _() -> dict:
+    checks: list[dict] = []
+    notes: list[str] = []
+    cps = ControlPlaneSupervisor(
+        config=ControlPlaneSupervisorConfig(
+            max_inconsistencies_per_window=2,
+        ),
+    )
+    active_workers = {"w-1", "w-2"}
+
+    # 3 inconsistent jobs will exceed threshold of 2
+    snap1 = JobStateSnapshot(
+        job_id="j1", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    snap2 = JobStateSnapshot(
+        job_id="j2", s2_state="succeeded", s3_has_job=True, s3_worker_id=None,
+        s4_worker_ids=(),
+    )
+    snap3 = JobStateSnapshot(
+        job_id="j3", s2_state="queued", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d = cps.evaluate([snap1, snap2, snap3], active_workers, now=3000.0)
+
+    # Each job should have an inconsistency
+    checks.append({"check": "3 inconsistent jobs → 3 inconsistencies",
+                   "passed": len(d.inconsistencies) == 3})
+
+    # Should escalate due to exceeding threshold
+    checks.append({"check": "Exceeded inconsistency threshold → escalation",
+                   "passed": len(d.escalations) >= 1})
+
+    # Check escalation event schema
+    esc = d.escalations[0]
+    checks.append({"check": "Escalation severity = critical",
+                   "passed": esc.severity == "critical"})
+    checks.append({"check": "Escalation event = control_plane_escalation",
+                   "passed": esc.event == "control_plane_escalation"})
+    checks.append({"check": "Escalation reason mentions threshold",
+                   "passed": "threshold" in esc.reason})
+
+    # to_dict schema check
+    ed = esc.to_dict()
+    checks.append({"check": "ControlPlaneEscalation.to_dict() has expected keys",
+                   "passed": all(k in ed for k in
+                                 ("event", "severity", "job_id", "reason", "timestamp"))})
+
+    # Unsafe repair case: should also escalate
+    cps2 = ControlPlaneSupervisor(config=ControlPlaneSupervisorConfig(repair_enabled=False))
+    snap4 = JobStateSnapshot(
+        job_id="j4", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d2 = cps2.evaluate([snap4], active_workers, now=3001.0)
+    checks.append({"check": "Repair disabled → inconsistency triggers escalation",
+                   "passed": len(d2.escalations) >= 1})
+    if d2.escalations:
+        checks.append({"check": "Escalation reason mentions unsafe/cannot repair",
+                       "passed": "Unsafe" in d2.escalations[0].reason
+                                 or "cannot repair" in d2.escalations[0].reason})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario(
+    "control_plane_behavioural_contract",
+    "Control Plane Supervisor §6 — Behavioural contract verification",
+)
+def _() -> dict:
+    checks: list[dict] = []
+    notes: list[str] = []
+    cps = ControlPlaneSupervisor()
+    active_workers = {"w-1"}
+
+    # The supervisor must NOT execute job logic, modify worker state,
+    # retry jobs, assign jobs, or complete jobs.
+    # It only detects inconsistencies and produces events.
+
+    # Send a consistent state — no events of any kind
+    snap_ok = JobStateSnapshot(
+        job_id="j1", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=("w-1",),
+    )
+    d_ok = cps.evaluate([snap_ok], active_workers, now=4000.0)
+    checks.append({"check": "Consistent state → zero events",
+                   "passed": (len(d_ok.inconsistencies) == 0
+                              and len(d_ok.auto_repairs) == 0
+                              and len(d_ok.escalations) == 0)})
+
+    # The supervisor must NOT retry or assign jobs — it only emits
+    snap_proc = JobStateSnapshot(
+        job_id="j2", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d_proc = cps.evaluate([snap_proc], active_workers, now=4001.0)
+    checks.append({"check": "Inconsistent → repairs emitted, not job mutations",
+                   "passed": len(d_proc.auto_repairs) >= 1 or len(d_proc.escalations) >= 1})
+    # Verify events only — no job completion/mutation
+    for inc in d_proc.inconsistencies:
+        checks.append({"check": f"Inconsistency ({inc.job_id}) is never 'succeeded' or 'failed'",
+                       "passed": "succeeded" not in inc.reason and "failed" not in inc.reason})
+
+    # InconsistencyEvent schema: to_dict produces proper event
+    snap_inc = JobStateSnapshot(
+        job_id="j3", s2_state="queued", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d_inc = cps.evaluate([snap_inc], active_workers, now=4002.0)
+    if d_inc.inconsistencies:
+        inc = d_inc.inconsistencies[0]
+        dct = inc.to_dict()
+        checks.append({"check": "InconsistencyEvent.to_dict() complete schema",
+                       "passed": all(k in dct for k in
+                                     ("event", "job_id", "s2_state", "s3_state",
+                                      "s4_state", "timestamp", "reason"))})
+        checks.append({"check": "InconsistencyEvent.event == job_inconsistent",
+                       "passed": dct["event"] == "job_inconsistent"})
+
+    # to_dict is deterministic — multiple calls yield the same dict
+    snap_j4 = JobStateSnapshot(
+        job_id="j4", s2_state="processing", s3_has_job=True, s3_worker_id="w-1",
+        s4_worker_ids=(),
+    )
+    d_j4 = cps.evaluate([snap_j4], active_workers, now=4003.0)
+    if d_j4.auto_repairs:
+        r = d_j4.auto_repairs[0].to_dict()
+        r2 = d_j4.auto_repairs[0].to_dict()
+        checks.append({"check": "AutoRepairEvent.to_dict() deterministic",
+                       "passed": r == r2})
+
+    # The supervisor never infers missing data — no guesswork in events
+    for inc in d_proc.inconsistencies + d_inc.inconsistencies:
+        checks.append({"check": f"Inconsistency {inc.job_id} has non-empty reason",
+                       "passed": bool(inc.reason)})
+        checks.append({"check": f"Inconsistency {inc.job_id} has timestamp",
+                       "passed": bool(inc.timestamp)})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario(
+    "control_plane_integration",
+    "Control Plane Supervisor — Full integration cycle",
+)
+def _() -> dict:
+    checks: list[dict] = []
+    notes: list[str] = []
+    cps = ControlPlaneSupervisor()
+
+    # Cycle 1: all consistent
+    snapshots1 = [
+        JobStateSnapshot("j1", "processing", True, "w-1", ("w-1",)),
+        JobStateSnapshot("j2", "queued", False, None, ()),
+        JobStateSnapshot("j3", "succeeded", False, None, ()),
+    ]
+    d1 = cps.evaluate(snapshots1, {"w-1"}, now=5000.0)
+    checks.append({"check": "Cycle 1: all consistent → no events",
+                   "passed": (len(d1.inconsistencies) == 0
+                              and len(d1.auto_repairs) == 0
+                              and len(d1.escalations) == 0)})
+
+    # Cycle 2: S2 succeeded but S3 still holds j3
+    snapshots2 = [
+        JobStateSnapshot("j1", "processing", True, "w-1", ("w-1",)),
+        JobStateSnapshot("j2", "queued", False, None, ()),
+        JobStateSnapshot("j3", "succeeded", True, None, ()),
+    ]
+    d2 = cps.evaluate(snapshots2, {"w-1"}, now=5001.0)
+    checks.append({"check": "Cycle 2: j3 inconsistency detected",
+                   "passed": len(d2.inconsistencies) == 1
+                             and d2.inconsistencies[0].job_id == "j3"})
+    checks.append({"check": "Cycle 2: j3 auto-repair emitted",
+                   "passed": len(d2.auto_repairs) == 1
+                             and d2.auto_repairs[0].job_id == "j3"})
+
+    # Cycle 3: S2 processing but j1 has no worker (worker crashed)
+    snapshots3 = [
+        JobStateSnapshot("j1", "processing", True, "w-1", ()),
+        JobStateSnapshot("j2", "queued", False, None, ()),
+    ]
+    d3 = cps.evaluate(snapshots3, set(), now=5002.0)
+    checks.append({"check": "Cycle 3: j1 inconsistency (no worker claims)",
+                   "passed": len(d3.inconsistencies) == 1
+                             and d3.inconsistencies[0].job_id == "j1"})
+    checks.append({"check": "Cycle 3: j1 auto-repair (reset to queued)",
+                   "passed": len(d3.auto_repairs) == 1
+                             and d3.auto_repairs[0].job_id == "j1"
+                             and d3.auto_repairs[0].new_state == "queued"})
+
+    # Cycle 4: S3 assigned to nonexistent worker
+    snapshots4 = [
+        JobStateSnapshot("j4", "queued", True, "w-gone", ()),
+    ]
+    d4 = cps.evaluate(snapshots4, {"w-1"}, now=5003.0)
+    checks.append({"check": "Cycle 4: j4 inconsistency (nonexistent worker)",
+                   "passed": len(d4.inconsistencies) == 1
+                             and d4.inconsistencies[0].job_id == "j4"})
+    checks.append({"check": "Cycle 4: auto-repair for S3/S4 claim with S2 queued",
+                   "passed": len(d4.auto_repairs) == 1})
+
+    # Cycle 5: multi-job inconsistency (checking threshold)
+    cps_crit = ControlPlaneSupervisor(
+        config=ControlPlaneSupervisorConfig(max_inconsistencies_per_window=1),
+    )
+    snapshots5 = [
+        JobStateSnapshot("j5", "processing", True, "w-1", ()),
+        JobStateSnapshot("j6", "succeeded", True, None, ()),
+    ]
+    d5 = cps_crit.evaluate(snapshots5, {"w-1"}, now=5004.0)
+    checks.append({"check": "Cycle 5: 2 inconsistencies → exceeds threshold",
+                   "passed": len(d5.escalations) >= 1})
+
+    # Stateless: same input twice = same result
+    d5a = cps_crit.evaluate(snapshots5, {"w-1"}, now=5004.0)
+    checks.append({"check": "Idempotent: same input → same inconsistency count",
+                   "passed": len(d5.inconsistencies) == len(d5a.inconsistencies)})
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}

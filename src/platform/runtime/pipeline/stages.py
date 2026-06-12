@@ -20,7 +20,12 @@ from src.platform.runtime.retry.tool_wrapper import (
 )
 from src.platform.runtime.safety.degraded_mode import (
     DegradedContext,
+    DegradedDecision,
     DegradedMode,
+    SafeFallbackOutput,
+    SignalState,
+    WorkerDegradedEvent,
+    WorkerRecoveredEvent,
 )
 from src.platform.runtime.safety.panic_guard import PanicDecision, PanicGuard
 
@@ -136,20 +141,71 @@ class IdempotencyStage(PipelineStage):
 
 
 class DegradedModeStage(PipelineStage):
-    """Evaluates whether the worker should enter degraded mode.
+    """Evaluates whether the worker should enter degraded mode (v2).
 
-    If cumulative failure statistics exceed the threshold, produce a safe
-    fallback result and mark the job as succeeded without executing.
+    Degraded Mode is a restricted execution state entered when the runtime
+    detects instability in S1, S2, or S3.  This stage:
+
+    * Produces schema-compliant safe fallback output.
+    * Emits escalation events (``worker_degraded``) on entry.
+    * Checks recovery triggers on every cycle while degraded.
+    * Emits recovery events (``worker_recovered``) on exit.
+
+    The stage is stateful — it tracks ``_degraded`` per worker instance.
+    While degraded, it short-circuits the pipeline with safe fallback output
+    on every job until recovery signals are confirmed.
     """
 
     def __init__(self, degraded_mode: DegradedMode) -> None:
         self._degraded_mode = degraded_mode
+        self._degraded: bool = False
 
     @property
     def name(self) -> str:
         return "degraded_mode"
 
+    @property
+    def is_degraded(self) -> bool:
+        """``True`` if this worker is currently in degraded mode."""
+        return self._degraded
+
     def evaluate(self, ctx: PipelineContext) -> Job | None:
+        job = ctx.job
+        cp = ctx.control_plane
+
+        # ── Currently degraded → check recovery ────────────────────────
+        if self._degraded:
+            return self._handle_degraded_cycle(ctx)
+
+        # ── Not degraded → evaluate thresholds and signals ─────────────
+        degraded_ctx = DegradedContext(
+            consecutive_failures=job.consecutive_failures,
+            panic_count=job.panic_count,
+            crash_count=job.crash_count,
+            retry_exhausted=False,
+            signal_state=ctx.signal_state,
+            worker_id=self._degraded_mode.worker_id,
+            job_id=job.job_id,
+        )
+        decision = self._degraded_mode.evaluate(degraded_ctx)
+
+        if not decision.enter_degraded:
+            return None
+
+        # ── Enter degraded mode ────────────────────────────────────────
+        self._enter_degraded(job, cp, decision)
+        return job
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _handle_degraded_cycle(self, ctx: PipelineContext) -> Job | None:
+        """Handle a job while the worker is currently degraded.
+
+        Checks recovery first.  If recovery is possible, emits the recovery
+        event and continues the pipeline.  Otherwise produces fallback output.
+        """
         job = ctx.job
         cp = ctx.control_plane
 
@@ -158,22 +214,76 @@ class DegradedModeStage(PipelineStage):
             panic_count=job.panic_count,
             crash_count=job.crash_count,
             retry_exhausted=False,
+            signal_state=ctx.signal_state,
+            worker_id=self._degraded_mode.worker_id,
+            job_id=job.job_id,
+            already_degraded=True,
         )
-        degraded_decision = self._degraded_mode.evaluate(degraded_ctx)
 
-        if degraded_decision.enter_degraded:
+        recovery_decision = self._degraded_mode.check_recovery(degraded_ctx)
+
+        if (
+            not recovery_decision.enter_degraded
+            and recovery_decision.recovery_event is not None
+        ):
+            # ── Recovery confirmed ─────────────────────────────────────
+            self._degraded = False
+            cp.append_lifecycle_event(
+                job,
+                "worker_recovered",
+                recovery_decision.recovery_event.to_dict(),
+            )
+            # Continue the pipeline — the job can now execute normally
+            return None
+
+        # ── Still degraded — produce fallback output ───────────────────
+        fallback = SafeFallbackOutput(
+            reason=recovery_decision.reason or "still_degraded",
+            detail="Worker is in degraded mode and awaiting recovery signals.",
+            job_id=job.job_id,
+            fallback_action="short_circuit_and_acknowledge",
+            recovery_hint="Worker is waiting for S1/S2/S3 stability signals.",
+        )
+        job.result = fallback.to_dict()
+        cp.mark_succeeded(job, job.result)
+        cp.save_checkpoint(job)
+        log_job_finished(job)
+        return job
+
+    def _enter_degraded(
+        self,
+        job: Job,
+        cp: Any,
+        decision: DegradedDecision,
+    ) -> None:
+        """Enter degraded mode: store fallback output and emit escalation."""
+        self._degraded = True
+
+        # Schema-compliant fallback output
+        if decision.fallback_output is not None:
+            job.result = decision.fallback_output.to_dict()
+        else:
             job.result = {
-                "output": None,
-                "error": None,
-                "fallback": True,
-                "reason": degraded_decision.reason,
+                "status": "degraded",
+                "reason": decision.reason or "unknown",
+                "detail": "Worker entered degraded mode.",
+                "job_id": job.job_id,
+                "fallback_action": "short_circuit_and_acknowledge",
+                "recovery_hint": "Awaiting S1/S2/S3 stability signals.",
             }
-            cp.mark_succeeded(job, job.result)
-            cp.save_checkpoint(job)
-            log_job_finished(job)
-            return job
 
-        return None
+        # Escalation event
+        if decision.escalation_event is not None:
+            cp.append_lifecycle_event(
+                job,
+                "worker_degraded",
+                decision.escalation_event.to_dict(),
+            )
+
+        cp.mark_succeeded(job, job.result)
+        cp.save_checkpoint(job)
+        log_job_finished(job)
+
 
 
 # ---------------------------------------------------------------------------

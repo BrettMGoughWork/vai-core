@@ -1981,21 +1981,21 @@ S4 can accept requests from any client or platform.
 ## PHASE 4.7 — Supervisors & Governance
 Goal: Add system‑level monitoring and self‑healing.
 
-⬜ 4.7.0 — Degraded Mode Runtime Semantics
+✅ 4.7.0 — Degraded Mode Runtime Semantics
 - Define what "safe fallback output" actually looks like (schema, content).
 - Define escalation path: who gets notified, how to trigger recovery.
 - Define recovery trigger: what events bring the worker back to normal mode.
 - ⚠️ Stub from 4.4.5 needs real semantics before production.
 
-⬜ 4.7.1 — Supervisor Loop
+✅ 4.7.1 — Supervisor Loop
 - Monitor worker pool.  
 - Restart unhealthy workers.
 
-4.7.2 — Queue Supervisor
+✅ 4.7.2 — Queue Supervisor
 - Detect stuck jobs.  
 - Detect queue backpressure.
 
-4.7.3 — Control Plane Supervisor
+✅ 4.7.3 — Control Plane Supervisor
 - Detect inconsistent job states.  
 - Auto‑repair or escalate.
 

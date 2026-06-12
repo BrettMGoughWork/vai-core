@@ -468,7 +468,8 @@ class TestDegradedModeStage:
         assert result is running_ctx.job
         assert result.state == JobState.SUCCEEDED
         assert result.result is not None
-        assert result.result.get("fallback") is True
+        assert result.result.get("fallback_action") is not None
+        assert result.result.get("status") == "degraded"
 
     def test_high_panics_returns_job(
         self, running_ctx: PipelineContext, degraded_mode: DegradedMode
