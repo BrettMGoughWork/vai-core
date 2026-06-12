@@ -1723,32 +1723,32 @@ Defined
 Extended `map_error_to_recovery()` with `_map_planner_error()`
 Exported `ALL_PLANNER_ERROR_TYPES`
 
-✅ 3.21.4 - Capability Graph Consistency
-`CapabilityGraphChecker` (pure read-only): `check_dangling_primitives()`, `check_dangling_skills(referenced)`, `check_schema_drift(baseline_primitives)`, `check_privilege_drift(baseline_privileges)`, `check_capability_cycles()` (DFS on skill→skill deps), `check_plugin_unload_safety(plugin_name)`. Returns `GraphConsistencyReport` (frozen, `is_clean`, `violations_by_kind()`). `ConsistencyViolation` frozen dataclass with 6 kind constants.
----
+✅ 3.21.4 - Capability Graph Consistency  
+- `CapabilityGraphChecker` (pure read-only): `check_dangling_primitives()``check_dangling_skills(referenced)`, `check_schema_drift(baseline_primitives)`, `check_privilege_drift(baseline_privileges)`, `check_capability_cycles()` (DFS on skill→skill deps), `check_plugin_unload_safety(plugin_name)`. Returns `GraphConsistencyReport` (frozen, `is_clean`, `violations_by_kind()`). `ConsistencyViolation` frozen dataclass with 6 kind constants.
+
 
 🚀 Release 0.2 — "Extensible Agent"
 ---
 
 ## REFACTOR - Reduce tech debt, enforce domain->stratum mapping, remove medium/low issues
 
-Refactor.1 - New folder structure
-  /src/runtime (s1 concerns)
-  /src/strategy (s2 concerns)
-  /src/capabilities (s3 concerns)
-  /src/platform (s4 concerns)
-  /src/agent (s5 concerns)
+✅ Refactor.1 - New folder structure  
+  /src/runtime (s1 concerns)  
+  /src/strategy (s2 concerns)  
+  /src/capabilities (s3 concerns)  
+  /src/platform (s4 concerns)  
+  /src/agent (s5 concerns)  
 
-✅ Refactor.2 - Remove test warnings
-✅ Refactor.3 - Reduce Medium, Low issues
-Refactor.4 - Capability Loaders (CLILoader, MCPLoader)
-  Extend capability discovery beyond Python stdlib primitives to support CLI and MCP primitives.
-  CLILoader wraps local CLI tools as CapabilityPrimitive instances; MCPLoader connects to MCP servers and
+✅ Refactor.2 - Remove test warnings  
+✅ Refactor.3 - Reduce Medium, Low issues  
+✅ Refactor.4 - Capability Loaders (CLILoader, MCPLoader)  
+- Extend capability discovery beyond Python stdlib primitives to support CLI and MCP primitives  
+  *(CLILoader wraps local CLI tools as CapabilityPrimitive instances; MCPLoader connects to MCP servers and
   exposes their tools/skills as CapabilityPrimitive instances. Both abstract the calling mechanism so that
   S3's skill executor can invoke any primitive (Python, CLI, or MCP) through a uniform interface.
   *Rationale*: These loaders were built alongside the existing PythonLoader but never wired into the
   capability registry. Wiring them unlocks CLI tool access and MCP server integration without requiring
-  Python wrappers for each external tool.
+  Python wrappers for each external tool)*
 
 ---
 🚀 Release 1.0 - Basic Agent
@@ -1759,45 +1759,50 @@ Refactor.4 - Capability Loaders (CLILoader, MCPLoader)
 - S4 must remain operational, deterministic, isolated, and free of cognitive logic.  
 - Platform stratum must be strictly isolated from other strata (S4 may orchestrate S1/S2/S3, but it must never reach into them)
 - Components within S4 should be isolated from each other where possible (each S4 subsystem should be independently testable, replaceable, and composable)
+- platform lives in /src/platform
 - S4 orchestrates execution but never performs reasoning.  
 
 
 ## PHASE 4.1 — Minimal Execution Path (MVP Runtime)
 Goal: Make the system run a single job end‑to‑end.
 
-4.1.1 — Gateway (Transport Boundary)
+✅ 4.1.1 — Gateway (Transport Boundary)
 - Define FastAPI app with a single POST /run endpoint.  
 - Accept raw JSON payload → validate → hand to channel normalizer.  
 - No channels, no WebSockets, no auth.
 
-4.1.2 — Channel Normalization (ChannelMessage v1)
+✅ 4.1.2 — Channel Normalization (ChannelMessage v1)
 - Define ChannelMessage schema: {input, metadata, channel="cli"}.  
 - Implement CLI → ChannelMessage converter.  
 - Implement gateway → ChannelMessage converter.
 
-4.1.3 — Job Envelope (Job v1)
+✅ 4.1.3 — Job Envelope (Job v1)
 - Define Job model: id, created_at, state, payload, result.  
 - Implement job creation from ChannelMessage.
 
-4.1.4 — In‑Memory Queue (Queue v1)
+✅ 4.1.4 — In‑Memory Queue (Queue v1)
 - Implement simple FIFO queue.  
 - Push job into queue on /run.
 
-4.1.5 — Minimal Worker Loop (Worker v1)
+✅ 4.1.5 — Minimal Worker Loop (Worker v1)
 - Worker pops job → calls S1/S2/S3 adaptor → stores result.  
 - No concurrency, no retries, no lifecycle.
 
-4.1.6 — S1/S2/S3 Adaptor (Thin Boundary Layer)
+✅ 4.1.6 — S1/S2/S3 Adaptor (Thin Boundary Layer)
 - Implement s2tos1adapter and s1tos2adapter.  
 - Ensure S4 never sees internal S2 structures.  
 - Ensure S2 never sees raw LLM/tool outputs.
 
-4.1.7 — Result Retrieval
+✅ 4.1.7 — Result Retrieval
 - Add GET /jobs/{id} endpoint.  
 - Return job result.
 
-4.1.8 — Logging & Tracing
+✅ 4.1.8 — Logging & Tracing
 - Minimal logs: job created, job started, job finished.
+
+✅ 4.1.9 - Test harness for s4 MVP
+- keep extending this test harness to include changes every iteration
+- include usage in /docs/architecture/TOOLS.md
 
 Outcome:  
 The system can run a single request → through S1/S2/S3 → return a result.

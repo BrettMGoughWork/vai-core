@@ -156,6 +156,37 @@ python -m tools.testing_harness.repl_harness --mock
 
 REPL commands: `<prompt>` (run pipeline), `:history`, `:plans`, `:context`, `:clear`, `:help`, `:quit`
 
+### `s4_mvp_harness.py`
+
+Scenario-driven integration test harness for the Stratum-4 Phase 4.1 Minimal Execution Path. Exercises each S4 component — Gateway, Normalization, Job, Queue, Worker, Adapter, Job Store, and Logging — in isolation plus the full end-to-end pipeline. Does not import from S1/S2/S3.
+
+*Invariants*:
+- S4 must remain operational, deterministic, isolated, and free of cognitive logic.
+- Platform stratum must be strictly isolated from other strata (S4 may orchestrate S1/S2/S3, but it must never reach into them).
+- Components within S4 should be isolated from each other where possible (each S4 subsystem should be independently testable, replaceable, and composable).
+- Platform lives in `/src/platform`.
+- S4 orchestrates execution but never performs reasoning.
+
+```
+# Run all 11 scenarios
+python -m tools.testing_harness.s4_mvp_harness
+
+# Run a single scenario by name
+python -m tools.testing_harness.s4_mvp_harness --name end_to_end
+
+# JSON output (machine-readable)
+python -m tools.testing_harness.s4_mvp_harness --json
+
+# List available scenarios
+python -m tools.testing_harness.s4_mvp_harness --list
+```
+
+Available scenarios: `normalization`, `job_creation`, `queue_fifo`, `job_store`, `worker_empty`, `worker_execute`, `adapter`, `logging`, `end_to_end`, `gateway_post`, `gateway_get`
+
+Options: `--name` / `-n`, `--json` / `-j`, `--list` / `-l`
+
+Uses `FastAPI TestClient` for gateway scenarios and direct imports for all other scenarios. Scenarios share the module-level `app` singleton — `gateway_get` drains leftover queue state from prior tests to avoid interference.
+
 ---
 
 ## Custom Utilities (`tools/custom/`)
