@@ -2011,8 +2011,31 @@ Goal: Add system‑level monitoring and self‑healing.
 - Keeps the daemon generic — adding a new instruction in S4.9+ doesn't
   require daemon changes.
 
-Outcome:  
+Outcome:
 S4 becomes self‑healing and production‑ready.
+
+---
+
+⬜ 4.7.6 — Real LLM Dispatch + Interactive Channels
+- Replace `_mock_execute` in `src/platform/runtime/worker.py:43` with a
+  real `ChatProvider.chat()` call that hits an actual LLM backend.
+- Wire the existing `ChatProvider` protocol (`src/strategy/llm/providers/_base.py`)
+  into the S4 worker's execution pipeline.
+- Add `enable_real_llm` configuration switch to toggle mock ↔ real dispatch.
+- Add prompt input to CLI channel: read stdin, submit as S4 job, display
+  LLM response to stdout.
+- Add prompt input to TUI channel: add an input widget to the operator
+  console, submit prompt as S4 job, render LLM response in a dedicated
+  "response" panel.
+- Add prompt input to Web channel: add a chat-style input form, submit as
+  S4 job, display LLM response in the UI.
+- Wire the LLM response back through each channel's `send()` method as a
+  rendered user-facing message (not just job metadata).
+- Verify end-to-end flow: user prompt → channel → job → pipeline →
+  real LLM call → response → channel → user sees answer.
+
+Outcome:  
+User can interact with VAI end-to-end via CLI, TUI, or Web channels.
 
 ---
 
