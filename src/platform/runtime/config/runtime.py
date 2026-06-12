@@ -53,6 +53,77 @@ class HeartbeatConfig:
 
 
 @dataclass
+class ChannelConfig:
+    """Configuration for the channel abstraction layer.
+
+    Attributes:
+        enabled_channels: Tuple of channel names to activate at startup.
+    """
+
+    enabled_channels: tuple[str, ...] = ("cli",)
+
+
+@dataclass
+class CLIChannelConfig:
+    """Configuration for the CLI channel adapter.
+
+    Attributes:
+        enable_tui: Whether to enable the TUI fallback rendering.
+    """
+
+    enable_tui: bool = False
+
+
+@dataclass
+class TUIChannelConfig:
+    """Configuration for the TUI channel adapter.
+
+    Attributes:
+        enable_heartbeat_panel: Show heartbeat status in the TUI.
+        enable_scheduling_panel: Show scheduling decisions in the TUI.
+        refresh_interval: Auto-refresh interval in seconds (0 = no auto).
+    """
+
+    enable_heartbeat_panel: bool = True
+    enable_scheduling_panel: bool = True
+    refresh_interval: float = 0.0
+
+
+@dataclass
+class WebChannelConfig:
+    """Configuration for the Web (HTTP) channel adapter.
+
+    Attributes:
+        enabled: Whether the Web channel is active at startup.
+    """
+
+    enabled: bool = True
+
+
+@dataclass
+class WebhookChannelConfig:
+    """Configuration for the Webhook channel adapter.
+
+    Attributes:
+        enabled_sources: Tuple of webhook source identifiers to accept
+            (e.g. ``"github"``, ``"whatsapp"``, ``"generic"``).
+    """
+
+    enabled_sources: tuple[str, ...] = ("generic",)
+
+
+@dataclass
+class WebSocketChannelConfig:
+    """Configuration for the WebSocket channel adapter.
+
+    Attributes:
+        enabled: Whether the WebSocket channel is active at startup.
+    """
+
+    enabled: bool = True
+
+
+@dataclass
 class PersistenceConfig:
     """Configuration for the persistence (JobStore) backend.
 

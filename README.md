@@ -8,11 +8,252 @@ The core idea is simple: give LLMs structured jobs, not free rein. The runtime f
 
 ---
 
-## 🚀 Primary Interface (REPL)
+## 📡 Channels
 
-**Right now, the project is driven through a single interactive REPL.** As the system matures toward channels, ingress, transport, and control planes, this REPL will remain the development cockpit — a direct line into the S2 planner, skill execution, and breakage repair loop.
+`vai-core` uses a channel abstraction (Stratum-4) to decouple ingress/egress from runtime logic.
+Each channel implements the `Channel` protocol — `receive()`, `normalize()`, `send()` — and is
+registered in a `ChannelRegistry` for transport-agnostic dispatch.
 
-### Start the REPL
+### CLI Channel
+
+The CLI channel converts raw terminal input into canonical ChannelMessages and renders outbound
+S4 payloads as human-readable text structures.
+
+Key features:
+- Deterministic, pure-logic adapter (no argparse, no stdout writes)
+- `receive()` — dict with `text` + optional `sender` → `InboundChannelMessage`
+- `normalize()` → canonical S4 job payload (`input` / `metadata`)
+- `send()` → CLI-friendly dict (`text` / `metadata`)
+
+Entry point:
+```
+# Single command
+python -m tools.channels.cli_app "deploy the app" --sender alice
+
+# Interactive mode (type commands, Ctrl+C to exit)
+python -m tools.channels.cli_app
+
+# Pipe mode
+echo "list jobs" | python -m tools.channels.cli_app
+```
+
+### Web Channel
+
+The Web channel converts structured HTTP JSON bodies into ChannelMessages and renders
+outbound S4 payloads as transport-agnostic HTTP response structures. Pure logic only — no
+FastAPI, no routing, no network IO.
+
+Key features:
+- Deterministic, pure-logic adapter (no FastAPI dependency)
+- Pydantic models: `WebRequest` (`input`, `sender`, `metadata`) and `WebResponse` (`output`, `metadata`)
+- `receive()` — dict with `input` + optional `sender` / `metadata` → `InboundChannelMessage`
+- `normalize()` → canonical S4 job payload (merges channel metadata with user metadata)
+- `send()` → HTTP-friendly dict (`output` / `metadata`)
+- `handle_web_request()` — gateway convenience for FastAPI route handlers
+
+Entry point:
+```
+python -m tools.channels.web_app
+```
+
+Friendly UI at `http://localhost:8000/`:
+- Ingress pipeline form — enter text + sender → see the S4 job payload
+- Egress pipeline form — enter output + metadata → see the HTTP-friendly response
+- Channel inspector — live view of registered channels
+- Service status bar with health indicator and channel count
+
+API endpoints:
+- `POST /api/ingress` — HTTP JSON body → S4 job payload (ingress pipeline)
+- `POST /api/egress` — S4 payload → HTTP-friendly response (egress pipeline)
+- `GET /api/inspect` — Show registered channels
+- `GET /health` — Health check
+- `GET /` — Friendly demo UI (this page)
+
+### WebSocket Channel
+
+The WebSocket channel converts structured WebSocket frames into ChannelMessages and
+renders outbound S4 payloads as frame-friendly output structures. Pure logic only — no
+WebSocket server, no event loop, no network IO.
+
+Key features:
+- Deterministic, pure-logic adapter (no async, no event-loop dependency)
+- Supports `message_type` field (`"text"`, `"binary"`, …) for frame-type awareness
+- `receive()` — dict with `text` + optional `sender` / `message_type` → `InboundChannelMessage`
+- `normalize()` → canonical S4 job payload (`input` / `metadata` with channel, sender, message_type)
+- `send()` → WebSocket-friendly dict (`text` / `message_type` / `metadata`)
+- `handle_ws_message()` — gateway convenience for WebSocket server handlers
+
+Entry point (programmatic):
+```python
+from src.platform.runtime.channels.registry import ChannelRegistry
+from src.platform.runtime.channels.ws import register_websocket_channel
+from src.platform.runtime.gateway_entrypoint import process_channel_input
+
+# Register
+registry = ChannelRegistry()
+register_websocket_channel(registry)
+
+# Ingress
+payload = process_channel_input(registry, "ws", {"text": "hello", "sender": "node1"})
+# {"input": "hello", "metadata": {"channel": "ws", "sender": "node1", "message_type": "text"}}
+
+# Egress
+from src.platform.runtime.channels.ws import WebSocketChannel
+channel = WebSocketChannel()
+output = channel.send({"output": "Ack", "metadata": {"job_id": "j-1"}})
+# {"text": "Ack", "message_type": "text", "metadata": {"job_id": "j-1"}}
+```
+
+### Webhook Channel
+
+The Webhook channel accepts arbitrary inbound POST payloads from external services
+(WhatsApp, Telegram, GitHub, Stripe, Twilio, Slack, Discord, custom integrations) and
+normalises them into ChannelMessages. Pure logic only — no FastAPI, no routing, no
+signature verification, no network IO.
+
+Key features:
+- Deterministic, pure-logic adapter (no IO, no framework dependency)
+- `WebhookEvent` frozen dataclass — canonical event model (`source`, `payload`, `sender`)
+- `receive()` — dict with `source` + `payload` + optional `sender` → `InboundChannelMessage`
+- `normalize()` → canonical S4 job payload (`input` = raw payload dict, `metadata` includes source)
+- `send()` → webhook-compatible dict (`status: "ok"` / `response` / `metadata`)
+- `handle_webhook_post()` — gateway convenience for FastAPI webhook route handlers
+
+Entry point (programmatic):
+```python
+from src.platform.runtime.channels.registry import ChannelRegistry
+from src.platform.runtime.channels.webhook import register_webhook_channel
+from src.platform.runtime.gateway_entrypoint import process_channel_input
+
+# Register
+registry = ChannelRegistry()
+register_webhook_channel(registry)
+
+# Ingress (GitHub push event)
+payload = process_channel_input(registry, "webhook", {
+    "source": "github",
+    "payload": {"event": "push", "ref": "main", "commits": [...]},
+    "sender": "github-bot",
+})
+# {"input": {"event": "push", "ref": "main", "commits": [...]},
+#  "metadata": {"channel": "webhook", "source": "github", "sender": "github-bot"}}
+
+# Ingress (WhatsApp message)
+payload = process_channel_input(registry, "webhook", {
+    "source": "whatsapp",
+    "payload": {"from": "+1234567890", "text": "Hello"},
+})
+# {"input": {"from": "+1234567890", "text": "Hello"},
+#  "metadata": {"channel": "webhook", "source": "whatsapp", "sender": None}}
+
+# Egress
+from src.platform.runtime.channels.webhook import WebhookChannel
+channel = WebhookChannel()
+output = channel.send({"output": "Processed", "metadata": {"job_id": "j-1"}})
+# {"status": "ok", "response": "Processed", "metadata": {"job_id": "j-1"}}
+```
+
+Supported source identifiers: `whatsapp`, `telegram`, `github`, `stripe`, `twilio`,
+`slack`, `discord`, `generic`.
+
+---
+
+## 🎯 Usage Examples
+
+### CLI Channel
+
+**Runnable entry point:**
+```
+# Single command
+python -m tools.channels.cli_app "deploy the app" --sender alice
+
+# Interactive mode (type commands, Ctrl+C to exit)
+python -m tools.channels.cli_app
+
+# Pipe mode
+echo "list jobs" | python -m tools.channels.cli_app
+```
+
+**Programmatic usage:**
+
+```python
+from src.platform.runtime.channels.registry import ChannelRegistry
+from src.platform.runtime.channels.cli import register_cli_channel
+from src.platform.runtime.gateway_entrypoint import process_channel_input
+
+# Register
+registry = ChannelRegistry()
+register_cli_channel(registry)
+
+# Ingress
+payload = process_channel_input(registry, "cli", {"text": "deploy the app", "sender": "alice"})
+# {"input": "deploy the app", "metadata": {"channel": "cli", "sender": "alice", "received_at": ...}}
+
+# Egress
+from src.platform.runtime.channels.cli import CLIChannel
+channel = CLIChannel()
+output = channel.send({"output": "Done!", "metadata": {"job_id": "j-1"}})
+# {"text": "Done!", "metadata": {"job_id": "j-1"}}
+```
+
+### Web Channel
+
+**Runnable entry point (start server, then curl):**
+```
+# Terminal 1: Start the service
+python -m tools.channels.web_app
+
+# Terminal 2: Ingress — send a request through the web pipeline
+curl -X POST http://localhost:8000/api/ingress \
+  -H "Content-Type: application/json" \
+  -d '{"input": "deploy the app", "sender": "alice"}'
+
+# Egress — convert S4 payload back to HTTP-friendly response
+curl -X POST http://localhost:8000/api/egress \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev-token" \
+  -d '{"output": "Deploying...", "metadata": {"job_id": "j-1"}}'
+
+# Inspect registered channels
+curl http://localhost:8000/api/inspect
+
+# Health check
+curl http://localhost:8000/health
+```
+
+**Programmatic usage:**
+
+```python
+from src.platform.runtime.channels.registry import ChannelRegistry
+from src.platform.runtime.channels.web import register_web_channel
+from src.platform.runtime.gateway_entrypoint import handle_web_request
+
+# Register
+registry = ChannelRegistry()
+register_web_channel(registry)
+
+# Ingress (as called by a FastAPI route handler)
+payload = handle_web_request(registry, {"input": "deploy", "sender": "api-key-123"})
+# {"input": "deploy", "metadata": {"channel": "web", "sender": "api-key-123"}}
+
+# Egress
+from src.platform.runtime.channels.web import WebChannel
+channel = WebChannel()
+response = channel.send({"output": "Deploying...", "metadata": {"job_id": "j-1"}})
+# {"output": "Deploying...", "metadata": {"job_id": "j-1"}}
+
+# Validate with Pydantic models
+from src.platform.runtime.channels.web import WebRequest, WebResponse
+req = WebRequest(input="deploy", sender="alice")
+resp = WebResponse(output="ok", metadata={"job_id": "j-1"})
+```
+
+---
+
+## 🚀 Interactive REPL
+
+The project includes a live REPL for development — a direct line into the S2 planner, skill
+execution, and breakage repair loop.
 
 ```
 # Real LLM (default — set LLM_PROVIDER + LLM_MODEL env vars)
@@ -22,11 +263,8 @@ python -m tools.testing_harness.repl_harness
 python -m tools.testing_harness.repl_harness --mock
 ```
 
-### What it does
-
-Each turn at the `s2>` prompt runs the full pipeline: **plan → breakage detection → repair → execute skills**. The plan, breakage report, repair outcome, and skill execution results are all displayed inline. Conversation context is remembered across turns — prior prompts and assistant outputs feed back to the LLM on each request.
-
-Type `:help` inside the REPL to see all commands.
+Each turn at the `s2>` prompt runs: **plan → breakage detection → repair → execute skills**.
+Conversation context is remembered across turns. Type `:help` for all commands.
 
 ---
 
@@ -110,6 +348,28 @@ docs/architecture/ — deep technical docs
 
 
 ## Developer Tools
+
+
+### Operator Console (TUI Dashboard)
+
+The Operator Console is a read-only operational dashboard for monitoring Stratum-4 runtime
+state. Built with `textual`, it displays real-time views of workers, jobs, scheduling, and
+heartbeats — without any channel adapter logic.
+
+This is an **operational developer tool**, separate from the channel abstraction. It consumes
+the same data models that the runtime produces but does not slot into the ingress/egress
+pipeline.
+
+```
+python -m tools.channels.tui_app
+```
+
+Key features:
+- Four live panels: WORKERS, JOBS, SCHEDULING, HEARTBEATS
+- Colour-coded status indicators (active/inactive/failed)
+- Keybindings: `q` quit, `r` refresh
+- Pure-logic data models shared with the runtime adapter layer
+- Zero network, queue, or persistence coupling
 
 
 ### Inspector Dashboard
