@@ -1947,26 +1947,26 @@ S4 can run many jobs concurrently and safely.
 ## PHASE 4.6 — Channels (CLI, Web, WebSocket, Webhooks)
 Goal: Add multiple ingress channels without changing S1–S3.
 
-4.6.1 — Channel Abstraction
+✅ 4.6.1 — Channel Abstraction
 - Define Channel interface:  
   receive(), normalize(), send().
 
-4.6.2 — CLI Channel
+✅ 4.6.2 — CLI Channel
 - Local CLI → ChannelMessage.  
 - TUI optional.
 
-4.6.3 — Web Channel
+✅ 4.6.3 — Web Channel
 - Web UI → FastAPI → ChannelMessage.
 
-4.6.4 — WebSocket Channel
+✅ 4.6.4 — WebSocket Channel
 - Real‑time streaming updates.  
 - Push job state changes.
 
-4.6.5 — Webhook Channel
+✅ 4.6.5 — Webhook Channel
 - Generic webhook adapter.  
 - Normalizes inbound POSTs.
 
-4.6.6 — Provider‑Specific Webhooks
+✅ 4.6.6 — Provider‑Specific Webhooks
 - WhatsApp  
 - Slack  
 - GitHub  

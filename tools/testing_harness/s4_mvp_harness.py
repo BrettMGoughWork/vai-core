@@ -79,6 +79,19 @@ from src.platform.runtime.safety.degraded_mode import (
     DegradedMode,
     default_degraded_mode,
 )
+from src.platform.runtime.channels import (
+    CLIChannel,
+    CLITUI,
+    InboundChannelMessage,
+    ChannelRegistry,
+    WebhookChannel,
+    WebhookEvent,
+    WebSocketChannel,
+    register_cli_channel,
+    register_webhook_channel,
+    register_websocket_channel,
+)
+from src.platform.runtime.gateway_entrypoint import process_channel_input
 
 # ---- Helpers ---------------------------------------------------------------
 
@@ -1636,6 +1649,374 @@ def _test_panic_guard_in_worker() -> dict[str, Any]:
             notes.append(f"Result state: {result.state.value}")
     finally:
         worker_mod.execute_job_payload = _original
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("channels",
+           "Channel abstraction: InboundChannelMessage, CLIChannel, CLITUI, registry, gateway")
+def _test_channels() -> dict[str, Any]:
+    """S4.6.1–S4.6.2 — Channel abstraction + CLI Channel integration."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # ------------------------------------------------------------------
+    # 1. InboundChannelMessage immutability and construction
+    # ------------------------------------------------------------------
+    import time as _time
+    ts = _time.time()
+    msg = InboundChannelMessage(
+        channel="cli", sender="alice",
+        payload={"text": "hello"}, timestamp=ts,
+    )
+    checks.append({"check": "InboundChannelMessage constructed",
+                   "passed": msg.channel == "cli"
+                             and msg.sender == "alice"
+                             and msg.payload == {"text": "hello"}
+                             and msg.timestamp == ts})
+    try:
+        msg.payload = {}  # type: ignore[misc]
+        checks.append({"check": "InboundChannelMessage immutable", "passed": False})
+    except Exception:
+        checks.append({"check": "InboundChannelMessage immutable", "passed": True})
+    notes.append(f"InboundChannelMessage(channel={msg.channel}, sender={msg.sender})")
+
+    # ------------------------------------------------------------------
+    # 2. CLIChannel — receive with validation
+    # ------------------------------------------------------------------
+    _clock = iter([100.0, 101.0, 102.0, 103.0]).__next__
+    cli_ch = CLIChannel(clock=_clock)
+
+    # 2a. Minimal receive
+    _msg1 = cli_ch.receive({"text": "deploy"})
+    checks.append({"check": "CLIChannel receive minimal",
+                   "passed": _msg1.channel == "cli"
+                             and _msg1.sender is None
+                             and _msg1.payload == {"text": "deploy"}
+                             and _msg1.timestamp == 100.0})
+
+    # 2b. Receive with sender
+    _msg2 = cli_ch.receive({"text": "status", "sender": "bob"})
+    checks.append({"check": "CLIChannel receive with sender",
+                   "passed": _msg2.sender == "bob"
+                             and _msg2.timestamp == 101.0})
+
+    # 2c. Validation — non-dict raises TypeError
+    try:
+        cli_ch.receive("raw string")  # type: ignore[arg-type]
+        checks.append({"check": "CLIChannel rejects non-dict", "passed": False})
+    except TypeError:
+        checks.append({"check": "CLIChannel rejects non-dict", "passed": True})
+
+    # 2d. Validation — missing text raises ValueError
+    try:
+        cli_ch.receive({"sender": "alice"})
+        checks.append({"check": "CLIChannel rejects missing text", "passed": False})
+    except ValueError:
+        checks.append({"check": "CLIChannel rejects missing text", "passed": True})
+
+    # ------------------------------------------------------------------
+    # 3. CLIChannel — normalize
+    # ------------------------------------------------------------------
+    _norm = cli_ch.normalize(_msg1)
+    checks.append({"check": "CLIChannel normalize",
+                   "passed": _norm == {
+                       "input": "deploy",
+                       "metadata": {
+                           "channel": "cli",
+                           "sender": None,
+                           "received_at": 100.0,
+                       },
+                   }})
+
+    # ------------------------------------------------------------------
+    # 4. CLIChannel — send
+    # ------------------------------------------------------------------
+    _out = cli_ch.send({"output": "done", "metadata": {"key": "val"}})
+    checks.append({"check": "CLIChannel send",
+                   "passed": _out == {"text": "done", "metadata": {"key": "val"}}})
+
+    # ------------------------------------------------------------------
+    # 5. CLITUI stub
+    # ------------------------------------------------------------------
+    _tui = CLITUI()
+    _rendered = _tui.render({"output": "hello", "metadata": {}})
+    checks.append({"check": "CLITUI render",
+                   "passed": _rendered == {
+                       "rendered": True,
+                       "content": {"output": "hello", "metadata": {}},
+                   }})
+
+    # ------------------------------------------------------------------
+    # 6. ChannelRegistry
+    # ------------------------------------------------------------------
+    registry = ChannelRegistry()
+    registry.register("cli", cli_ch)
+    checks.append({"check": "registry.get returns channel",
+                   "passed": registry.get("cli") is cli_ch})
+    checks.append({"check": "registry.names includes cli",
+                   "passed": "cli" in registry.names})
+    try:
+        registry.get("nope")
+        checks.append({"check": "KeyError on unknown channel", "passed": False})
+    except KeyError:
+        checks.append({"check": "KeyError on unknown channel", "passed": True})
+
+    # ------------------------------------------------------------------
+    # 7. register_cli_channel convenience
+    # ------------------------------------------------------------------
+    _reg2 = ChannelRegistry()
+    register_cli_channel(_reg2, clock=_clock)
+    _ch2 = _reg2.get("cli")
+    checks.append({"check": "register_cli_channel registers CLIChannel",
+                   "passed": isinstance(_ch2, CLIChannel)})
+
+    # ------------------------------------------------------------------
+    # 8. Gateway entrypoint
+    # ------------------------------------------------------------------
+    result = process_channel_input(registry, "cli", {"text": "say hello"})
+    checks.append({"check": "gateway processes cli input",
+                   "passed": result is not None and result["input"] == "say hello"})
+
+    result_none = process_channel_input(registry, "unknown", {"text": "data"})
+    checks.append({"check": "gateway returns None for unknown channel",
+                   "passed": result_none is None})
+
+    empty_reg = ChannelRegistry()
+    result_empty = process_channel_input(empty_reg, "cli", {"text": "data"})
+    checks.append({"check": "gateway returns None for empty registry",
+                   "passed": result_empty is None})
+
+    # ------------------------------------------------------------------
+    # 9. WebSocketChannel — receive with validation
+    # ------------------------------------------------------------------
+    _ws_clock = iter([200.0, 201.0, 202.0, 203.0, 204.0]).__next__
+    ws_ch = WebSocketChannel(clock=_ws_clock)
+
+    # 9a. Minimal receive
+    _ws_msg1 = ws_ch.receive({"text": "ws hello"})
+    checks.append({"check": "WebSocketChannel receive minimal",
+                   "passed": _ws_msg1.channel == "ws"
+                             and _ws_msg1.sender is None
+                             and _ws_msg1.payload == {"text": "ws hello",
+                                                      "message_type": "text"}
+                             and _ws_msg1.timestamp == 200.0})
+
+    # 9b. Receive with sender and message_type
+    _ws_msg2 = ws_ch.receive({"text": "ping", "sender": "node1",
+                              "message_type": "binary"})
+    checks.append({"check": "WebSocketChannel receive with sender+type",
+                   "passed": _ws_msg2.sender == "node1"
+                             and _ws_msg2.payload == {"text": "ping",
+                                                      "message_type": "binary"}
+                             and _ws_msg2.timestamp == 201.0})
+
+    # 9c. Validation — non-dict raises TypeError
+    try:
+        ws_ch.receive("raw string")  # type: ignore[arg-type]
+        checks.append({"check": "WebSocketChannel rejects non-dict", "passed": False})
+    except TypeError:
+        checks.append({"check": "WebSocketChannel rejects non-dict", "passed": True})
+
+    # 9d. Validation — missing text raises ValueError
+    try:
+        ws_ch.receive({"sender": "alice"})
+        checks.append({"check": "WebSocketChannel rejects missing text",
+                       "passed": False})
+    except ValueError:
+        checks.append({"check": "WebSocketChannel rejects missing text",
+                       "passed": True})
+
+    # 9e. Validation — invalid sender type
+    try:
+        ws_ch.receive({"text": "hi", "sender": 42})
+        checks.append({"check": "WebSocketChannel rejects non-string sender",
+                       "passed": False})
+    except TypeError:
+        checks.append({"check": "WebSocketChannel rejects non-string sender",
+                       "passed": True})
+
+    # 9f. Validation — invalid message_type type
+    try:
+        ws_ch.receive({"text": "hi", "message_type": 42})
+        checks.append({"check": "WebSocketChannel rejects non-string message_type",
+                       "passed": False})
+    except TypeError:
+        checks.append({"check": "WebSocketChannel rejects non-string message_type",
+                       "passed": True})
+
+    # ------------------------------------------------------------------
+    # 10. WebSocketChannel — normalize
+    # ------------------------------------------------------------------
+    _ws_norm = ws_ch.normalize(_ws_msg1)
+    checks.append({"check": "WebSocketChannel normalize",
+                   "passed": _ws_norm == {
+                       "input": "ws hello",
+                       "metadata": {
+                           "channel": "ws",
+                           "sender": None,
+                           "message_type": "text",
+                       },
+                   }})
+
+    # ------------------------------------------------------------------
+    # 11. WebSocketChannel — send
+    # ------------------------------------------------------------------
+    _ws_out = ws_ch.send({"output": "ws done", "metadata": {"key": "val"}})
+    checks.append({"check": "WebSocketChannel send",
+                   "passed": _ws_out == {
+                       "text": "ws done",
+                       "message_type": "text",
+                       "metadata": {"key": "val"},
+                   }})
+
+    # ------------------------------------------------------------------
+    # 12. register_websocket_channel convenience
+    # ------------------------------------------------------------------
+    _reg3 = ChannelRegistry()
+    register_websocket_channel(_reg3, clock=_ws_clock)
+    _ws_ch2 = _reg3.get("ws")
+    checks.append({"check": "register_websocket_channel registers WebSocketChannel",
+                   "passed": isinstance(_ws_ch2, WebSocketChannel)})
+
+    # ------------------------------------------------------------------
+    # 13. Gateway with WebSocket channel
+    # ------------------------------------------------------------------
+    registry.register("ws", ws_ch)
+    ws_result = process_channel_input(registry, "ws", {"text": "via gateway"})
+    checks.append({"check": "gateway processes ws input",
+                   "passed": ws_result is not None
+                             and ws_result["input"] == "via gateway"
+                             and ws_result["metadata"]["channel"] == "ws"})
+
+    # ------------------------------------------------------------------
+    # 14. WebhookChannel — receive with validation
+    # ------------------------------------------------------------------
+    _wh_clock = iter([300.0, 301.0, 302.0, 303.0, 304.0, 305.0]).__next__
+    wh_ch = WebhookChannel(clock=_wh_clock)
+
+    # 14a. Minimal receive (generic source)
+    _wh_msg1 = wh_ch.receive({
+        "source": "generic",
+        "payload": {"action": "deploy", "env": "prod"},
+    })
+    checks.append({"check": "WebhookChannel receive minimal",
+                   "passed": _wh_msg1.channel == "webhook"
+                             and _wh_msg1.sender is None
+                             and _wh_msg1.payload == {
+                                 "source": "generic",
+                                 "payload": {"action": "deploy", "env": "prod"},
+                             }
+                             and _wh_msg1.timestamp == 300.0})
+
+    # 14b. Receive with named source and sender
+    _wh_msg2 = wh_ch.receive({
+        "source": "github",
+        "payload": {"event": "push", "ref": "main"},
+        "sender": "webhook-bot",
+    })
+    checks.append({"check": "WebhookChannel receive with source+sender",
+                   "passed": _wh_msg2.sender == "webhook-bot"
+                             and _wh_msg2.payload == {
+                                 "source": "github",
+                                 "payload": {"event": "push", "ref": "main"},
+                             }
+                             and _wh_msg2.timestamp == 301.0})
+
+    # 14c. Validation — non-dict raises TypeError
+    try:
+        wh_ch.receive("raw string")  # type: ignore[arg-type]
+        checks.append({"check": "WebhookChannel rejects non-dict", "passed": False})
+    except TypeError:
+        checks.append({"check": "WebhookChannel rejects non-dict", "passed": True})
+
+    # 14d. Validation — missing source raises ValueError
+    try:
+        wh_ch.receive({"payload": {}})
+        checks.append({"check": "WebhookChannel rejects missing source",
+                       "passed": False})
+    except ValueError:
+        checks.append({"check": "WebhookChannel rejects missing source",
+                       "passed": True})
+
+    # 14e. Validation — missing payload raises ValueError
+    try:
+        wh_ch.receive({"source": "github"})
+        checks.append({"check": "WebhookChannel rejects missing payload",
+                       "passed": False})
+    except ValueError:
+        checks.append({"check": "WebhookChannel rejects missing payload",
+                       "passed": True})
+
+    # 14f. Validation — non-dict payload raises ValueError
+    try:
+        wh_ch.receive({"source": "github", "payload": "not-a-dict"})
+        checks.append({"check": "WebhookChannel rejects non-dict payload",
+                       "passed": False})
+    except ValueError:
+        checks.append({"check": "WebhookChannel rejects non-dict payload",
+                       "passed": True})
+
+    # ------------------------------------------------------------------
+    # 15. WebhookChannel — normalize
+    # ------------------------------------------------------------------
+    _wh_norm = wh_ch.normalize(_wh_msg1)
+    checks.append({"check": "WebhookChannel normalize",
+                   "passed": _wh_norm == {
+                       "input": {"action": "deploy", "env": "prod"},
+                       "metadata": {
+                           "channel": "webhook",
+                           "source": "generic",
+                           "sender": None,
+                       },
+                   }})
+
+    # ------------------------------------------------------------------
+    # 16. WebhookChannel — send
+    # ------------------------------------------------------------------
+    _wh_out = wh_ch.send({"output": "deploying", "metadata": {"job_id": "j-1"}})
+    checks.append({"check": "WebhookChannel send",
+                   "passed": _wh_out == {
+                       "status": "ok",
+                       "response": "deploying",
+                       "metadata": {"job_id": "j-1"},
+                   }})
+
+    # ------------------------------------------------------------------
+    # 17. register_webhook_channel convenience
+    # ------------------------------------------------------------------
+    _reg4 = ChannelRegistry()
+    register_webhook_channel(_reg4, clock=_wh_clock)
+    _wh_ch2 = _reg4.get("webhook")
+    checks.append({"check": "register_webhook_channel registers WebhookChannel",
+                   "passed": isinstance(_wh_ch2, WebhookChannel)})
+
+    # ------------------------------------------------------------------
+    # 18. Gateway with Webhook channel
+    # ------------------------------------------------------------------
+    registry.register("webhook", wh_ch)
+    wh_result = process_channel_input(registry, "webhook", {
+        "source": "github", "payload": {"event": "issues"},
+    })
+    checks.append({"check": "gateway processes webhook input",
+                   "passed": wh_result is not None
+                             and wh_result["metadata"]["source"] == "github"
+                             and wh_result["metadata"]["channel"] == "webhook"})
+
+    # ------------------------------------------------------------------
+    # 19. WebhookEvent dataclass
+    # ------------------------------------------------------------------
+    _we = WebhookEvent(source="stripe", payload={"charge": 100}, sender="svc-1")
+    checks.append({"check": "WebhookEvent constructed",
+                   "passed": _we.source == "stripe"
+                             and _we.payload == {"charge": 100}
+                             and _we.sender == "svc-1"})
+    try:
+        _we.payload = {}  # type: ignore[misc]
+        checks.append({"check": "WebhookEvent immutable", "passed": False})
+    except Exception:
+        checks.append({"check": "WebhookEvent immutable", "passed": True})
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
