@@ -17,6 +17,7 @@ from src.platform.queue.queue import Queue
 from src.platform.runtime.control_plane import ControlPlane
 from src.platform.runtime.execution_context import ExecutionContext
 from src.platform.runtime.job import Job
+from src.platform.runtime.retry.tool_wrapper import RetryInstruction, ToolRetryWrapper
 from src.platform.transport.normalization import ChannelMessage
 
 
@@ -79,6 +80,7 @@ class Worker:
         self._queue = queue
         self._cp = control_plane
         self.timeout_seconds = timeout_seconds
+        self._retry_wrapper = ToolRetryWrapper(execute_job_payload)
 
     def process_next(self) -> Job | None:
         """Pop the next job and execute multi-cycle loop.
@@ -127,16 +129,18 @@ class Worker:
 
         # ---- Multi-cycle loop ------------------------------------------------
         done = False
+        attempt = 1
         while not done:
             self._cp.append_cycle_trace(job, "cycle_start", {})
 
             try:
-                output = execute_job_payload(
+                output = self._retry_wrapper.execute(
                     payload=job.payload,
                     execution_context=job.execution_context.to_dict()
                     if job.execution_context
                     else None,
                     resume_token=job.resume_token,
+                    attempt=attempt,
                 )
             except Exception as e:
                 self._cp.mark_failed(
@@ -147,6 +151,19 @@ class Worker:
                 log_job_finished(job)
                 return job
 
+            # Check for retry instruction
+            if isinstance(output, RetryInstruction):
+                time.sleep(output.delay_seconds)
+                attempt = output.next_attempt
+                self._cp.append_cycle_trace(
+                    job, "cycle_end",
+                    {"done": False, "retry": True,
+                     "delay": output.delay_seconds, "attempt": attempt - 1},
+                )
+                self._cp.save_checkpoint(job)
+                self._cp.issue_resume_token(job)
+                continue
+
             # Update ExecutionContext from output
             if job.execution_context is not None:
                 job.execution_context.cognitive_state = output.get(
@@ -155,8 +172,9 @@ class Worker:
                 job.execution_context.memory = output.get("memory", {})
                 job.execution_context.last_result = output.get("result")
 
-            # Check done flag
+            # Check done flag — reset attempt on success
             done = bool(output.get("done", False))
+            attempt = 1
 
             # End-of-cycle trace + checkpoint
             self._cp.append_cycle_trace(job, "cycle_end", {"done": done})

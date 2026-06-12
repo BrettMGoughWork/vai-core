@@ -42,6 +42,18 @@ from src.platform.observability.logging import (
     log_job_started,
     log_job_finished,
 )
+from src.platform.runtime.retry.policy import (
+    RetryDecision,
+    RetryContext,
+    RetryPolicy,
+    DEFAULT_RETRY_RULES,
+    default_retry_policy,
+)
+from src.platform.runtime.retry.tool_wrapper import (
+    RetryInstruction,
+    ToolRetryWrapper,
+)
+from src.platform.runtime.control_plane import ControlPlane
 
 # ---- Helpers ---------------------------------------------------------------
 
@@ -859,6 +871,172 @@ def _test_multi_cycle() -> dict[str, Any]:
     # Create a second job where execute_job_payload returns done=False on first call
     # (simulate by injecting a custom execute via a test subclass or manually looping)
     notes.append("Verifying multi-cycle loop completes after one cycle (done=True from stub)")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("retry_policy", "RetryPolicy evaluation logic — known/unknown errors, exhaustion, backoff")
+def _test_retry_policy() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    policy = default_retry_policy()
+
+    # --- Known error type, first attempt ---
+    d = policy.evaluate(RetryContext(attempt=1, error_type="TimeoutError"))
+    checks.append({"check": "TimeoutError attempt 1 should_retry", "passed": d.should_retry is True})
+    checks.append({"check": "TimeoutError attempt 1 delay", "passed": d.delay_seconds == 1.5})
+
+    # --- Exponential backoff (attempt 2 of 2 max) ---
+    d = policy.evaluate(RetryContext(attempt=2, error_type="TimeoutError"))
+    # max_attempts=2, so attempt 2 >= 2 → exhausted
+    checks.append({"check": "TimeoutError attempt 2 exhausted", "passed": d.should_retry is False})
+    checks.append({"check": "TimeoutError attempt 2 no delay", "passed": d.delay_seconds is None})
+
+    # Verify the exponential backoff calculation on attempt 2 with higher max_attempts
+    policy3 = RetryPolicy({"TimeoutError": {"max_attempts": 5, "base_delay": 1.5}})
+    d = policy3.evaluate(RetryContext(attempt=2, error_type="TimeoutError"))
+    checks.append({"check": "backoff attempt 2 delay 3.0", "passed": d.delay_seconds == 3.0})  # 1.5 * 2^(2-1)
+
+    # --- Exhaustion (attempt 3, max=2) ---
+    d = policy.evaluate(RetryContext(attempt=3, error_type="TimeoutError"))
+    checks.append({"check": "TimeoutError attempt 3 exhausted", "passed": d.should_retry is False})
+    checks.append({"check": "TimeoutError attempt 3 no delay", "passed": d.delay_seconds is None})
+
+    # --- Unknown error type ---
+    d = policy.evaluate(RetryContext(attempt=1, error_type="UnknownError"))
+    checks.append({"check": "UnknownError no retry", "passed": d.should_retry is False})
+
+    # --- RateLimitError default rules ---
+    d = policy.evaluate(RetryContext(attempt=1, error_type="RateLimitError"))
+    checks.append({"check": "RateLimitError attempt 1 delay", "passed": d.delay_seconds == 2.0})
+
+    # --- Custom policy (max_attempts=1, so attempt 1 >= 1 → no retry) ---
+    custom = RetryPolicy({"CustomError": {"max_attempts": 1, "base_delay": 0.5}})
+    d = custom.evaluate(RetryContext(attempt=1, error_type="CustomError"))
+    checks.append({"check": "CustomError attempt 1 exhausted", "passed": d.should_retry is False})
+
+    # max_attempts=1 → only retry when attempt=0 (impossible), attempt 1 is always exhausted
+    d = custom.evaluate(RetryContext(attempt=2, error_type="CustomError"))
+    checks.append({"check": "CustomError attempt 2 exhausted", "passed": d.should_retry is False})
+
+    # --- DEFAULT_RETRY_RULES structure ---
+    checks.append({"check": "default rules contain TransientNetworkError",
+                   "passed": "TransientNetworkError" in DEFAULT_RETRY_RULES})
+    checks.append({"check": "default rules contain RateLimitError",
+                   "passed": "RateLimitError" in DEFAULT_RETRY_RULES})
+    checks.append({"check": "default rules contain TimeoutError",
+                   "passed": "TimeoutError" in DEFAULT_RETRY_RULES})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("retry_wrapper_recovery", "ToolRetryWrapper retries a flaky function until success")
+def _test_retry_wrapper_recovery() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    class _FlakyError(Exception):
+        pass
+
+    call_count: int = 0
+
+    def _flaky_fn() -> str:
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            raise _FlakyError("simulated transient failure")
+        return "ok"
+
+    policy = RetryPolicy({_FlakyError.__name__: {"max_attempts": 5, "base_delay": 0.001}})
+    wrapper = ToolRetryWrapper(_flaky_fn, retry_policy=policy)
+
+    result = wrapper.execute(attempt=1)
+
+    # After attempt 1: failure → RetryInstruction
+    checks.append({"check": "attempt 1 returns RetryInstruction", "passed": isinstance(result, RetryInstruction)})
+    if isinstance(result, RetryInstruction):
+        checks.append({"check": "attempt 1 sets next_attempt=2", "passed": result.next_attempt == 2})
+        notes.append(f"attempt 1 → RetryInstruction(delay={result.delay_seconds}, next={result.next_attempt})")
+
+        # Simulate retry by calling with next_attempt
+        result2 = wrapper.execute(attempt=result.next_attempt)
+        checks.append({"check": "attempt 2 returns RetryInstruction again",
+                       "passed": isinstance(result2, RetryInstruction)})
+        if isinstance(result2, RetryInstruction):
+            notes.append(f"attempt 2 → RetryInstruction(delay={result2.delay_seconds}, next={result2.next_attempt})")
+            result3 = wrapper.execute(attempt=result2.next_attempt)
+            checks.append({"check": "attempt 3 succeeds", "passed": result3 == "ok"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("retry_wrapper_exhaustion", "ToolRetryWrapper exhausts max_attempts and re-raises")
+def _test_retry_wrapper_exhaustion() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    class _AlwaysFailError(Exception):
+        pass
+
+    call_count: int = 0
+
+    def _always_fail() -> str:
+        nonlocal call_count
+        call_count += 1
+        raise _AlwaysFailError("always fails")
+
+    policy = RetryPolicy({_AlwaysFailError.__name__: {"max_attempts": 3, "base_delay": 0.001}})
+    wrapper = ToolRetryWrapper(_always_fail, retry_policy=policy)
+
+    # Attempt 1 → RetryInstruction (attempt 1 < 3)
+    r1 = wrapper.execute(attempt=1)
+    checks.append({"check": "attempt 1 returns instruction", "passed": isinstance(r1, RetryInstruction)})
+    if isinstance(r1, RetryInstruction):
+        notes.append(f"attempt 1 → retry (delay={r1.delay_seconds})")
+
+    # Attempt 2 → RetryInstruction (attempt 2 < 3)
+    r2 = wrapper.execute(attempt=r1.next_attempt)
+    checks.append({"check": "attempt 2 returns instruction", "passed": isinstance(r2, RetryInstruction)})
+    if isinstance(r2, RetryInstruction):
+        notes.append(f"attempt 2 → retry (delay={r2.delay_seconds})")
+
+    # Attempt 3 → exhausted (attempt 3 >= 3), should raise
+    try:
+        wrapper.execute(attempt=r2.next_attempt)
+        checks.append({"check": "attempt 3 raises exception", "passed": False})
+    except _AlwaysFailError:
+        checks.append({"check": "attempt 3 re-raises original error", "passed": True})
+        notes.append("attempt 3 → _AlwaysFailError re-raised (exhausted)")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("worker_retry", "Worker accepts retry wrapper and processes normally")
+def _test_worker_retry() -> dict[str, Any]:
+    """Verify the Worker's retry wrapper doesn't block normal execution."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    q = InMemoryQueue()
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    w = Worker(queue=q, control_plane=cp)
+
+    job = create_job(cli_to_channel_message({"cmd": "deploy"}))
+    cp.register_job(job)
+    q.push(job)
+    notes.append(f"Pushed job {job.job_id}")
+
+    result = w.process_next()
+    checks.append({"check": "worker returns job", "passed": result is not None})
+    if result:
+        checks.append({"check": "worker succeeds", "passed": result.state.value == "succeeded"})
+        checks.append({"check": "result payload present", "passed": result.result is not None})
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
