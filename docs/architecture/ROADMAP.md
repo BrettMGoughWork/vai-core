@@ -1843,19 +1843,19 @@ Goal: Enable multi‑cycle execution (S2 reflection, drift, repair).
 - Define schema: cognitive state, last result, memory snapshot.  
 - Add serialization + hydration.
 
-4.3.2 — Checkpointing
+✅ 4.3.2 — Checkpointing
 - Store ExecutionContext after each cycle.  
 - Worker loads context on resume.
 
-4.3.3 — Resume Tokens
+✅ 4.3.3 — Resume Tokens
 - Add resume token to job envelope.  
 - Worker uses token to continue multi‑cycle execution.
 
-4.3.4 — Multi‑Cycle Worker Loop
+✅ 4.3.4 — Multi‑Cycle Worker Loop
 - Worker runs:  
   while not done: step → update context → checkpoint.
 
-4.3.5 — Lifecycle Trace
+✅ 4.3.5 — Lifecycle Trace
 - Add hydration/dehydration events to trace.
 
 Outcome:  
@@ -1866,23 +1866,23 @@ The runtime can execute multi‑step S2 reasoning loops.
 ## PHASE 4.4 — Reliability & Safety (Retries, Backoff, Poison Jobs)
 Goal: Make S4 robust under failure.
 
-4.4.1 — Retry Policy
+✅ 4.4.1 — Retry Policy
 - Per‑error‑type retry rules.  
 - Exponential backoff.
 
-4.4.2 — Poison Job Detection
+✅ 4.4.2 — Poison Job Detection
 - Mark job as poison after N failures.  
 - Move to dead‑letter queue.
 
-4.4.3 — Worker Crash Recovery
+✅ 4.4.3 — Worker Crash Recovery
 - Worker restarts job from last checkpoint.  
 - Ensure idempotency.
 
-4.4.4 — Panic Guard
+✅ 4.4.4 — Panic Guard
 - Catch unexpected exceptions.  
 - Mark job failed safely.
 
-4.4.5 — Degraded Mode
+✅ 4.4.5 — Degraded Mode
 - Fallback to simpler execution if S1/S2 unstable.
 
 Outcome:  

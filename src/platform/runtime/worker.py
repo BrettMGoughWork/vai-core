@@ -17,6 +17,28 @@ from src.platform.queue.queue import Queue
 from src.platform.runtime.control_plane import ControlPlane
 from src.platform.runtime.execution_context import ExecutionContext
 from src.platform.runtime.job import Job
+from src.platform.runtime.job_state import JobState
+from src.platform.runtime.recovery.crash_recovery import (
+    CrashRecovery,
+    RecoveryContext,
+    default_crash_recovery,
+)
+from src.platform.runtime.retry.tool_wrapper import (
+    PoisonInstruction,
+    RetryInstruction,
+    ToolRetryWrapper,
+)
+from src.platform.runtime.retry.poison import default_poison_detector
+from src.platform.runtime.safety.panic_guard import (
+    PanicDecision,
+    PanicGuard,
+    default_panic_guard,
+)
+from src.platform.runtime.safety.degraded_mode import (
+    DegradedContext,
+    DegradedMode,
+    default_degraded_mode,
+)
 from src.platform.transport.normalization import ChannelMessage
 
 
@@ -75,10 +97,21 @@ class Worker:
         queue: Queue,
         control_plane: ControlPlane,
         timeout_seconds: int = 5,
+        crash_recovery: CrashRecovery | None = None,
     ) -> None:
         self._queue = queue
         self._cp = control_plane
         self.timeout_seconds = timeout_seconds
+        self._retry_wrapper = ToolRetryWrapper(
+            execute_job_payload,
+            poison_detector=default_poison_detector(),
+        )
+        self._crash_recovery = (
+            crash_recovery if crash_recovery is not None
+            else default_crash_recovery()
+        )
+        self._panic_guard = default_panic_guard()
+        self._degraded_mode = default_degraded_mode()
 
     def process_next(self) -> Job | None:
         """Pop the next job and execute multi-cycle loop.
@@ -105,47 +138,156 @@ class Worker:
         if job is None:
             return None
 
-        # Reload from store and hydrate execution context (checkpoint load)
+        # Reload from store and hydrate persisted fields (checkpoint load)
         stored = self._cp.job_store.get(job.job_id)
         if stored is not None:
             if stored.execution_context is not None:
                 job.execution_context = stored.execution_context
             if stored.resume_token is not None:
                 job.resume_token = stored.resume_token
+            job.failure_count = stored.failure_count
 
         # Record hydration event
         self._cp.append_lifecycle_event(
             job, "hydrate_execution_context",
         )
 
-        # Ensure a resume token exists for this cycle
-        if job.resume_token is None:
-            self._cp.issue_resume_token(job)
+        # ---- Crash recovery check -------------------------------------------
+        recovery_ctx = RecoveryContext(
+            job_id=job.job_id,
+            last_checkpoint=job.execution_context,
+            last_resume_token=job.resume_token,
+            job_state=job.state.value,
+        )
+        recovery_decision = self._crash_recovery.evaluate(recovery_ctx)
 
-        self._cp.mark_running(job)
-        log_job_started(job)
+        if recovery_decision.should_recover:
+            # Job was left in RUNNING state by a crashed worker.
+            # Keep existing state, resume token, and checkpoint.
+            # Do NOT mark_running (already RUNNING).
+            # Do NOT issue a new resume token.
+            self._cp.append_lifecycle_event(
+                job, "crash_recovery",
+                {"reason": recovery_decision.reason},
+            )
+            job.crash_count += 1
+        elif job.state == JobState.POISON:
+            # Poison jobs are dead — return them as-is
+            self._cp.append_lifecycle_event(
+                job, "poison_skip",
+                {"reason": "Job is POISON — skipping execution"},
+            )
+            return job
+        else:
+            # Normal path: ensure resume token and transition to RUNNING
+            if job.resume_token is None:
+                self._cp.issue_resume_token(job)
+            self._cp.mark_running(job)
+            log_job_started(job)
+
+        # ---- Idempotency validation -------------------------------------------
+        # Ensure the resume token we hold matches the stored checkpoint.
+        # A mismatch means a crash occurred between checkpoint and execution;
+        # in that case, re-hydrate from the stored checkpoint.
+        if stored is not None and stored.resume_token is not None:
+            if not self._crash_recovery.validate_resume_token(
+                stored.resume_token, job.resume_token,
+            ):
+                # Re-hydrate from stored checkpoint for consistent state
+                job.execution_context = stored.execution_context
+                job.resume_token = stored.resume_token
+                self._cp.append_lifecycle_event(
+                    job, "idempotency_recovery",
+                    {"reason": "Resume token mismatch — re-hydrated from checkpoint"},
+                )
+
+        # ---- Degraded mode check --------------------------------------------
+        # Before the multi-cycle loop, retry exhaustion has not been evaluated
+        # yet — only cumulative statistics are meaningful here.
+        degraded_ctx = DegradedContext(
+            consecutive_failures=job.consecutive_failures,
+            panic_count=job.panic_count,
+            crash_count=job.crash_count,
+            retry_exhausted=False,
+        )
+        degraded_decision = self._degraded_mode.evaluate(degraded_ctx)
+
+        if degraded_decision.enter_degraded:
+            # Skip S1/S2 execution — produce safe fallback
+            job.result = {
+                "output": None,
+                "error": None,
+                "fallback": True,
+                "reason": degraded_decision.reason,
+            }
+            self._cp.mark_succeeded(job, job.result)
+            self._cp.save_checkpoint(job)
+            log_job_finished(job)
+            return job
 
         # ---- Multi-cycle loop ------------------------------------------------
         done = False
+        attempt = 1
         while not done:
             self._cp.append_cycle_trace(job, "cycle_start", {})
 
-            try:
-                output = execute_job_payload(
+            @self._panic_guard.wrap
+            def run_cycle():
+                return self._retry_wrapper.execute(
                     payload=job.payload,
                     execution_context=job.execution_context.to_dict()
                     if job.execution_context
                     else None,
                     resume_token=job.resume_token,
+                    attempt=attempt,
+                    job_id=job.job_id,
+                    failure_count=job.failure_count,
                 )
-            except Exception as e:
+
+            output = run_cycle()
+
+            # Panic check — unexpected exception caught by PanicGuard
+            if isinstance(output, PanicDecision) and output.is_panic:
+                job.panic_count += 1
+                job.consecutive_failures += 1
                 self._cp.mark_failed(
                     job,
-                    {"error_type": type(e).__name__, "message": str(e)},
+                    {
+                        "error_type": output.safe_failure.error_type,
+                        "message": output.safe_failure.message,
+                    },
                 )
                 self._cp.save_checkpoint(job)
                 log_job_finished(job)
                 return job
+
+            # Check for poison instruction
+            if isinstance(output, PoisonInstruction):
+                job.failure_count += 1
+                job.consecutive_failures += 1
+                poison_reason = output.reason
+                self._cp.mark_poison(job, poison_reason)
+                log_job_finished(job)
+                return job
+
+            # Check for retry instruction
+            if isinstance(output, RetryInstruction):
+                job.failure_count += 1
+                job.consecutive_failures += 1
+                time.sleep(output.delay_seconds)
+                attempt = output.next_attempt
+                self._cp.append_cycle_trace(
+                    job, "cycle_end",
+                    {"done": False, "retry": True,
+                     "delay": output.delay_seconds, "attempt": attempt - 1},
+                )
+                self._cp.save_checkpoint(job)
+                self._cp.issue_resume_token(job)
+                continue
+
+            # Reset failure counts on successful cycle
+            job.failure_count = 0
+            job.consecutive_failures = 0
 
             # Update ExecutionContext from output
             if job.execution_context is not None:
@@ -155,8 +297,9 @@ class Worker:
                 job.execution_context.memory = output.get("memory", {})
                 job.execution_context.last_result = output.get("result")
 
-            # Check done flag
+            # Check done flag — reset attempt on success
             done = bool(output.get("done", False))
+            attempt = 1
 
             # End-of-cycle trace + checkpoint
             self._cp.append_cycle_trace(job, "cycle_end", {"done": done})

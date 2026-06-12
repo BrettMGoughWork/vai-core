@@ -7,6 +7,7 @@ Allowed transitions::
 
     pending → running → succeeded
                       ↘  failed
+                      ↘  poison  (terminal)
 """
 
 from __future__ import annotations
@@ -17,8 +18,10 @@ from enum import Enum
 class JobState(str, Enum):
     """Lifecycle states for a ``Job`` inside Stratum-4.
 
-    Only the four states below exist.  No sub-states, no pending_failed,
-    no resumed — just the minimal linear lifecycle.
+    Six states total: ``PENDING``, ``RUNNING``, ``SUCCEEDED``, ``FAILED``,
+    and ``POISON``.  ``POISON`` is a terminal state for jobs that have
+    exceeded the maximum consecutive failure threshold and must not be
+    retried.
 
     Values are lowercase strings for stable JSON serialisation.
     """
@@ -27,6 +30,7 @@ class JobState(str, Enum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    POISON = "poison"
 
 
 # Allowed transitions expressed as a set of (current, target) pairs.
@@ -34,7 +38,8 @@ _TRANSITIONS: set[tuple[JobState, JobState]] = {
     (JobState.PENDING, JobState.RUNNING),
     (JobState.RUNNING, JobState.SUCCEEDED),
     (JobState.RUNNING, JobState.FAILED),
-    # Terminal — no outgoing transitions from SUCCEEDED or FAILED.
+    (JobState.RUNNING, JobState.POISON),
+    # Terminal — no outgoing transitions from SUCCEEDED, FAILED, or POISON.
 }
 
 

@@ -36,3 +36,6 @@ tools/custom/
 # CI architecture check (auto-generated)
 docs/architecture.json
 docs/architecture_audit.md
+
+# Harness output (runtime artifacts, not code)
+harness_results.json

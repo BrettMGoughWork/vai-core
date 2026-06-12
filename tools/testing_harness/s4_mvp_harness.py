@@ -42,6 +42,43 @@ from src.platform.observability.logging import (
     log_job_started,
     log_job_finished,
 )
+from src.platform.runtime.retry.policy import (
+    PlatformRetryPolicy,
+    RetryDecision,
+    RetryContext,
+    DEFAULT_RETRY_RULES,
+    default_retry_policy,
+)
+from src.platform.runtime.retry.tool_wrapper import (
+    PoisonInstruction,
+    RetryInstruction,
+    ToolRetryWrapper,
+)
+from src.platform.runtime.retry.poison import (
+    PoisonDecision,
+    PoisonContext,
+    PoisonDetector,
+    default_poison_detector,
+)
+from src.platform.runtime.control_plane import ControlPlane
+from src.platform.runtime.job_state import JobState
+from src.platform.runtime.recovery.crash_recovery import (
+    CrashRecovery,
+    RecoveryContext,
+    default_crash_recovery,
+)
+from src.platform.runtime.safety.panic_guard import (
+    PanicDecision,
+    PanicGuard,
+    StructuredFailure,
+    default_panic_guard,
+)
+from src.platform.runtime.safety.degraded_mode import (
+    DegradedContext,
+    DegradedDecision,
+    DegradedMode,
+    default_degraded_mode,
+)
 
 # ---- Helpers ---------------------------------------------------------------
 
@@ -859,6 +896,746 @@ def _test_multi_cycle() -> dict[str, Any]:
     # Create a second job where execute_job_payload returns done=False on first call
     # (simulate by injecting a custom execute via a test subclass or manually looping)
     notes.append("Verifying multi-cycle loop completes after one cycle (done=True from stub)")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("retry_policy", "RetryPolicy evaluation logic — known/unknown errors, exhaustion, backoff")
+def _test_retry_policy() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    policy = default_retry_policy()
+
+    # --- Known error type, first attempt ---
+    d = policy.evaluate(RetryContext(attempt=1, error_type="TimeoutError"))
+    checks.append({"check": "TimeoutError attempt 1 should_retry", "passed": d.should_retry is True})
+    checks.append({"check": "TimeoutError attempt 1 delay", "passed": d.delay_seconds == 1.5})
+
+    # --- Exponential backoff (attempt 2 of 2 max) ---
+    d = policy.evaluate(RetryContext(attempt=2, error_type="TimeoutError"))
+    # max_attempts=2, so attempt 2 >= 2 → exhausted
+    checks.append({"check": "TimeoutError attempt 2 exhausted", "passed": d.should_retry is False})
+    checks.append({"check": "TimeoutError attempt 2 no delay", "passed": d.delay_seconds is None})
+
+    # Verify the exponential backoff calculation on attempt 2 with higher max_attempts
+    policy3 = PlatformRetryPolicy({"TimeoutError": {"max_attempts": 5, "base_delay": 1.5}})
+    d = policy3.evaluate(RetryContext(attempt=2, error_type="TimeoutError"))
+    checks.append({"check": "backoff attempt 2 delay 3.0", "passed": d.delay_seconds == 3.0})  # 1.5 * 2^(2-1)
+
+    # --- Exhaustion (attempt 3, max=2) ---
+    d = policy.evaluate(RetryContext(attempt=3, error_type="TimeoutError"))
+    checks.append({"check": "TimeoutError attempt 3 exhausted", "passed": d.should_retry is False})
+    checks.append({"check": "TimeoutError attempt 3 no delay", "passed": d.delay_seconds is None})
+
+    # --- Unknown error type ---
+    d = policy.evaluate(RetryContext(attempt=1, error_type="UnknownError"))
+    checks.append({"check": "UnknownError no retry", "passed": d.should_retry is False})
+
+    # --- RateLimitError default rules ---
+    d = policy.evaluate(RetryContext(attempt=1, error_type="RateLimitError"))
+    checks.append({"check": "RateLimitError attempt 1 delay", "passed": d.delay_seconds == 2.0})
+
+    # --- Custom policy (max_attempts=1, so attempt 1 >= 1 → no retry) ---
+    custom = PlatformRetryPolicy({"CustomError": {"max_attempts": 1, "base_delay": 0.5}})
+    d = custom.evaluate(RetryContext(attempt=1, error_type="CustomError"))
+    checks.append({"check": "CustomError attempt 1 exhausted", "passed": d.should_retry is False})
+
+    # max_attempts=1 → only retry when attempt=0 (impossible), attempt 1 is always exhausted
+    d = custom.evaluate(RetryContext(attempt=2, error_type="CustomError"))
+    checks.append({"check": "CustomError attempt 2 exhausted", "passed": d.should_retry is False})
+
+    # --- DEFAULT_RETRY_RULES structure ---
+    checks.append({"check": "default rules contain TransientNetworkError",
+                   "passed": "TransientNetworkError" in DEFAULT_RETRY_RULES})
+    checks.append({"check": "default rules contain RateLimitError",
+                   "passed": "RateLimitError" in DEFAULT_RETRY_RULES})
+    checks.append({"check": "default rules contain TimeoutError",
+                   "passed": "TimeoutError" in DEFAULT_RETRY_RULES})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("retry_wrapper_recovery", "ToolRetryWrapper retries a flaky function until success")
+def _test_retry_wrapper_recovery() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    class _FlakyError(Exception):
+        pass
+
+    call_count: int = 0
+
+    def _flaky_fn() -> str:
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            raise _FlakyError("simulated transient failure")
+        return "ok"
+
+    policy = PlatformRetryPolicy({_FlakyError.__name__: {"max_attempts": 5, "base_delay": 0.001}})
+    wrapper = ToolRetryWrapper(_flaky_fn, retry_policy=policy)
+
+    result = wrapper.execute(attempt=1)
+
+    # After attempt 1: failure → RetryInstruction
+    checks.append({"check": "attempt 1 returns RetryInstruction", "passed": isinstance(result, RetryInstruction)})
+    if isinstance(result, RetryInstruction):
+        checks.append({"check": "attempt 1 sets next_attempt=2", "passed": result.next_attempt == 2})
+        notes.append(f"attempt 1 → RetryInstruction(delay={result.delay_seconds}, next={result.next_attempt})")
+
+        # Simulate retry by calling with next_attempt
+        result2 = wrapper.execute(attempt=result.next_attempt)
+        checks.append({"check": "attempt 2 returns RetryInstruction again",
+                       "passed": isinstance(result2, RetryInstruction)})
+        if isinstance(result2, RetryInstruction):
+            notes.append(f"attempt 2 → RetryInstruction(delay={result2.delay_seconds}, next={result2.next_attempt})")
+            result3 = wrapper.execute(attempt=result2.next_attempt)
+            checks.append({"check": "attempt 3 succeeds", "passed": result3 == "ok"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("retry_wrapper_exhaustion", "ToolRetryWrapper exhausts max_attempts and re-raises")
+def _test_retry_wrapper_exhaustion() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    class _AlwaysFailError(Exception):
+        pass
+
+    call_count: int = 0
+
+    def _always_fail() -> str:
+        nonlocal call_count
+        call_count += 1
+        raise _AlwaysFailError("always fails")
+
+    policy = PlatformRetryPolicy({_AlwaysFailError.__name__: {"max_attempts": 3, "base_delay": 0.001}})
+    wrapper = ToolRetryWrapper(_always_fail, retry_policy=policy)
+
+    # Attempt 1 → RetryInstruction (attempt 1 < 3)
+    r1 = wrapper.execute(attempt=1)
+    checks.append({"check": "attempt 1 returns instruction", "passed": isinstance(r1, RetryInstruction)})
+    if isinstance(r1, RetryInstruction):
+        notes.append(f"attempt 1 → retry (delay={r1.delay_seconds})")
+
+    # Attempt 2 → RetryInstruction (attempt 2 < 3)
+    r2 = wrapper.execute(attempt=r1.next_attempt)
+    checks.append({"check": "attempt 2 returns instruction", "passed": isinstance(r2, RetryInstruction)})
+    if isinstance(r2, RetryInstruction):
+        notes.append(f"attempt 2 → retry (delay={r2.delay_seconds})")
+
+    # Attempt 3 → exhausted (attempt 3 >= 3), should raise
+    try:
+        wrapper.execute(attempt=r2.next_attempt)
+        checks.append({"check": "attempt 3 raises exception", "passed": False})
+    except _AlwaysFailError:
+        checks.append({"check": "attempt 3 re-raises original error", "passed": True})
+        notes.append("attempt 3 → _AlwaysFailError re-raised (exhausted)")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("worker_retry", "Worker accepts retry wrapper and processes normally")
+def _test_worker_retry() -> dict[str, Any]:
+    """Verify the Worker's retry wrapper doesn't block normal execution."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    q = InMemoryQueue()
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    w = Worker(queue=q, control_plane=cp)
+
+    job = create_job(cli_to_channel_message({"cmd": "deploy"}))
+    cp.register_job(job)
+    q.push(job)
+    notes.append(f"Pushed job {job.job_id}")
+
+    result = w.process_next()
+    checks.append({"check": "worker returns job", "passed": result is not None})
+    if result:
+        checks.append({"check": "worker succeeds", "passed": result.state.value == "succeeded"})
+        checks.append({"check": "result payload present", "passed": result.result is not None})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("poison_detection", "PoisonDetector identifies poison jobs by failure count")
+def _test_poison_detection() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    detector = default_poison_detector()
+
+    # Below threshold
+    d = detector.evaluate(PoisonContext(job_id="j1", failure_count=3, error_type="TimeoutError"))
+    checks.append({"check": "failure_count 3 < 5 is not poison", "passed": d.is_poison is False})
+    checks.append({"check": "below threshold reason is None", "passed": d.reason is None})
+
+    # At threshold
+    d = detector.evaluate(PoisonContext(job_id="j2", failure_count=5, error_type="TimeoutError"))
+    checks.append({"check": "failure_count 5 >= 5 is poison", "passed": d.is_poison is True})
+    checks.append({"check": "poison reason populated", "passed": d.reason is not None})
+
+    # Above threshold
+    d = detector.evaluate(PoisonContext(job_id="j3", failure_count=7, error_type="RateLimitError"))
+    checks.append({"check": "failure_count 7 >= 5 is poison", "passed": d.is_poison is True})
+
+    # Custom threshold
+    strict = PoisonDetector(max_failures=1)
+    d = strict.evaluate(PoisonContext(job_id="j4", failure_count=1, error_type="AnyError"))
+    checks.append({"check": "strict max=1 triggers at count 1", "passed": d.is_poison is True})
+
+    d = strict.evaluate(PoisonContext(job_id="j5", failure_count=0, error_type="AnyError"))
+    checks.append({"check": "strict max=1 count 0 not poison", "passed": d.is_poison is False})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("poison_wrapper", "ToolRetryWrapper returns PoisonInstruction for poison jobs")
+def _test_poison_wrapper() -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    class _PoisonError(Exception):
+        pass
+
+    def _always_poison() -> str:
+        raise _PoisonError("too many failures")
+
+    policy = PlatformRetryPolicy({_PoisonError.__name__: {"max_attempts": 10, "base_delay": 0.001}})
+    detector = PoisonDetector(max_failures=3)
+    wrapper = ToolRetryWrapper(_always_poison, retry_policy=policy, poison_detector=detector)
+
+    # failure_count=3 (at threshold) → PoisonInstruction, not RetryInstruction
+    result = wrapper.execute(attempt=1, job_id="poison-1", failure_count=3)
+    checks.append({"check": "poison at threshold returns PoisonInstruction",
+                   "passed": isinstance(result, PoisonInstruction)})
+    if isinstance(result, PoisonInstruction):
+        checks.append({"check": "poison instruction reason present",
+                       "passed": len(result.reason) > 0})
+        notes.append(f"PoisonInstruction(reason={result.reason})")
+
+    # failure_count=1 (below threshold) → RetryInstruction
+    result2 = wrapper.execute(attempt=1, job_id="poison-2", failure_count=1)
+    checks.append({"check": "below poison threshold returns RetryInstruction",
+                   "passed": isinstance(result2, RetryInstruction)})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("worker_poison", "Worker marks job POISON when failure threshold exceeded")
+def _test_worker_poison() -> dict[str, Any]:
+    """Verify the worker marks a job as POISON after repeated failures."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    q = InMemoryQueue()
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    w = Worker(queue=q, control_plane=cp)
+
+    # Replace the retry wrapper's function with one that always fails
+    def _always_fail_fn(*args, **kwargs):
+        raise RuntimeError("simulated poison")
+
+    w._retry_wrapper.fn = _always_fail_fn
+
+    job = create_job(cli_to_channel_message({"cmd": "deploy"}))
+    cp.register_job(job)
+    q.push(job)
+
+    notes.append(f"Pushed job {job.job_id}")
+
+    # Inject high failure_count + store so the Worker loads it
+    job.failure_count = 5
+    store.save(job)
+    notes.append(f"Set failure_count=5 to trigger poison")
+
+    result = w.process_next()
+    checks.append({"check": "worker returns job", "passed": result is not None})
+    if result:
+        checks.append({"check": "job state is poison", "passed": result.state == JobState.POISON})
+        checks.append({"check": "failure_count incremented to 6", "passed": result.failure_count == 6})
+        checks.append({"check": "result has poison flag",
+                       "passed": result.result is not None and result.result.get("poison") is True})
+        notes.append(f"Job {result.job_id} → {result.state.value} (failures={result.failure_count})")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("crash_recovery_logic", "Pure logic tests for CrashRecovery.evaluate()")
+def _test_crash_recovery_logic() -> dict[str, Any]:
+    """Verify CrashRecovery decisions: no checkpoint, not running, RUNNING+checkpoint, token match/mismatch."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    from src.platform.runtime.execution_context import ExecutionContext
+
+    cr = default_crash_recovery()
+
+    # No checkpoint
+    ctx1 = RecoveryContext(
+        job_id="j1", last_checkpoint=None, last_resume_token=None, job_state="pending",
+    )
+    d1 = cr.evaluate(ctx1)
+    checks.append({"check": "no checkpoint → no recovery", "passed": not d1.should_recover})
+    notes.append(f"no checkpoint → should_recover={d1.should_recover}")
+
+    # Not running — use a real ExecutionContext
+    ec_failed = ExecutionContext(cognitive_state={"x": 1}, memory={}, last_result=None)
+    ctx2 = RecoveryContext(
+        job_id="j2", last_checkpoint=ec_failed, last_resume_token="tok1", job_state="failed",
+    )
+    d2 = cr.evaluate(ctx2)
+    checks.append({"check": "not running → no recovery", "passed": not d2.should_recover})
+    notes.append(f"state=failed → should_recover={d2.should_recover}")
+
+    # Running + checkpoint — should recover
+    ec = ExecutionContext(cognitive_state={"a": 1}, memory={}, last_result={"value": "partial"})
+    ctx3 = RecoveryContext(
+        job_id="j3", last_checkpoint=ec, last_resume_token="tok2", job_state="running",
+    )
+    d3 = cr.evaluate(ctx3)
+    checks.append({"check": "RUNNING + checkpoint → recover", "passed": d3.should_recover})
+    checks.append({"check": "resume_token preserved", "passed": d3.resume_token == "tok2"})
+    notes.append(f"RUNNING + checkpoint → should_recover={d3.should_recover} token={d3.resume_token}")
+
+    # Validate token: match
+    checks.append({
+        "check": "validate_resume_token match",
+        "passed": cr.validate_resume_token("abc", "abc"),
+    })
+
+    # Validate token: mismatch
+    checks.append({
+        "check": "validate_resume_token mismatch",
+        "passed": not cr.validate_resume_token("abc", "xyz"),
+    })
+
+    # Validate token: first token None
+    checks.append({
+        "check": "validate_resume_token first is None",
+        "passed": cr.validate_resume_token(None, "any"),
+    })
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("worker_crash_recovery", "Worker recovers a job left in RUNNING state with a checkpoint")
+def _test_worker_crash_recovery() -> dict[str, Any]:
+    """Push a job, execute one cycle (creating a checkpoint), then simulate crash
+    by pushing the same job again in RUNNING state. Worker should recover and complete it."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    from src.platform.runtime.execution_context import ExecutionContext
+
+    q = InMemoryQueue()
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    w = Worker(queue=q, control_plane=cp)
+
+    job = create_job(cli_to_channel_message({"cmd": "analyze"}))
+    cp.register_job(job)
+    q.push(job)
+    notes.append(f"Pushed job {job.job_id}")
+
+    # First cycle — execute normally
+    notes.append("First process_next (normal execution)...")
+    result1 = w.process_next()
+    checks.append({"check": "first cycle succeeded", "passed": result1 is not None and result1.state == JobState.SUCCEEDED})
+    notes.append(f"After first cycle: state={result1.state.value if result1 else 'None'}")
+
+    # Simulate a crash: create a fresh job that references the same ID, in RUNNING state
+    # with a checkpoint in the store
+    crash_job = create_job(cli_to_channel_message({"cmd": "analyze"}))
+    cp.register_job(crash_job)
+    # Put it in RUNNING state in the store
+    crash_job.state = JobState.RUNNING
+    crash_job.execution_context = ExecutionContext(
+        cognitive_state={"phase": "mid"},
+        memory={},
+        last_result={"value": "partial"},
+    )
+    crash_job.resume_token = result1.resume_token if result1 else None
+    store.save(crash_job)
+    q.push(crash_job)
+    notes.append(f"Simulated crash — pushed job {crash_job.job_id} in RUNNING state with checkpoint")
+
+    # Second process_next — worker should recover and complete
+    notes.append("Second process_next (crash recovery)...")
+    result2 = w.process_next()
+    checks.append({"check": "recovery returned job", "passed": result2 is not None})
+    if result2:
+        checks.append({"check": "recovery completed job", "passed": result2.state == JobState.SUCCEEDED})
+        notes.append(f"After recovery: state={result2.state.value} token={result2.resume_token}")
+        # Should have a lifecycle event for crash_recovery
+        has_crash_event = any(
+            t.get("event") == "crash_recovery" for t in result2.trace
+        )
+        checks.append({"check": "crash_recovery lifecycle event recorded", "passed": has_crash_event})
+        if has_crash_event:
+            notes.append("crash_recovery event found in trace")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("recovery_idempotency", "Pure logic: validate_resume_token enforces idempotency")
+def _test_recovery_idempotency() -> dict[str, Any]:
+    """Verify `validate_resume_token` pure logic — the idempotency gate that
+    ensures a cycle only advances when tokens match."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    cr = default_crash_recovery()
+
+    from src.platform.runtime.execution_context import ExecutionContext
+
+    # Same token → safe to advance
+    checks.append({
+        "check": "identical tokens → safe",
+        "passed": cr.validate_resume_token("token-A", "token-A"),
+    })
+    notes.append("token-A == token-A: safe to advance")
+
+    # Different tokens → must re-hydrate
+    checks.append({
+        "check": "different tokens → block",
+        "passed": not cr.validate_resume_token("token-A", "token-B"),
+    })
+    notes.append("token-A != token-B: block advancement")
+
+    # Both None → safe (fresh job, no checkpoint)
+    checks.append({
+        "check": "both None → safe",
+        "passed": cr.validate_resume_token(None, None),
+    })
+    notes.append("None == None: safe (fresh job)")
+
+    # expected is None, actual is set → safe (first cycle)
+    checks.append({
+        "check": "expected None, actual set → safe",
+        "passed": cr.validate_resume_token(None, "new-token"),
+    })
+    notes.append("expected=None, actual=token: safe (first cycle)")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("poison_skip_recovery",
+           "Poisoned jobs in RUNNING state skip recovery and go to POISON")
+def _test_poison_skip_recovery() -> dict[str, Any]:
+    """A job with POISON state should not be recovered even if a checkpoint exists."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    from src.platform.runtime.execution_context import ExecutionContext
+
+    q = InMemoryQueue()
+    store = JobStore()
+    cp = ControlPlane(job_store=store)
+    w = Worker(queue=q, control_plane=cp)
+
+    job = create_job(cli_to_channel_message({"cmd": "tainted"}))
+    cp.register_job(job)
+
+    # Job is POISON but has a checkpoint (simulates a poison job that crashed after being marked)
+    job.state = JobState.POISON
+    job.failure_count = 5
+    job.execution_context = ExecutionContext(
+        cognitive_state={"bad": True}, memory={}, last_result=None,
+    )
+    job.resume_token = "poison-token"
+    store.save(job)
+    q.push(job)
+    notes.append(f"Pushed POISON job {job.job_id} with checkpoint")
+
+    result = w.process_next()
+    checks.append({"check": "worker returned job", "passed": result is not None})
+    if result:
+        # The worker should NOT try to run or recover a poison job
+        checks.append({"check": "state remains poison",
+                       "passed": result.state == JobState.POISON})
+        notes.append(f"Result state: {result.state.value}")
+
+    # Verify CrashRecovery pure logic: POISON should not recover
+    cr = default_crash_recovery()
+    ctx = RecoveryContext(
+        job_id="p1",
+        last_checkpoint=job.execution_context,
+        last_resume_token="poison-token",
+        job_state="poison",
+    )
+    d = cr.evaluate(ctx)
+    checks.append({"check": "poison state → no recovery (pure logic)",
+                   "passed": not d.should_recover})
+    notes.append(f"Poison evaluate: should_recover={d.should_recover}")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("panic_guard_pure_logic",
+           "PanicGuard pure logic: wrap catches exceptions, returns StructuredFailure/PanicDecision")
+def _test_panic_guard_pure_logic() -> dict[str, Any]:
+    """PanicGuard.wrap() catches unexpected exceptions and returns PanicDecision."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    guard = default_panic_guard()
+
+    # --- Success path ---
+    @guard.wrap
+    def _succeeds() -> str:
+        return "ok"
+
+    result = _succeeds()
+    checks.append({"check": "successful fn returns its value", "passed": result == "ok"})
+
+    # --- Exception path ---
+    @guard.wrap
+    def _panics() -> str:
+        raise RuntimeError("boom")
+
+    result = _panics()
+    checks.append({"check": "panicked fn returns PanicDecision", "passed": isinstance(result, PanicDecision)})
+    if isinstance(result, PanicDecision):
+        checks.append({"check": "is_panic is True", "passed": result.is_panic is True})
+        checks.append({"check": "reason is set", "passed": result.reason is not None})
+        checks.append({"check": "safe_failure is StructuredFailure", "passed": isinstance(result.safe_failure, StructuredFailure)})
+        if result.safe_failure is not None:
+            checks.append({"check": "error_type captured", "passed": result.safe_failure.error_type == "RuntimeError"})
+            checks.append({"check": "message captured", "passed": str(result.safe_failure.message) == "boom"})
+
+    # --- handle_exception directly ---
+    raw_decision = guard.handle_exception(ValueError("bad value"))
+    checks.append({"check": "handle_exception returns PanicDecision", "passed": isinstance(raw_decision, PanicDecision)})
+    if isinstance(raw_decision, PanicDecision):
+        checks.append({"check": "handle_exception is_panic True",
+                       "passed": raw_decision.is_panic is True})
+        if raw_decision.safe_failure is not None:
+            checks.append({"check": "handle_exception error_type",
+                           "passed": raw_decision.safe_failure.error_type == "ValueError"})
+
+    # --- StructuredFailure idempotency ---
+    sf1 = StructuredFailure.from_exception(ValueError("same"))
+    sf2 = StructuredFailure.from_exception(ValueError("same"))
+    checks.append({"check": "same exception → same StructuredFailure fields",
+                   "passed": sf1.error_type == sf2.error_type and sf1.message == sf2.message})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("degraded_mode_pure_logic",
+           "DegradedMode pure logic — thresholds, signals, edge cases")
+def _test_degraded_mode_pure_logic() -> dict[str, Any]:
+    """DegradedMode.evaluate() returns correct decisions for various contexts."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    dm = default_degraded_mode()
+
+    # --- Normal mode (no signals) ---
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "no signals → normal mode", "passed": d.enter_degraded is False})
+    checks.append({"check": "no signals → no reason", "passed": d.reason is None})
+
+    # --- Retry exhausted ---
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=0, retry_exhausted=True,
+    ))
+    checks.append({"check": "retry exhausted → degraded", "passed": d.enter_degraded is True})
+    if d.reason:
+        checks.append({"check": "retry exhausted reason set", "passed": "Retry" in d.reason})
+
+    # --- Consecutive failures threshold ---
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=3, panic_count=0, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "failures=3 → degraded", "passed": d.enter_degraded is True})
+    if d.reason:
+        checks.append({"check": "failures reason mentions failures", "passed": "failures" in d.reason.lower()})
+
+    # Below threshold
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=2, panic_count=0, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "failures=2 → normal", "passed": d.enter_degraded is False})
+
+    # --- Panic count threshold ---
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=1, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "panic=1 → degraded", "passed": d.enter_degraded is True})
+
+    # Below threshold
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "panic=0 → normal", "passed": d.enter_degraded is False})
+
+    # --- Crash count threshold ---
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=1, retry_exhausted=False,
+    ))
+    checks.append({"check": "crash=1 → degraded", "passed": d.enter_degraded is True})
+
+    # Below threshold
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "crash=0 → normal", "passed": d.enter_degraded is False})
+
+    # --- Custom thresholds ---
+    custom = DegradedMode({"failures": 5, "panics": 2, "crashes": 3})
+    d = custom.evaluate(DegradedContext(
+        consecutive_failures=4, panic_count=1, crash_count=2, retry_exhausted=False,
+    ))
+    checks.append({"check": "custom: all below → normal", "passed": d.enter_degraded is False})
+
+    d = custom.evaluate(DegradedContext(
+        consecutive_failures=5, panic_count=1, crash_count=2, retry_exhausted=False,
+    ))
+    checks.append({"check": "custom: failures=5 → degraded", "passed": d.enter_degraded is True})
+
+    d = custom.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=2, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "custom: panics=2 → degraded", "passed": d.enter_degraded is True})
+
+    d = custom.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=3, retry_exhausted=False,
+    ))
+    checks.append({"check": "custom: crashes=3 → degraded", "passed": d.enter_degraded is True})
+
+    # --- Priority: retry exhausted checked first ---
+    d = dm.evaluate(DegradedContext(
+        consecutive_failures=0, panic_count=0, crash_count=0, retry_exhausted=True,
+    ))
+    checks.append({"check": "retry exhausted before other signals",
+                   "passed": d.enter_degraded is True})
+
+    # --- Factory returns defaults ---
+    dm2 = default_degraded_mode()
+    d = dm2.evaluate(DegradedContext(
+        consecutive_failures=3, panic_count=0, crash_count=0, retry_exhausted=False,
+    ))
+    checks.append({"check": "factory threshold appears correct",
+                   "passed": d.enter_degraded is True})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("degraded_mode_in_worker",
+           "Worker enters degraded mode when consecutive failures exceed threshold")
+def _test_degraded_mode_in_worker() -> dict[str, Any]:
+    """Worker.process_next() enters degraded mode when failure thresholds are exceeded."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    from src.platform.runtime.worker import execute_job_payload
+
+    # Save original to restore later
+    _original = execute_job_payload
+
+    def _always_fail(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise RuntimeError("persistent failure")
+
+    import src.platform.runtime.worker as worker_mod
+    worker_mod.execute_job_payload = _always_fail  # type: ignore[assignment]
+
+    try:
+        q = InMemoryQueue()
+        store = JobStore()
+        cp = ControlPlane(job_store=store)
+        w = Worker(queue=q, control_plane=cp)
+
+        # Create a job with consecutive_failures already at the degraded threshold (3)
+        job = create_job(cli_to_channel_message({"cmd": "degrade-me"}))
+        job.consecutive_failures = 3
+        cp.register_job(job)
+        q.push(job)
+
+        result = w.process_next()
+        checks.append({"check": "worker returned job", "passed": result is not None})
+        if result:
+            # Should succeed with fallback, not fail
+            checks.append({"check": "state is SUCCEEDED (fallback)",
+                           "passed": result.state == JobState.SUCCEEDED})
+            if result.result is not None:
+                checks.append({"check": "result has fallback flag",
+                               "passed": result.result.get("fallback") is True})
+                checks.append({"check": "result has reason",
+                               "passed": result.result.get("reason") is not None})
+            notes.append(f"Result state: {result.state.value}")
+            notes.append(f"Result: {result.result}")
+    finally:
+        worker_mod.execute_job_payload = _original
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("panic_guard_in_worker",
+           "Worker wraps cycle execution with PanicGuard on unexpected exception")
+def _test_panic_guard_in_worker() -> dict[str, Any]:
+    """Worker.process_next() catches unexpected exceptions via PanicGuard and marks FAILED."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    from src.platform.runtime.worker import execute_job_payload
+
+    # Save original to restore later
+    _original = execute_job_payload
+
+    def _broken_execute(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise RuntimeError("catastrophic failure")
+
+    import src.platform.runtime.worker as worker_mod
+    worker_mod.execute_job_payload = _broken_execute  # type: ignore[assignment]
+
+    try:
+        q = InMemoryQueue()
+        store = JobStore()
+        cp = ControlPlane(job_store=store)
+        w = Worker(queue=q, control_plane=cp)
+
+        job = create_job(cli_to_channel_message({"cmd": "boom"}))
+        cp.register_job(job)
+        q.push(job)
+
+        result = w.process_next()
+        checks.append({"check": "worker returned job", "passed": result is not None})
+        if result:
+            checks.append({"check": "job state is FAILED",
+                           "passed": result.state == JobState.FAILED})
+            # Verify the trace has lifecycle events indicating hydration + failure
+            has_hydrate = any(
+                e.get("event") == "hydrate_execution_context"
+                for e in result.trace
+            )
+            checks.append({"check": "hydrate event in trace", "passed": has_hydrate})
+            notes.append(f"Result state: {result.state.value}")
+    finally:
+        worker_mod.execute_job_payload = _original
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
