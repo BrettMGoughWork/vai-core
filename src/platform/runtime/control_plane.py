@@ -4,6 +4,9 @@ The authoritative source of truth for job state.  Owns the job registry,
 validates all state transitions, and exposes simple orchestration methods.
 Synchronous, single-threaded, minimal — no retries, no supervision, no
 scheduling, no concurrency.
+
+S4.5.4: The control plane also tracks worker heartbeats via an embedded
+:class:`~src.platform.runtime.heartbeat.control_plane.HeartbeatMonitor`.
 """
 
 from __future__ import annotations
@@ -11,6 +14,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from src.platform.runtime.execution_context import ExecutionContext
+from src.platform.runtime.heartbeat.control_plane import (
+    HeartbeatMonitor,
+    HeartbeatStatus,
+)
+from src.platform.runtime.heartbeat.events import HeartbeatEvent
 from src.platform.runtime.job import Job
 from src.platform.runtime.job_state import JobState, transition
 from src.platform.runtime.job_store import JobStore, job_store as _default_store
@@ -27,10 +35,44 @@ class ControlPlane:
     Args:
         job_store: The store that persists job data.  Defaults to the
             module-level ``job_store`` singleton.
+        heartbeat_timeout: Seconds before a worker is considered unhealthy.
+            ``None`` disables heartbeat tracking (default).
     """
 
-    def __init__(self, job_store: JobStore | None = None) -> None:
+    def __init__(
+        self,
+        job_store: JobStore | None = None,
+        heartbeat_timeout: float | None = None,
+    ) -> None:
         self.job_store = job_store if job_store is not None else _default_store
+        self.heartbeat_monitor: HeartbeatMonitor | None = (
+            HeartbeatMonitor(timeout_seconds=heartbeat_timeout)
+            if heartbeat_timeout is not None
+            else None
+        )
+
+    # ------------------------------------------------------------------
+    # Heartbeat integration (S4.5.4)
+    # ------------------------------------------------------------------
+
+    def accept_heartbeat(
+        self,
+        event: HeartbeatEvent,
+        now: float | None = None,
+    ) -> HeartbeatStatus | None:
+        """Record a worker heartbeat and return the worker's health status.
+
+        Args:
+            event: The heartbeat event emitted by a worker.
+            now: Optional current timestamp (defaults to ``event.timestamp``).
+
+        Returns:
+            :class:`HeartbeatStatus` if heartbeat tracking is enabled, or
+            ``None`` if no ``heartbeat_timeout`` was configured.
+        """
+        if self.heartbeat_monitor is None:
+            return None
+        return self.heartbeat_monitor.update(event, now=now)
 
     # ------------------------------------------------------------------
     # Resume token helpers

@@ -1884,6 +1884,19 @@ Goal: Make S4 robust under failure.
 
 ✅ 4.4.5 — Degraded Mode
 - Fallback to simpler execution if S1/S2 unstable.
+- ⚠️ Runtime semantics still a stub — safe fallback output format, escalation path, and recovery trigger deferred to S4.7.5.
+
+⬜ 4.4.6 — Worker Pipeline Abstraction
+- Refactor process_next() into a composable stage pipeline.
+- Each choke (crash recovery, poison, idempotency, degraded, retry, panic) becomes a PipelineStage with evaluate() → Decision.
+- Preserves evaluation order invariant without procedural entanglement.
+- Keeps the worker lean as S4.5–S4.8 add more stages.
+
+⬜ 4.4.7 — Subsystem Unit Tests
+- Add parameterized unit tests for all 5 pure-logic evaluators:
+  RetryPolicy, PoisonDetector, CrashRecovery, PanicGuard, DegradedMode.
+- Harness remains the primary integration validation tool.
+- Unit tests cover edge cases the harness doesn't (empty rules, boundary thresholds, token mismatches).
 
 Outcome:  
 S4 becomes resilient to errors, crashes, and malformed inputs.
@@ -1893,25 +1906,38 @@ S4 becomes resilient to errors, crashes, and malformed inputs.
 ## PHASE 4.5 — Concurrency & Worker Pool
 Goal: Support multiple workers and parallel execution.
 
-4.5.1 — Worker Pool
+✅ 4.5.0 — Queue Backend Abstraction
+- Define Queue interface (push, pop, acknowledge, requeue).
+- Implement Redis List backend.
+- In-memory queue from 4.1.4 becomes default for dev/testing.
+- ⚠️ Required before 4.5.1 — in-memory queue doesn't survive multi-process.
+
+✅ 4.5.1 — Worker Pool
 - Implement N workers.  
 - Configurable concurrency.
 
-4.5.2 — Thread/Process Isolation
+✅ 4.5.2 — Thread/Process Isolation
 - Choose threads or processes.  
 - Ensure S1/S2 purity preserved.
 
-4.5.3 — Job Scheduling
+✅ 4.5.3 — Job Scheduling
 - FIFO or priority queue.  
 - Add scheduling policy.
 
-4.5.4 — Worker Heartbeats
+✅ 4.5.4 — Worker Heartbeats
 - Workers emit heartbeat events.  
 - Control plane monitors health.
 
-4.5.5 — Worker Crash Recovery
+✅ 4.5.5 — Worker Crash Recovery
 - Restart crashed workers.  
 - Requeue in‑flight jobs.
+- ⚠️ Complements 4.4.3 (job-level crash recovery). 4.4.3 resumes from checkpoint within a cycle; 4.5.5 restarts the worker process itself. 4.5.5 depends on 4.4.3's checkpoint metadata.
+
+✅ 4.5.6 — Persistence Backend Abstraction
+- Define JobStore interface (save, load, list, delete).
+- Implement SQLite backend.
+- In-memory JobStore from 4.1.x becomes default for dev/testing.
+- ⚠️ Required before 4.9 production deployment.
 
 Outcome:  
 S4 can run many jobs concurrently and safely.
@@ -1955,7 +1981,13 @@ S4 can accept requests from any client or platform.
 ## PHASE 4.7 — Supervisors & Governance
 Goal: Add system‑level monitoring and self‑healing.
 
-4.7.1 — Supervisor Loop
+⬜ 4.7.0 — Degraded Mode Runtime Semantics
+- Define what "safe fallback output" actually looks like (schema, content).
+- Define escalation path: who gets notified, how to trigger recovery.
+- Define recovery trigger: what events bring the worker back to normal mode.
+- ⚠️ Stub from 4.4.5 needs real semantics before production.
+
+⬜ 4.7.1 — Supervisor Loop
 - Monitor worker pool.  
 - Restart unhealthy workers.
 
@@ -1967,9 +1999,17 @@ Goal: Add system‑level monitoring and self‑healing.
 - Detect inconsistent job states.  
 - Auto‑repair or escalate.
 
-4.7.4 — System‑Level Alerts
+⬜ 4.7.4 — System‑Level Alerts
 - Emit alerts to Slack/email.  
 - Structured alert payloads.
+
+⬜ 4.7.5 — Unified Instruction Dispatch
+- Formalize how the daemon dispatches all instruction types:
+  PanicInstruction, PoisonInstruction, RecoveryInstruction,
+  DegradedInstruction, RetryInstruction.
+- Each instruction maps to one action: fail, retry, recover, degrade, etc.
+- Keeps the daemon generic — adding a new instruction in S4.9+ doesn't
+  require daemon changes.
 
 Outcome:  
 S4 becomes self‑healing and production‑ready.
