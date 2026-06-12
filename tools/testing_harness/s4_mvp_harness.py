@@ -35,7 +35,7 @@ from src.platform.transport.normalization import (
 from src.platform.runtime.job import Job, create_job
 from src.platform.queue.queue import InMemoryQueue
 from src.platform.runtime.worker import Worker
-from src.platform.runtime.job_store import JobStore
+from src.platform.runtime.job_store import InMemoryJobStore, JobStore
 from src.platform.adapter.adapter import s2_to_s1_adapter, s1_to_s2_adapter
 from src.platform.observability.logging import (
     log_job_created,
@@ -249,10 +249,10 @@ def _test_control_plane() -> dict[str, Any]:
     from src.platform.runtime.control_plane import ControlPlane
     from src.platform.runtime.job import Job, create_job
     from src.platform.runtime.job_state import JobState
-    from src.platform.runtime.job_store import JobStore
+    from src.platform.runtime.job_store import InMemoryJobStore
     from src.platform.transport.normalization import ChannelMessage
 
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     ch = ChannelMessage(input={"x": 1})
     job = create_job(ch)
@@ -372,7 +372,7 @@ def _test_queue_fifo() -> dict[str, Any]:
 def _test_job_store() -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
-    store = JobStore()
+    store = InMemoryJobStore()
     ch = ChannelMessage(input={"x": 1})
     job = create_job(ch)
 
@@ -516,7 +516,7 @@ def _test_end_to_end() -> dict[str, Any]:
     checks.append({"check": "job state is pending", "passed": job.state == "pending"})
 
     # 3. Save to store
-    store = JobStore()
+    store = InMemoryJobStore()
     store.save(job)
     checks.append({"check": "job saved to store", "passed": store.get(job.job_id) == job})
 
@@ -633,7 +633,7 @@ def _test_execution_context() -> dict[str, Any]:
     from src.platform.runtime.execution_context import ExecutionContext
     from src.platform.runtime.control_plane import ControlPlane
     from src.platform.runtime.job import Job, create_job
-    from src.platform.runtime.job_store import JobStore
+    from src.platform.runtime.job_store import InMemoryJobStore
     from src.platform.transport.normalization import ChannelMessage
 
     # ExecutionContext default construction
@@ -662,7 +662,7 @@ def _test_execution_context() -> dict[str, Any]:
     checks.append({"check": "round-trip preserves last_result", "passed": ec2.last_result == {"output": "ok"}})
 
     # ControlPlane initialises ExecutionContext on register
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     ch = ChannelMessage(input={"hello": "world"})
     job = create_job(ch)
@@ -696,10 +696,10 @@ def _test_checkpointing() -> dict[str, Any]:
     from src.platform.runtime.execution_context import ExecutionContext
     from src.platform.runtime.control_plane import ControlPlane
     from src.platform.runtime.job import Job, create_job
-    from src.platform.runtime.job_store import JobStore
+    from src.platform.runtime.job_store import InMemoryJobStore
     from src.platform.transport.normalization import ChannelMessage
 
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
 
     # --- Job.save_checkpoint() ---
@@ -763,7 +763,7 @@ def _test_resume_tokens() -> dict[str, Any]:
     from src.platform.runtime.tokens import new_resume_token
     from src.platform.runtime.control_plane import ControlPlane
     from src.platform.runtime.job import Job, create_job
-    from src.platform.runtime.job_store import JobStore
+    from src.platform.runtime.job_store import InMemoryJobStore
     from src.platform.transport.normalization import ChannelMessage
     from src.platform.adapter.adapter import s2_to_s1_adapter
 
@@ -776,7 +776,7 @@ def _test_resume_tokens() -> dict[str, Any]:
     checks.append({"check": "consecutive tokens are unique", "passed": t1 != t2})
 
     # --- ControlPlane.issue_resume_token() ---
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     ch = ChannelMessage(input={"token": "test"})
     job = create_job(ch)
@@ -840,9 +840,9 @@ def _test_multi_cycle() -> dict[str, Any]:
     from src.platform.runtime.control_plane import ControlPlane
     from src.platform.runtime.execution_context import ExecutionContext
     from src.platform.runtime.job import create_job
-    from src.platform.runtime.job_store import JobStore
+    from src.platform.runtime.job_store import InMemoryJobStore
 
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     q = InMemoryQueue()
     w = Worker(queue=q, control_plane=cp)
@@ -1048,7 +1048,7 @@ def _test_worker_retry() -> dict[str, Any]:
     notes: list[str] = []
 
     q = InMemoryQueue()
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     w = Worker(queue=q, control_plane=cp)
 
@@ -1140,7 +1140,7 @@ def _test_worker_poison() -> dict[str, Any]:
     notes: list[str] = []
 
     q = InMemoryQueue()
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     w = Worker(queue=q, control_plane=cp)
 
@@ -1243,7 +1243,7 @@ def _test_worker_crash_recovery() -> dict[str, Any]:
     from src.platform.runtime.execution_context import ExecutionContext
 
     q = InMemoryQueue()
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     w = Worker(queue=q, control_plane=cp)
 
@@ -1346,7 +1346,7 @@ def _test_poison_skip_recovery() -> dict[str, Any]:
     from src.platform.runtime.execution_context import ExecutionContext
 
     q = InMemoryQueue()
-    store = JobStore()
+    store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     w = Worker(queue=q, control_plane=cp)
 
@@ -1564,7 +1564,7 @@ def _test_degraded_mode_in_worker() -> dict[str, Any]:
 
     try:
         q = InMemoryQueue()
-        store = JobStore()
+        store = InMemoryJobStore()
         cp = ControlPlane(job_store=store)
         w = Worker(queue=q, control_plane=cp)
 
@@ -1614,7 +1614,7 @@ def _test_panic_guard_in_worker() -> dict[str, Any]:
 
     try:
         q = InMemoryQueue()
-        store = JobStore()
+        store = InMemoryJobStore()
         cp = ControlPlane(job_store=store)
         w = Worker(queue=q, control_plane=cp)
 
