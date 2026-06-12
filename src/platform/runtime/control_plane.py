@@ -10,9 +10,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from src.platform.runtime.execution_context import ExecutionContext
 from src.platform.runtime.job import Job
 from src.platform.runtime.job_state import JobState, transition
 from src.platform.runtime.job_store import JobStore, job_store as _default_store
+from src.platform.runtime.tokens import new_resume_token
+
+# ---------------------------------------------------------------------------
+# Stratum‑4 isolation: no imports from S1/S2/S3, no queue, no adapter.
+# ---------------------------------------------------------------------------
 
 
 class ControlPlane:
@@ -25,6 +31,32 @@ class ControlPlane:
 
     def __init__(self, job_store: JobStore | None = None) -> None:
         self.job_store = job_store if job_store is not None else _default_store
+
+    # ------------------------------------------------------------------
+    # Resume token helpers
+    # ------------------------------------------------------------------
+
+    def issue_resume_token(self, job: Job) -> None:
+        """Generate a new resume token for the next cycle and persist.
+
+        Args:
+            job: The job to issue a token for.
+        """
+        job.resume_token = new_resume_token()
+        self.save_checkpoint(job)
+
+    # ------------------------------------------------------------------
+    # Checkpoint helpers
+    # ------------------------------------------------------------------
+
+    def save_checkpoint(self, job: Job) -> None:
+        """Persist the job (including its execution context) to the store.
+
+        Args:
+            job: The job to persist.
+        """
+        self.append_lifecycle_event(job, "dehydrate_execution_context")
+        self.job_store.save(job)
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -52,7 +84,8 @@ class ControlPlane:
     def register_job(self, job: Job) -> None:
         """Persist a newly created job.
 
-        Asserts that the job is in ``PENDING`` state.
+        Asserts that the job is in ``PENDING`` state.  If the job does not
+        yet have an ``execution_context``, one is initialised automatically.
 
         Args:
             job: A freshly created ``Job`` (must be ``state == PENDING``).
@@ -65,7 +98,9 @@ class ControlPlane:
                 f"Cannot register job in state {job.state.value!r}; "
                 f"must be {JobState.PENDING.value!r}"
             )
-        self.job_store.save(job)
+        if job.execution_context is None:
+            job.execution_context = ExecutionContext()
+        self.save_checkpoint(job)
 
     def mark_running(self, job: Job) -> None:
         """Transition job to ``RUNNING`` and persist.
@@ -79,7 +114,7 @@ class ControlPlane:
         old = job.state
         job.state = transition(job.state, JobState.RUNNING)
         self._append_trace(job, old, JobState.RUNNING)
-        self.job_store.save(job)
+        self.save_checkpoint(job)
 
     def mark_succeeded(self, job: Job, result: dict) -> None:
         """Transition job to ``SUCCEEDED``, attach the result, and persist.
@@ -95,7 +130,8 @@ class ControlPlane:
         job.state = transition(job.state, JobState.SUCCEEDED)
         job.result = result
         self._append_trace(job, old, JobState.SUCCEEDED)
-        self.job_store.save(job)
+        self.save_checkpoint(job)
+        self.issue_resume_token(job)
 
     def mark_failed(self, job: Job, error: dict) -> None:
         """Transition job to ``FAILED``, attach the structured error, and persist.
@@ -111,7 +147,54 @@ class ControlPlane:
         job.state = transition(job.state, JobState.FAILED)
         job.result = error
         self._append_trace(job, old, JobState.FAILED)
+        self.save_checkpoint(job)
+        self.issue_resume_token(job)
+
+    # ------------------------------------------------------------------
+    # Cycle trace
+    # ------------------------------------------------------------------
+
+    def append_lifecycle_event(
+        self, job: Job, event: str, payload: dict | None = None
+    ) -> None:
+        """Append a lifecycle trace entry to the job's trace.
+
+        Lifecycle events record hydration/dehydration of the execution
+        context at the runtime level.
+
+        Args:
+            job:    The job whose trace to extend.
+            event:  The lifecycle event name
+                    (e.g. ``"hydrate_execution_context"``).
+            payload: Optional metadata dict for the entry.
+        """
+        job.trace.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "event": event,
+                "payload": payload or {},
+            }
+        )
         self.job_store.save(job)
+
+    def append_cycle_trace(self, job: Job, event: str, payload: dict) -> None:
+        """Append a cycle trace entry to the job's execution context.
+
+        Args:
+            job:    The job whose cycle trace to extend.
+            event:  The cycle event name (e.g. ``"cycle_start"``).
+            payload: Arbitrary metadata dict for the entry.
+        """
+        if job.execution_context is None:
+            job.execution_context = ExecutionContext()
+        job.execution_context.cycle_trace.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "event": event,
+                "payload": payload,
+            }
+        )
+        self.save_checkpoint(job)
 
 
 # Module-level singleton so gateway and worker share one control plane

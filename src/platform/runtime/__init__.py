@@ -1,5 +1,6 @@
-"""Stratum-4 runtime — job model, lifecycle, state machine, control plane, and creation."""
+"""Stratum-4 runtime — job model, lifecycle, state machine, control plane, execution context, and creation."""
 
+from src.platform.runtime.execution_context import ExecutionContext
 from src.platform.runtime.job import Job, create_job
 from src.platform.runtime.job_state import (
     JobState,
@@ -9,6 +10,7 @@ from src.platform.runtime.job_state import (
 )
 
 __all__ = [
+    "ExecutionContext",
     "Job",
     "JobState",
     "can_transition",
