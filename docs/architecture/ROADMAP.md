@@ -1906,34 +1906,34 @@ S4 becomes resilient to errors, crashes, and malformed inputs.
 ## PHASE 4.5 — Concurrency & Worker Pool
 Goal: Support multiple workers and parallel execution.
 
-⬜ 4.5.0 — Queue Backend Abstraction
+✅ 4.5.0 — Queue Backend Abstraction
 - Define Queue interface (push, pop, acknowledge, requeue).
 - Implement Redis List backend.
 - In-memory queue from 4.1.4 becomes default for dev/testing.
 - ⚠️ Required before 4.5.1 — in-memory queue doesn't survive multi-process.
 
-⬜ 4.5.1 — Worker Pool
+✅ 4.5.1 — Worker Pool
 - Implement N workers.  
 - Configurable concurrency.
 
-4.5.2 — Thread/Process Isolation
+✅ 4.5.2 — Thread/Process Isolation
 - Choose threads or processes.  
 - Ensure S1/S2 purity preserved.
 
-4.5.3 — Job Scheduling
+✅ 4.5.3 — Job Scheduling
 - FIFO or priority queue.  
 - Add scheduling policy.
 
-4.5.4 — Worker Heartbeats
+✅ 4.5.4 — Worker Heartbeats
 - Workers emit heartbeat events.  
 - Control plane monitors health.
 
-⬜ 4.5.5 — Worker Crash Recovery
+✅ 4.5.5 — Worker Crash Recovery
 - Restart crashed workers.  
 - Requeue in‑flight jobs.
 - ⚠️ Complements 4.4.3 (job-level crash recovery). 4.4.3 resumes from checkpoint within a cycle; 4.5.5 restarts the worker process itself. 4.5.5 depends on 4.4.3's checkpoint metadata.
 
-⬜ 4.5.6 — Persistence Backend Abstraction
+✅ 4.5.6 — Persistence Backend Abstraction
 - Define JobStore interface (save, load, list, delete).
 - Implement SQLite backend.
 - In-memory JobStore from 4.1.x becomes default for dev/testing.
