@@ -372,6 +372,96 @@ Key features:
 - Zero network, queue, or persistence coupling
 
 
+### DevSMTPTransport (Development Email)
+
+`DevSMTPTransport` is a pluggable **SMTP-based** email transport that sends system alerts to a
+local SMTP test service — no real SMTP, DKIM, SPF, or DMARC required.
+
+It connects via SMTP to a configurable host:port, making it compatible with
+[MailHog](https://github.com/mailhog/MailHog) (``localhost:1025`` — the opinionated default)
+and [smtp4dev](https://github.com/rnwood/smtp4dev) (``localhost:25``) out of the box.
+A real SMTP relay can also be pointed to (e.g. ``smtp.example.com:587``).
+
+```python
+from src.platform.transport import DevSMTPConfig, DevSMTPTransport
+
+config = DevSMTPConfig(host="localhost", port=1025)
+transport = DevSMTPTransport(config)
+
+result = transport.send(
+    to="admin@example.com",
+    subject="System alert: disk 90% full",
+    body="The /dev/sda1 partition is at 90% capacity.",
+)
+```
+
+Configuration via ``DevSMTPConfig``:
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| ``host`` | ``localhost`` | SMTP server hostname. |
+| ``port`` | ``1025`` | SMTP server port. MailHog default is ``1025``; smtp4dev uses ``25``. |
+| ``sender`` | ``alerts@vai-core.local`` | Default ``From`` address. |
+| ``timeout`` | ``5.0`` | SMTP connection timeout (seconds). |
+
+**Note:** [MailHog](https://github.com/mailhog/MailHog) is the opinionated choice for local
+testing. It can be replaced with [smtp4dev](https://github.com/rnwood/smtp4dev) or a real
+SMTP service by updating ``host`` and ``port``.
+
+View captured messages at the MailHog web UI: **http://localhost:8025**
+
+To start MailHog manually:
+```powershell
+# SMTP on :1025, HTTP UI on :8025
+.\tools\dev\MailHog.exe
+```
+
+
+### AlertNotification (Mail by default)
+
+``AlertNotifier`` is the runtime alert delivery system.  It routes severity-gated
+alerts through the configured transport — by default via ``DevSMTPTransport``
+(MailHog on ``localhost:1025``).  Alerts below the configured ``min_level`` are
+silently dropped.
+
+```python
+from src.platform.runtime.alerting import AlertNotifierConfig, AlertNotifier
+from src.platform.transport import DevSMTPConfig, DevSMTPTransport
+
+config = AlertNotifierConfig(
+    recipient="ops@example.com",
+    min_level="warning",   # info / warning / error / critical
+    sender="noreply@vai-core.local",
+)
+transport = DevSMTPTransport(DevSMTPConfig())
+notifier = AlertNotifier(config, transport)
+
+# Sends (level >= warning)
+notifier.alert("Disk 90% full", "/dev/sda1 at 90%", level="critical")
+
+# Skipped (info < warning)
+notifier.alert("Routine check", "All healthy", level="info")
+```
+
+The notification recipient is configured via the ``AlertNotifierConfig.recipient``
+field — this is where all system alerts are delivered.
+
+``notify_on_dispatch`` composes the notifier with the instruction dispatcher
+so daemon actions (panic, fail, degrade, etc.) automatically produce alerts:
+
+```python
+from src.platform.runtime.alerting import notify_on_dispatch
+from src.daemon.instruction_dispatch import default_dispatcher
+
+action, event, alert = notify_on_dispatch(
+    {"type": "PanicInstruction", "reason": "OOM detected"},
+    default_dispatcher().dispatch,
+    notifier,
+    subject_prefix="[S4]",
+)
+```
+
+
 ### Inspector Dashboard
 
 The Stratum-2 Inspection Dashboard is a read-only, developer-facing TUI for visualizing agent cycle traces and memory substrate state in real time. It provides a safe, side-effect-free way to inspect agent activity and health.

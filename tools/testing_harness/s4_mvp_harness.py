@@ -27,6 +27,10 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from src.platform.transport.dev_smtp import (
+    DevSMTPConfig,
+    DevSMTPTransport,
+)
 from src.platform.transport.normalization import (
     ChannelMessage,
     cli_to_channel_message,
@@ -88,14 +92,22 @@ from src.platform.runtime.channels import (
     CLITUI,
     InboundChannelMessage,
     ChannelRegistry,
+    MailChannel,
+    SlackChannel,
     WebhookChannel,
     WebhookEvent,
     WebSocketChannel,
     register_cli_channel,
+    register_mail_channel,
+    register_slack_channel,
     register_webhook_channel,
     register_websocket_channel,
 )
-from src.platform.runtime.gateway_entrypoint import process_channel_input
+from src.platform.runtime.gateway_entrypoint import (
+    process_channel_input,
+    handle_slack_event,
+    handle_mail_message,
+)
 from src.platform.supervisor.supervisor_loop import (
     SupervisorConfig,
     SupervisorDecision,
@@ -2321,6 +2333,638 @@ def _test_channels() -> dict[str, Any]:
         checks.append({"check": "WebhookEvent immutable", "passed": False})
     except Exception:
         checks.append({"check": "WebhookEvent immutable", "passed": True})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+# ------------------------------------------------------------------
+# 20. SlackChannel — receive, normalize, send, validation
+# ------------------------------------------------------------------
+
+@_scenario("slack_channel",
+           "SlackChannel: receive, normalize, send, validation, register, gateway")
+def _test_slack_channel() -> dict[str, Any]:
+    """S4.7.4 — Slack Channel integration."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    _slack_clock = iter([400.0, 401.0, 402.0, 403.0, 404.0]).__next__
+    slack_ch = SlackChannel(clock=_slack_clock)
+
+    # 1. Receive minimal
+    _s_msg1 = slack_ch.receive({"text": "deploy"})
+    checks.append({"check": "SlackChannel receive minimal",
+                   "passed": _s_msg1.channel == "slack"
+                             and _s_msg1.sender is None
+                             and _s_msg1.payload == {"text": "deploy"}
+                             and _s_msg1.timestamp == 400.0})
+
+    # 2. Receive with sender, channel, team
+    _s_msg2 = slack_ch.receive({
+        "text": "status", "sender": "U123",
+        "channel": "C456", "team": "T789",
+    })
+    checks.append({"check": "SlackChannel receive with sender+channel+team",
+                   "passed": _s_msg2.sender == "U123"
+                             and _s_msg2.payload == {
+                                 "text": "status",
+                                 "channel": "C456",
+                                 "team": "T789",
+                             }
+                             and _s_msg2.timestamp == 401.0})
+
+    # 3. Validation — non-dict
+    try:
+        slack_ch.receive("bad")
+        checks.append({"check": "SlackChannel rejects non-dict", "passed": False})
+    except TypeError:
+        checks.append({"check": "SlackChannel rejects non-dict", "passed": True})
+
+    # 4. Validation — missing text
+    try:
+        slack_ch.receive({"sender": "U1"})
+        checks.append({"check": "SlackChannel rejects missing text", "passed": False})
+    except ValueError:
+        checks.append({"check": "SlackChannel rejects missing text", "passed": True})
+
+    # 5. Normalize
+    _s_norm = slack_ch.normalize(_s_msg1)
+    checks.append({"check": "SlackChannel normalize minimal",
+                   "passed": _s_norm == {
+                       "input": "deploy",
+                       "metadata": {
+                           "channel": "slack",
+                           "sender": None,
+                       },
+                   }})
+
+    _s_norm2 = slack_ch.normalize(_s_msg2)
+    checks.append({"check": "SlackChannel normalize with metadata",
+                   "passed": _s_norm2 == {
+                       "input": "status",
+                       "metadata": {
+                           "channel": "slack",
+                           "sender": "U123",
+                           "slack_channel": "C456",
+                           "slack_team": "T789",
+                       },
+                   }})
+
+    # 6. Send
+    _s_out = slack_ch.send({"output": "done", "metadata": {"job_id": "j-1"}})
+    checks.append({"check": "SlackChannel send",
+                   "passed": _s_out == {
+                       "text": "done",
+                       "metadata": {"job_id": "j-1"},
+                   }})
+
+    # 7. Send with slack_channel in metadata
+    _s_out2 = slack_ch.send({
+        "output": "reply",
+        "metadata": {"slack_channel": "C456", "job_id": "j-2"},
+    })
+    checks.append({"check": "SlackChannel send with channel override",
+                   "passed": _s_out2 == {
+                       "text": "reply",
+                       "channel": "C456",
+                       "metadata": {"slack_channel": "C456", "job_id": "j-2"},
+                   }})
+
+    # 8. register_slack_channel convenience
+    _reg_slack = ChannelRegistry()
+    register_slack_channel(_reg_slack, clock=_slack_clock)
+    _s_ch2 = _reg_slack.get("slack")
+    checks.append({"check": "register_slack_channel registers SlackChannel",
+                   "passed": isinstance(_s_ch2, SlackChannel)})
+
+    # 9. Gateway convenience
+    _reg_all = ChannelRegistry()
+    register_slack_channel(_reg_all, clock=_slack_clock)
+    _gw = handle_slack_event(_reg_all, {"text": "gateway test"})
+    checks.append({"check": "handle_slack_event processes input",
+                   "passed": _gw is not None
+                             and _gw["input"] == "gateway test"
+                             and _gw["metadata"]["channel"] == "slack"})
+
+    # 10. Gateway unregistered
+    _empty = ChannelRegistry()
+    _gw_none = handle_slack_event(_empty, {"text": "x"})
+    checks.append({"check": "handle_slack_event returns None unregistered",
+                   "passed": _gw_none is None})
+
+    notes.append("TODO: Add e2e integration test with real Slack workspace + Events API app")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+# ------------------------------------------------------------------
+# 21. MailChannel — receive, normalize, send, validation
+# ------------------------------------------------------------------
+
+@_scenario("mail_channel",
+           "MailChannel: receive, normalize, send, validation, register, gateway")
+def _test_mail_channel() -> dict[str, Any]:
+    """S4.7.4 — Mail Channel integration."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    _mail_clock = iter([500.0, 501.0, 502.0, 503.0, 504.0]).__next__
+    mail_ch = MailChannel(clock=_mail_clock)
+
+    # 1. Receive minimal
+    _m_msg1 = mail_ch.receive({
+        "from": "alice@example.com",
+        "subject": "Deploy",
+        "body": "Please deploy staging",
+    })
+    checks.append({"check": "MailChannel receive minimal",
+                   "passed": _m_msg1.channel == "mail"
+                             and _m_msg1.sender == "alice@example.com"
+                             and _m_msg1.payload["subject"] == "Deploy"
+                             and _m_msg1.payload["body"] == "Please deploy staging"
+                             and _m_msg1.timestamp == 500.0})
+
+    # 2. Receive with recipient
+    _m_msg2 = mail_ch.receive({
+        "from": "bob@work.com",
+        "to": "bot@vai.example",
+        "subject": "Status",
+        "body": "All good",
+    })
+    checks.append({"check": "MailChannel receive with recipient",
+                   "passed": _m_msg2.payload["to"] == "bot@vai.example"
+                             and _m_msg2.timestamp == 501.0})
+
+    # 3. Validation — non-dict
+    try:
+        mail_ch.receive("bad")
+        checks.append({"check": "MailChannel rejects non-dict", "passed": False})
+    except TypeError:
+        checks.append({"check": "MailChannel rejects non-dict", "passed": True})
+
+    # 4. Validation — missing from
+    try:
+        mail_ch.receive({"subject": "Hi", "body": "Hello"})
+        checks.append({"check": "MailChannel rejects missing from", "passed": False})
+    except ValueError:
+        checks.append({"check": "MailChannel rejects missing from", "passed": True})
+
+    # 5. Validation — missing subject
+    try:
+        mail_ch.receive({"from": "a@b.com", "body": "Hello"})
+        checks.append({"check": "MailChannel rejects missing subject", "passed": False})
+    except ValueError:
+        checks.append({"check": "MailChannel rejects missing subject", "passed": True})
+
+    # 6. Validation — missing body
+    try:
+        mail_ch.receive({"from": "a@b.com", "subject": "Hi"})
+        checks.append({"check": "MailChannel rejects missing body", "passed": False})
+    except ValueError:
+        checks.append({"check": "MailChannel rejects missing body", "passed": True})
+
+    # 7. Normalize
+    _m_norm = mail_ch.normalize(_m_msg1)
+    checks.append({"check": "MailChannel normalize",
+                   "passed": _m_norm == {
+                       "input": "Deploy: Please deploy staging",
+                       "metadata": {
+                           "channel": "mail",
+                           "sender": "alice@example.com",
+                           "to": "",
+                           "subject": "Deploy",
+                       },
+                   }})
+
+    # 8. Normalize with recipient
+    _m_norm2 = mail_ch.normalize(_m_msg2)
+    checks.append({"check": "MailChannel normalize with recipient",
+                   "passed": _m_norm2["metadata"]["to"] == "bot@vai.example"
+                             and _m_norm2["metadata"]["subject"] == "Status"})
+
+    # 9. Send
+    _m_out = mail_ch.send({"output": "Deploying now", "metadata": {}})
+    checks.append({"check": "MailChannel send",
+                   "passed": _m_out == {
+                       "to": "",
+                       "subject": "Re: Your request",
+                       "body": "Deploying now",
+                       "metadata": {},
+                   }})
+
+    # 10. Send with recipient metadata
+    _m_out2 = mail_ch.send({
+        "output": "Done",
+        "metadata": {"to": "alice@example.com", "subject": "Re: Deploy"},
+    })
+    checks.append({"check": "MailChannel send with metadata",
+                   "passed": _m_out2["to"] == "alice@example.com"
+                             and _m_out2["subject"] == "Re: Deploy"
+                             and _m_out2["body"] == "Done"})
+
+    # 11. register_mail_channel convenience
+    _reg_mail = ChannelRegistry()
+    register_mail_channel(_reg_mail, clock=_mail_clock)
+    _m_ch2 = _reg_mail.get("mail")
+    checks.append({"check": "register_mail_channel registers MailChannel",
+                   "passed": isinstance(_m_ch2, MailChannel)})
+
+    # 12. Gateway convenience
+    _reg_all = ChannelRegistry()
+    register_mail_channel(_reg_all, clock=_mail_clock)
+    _gw = handle_mail_message(_reg_all, {
+        "from": "a@b.com", "subject": "Hi", "body": "Hello",
+    })
+    checks.append({"check": "handle_mail_message processes input",
+                   "passed": _gw is not None
+                             and _gw["input"] == "Hi: Hello"
+                             and _gw["metadata"]["channel"] == "mail"})
+
+    # 13. Gateway unregistered
+    _empty = ChannelRegistry()
+    _gw_none = handle_mail_message(_empty, {
+        "from": "a@b.com", "subject": "Hi", "body": "Hello",
+    })
+    checks.append({"check": "handle_mail_message returns None unregistered",
+                   "passed": _gw_none is None})
+
+    notes.append("TODO: Add e2e integration test with SMTP server + IMAP inbox")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+# ------------------------------------------------------------------
+# 22. DevSMTPTransport — HTTP-based dev email transport
+# ------------------------------------------------------------------
+
+
+@_scenario("dev_smtp",
+           "DevSMTPTransport: send alerts to local SMTP test service (MailHog/smtp4dev)")
+def _test_dev_smtp() -> dict[str, Any]:
+    """S4.7.5 — DevSMTPTransport integration with mocked SMTP."""
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # 1. DevSMTPConfig defaults
+    cfg = DevSMTPConfig()
+    checks.append({"check": "DevSMTPConfig defaults",
+                   "passed": cfg.host == "localhost"
+                             and cfg.port == 1025
+                             and cfg.sender == "alerts@vai-core.local"
+                             and cfg.timeout == 5.0})
+
+    # 2. DevSMTPConfig custom host/port (smtp4dev)
+    cfg_smtp4dev = DevSMTPConfig(host="localhost", port=25)
+    checks.append({"check": "DevSMTPConfig custom host/port",
+                   "passed": cfg_smtp4dev.host == "localhost"
+                             and cfg_smtp4dev.port == 25})
+
+    # 3. DevSMTPTransport construction
+    transport = DevSMTPTransport(cfg, clock=lambda: 2000.0)
+    checks.append({"check": "DevSMTPTransport constructed",
+                   "passed": transport.config.host == cfg.host
+                             and transport.config.port == cfg.port})
+
+    # 4. Send — success (mocked SMTP)
+    import smtplib as _smtplib
+    from unittest.mock import MagicMock, patch as _patch
+
+    with _patch.object(_smtplib, "SMTP") as _mock_smtp_cls:
+        _mock_smtp = MagicMock()
+        _mock_smtp_cls.return_value = _mock_smtp
+        _mock_smtp.__enter__.return_value = _mock_smtp
+
+        result = transport.send(
+            to="test@vai.local",
+            subject="Alert",
+            body="Test body",
+        )
+
+    checks.append({"check": "Send success result",
+                   "passed": result["success"] is True
+                             and result["status_code"] == 250
+                             and result["recipient"] == "test@vai.local"
+                             and result["body_len"] == 9
+                             and result["sent_at"] == 2000.0})
+
+    # 5. Send — SMTP error
+    with _patch.object(_smtplib, "SMTP") as _mock_smtp_cls2:
+        _mock_smtp2 = MagicMock()
+        _mock_smtp2.__enter__.return_value = _mock_smtp2
+        _mock_smtp2.send_message.side_effect = _smtplib.SMTPException("550 Rejected")
+        _mock_smtp_cls2.return_value = _mock_smtp2
+
+        result_err = transport.send(
+            to="bad@test.io",
+            subject="Fail",
+            body="Rejected",
+        )
+
+    checks.append({"check": "Send SMTP error",
+                   "passed": result_err["success"] is False
+                             and result_err["status_code"] is None
+                             and "SMTPException" in result_err["error"]})
+
+    # 6. Send — connection refused
+    with _patch.object(_smtplib, "SMTP") as _mock_smtp_cls3:
+        _mock_smtp3 = MagicMock()
+        _mock_smtp3.__enter__.return_value = _mock_smtp3
+        _mock_smtp3.send_message.side_effect = ConnectionRefusedError("No server")
+        _mock_smtp_cls3.return_value = _mock_smtp3
+
+        result_ref = transport.send(
+            to="down@test.io",
+            subject="Down",
+            body="Unreachable",
+        )
+
+    checks.append({"check": "Send connection refused",
+                   "passed": result_ref["success"] is False
+                             and result_ref["status_code"] is None
+                             and "ConnectionRefusedError" in result_ref["error"]})
+
+    # 7. Custom sender override
+    with _patch.object(_smtplib, "SMTP") as _mock_smtp_cls4:
+        _mock_smtp4 = MagicMock()
+        _mock_smtp4.__enter__.return_value = _mock_smtp4
+        _mock_smtp_cls4.return_value = _mock_smtp4
+
+        result_custom = transport.send(
+            to="ops@vai-core.local",
+            subject="CPU Alert",
+            body="High usage",
+            sender="noreply@vai-core.local",
+        )
+
+    # Verify the MIMEText headers were set correctly
+    call_args = _mock_smtp4.send_message.call_args
+    sent_msg = call_args[0][0] if call_args else None
+    checks.append({"check": "Custom sender in MIME headers",
+                   "passed": sent_msg is not None
+                             and sent_msg["From"] == "noreply@vai-core.local"
+                             and sent_msg["To"] == "ops@vai-core.local"
+                             and sent_msg["Subject"] == "CPU Alert"})
+
+    notes.append("TODO: Add e2e integration test with MailHog or smtp4dev running locally")
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+# =============================================================================
+# Instruction Dispatch scenarios
+# =============================================================================
+
+
+@_scenario("instruction_dispatch",
+           "UnifiedInstructionDispatch: route instruction types to canonical daemon actions via registry")
+def _test_instruction_dispatch() -> dict[str, Any]:
+    """Unified Instruction Dispatch §1-6 — full contract verification.
+
+    Tests: all 5 known types, unknown → noop, config injects, validation
+    rejects bad input, no mutation, deterministic, ISO-8601 timestamps.
+    """
+    from datetime import datetime, timezone
+
+    from src.daemon.instruction_dispatch import (
+        InstructionDispatchConfig,
+        UnifiedInstructionDispatcher,
+        default_dispatcher,
+    )
+
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    clock = [datetime(2026, 6, 13, 12, 0, 0, tzinfo=timezone.utc)]
+    d = default_dispatcher(clock=lambda: clock[0])
+
+    # 1. PanicInstruction → panic
+    action, event = d.dispatch({"type": "PanicInstruction", "reason": "OOM", "metadata": {"w": "42"}})
+    checks.append({"check": "PanicInstruction → panic",
+                   "passed": action == "panic" and event["action"] == "panic"})
+
+    # 2. PoisonInstruction → fail
+    action, event = d.dispatch({"type": "PoisonInstruction"})
+    checks.append({"check": "PoisonInstruction → fail",
+                   "passed": action == "fail" and event["action"] == "fail"})
+
+    # 3. RecoveryInstruction → recover
+    action, event = d.dispatch({"type": "RecoveryInstruction"})
+    checks.append({"check": "RecoveryInstruction → recover",
+                   "passed": action == "recover" and event["action"] == "recover"})
+
+    # 4. DegradedInstruction → degrade
+    action, event = d.dispatch({"type": "DegradedInstruction"})
+    checks.append({"check": "DegradedInstruction → degrade",
+                   "passed": action == "degrade" and event["action"] == "degrade"})
+
+    # 5. RetryInstruction → retry
+    action, event = d.dispatch({"type": "RetryInstruction", "reason": "timeout"})
+    checks.append({"check": "RetryInstruction → retry",
+                   "passed": action == "retry" and event["action"] == "retry"})
+
+    # 6. Unknown type → noop
+    action, event = d.dispatch({"type": "FutureS9Instruction"})
+    checks.append({"check": "Unknown type → noop",
+                   "passed": action == "noop" and event["action"] == "noop"})
+
+    # 7. Dispatch event structure
+    _, event = d.dispatch({"type": "RetryInstruction"})
+    has_all_keys = all(k in event for k in ("event", "instruction_type", "action", "timestamp"))
+    iso_timestamp = False
+    try:
+        datetime.fromisoformat(event["timestamp"])
+        iso_timestamp = True
+    except (ValueError, TypeError):
+        pass
+    checks.append({"check": "Dispatch event has all keys + ISO-8601 timestamp",
+                   "passed": has_all_keys and iso_timestamp and event["event"] == "instruction_dispatched"})
+
+    # 8. No mutation
+    original = {"type": "PanicInstruction", "reason": "test", "metadata": {"k": "v"}}
+    snapshot = dict(original)
+    d.dispatch(original)
+    checks.append({"check": "No mutation of input instruction",
+                   "passed": original == snapshot})
+
+    # 9. Deterministic
+    r1 = d.dispatch({"type": "RecoveryInstruction"})
+    r2 = d.dispatch({"type": "RecoveryInstruction"})
+    checks.append({"check": "Deterministic output",
+                   "passed": r1 == r2})
+
+    # 10. Config injection
+    cfg = InstructionDispatchConfig(action_map={"MyInstruction": "panic"})
+    d2 = UnifiedInstructionDispatcher(config=cfg, clock=lambda: clock[0])
+    action, _ = d2.dispatch({"type": "MyInstruction"})
+    checks.append({"check": "Custom action_map via config injection",
+                   "passed": action == "panic"})
+
+    # 11. Validation rejects non-dict
+    try:
+        d.validate("not_a_dict")  # type: ignore[arg-type]
+        val_passed = False
+    except TypeError:
+        val_passed = True
+    checks.append({"check": "Validation rejects non-dict input",
+                   "passed": val_passed})
+
+    # 12. Future-proof: action_map_override
+    action, _ = d.dispatch(
+        {"type": "S9AlphaOp"},
+        action_map_override={"S9AlphaOp": "retry"},
+    )
+    checks.append({"check": "action_map_override for future types",
+                   "passed": action == "retry"})
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+# =============================================================================
+# Alert Notification scenarios
+# =============================================================================
+
+
+@_scenario("alert_notifier",
+           "AlertNotifier: severity-gated alerts via DevSMTPTransport + notify_on_dispatch integration")
+def _test_alert_notifier() -> dict[str, Any]:
+    """Alert notification system — AlertNotifier, AlertLevel, notify_on_dispatch.
+
+    Tests that:
+      1. AlertLevel ordering is correct
+      2. Alert string parsing works
+      3. alert() delivers when level >= min_level
+      4. alert() skips when level < min_level
+      5. custom recipient / sender are respected
+      6. notify_on_dispatch integrates with instruction dispatcher
+      7. panic → critical alert is delivered
+      8. recover → info alert is filtered at warning threshold
+      9. unknown action → noop → info → filtered
+    """
+    notes: list[str] = []
+    checks: list[dict[str, Any]] = []
+
+    from src.platform.runtime.alerting import (
+        AlertLevel,
+        AlertNotifier,
+        AlertNotifierConfig,
+        notify_on_dispatch,
+        DISPATCH_ACTION_ALERT_MAP,
+    )
+
+    # 1. Level ordering
+    checks.append({
+        "check": "AlertLevel ordering: INFO < WARNING < ERROR < CRITICAL",
+        "passed": AlertLevel.INFO < AlertLevel.WARNING < AlertLevel.ERROR < AlertLevel.CRITICAL,
+    })
+
+    # 2. String parsing
+    checks.append({
+        "check": "AlertLevel.from_string('error') == AlertLevel.ERROR",
+        "passed": AlertLevel.from_string("error") is AlertLevel.ERROR,
+    })
+
+    # 3. alert() delivers when level >= min_level (warning)
+    config = AlertNotifierConfig(recipient="test@vai-core.local", min_level="warning")
+    transport = DevSMTPTransport(DevSMTPConfig())
+
+    # We need a mock transport since DevSMTPTransport requires network.
+    class MockTransport:
+        def __init__(self):
+            self.sends = []
+
+        def send(self, *, to, subject, body, sender=None) -> dict:
+            self.sends.append({"to": to, "subject": subject, "body": body, "sender": sender})
+            return {"success": True, "status_code": 200, "recipient": to, "subject": subject}
+
+    mock = MockTransport()
+    notifier = AlertNotifier(config, mock)
+
+    result = notifier.alert("test warning", "body", level="warning")
+    checks.append({
+        "check": "alert() delivers when level == min_level",
+        "passed": result.get("success") is True and len(mock.sends) == 1,
+    })
+
+    # 4. alert() skips when level < min_level
+    result = notifier.alert("test info", "body", level="info")
+    checks.append({
+        "check": "alert() skips when level < min_level",
+        "passed": result.get("skipped") is True and len(mock.sends) == 1,
+    })
+
+    # 5. Custom recipient / sender
+    config2 = AlertNotifierConfig(
+        recipient="ops@example.com", min_level="info", sender="noreply@vai-core.local"
+    )
+    mock2 = MockTransport()
+    notifier2 = AlertNotifier(config2, mock2)
+    notifier2.alert("test", "body", level="info")
+    sent = mock2.sends[0] if mock2.sends else {}
+    checks.append({
+        "check": "Custom recipient and sender are respected",
+        "passed": sent.get("to") == "ops@example.com" and sent.get("sender") == "noreply@vai-core.local",
+    })
+
+    # 6. notify_on_dispatch integration
+    def fake_dispatcher(inst: dict) -> tuple[str, dict]:
+        return inst.get("action", "noop"), {
+            "event": "instruction_dispatched",
+            "instruction_type": inst.get("type", "Unknown"),
+            "action": inst.get("action", "noop"),
+            "timestamp": "2025-06-01T00:00:00Z",
+        }
+
+    mock3 = MockTransport()
+    notifier3 = AlertNotifier(
+        AlertNotifierConfig(recipient="t@vai-core.local", min_level="warning"),
+        mock3,
+    )
+    action, event, alert = notify_on_dispatch(
+        {"type": "PanicInstruction", "reason": "OOM", "action": "panic"},
+        fake_dispatcher,
+        notifier3,
+    )
+    checks.append({
+        "check": "notify_on_dispatch panic → critical alert delivered",
+        "passed": action == "panic"
+                   and event["instruction_type"] == "PanicInstruction"
+                   and alert is not None
+                   and alert.get("success") is True,
+    })
+
+    # 7. Recover → info filtered at warning threshold
+    action2, event2, alert2 = notify_on_dispatch(
+        {"type": "RecoveryInstruction", "reason": "all good", "action": "recover"},
+        fake_dispatcher,
+        notifier3,
+    )
+    checks.append({
+        "check": "notify_on_dispatch recover → info → filtered at warning threshold",
+        "passed": action2 == "recover" and alert2 is None,
+    })
+
+    # 8. Unknown action → noop → info → filtered
+    action3, event3, alert3 = notify_on_dispatch(
+        {"type": "UnknownInstruction", "reason": "?", "action": "noop"},
+        fake_dispatcher,
+        notifier3,
+    )
+    checks.append({
+        "check": "notify_on_dispatch unknown → noop → info → filtered",
+        "passed": action3 == "noop" and alert3 is None,
+    })
+
+    # 9. DISPATCH_ACTION_ALERT_MAP covers all six canonical actions
+    expected_actions = {"panic", "fail", "recover", "degrade", "retry", "noop"}
+    checks.append({
+        "check": "DISPATCH_ACTION_ALERT_MAP covers all six canonical actions",
+        "passed": set(DISPATCH_ACTION_ALERT_MAP) == expected_actions,
+    })
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}

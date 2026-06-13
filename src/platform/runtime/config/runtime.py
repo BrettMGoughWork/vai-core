@@ -6,7 +6,7 @@ specific factory or backend, keeping the runtime DI chain explicit.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.platform.runtime.scheduling.policy import SchedulingMode
 from src.platform.runtime.worker_pool.isolation import IsolationMode
@@ -121,6 +121,32 @@ class WebSocketChannelConfig:
     """
 
     enabled: bool = True
+
+
+@dataclass
+class SlackChannelConfig:
+    """Configuration for the Slack channel adapter.
+
+    Attributes:
+        enabled: Whether the Slack channel is active at startup.
+        workspace: The Slack workspace/team domain for validation.
+    """
+
+    enabled: bool = True
+    workspace: str = ""
+
+
+@dataclass
+class MailChannelConfig:
+    """Configuration for the Mail (email) channel adapter.
+
+    Attributes:
+        enabled: Whether the Mail channel is active at startup.
+        allowed_domains: Tuple of sender domains to accept (empty = all).
+    """
+
+    enabled: bool = True
+    allowed_domains: tuple[str, ...] = ()
 
 
 @dataclass
