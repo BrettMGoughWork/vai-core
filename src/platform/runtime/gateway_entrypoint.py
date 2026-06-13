@@ -119,6 +119,48 @@ def handle_ws_message(
     return process_channel_input(registry, "ws", body)
 
 
+def handle_slack_event(
+    registry: ChannelRegistry,
+    body: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Convert a Slack Events API body into a canonical S4 job payload via the Slack channel.
+
+    This is a convenience wrapper around :func:`process_channel_input` that
+    hard-codes the channel name to ``"slack"``.
+
+    Args:
+        registry: The :class:`ChannelRegistry` with a registered Slack channel.
+        body:     The Slack event body as a ``dict`` with ``text``,
+                  optional ``sender``, ``channel``, and ``team`` fields.
+
+    Returns:
+        A canonical S4 job payload (``dict``) or ``None`` if the Slack
+        channel is not registered.
+    """
+    return process_channel_input(registry, "slack", body)
+
+
+def handle_mail_message(
+    registry: ChannelRegistry,
+    body: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Convert a parsed email body into a canonical S4 job payload via the Mail channel.
+
+    This is a convenience wrapper around :func:`process_channel_input` that
+    hard-codes the channel name to ``"mail"``.
+
+    Args:
+        registry: The :class:`ChannelRegistry` with a registered Mail channel.
+        body:     The email body as a ``dict`` with ``from``, ``subject``,
+                  ``body``, and optional ``to`` fields.
+
+    Returns:
+        A canonical S4 job payload (``dict``) or ``None`` if the Mail
+        channel is not registered.
+    """
+    return process_channel_input(registry, "mail", body)
+
+
 def handle_webhook_post(
     registry: ChannelRegistry,
     body: dict[str, Any],

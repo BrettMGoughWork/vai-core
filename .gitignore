@@ -24,6 +24,9 @@ agent_traces/
 # Custom tools
 tools/custom/
 
+# Local dev binaries (MailHog, smtp4dev, etc.)
+tools/dev/*.exe
+
 # Local ML models (embedding, etc.)
 .models/
 

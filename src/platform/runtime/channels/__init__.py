@@ -32,6 +32,14 @@ from src.platform.runtime.channels.ws import (
     WebSocketChannel,
     register_websocket_channel,
 )
+from src.platform.runtime.channels.slack import (
+    SlackChannel,
+    register_slack_channel,
+)
+from src.platform.runtime.channels.mail import (
+    MailChannel,
+    register_mail_channel,
+)
 
 __all__ = [
     "Channel",
@@ -39,6 +47,8 @@ __all__ = [
     "CLITUI",
     "ChannelRegistry",
     "InboundChannelMessage",
+    "MailChannel",
+    "SlackChannel",
     "TUIChannel",
     "TUIPanel",
     "TUIScreen",
@@ -50,6 +60,8 @@ __all__ = [
     "WebhookEvent",
     "WebSocketChannel",
     "register_cli_channel",
+    "register_mail_channel",
+    "register_slack_channel",
     "register_tui_channel",
     "register_web_channel",
     "register_webhook_channel",

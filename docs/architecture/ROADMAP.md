@@ -1999,11 +1999,14 @@ Goal: Add system‑level monitoring and self‑healing.
 - Detect inconsistent job states.  
 - Auto‑repair or escalate.
 
-⬜ 4.7.4 — System‑Level Alerts
+✅ 4.7.4 — System‑Level Alerts
 - Emit alerts to Slack/email.  
 - Structured alert payloads.
+- ⚠️ Mail selected as default system-alert, with a devsmtp service used for testing 
+- ⚠️ Opinionated selection for testing is currently MailHog, but that's easily swappable with an smtp service or smtp4dev, or slack
 
-⬜ 4.7.5 — Unified Instruction Dispatch
+
+✅ 4.7.5 — Unified Instruction Dispatch
 - Formalize how the daemon dispatches all instruction types:
   PanicInstruction, PoisonInstruction, RecoveryInstruction,
   DegradedInstruction, RetryInstruction.
@@ -2117,93 +2120,151 @@ S4 is production‑ready.
 🚀 Release 6 — "Multi-Agent System"
 ---
 
-## STRATUM 5 - Agent Runtime (Above CoreStep)
-*Invariant*: Orchestrates agents, memory, identity, multi-agent systems.  
+## STRATUM 5 — Agent Runtime (Cognitive Execution Layer)
+S5 is the only cognitive layer.  
+It owns agents, planning, skills, and the translation of cognition into S4 jobs.
 
-### PHASE 5.1 — Agent Runtime Core
-*Depends On*: PHASE 4.3
+### PHASE 5.1 — Agent Registry & Identity
+- Agent registration  
+- Agent metadata schema  
+- Capability declarations  
+- Agent discovery API  
 
-5.1.1. Define AgentSpec — instructions, tools, loop policy.  
-5.1.2. Implement agent registry  
-5.1.3. Implement agent context — memory, settings.  
-5.1.4. Implement agentstep — inject instructions.  
-5.1.5. Implement agentloop — wraps CoreStep.  
-5.1.6. Add agent permissions  
-5.1.7. Add agent templates  
-5.1.8. Add multi‑agent orchestration  
-5.1.9. Add scheduled agents  
-5.1.10. Add agent debugging view
-5.1.11. Agent Memory Model
-5.1.12. Agent Identity & Persona Model
-5.1.13. Agent Capability Graph
+Outcome: S5 knows what agents exist and what they can do.
 
----
+### PHASE 5.2 — Agent Activation Contract
+- Activation envelope  
+- Context injection  
+- Skill availability resolution  
 
-### PHASE 5.2 — Resilience, Self‑Healing, Health
-*Depends On*: PHASE 5.1
+Outcome: S5 can activate an agent deterministically.
 
-5.2.1. Classify loop health — healthy, stalled, poisoned.  
-5.2.2. Detect stalled loops  
-5.2.3. Auto‑abort stalled loops  
-5.2.4. Auto‑downgrade behaviour  
-5.2.5. Add global watchdog  
-5.2.6. Add auto‑scaling hooks  
-5.2.7. Add panic reporting  
-5.2.8. Add resilience tests  
-5.2.9. Add recovery drills  
-5.2.10. Document failure modes
+### PHASE 5.3 — Planning & Cognitive Loop
+- LLM planning contract  
+- Agent step evaluation  
+- Skill invocation semantics  
+- Error handling + fallback  
+
+Outcome: S5 can “think” on behalf of an agent.
+
+### PHASE 5.4 — S5 → S4 Job Interface
+- Job envelope schema  
+- Result interpretation  
+- Agent step continuation  
+
+Outcome: S5 can turn cognitive steps into S4 jobs and consume results.
+
+### PHASE 5.5 — Agent Runtime Supervisor
+- Agent lifecycle  
+- Agent state tracking  
+- Timeouts + cancellation  
+
+Outcome: S5 is stable, resumable, and debuggable.
+
+## STRATUM 6 — Workflow Layer (User Interaction + Orchestration)
+S6 is not cognitive.  
+It orchestrates workflows and delegates all thinking to S5.
+
+### PHASE 6.1 — Workflow Definition Model
+- Workflow schema  
+- Step types  
+- Branching + conditions  
+- Workflow metadata  
+
+Outcome: S6 can represent workflows declaratively.
+
+### PHASE 6.2 — Workflow Engine
+- State machine  
+- Step execution loop  
+- Persistence model  
+
+Outcome: S6 can run workflows deterministically.
+
+### PHASE 6.3 — Agent Selection Layer
+- Agent selection rules  
+- Capability matching  
+- S6 → S5 activation contract  
+
+Outcome: S6 knows which agent to activate for each step.
+
+### PHASE 6.4 — User Interaction Layer
+- Input collection  
+- UI adapters (CLI/Web/etc)  
+- Human‑in‑the‑loop steps  
+
+Outcome: S6 can interact with humans or external systems.
+
+### PHASE 6.5 — Workflow Supervisor
+- Workflow recovery  
+- Timeouts + stuck workflows  
+- Escalation paths  
+
+Outcome: S6 is resilient and self‑correcting.
+
+## X Hardening, Resilience ---
+
+### PHASE X.1 — Resilience, Self‑Healing, Health
+
+X.1.1. Classify loop health — healthy, stalled, poisoned.  
+X.1.2. Detect stalled loops  
+X.1.3. Auto‑abort stalled loops  
+X.1.4. Auto‑downgrade behaviour  
+X.1.5. Add global watchdog  
+X.1.6. Add auto‑scaling hooks  
+X.1.7. Add panic reporting  
+X.1.8. Add resilience tests  
+X.1.9. Add recovery drills  
+X.1.10. Document failure modes
 
 ---
 🚀 Release 7 — "Production-Ready Runtime"
 ---
 
-### PHASE 5.3 — Observability & Developer Experience
-*Depends On*: PHASE 5.2
+### PHASE X.2 — Observability & Developer Experience
 
-5.3.1. Add structured logging  
-5.3.2. Add metrics exporter  
-5.3.3. Add tracing spans  
-5.3.4. Add flamegraph timings  
-5.3.5. Add local dev CLI  
-5.3.6. Add replay tooling  
-5.3.7. Add config inspector  
-5.3.8. Add skill inspector  
-5.3.9. Add agent inspector  
-5.3.10. Add end‑to‑end smoke tests
+X.2.1. Add structured logging  
+X.2.2. Add metrics exporter  
+X.2.3. Add tracing spans  
+X.2.4. Add flamegraph timings  
+X.2.5. Add local dev CLI  
+X.2.6. Add replay tooling  
+X.2.7. Add config inspector  
+X.2.8. Add skill inspector  
+X.2.9. Add agent inspector  
+X.2.10. Add end‑to‑end smoke tests
 
 ---
 🚀 Release 8 — "Observable and Developer-Friendly Runtime"
 ---
 
-### PHASE 5.4 — Hardening & Polish
-*Depends On*: PHASE 5.3
+### PHASE X.3 — Hardening & Polish
 
-5.4.1. Security review of skills  
-5.4.2. Security review of fetch stack  
-5.4.3. LLM prompt hardening  
-5.4.4. Config profiles — dev, prod, paranoid.  
-5.4.5. Backwards‑compatible APIs  
-5.4.6. Performance tuning  
-5.4.7. Load testing  
-5.4.8. Graceful degradation strategy  
-5.4.9. Disaster recovery story  
-5.4d.10. Write architecture doc — for future contributors.
+X.3.1. Security review of skills  
+X.3.2. Security review of fetch stack  
+X.3.3. LLM prompt hardening  
+X.3.4. Config profiles — dev, prod, paranoid.  
+X.3.5. Backwards‑compatible APIs  
+X.3.6. Performance tuning  
+X.3.7. Load testing  
+X.3.8. Graceful degradation strategy  
+X.3.9. Disaster recovery story  
+X.3.10. Write architecture doc — for future contributors.
 
 ---
 🚀 Release 9 — "Hardened Runtime"
 ---
 
-## STRATUM 6 - Cognitive Systems and Meta-Agents
+## Y - Cognitive Systems and Meta-Agents
 *Note*: Future considerations of what is possible, rather than on the roadmap
 
-### PHASE 6.1 - Meta-Planning and Self-Reflection
+### PHASE Y.1 - Meta-Planning and Self-Reflection
 
-### PHASE 6.2 - Long-Term Memory and Knowledge Graphs
+### PHASE Y.2 - Long-Term Memory and Knowledge Graphs
 
-### PHASE 6.3 - Multi-Agent Societies
+### PHASE Y.3 - Multi-Agent Societies
 
-### PHASE 6.4 - Tool Learning and Skill Synthesis
+### PHASE Y.4 - Tool Learning and Skill Synthesis
 
-### PHASE 6.5 - Autonomy and Governance
+### PHASE Y.5 - Autonomy and Governance
 
 ---

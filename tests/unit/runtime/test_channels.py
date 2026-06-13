@@ -1,4 +1,4 @@
-"""Tests for S4.6.1–S4.6.5 — Channel Abstraction + CLI + TUI + Web + WebSocket + Webhook.
+"""Tests for S4.6.1–S4.7.4 — Channel Abstraction + all transport adapters.
 
 Covers:
     - InboundChannelMessage immutability and construction
@@ -10,9 +10,11 @@ Covers:
     - WebChannel (receive, normalize, send, validation, models)
     - WebSocketChannel (receive, normalize, send)
     - WebhookChannel (receive, normalize, send, validation)
+    - SlackChannel (receive, normalize, send, validation)
+    - MailChannel (receive, normalize, send, validation)
     - ChannelRegistry register / get / names / KeyError
-    - register_cli_channel / register_web_channel / register_websocket_channel / register_webhook_channel convenience
-    - Gateway entrypoint (process_channel_input, handle_web_request, handle_ws_message, handle_webhook_post)
+    - register_cli_channel / register_web_channel / register_websocket_channel / register_webhook_channel / register_slack_channel / register_mail_channel convenience
+    - Gateway entrypoint (process_channel_input, handle_web_request, handle_ws_message, handle_webhook_post, handle_slack_event, handle_mail_message)
 """
 
 from __future__ import annotations
@@ -28,6 +30,8 @@ from src.platform.runtime.channels import (
     CLIChannel,
     CLITUI,
     InboundChannelMessage,
+    MailChannel,
+    SlackChannel,
     TUIChannel,
     TUIPanel,
     TUIScreen,
@@ -40,6 +44,8 @@ from src.platform.runtime.channels import (
     WebhookEvent,
     ChannelRegistry,
     register_cli_channel,
+    register_mail_channel,
+    register_slack_channel,
     register_tui_channel,
     register_web_channel,
     register_websocket_channel,
@@ -50,6 +56,8 @@ from src.platform.runtime.gateway_entrypoint import (
     handle_web_request,
     handle_ws_message,
     handle_webhook_post,
+    handle_slack_event,
+    handle_mail_message,
 )
 
 
@@ -1066,5 +1074,355 @@ class TestHandleWebhookPost:
         result = handle_webhook_post(empty, {
             "source": "github",
             "payload": {},
+        })
+        assert result is None
+
+
+# ===================================================================
+# Slack Channel
+# ===================================================================
+
+
+class TestSlackChannel:
+    """SlackChannel — receive, normalize, send, validation.
+
+    .. todo::
+
+        Integration test: requires a real Slack workspace + app with
+        Event Subscriptions.  The unit tests here validate the pure-logic
+        receive/normalize/send pipeline only.
+    """
+
+    def setup_method(self) -> None:
+        self.clock = iter([300.0, 301.0, 302.0])
+        self.channel = SlackChannel(clock=lambda: next(self.clock))
+
+    def test_receive_minimal(self) -> None:
+        msg = self.channel.receive({"text": "deploy"})
+        assert msg.channel == "slack"
+        assert msg.sender is None
+        assert msg.payload["text"] == "deploy"
+        assert msg.timestamp == 300.0
+
+    def test_receive_with_sender(self) -> None:
+        msg = self.channel.receive({"text": "hello", "sender": "U12345"})
+        assert msg.sender == "U12345"
+        assert msg.payload["text"] == "hello"
+
+    def test_receive_with_channel_and_team(self) -> None:
+        msg = self.channel.receive({
+            "text": "status",
+            "sender": "U999",
+            "channel": "C67890",
+            "team": "T11111",
+        })
+        assert msg.payload["channel"] == "C67890"
+        assert msg.payload["team"] == "T11111"
+        assert msg.sender == "U999"
+
+    def test_receive_raises_on_non_dict(self) -> None:
+        with pytest.raises(TypeError, match="requires a dict"):
+            self.channel.receive("bad")  # type: ignore[arg-type]
+
+    def test_receive_raises_on_missing_text(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'text' field"):
+            self.channel.receive({"sender": "U1"})
+
+    def test_receive_raises_on_empty_text(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'text' field"):
+            self.channel.receive({"text": ""})
+
+    def test_receive_raises_on_bad_sender_type(self) -> None:
+        with pytest.raises(TypeError, match="'sender' must be a string"):
+            self.channel.receive({"text": "hi", "sender": 42})
+
+    def test_receive_raises_on_bad_channel_type(self) -> None:
+        with pytest.raises(TypeError, match="'channel' must be a string"):
+            self.channel.receive({"text": "hi", "channel": 42})
+
+    def test_receive_raises_on_bad_team_type(self) -> None:
+        with pytest.raises(TypeError, match="'team' must be a string"):
+            self.channel.receive({"text": "hi", "team": 99})
+
+    def test_normalize_minimal(self) -> None:
+        msg = self.channel.receive({"text": "deploy now"})
+        result = self.channel.normalize(msg)
+        assert result["input"] == "deploy now"
+        assert result["metadata"]["channel"] == "slack"
+        assert result["metadata"]["sender"] is None
+        assert "slack_channel" not in result["metadata"]
+        assert "slack_team" not in result["metadata"]
+
+    def test_normalize_with_channel(self) -> None:
+        msg = self.channel.receive({
+            "text": "status",
+            "sender": "U1",
+            "channel": "C1",
+            "team": "T1",
+        })
+        result = self.channel.normalize(msg)
+        assert result["input"] == "status"
+        assert result["metadata"]["sender"] == "U1"
+        assert result["metadata"]["slack_channel"] == "C1"
+        assert result["metadata"]["slack_team"] == "T1"
+
+    def test_send_basic(self) -> None:
+        result = self.channel.send({"output": "done"})
+        assert result["text"] == "done"
+        assert result["metadata"] == {}
+
+    def test_send_with_metadata(self) -> None:
+        result = self.channel.send({
+            "output": "deploying",
+            "metadata": {"job_id": "j-1", "slack_channel": "C1"},
+        })
+        assert result["text"] == "deploying"
+        assert result["channel"] == "C1"
+        assert result["metadata"]["job_id"] == "j-1"
+
+    def test_send_defaults(self) -> None:
+        result = self.channel.send({})
+        assert result["text"] == ""
+        assert result["metadata"] == {}
+
+
+# ===================================================================
+# Register Slack Channel
+# ===================================================================
+
+
+class TestRegisterSlackChannel:
+    """register_slack_channel convenience helper."""
+
+    def test_registers_under_slack(self) -> None:
+        registry = ChannelRegistry()
+        register_slack_channel(registry)
+        channel = registry.get("slack")
+        assert isinstance(channel, SlackChannel)
+
+    def test_registered_channel_works(self) -> None:
+        registry = ChannelRegistry()
+        register_slack_channel(registry)
+        result = process_channel_input(registry, "slack", {"text": "hello"})
+        assert result is not None
+        assert result["metadata"]["channel"] == "slack"
+        assert result["input"] == "hello"
+
+    def test_default_clock(self) -> None:
+        registry = ChannelRegistry()
+        register_slack_channel(registry)
+        ch = registry.get("slack")
+        assert ch._clock is not None
+
+
+# ===================================================================
+# Handle Slack Event (gateway convenience)
+# ===================================================================
+
+
+class TestHandleSlackEvent:
+    """handle_slack_event — gateway convenience."""
+
+    def setup_method(self) -> None:
+        self.registry = ChannelRegistry()
+        register_slack_channel(self.registry)
+
+    def test_handles_event(self) -> None:
+        result = handle_slack_event(self.registry, {"text": "deploy"})
+        assert result is not None
+        assert result["input"] == "deploy"
+        assert result["metadata"]["channel"] == "slack"
+
+    def test_unregistered_returns_none(self) -> None:
+        empty = ChannelRegistry()
+        result = handle_slack_event(empty, {"text": "data"})
+        assert result is None
+
+
+# ===================================================================
+# Mail Channel
+# ===================================================================
+
+
+class TestMailChannel:
+    """MailChannel — receive, normalize, send, validation.
+
+    .. todo::
+
+        Integration test: requires an SMTP server (e.g. ``smtpd``) and
+        an IMAP inbox for end-to-end send-and-receive testing.  The
+        unit tests here validate the pure-logic pipeline only.
+    """
+
+    def setup_method(self) -> None:
+        self.clock = iter([400.0, 401.0, 402.0])
+        self.channel = MailChannel(clock=lambda: next(self.clock))
+
+    def test_receive_minimal(self) -> None:
+        msg = self.channel.receive({
+            "from": "alice@example.com",
+            "subject": "Deploy",
+            "body": "Please deploy staging",
+        })
+        assert msg.channel == "mail"
+        assert msg.sender == "alice@example.com"
+        assert msg.payload["subject"] == "Deploy"
+        assert msg.payload["body"] == "Please deploy staging"
+        assert msg.timestamp == 400.0
+
+    def test_receive_with_to(self) -> None:
+        msg = self.channel.receive({
+            "from": "bob@work.com",
+            "to": "bot@vai.example",
+            "subject": "Status",
+            "body": "All good",
+        })
+        assert msg.payload["from"] == "bob@work.com"
+        assert msg.payload["to"] == "bot@vai.example"
+        assert msg.sender == "bob@work.com"
+
+    def test_receive_raises_on_non_dict(self) -> None:
+        with pytest.raises(TypeError, match="requires a dict"):
+            self.channel.receive("bad")  # type: ignore[arg-type]
+
+    def test_receive_raises_on_missing_from(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'from' field"):
+            self.channel.receive({"subject": "Hi", "body": "Hello"})
+
+    def test_receive_raises_on_empty_from(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'from' field"):
+            self.channel.receive({"from": "", "subject": "Hi", "body": "Hello"})
+
+    def test_receive_raises_on_missing_subject(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'subject' field"):
+            self.channel.receive({"from": "a@b.com", "body": "Hello"})
+
+    def test_receive_raises_on_empty_subject(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'subject' field"):
+            self.channel.receive({"from": "a@b.com", "subject": "", "body": "Hello"})
+
+    def test_receive_raises_on_missing_body(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'body' field"):
+            self.channel.receive({"from": "a@b.com", "subject": "Hi"})
+
+    def test_receive_raises_on_empty_body(self) -> None:
+        with pytest.raises(ValueError, match="requires a 'body' field"):
+            self.channel.receive({"from": "a@b.com", "subject": "Hi", "body": ""})
+
+    def test_receive_raises_on_bad_to_type(self) -> None:
+        with pytest.raises(TypeError, match="'to' must be a string"):
+            self.channel.receive({
+                "from": "a@b.com",
+                "to": 42,
+                "subject": "Hi",
+                "body": "Hello",
+            })
+
+    def test_normalize_minimal(self) -> None:
+        msg = self.channel.receive({
+            "from": "alice@example.com",
+            "subject": "Deploy",
+            "body": "Please deploy staging",
+        })
+        result = self.channel.normalize(msg)
+        assert result["input"] == "Deploy: Please deploy staging"
+        assert result["metadata"]["channel"] == "mail"
+        assert result["metadata"]["sender"] == "alice@example.com"
+        assert result["metadata"]["to"] == ""
+        assert result["metadata"]["subject"] == "Deploy"
+
+    def test_normalize_with_to(self) -> None:
+        msg = self.channel.receive({
+            "from": "bob@work.com",
+            "to": "bot@vai.example",
+            "subject": "Status",
+            "body": "All systems go",
+        })
+        result = self.channel.normalize(msg)
+        assert result["input"] == "Status: All systems go"
+        assert result["metadata"]["to"] == "bot@vai.example"
+
+    def test_send_basic(self) -> None:
+        result = self.channel.send({"output": "Deploying now"})
+        assert result["to"] == ""
+        assert result["subject"] == "Re: Your request"
+        assert result["body"] == "Deploying now"
+        assert result["metadata"] == {}
+
+    def test_send_with_metadata(self) -> None:
+        result = self.channel.send({
+            "output": "Done",
+            "metadata": {"to": "alice@example.com", "subject": "Re: Deploy"},
+        })
+        assert result["to"] == "alice@example.com"
+        assert result["subject"] == "Re: Deploy"
+        assert result["body"] == "Done"
+
+    def test_send_defaults(self) -> None:
+        result = self.channel.send({})
+        assert result["body"] == ""
+        assert result["subject"] == "Re: Your request"
+
+
+# ===================================================================
+# Register Mail Channel
+# ===================================================================
+
+
+class TestRegisterMailChannel:
+    """register_mail_channel convenience helper."""
+
+    def test_registers_under_mail(self) -> None:
+        registry = ChannelRegistry()
+        register_mail_channel(registry)
+        channel = registry.get("mail")
+        assert isinstance(channel, MailChannel)
+
+    def test_registered_channel_works(self) -> None:
+        registry = ChannelRegistry()
+        register_mail_channel(registry)
+        result = process_channel_input(registry, "mail", {
+            "from": "a@b.com",
+            "subject": "Hi",
+            "body": "Hello",
+        })
+        assert result is not None
+        assert result["metadata"]["channel"] == "mail"
+
+    def test_default_clock(self) -> None:
+        registry = ChannelRegistry()
+        register_mail_channel(registry)
+        ch = registry.get("mail")
+        assert ch._clock is not None
+
+
+# ===================================================================
+# Handle Mail Message (gateway convenience)
+# ===================================================================
+
+
+class TestHandleMailMessage:
+    """handle_mail_message — gateway convenience."""
+
+    def setup_method(self) -> None:
+        self.registry = ChannelRegistry()
+        register_mail_channel(self.registry)
+
+    def test_handles_message(self) -> None:
+        result = handle_mail_message(self.registry, {
+            "from": "alice@example.com",
+            "subject": "Deploy",
+            "body": "Please deploy",
+        })
+        assert result is not None
+        assert result["input"] == "Deploy: Please deploy"
+        assert result["metadata"]["channel"] == "mail"
+
+    def test_unregistered_returns_none(self) -> None:
+        empty = ChannelRegistry()
+        result = handle_mail_message(empty, {
+            "from": "a@b.com",
+            "subject": "Hi",
+            "body": "Hello",
         })
         assert result is None
