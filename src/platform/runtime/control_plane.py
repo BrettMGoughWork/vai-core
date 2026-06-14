@@ -17,6 +17,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from src.platform.observability.logging import log_job_state_transition
+from src.platform.observability.metrics import emit_metric
+from src.platform.observability.tracing import emit_job_trace as _emit_job_trace
+from src.platform.supervisor.system_alerts import alert_async as _alert_async
 from src.platform.runtime.execution_context import ExecutionContext
 from src.platform.runtime.heartbeat.control_plane import (
     HeartbeatMonitor,
@@ -184,6 +188,11 @@ class ControlPlane:
         if job.execution_context is None:
             job.execution_context = ExecutionContext()
         self.save_checkpoint(job)
+        emit_metric("s4.job.count", 1, {"state": "queued"})
+        _emit_job_trace(job.job_id, "pending", "queued", component="control_plane")
+        log_job_state_transition(
+            job.job_id, "pending", "queued", component="control_plane",
+        )
 
     def mark_running(self, job: Job) -> None:
         """Transition job to ``RUNNING`` and persist.
@@ -198,6 +207,11 @@ class ControlPlane:
         job.state = transition(job.state, JobState.RUNNING)
         self._append_trace(job, old, JobState.RUNNING)
         self.save_checkpoint(job)
+        emit_metric("s4.job.count", 1, {"state": "running"})
+        _emit_job_trace(job.job_id, old.value, "running", component="control_plane")
+        log_job_state_transition(
+            job.job_id, old.value, "running", component="control_plane",
+        )
 
     def mark_succeeded(self, job: Job, result: dict) -> None:
         """Transition job to ``SUCCEEDED``, attach the result, and persist.
@@ -215,6 +229,11 @@ class ControlPlane:
         self._append_trace(job, old, JobState.SUCCEEDED)
         self.save_checkpoint(job)
         self.issue_resume_token(job)
+        emit_metric("s4.job.count", 1, {"state": "completed"})
+        _emit_job_trace(job.job_id, old.value, "succeeded", component="control_plane")
+        log_job_state_transition(
+            job.job_id, old.value, "succeeded", component="control_plane",
+        )
 
     def mark_failed(self, job: Job, error: dict) -> None:
         """Transition job to ``FAILED``, attach the structured error, and persist.
@@ -232,6 +251,18 @@ class ControlPlane:
         self._append_trace(job, old, JobState.FAILED)
         self.save_checkpoint(job)
         self.issue_resume_token(job)
+        emit_metric("s4.job.count", 1, {"state": "failed"})
+        _emit_job_trace(job.job_id, old.value, "failed", component="control_plane")
+        log_job_state_transition(
+            job.job_id, old.value, "failed", component="control_plane",
+        )
+        _alert_async(
+            severity="warning",
+            source="control_plane",
+            summary=f"Job {job.job_id} failed",
+            details=f"Job {job.job_id} transitioned from {old} to FAILED",
+            metadata={"job_id": job.job_id, "error_type": error.get("error_type", "unknown")},
+        )
 
     def mark_poison(self, job: Job, reason: str) -> None:
         """Transition job to ``POISON`` (terminal), attach reason, and persist.
@@ -252,6 +283,18 @@ class ControlPlane:
         job.result = {"error": reason, "poison": True}
         self._append_trace(job, old, JobState.POISON)
         self.save_checkpoint(job)
+        emit_metric("s4.job.count", 1, {"state": "poisoned"})
+        _emit_job_trace(job.job_id, old.value, "poison", component="control_plane")
+        log_job_state_transition(
+            job.job_id, old.value, "poison", component="control_plane",
+        )
+        _alert_async(
+            severity="critical",
+            source="control_plane",
+            summary=f"Job {job.job_id} poisoned — {reason}",
+            details=f"Job {job.job_id} transitioned from {old} to POISON. Reason: {reason}",
+            metadata={"job_id": job.job_id, "reason": reason},
+        )
 
     # ------------------------------------------------------------------
     # Cycle trace

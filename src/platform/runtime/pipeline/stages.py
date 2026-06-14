@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from src.platform.observability.logging import log_job_finished, log_job_started
+from src.platform.observability.metrics import emit_metric
 from src.platform.runtime.job import Job
 from src.platform.runtime.job_state import JobState
 from src.platform.runtime.pipeline.base import PipelineContext, PipelineStage
@@ -357,6 +358,7 @@ class ExecutionStage(PipelineStage):
                 )
                 cp.save_checkpoint(job)
                 log_job_finished(job)
+                emit_metric("s4.repair.count", 1, {"repairtype": "panicrecovery"})
                 return job
 
             # Poison check
@@ -365,6 +367,7 @@ class ExecutionStage(PipelineStage):
                 job.consecutive_failures += 1
                 cp.mark_poison(job, output.reason)
                 log_job_finished(job)
+                emit_metric("s4.repair.count", 1, {"repairtype": "poisondetected"})
                 return job
 
             # Retry instruction

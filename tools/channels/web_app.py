@@ -68,7 +68,11 @@ control_plane: ControlPlane = ControlPlane()
 
 def _worker_loop() -> None:
     """Background worker: process one job at a time, forever."""
-    worker = Worker(queue=job_queue, control_plane=control_plane)
+    worker = Worker(
+        queue=job_queue,
+        control_plane=control_plane,
+        channel_registry=registry,
+    )
     while True:
         try:
             worker.process_next()

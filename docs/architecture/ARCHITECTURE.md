@@ -1,3 +1,38 @@
+# Architecture Overview
+
+Vai-core is organised into six strata (S1–S6), each with a single, bounded responsibility. Data flows cleanly between layers through well-defined interfaces.
+
+```
+External world
+     │
+     ▼
+Channels (S4) ───→ Event Substrate (S4) ───→ S6.0 Trigger Router ───→ S6.2 Workflow Engine
+                                                      │                      │
+                                                      │                 ┌────┘
+                                                      ▼                 ▼
+                                               S6.1 Definition ←─ S6.3 Agent Selection
+                                                                          │
+                                                                          ▼
+                                                                    S5 Cognitive Layer
+                                                                          │
+                                                                          ▼
+                                                                    S4 Jobs (execution)
+
+Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S6.0 Trigger Router
+```
+
+**Strata summary:**
+- **S1** — Foundation: config, LLM transport, types, execution engine, governance, observability, policy, telemetry
+- **S2** — Planning & persistence: task decomposition, continuity, state management
+- **S3** — Capabilities: primitives, skills, discovery, filtering, ranking
+- **S4** — Execution & runtime: channels (universal ingress), job system, event substrate, supervision, durability
+- **S5** — Cognition: agent registry, activation, planning loop, job interface, state persistence boundary
+- **S6** — Workflows: trigger router, definition model, engine, agent selection, user interaction, supervisor
+
+S4 is the universal ingress for all external stimuli. S6 subscribes to S4 events but owns no transport. S5 is the only cognitive layer. Each stratum delegates down and notifies up through S4.
+
+---
+
 ## Project Structure
 
 This layout is organised around a clear separation of concerns:

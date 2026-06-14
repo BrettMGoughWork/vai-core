@@ -13,21 +13,35 @@ I/O.  All other modules remain pure.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Optional
+
+import yaml
 
 from src.strategy.planning.s1_contract.s1_prompt_builder import build_llm_prompt
 from src.strategy.planning.s1_contract.types import PromptRequest
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Kill‑switch — global, defaults to OFF
+# Kill‑switch — driven by config.yaml:enable_real_llm
 # ══════════════════════════════════════════════════════════════════════════════
 
-ENABLE_REAL_LLM: bool = False
+_ENABLE_REAL_LLM_BY_CONFIG: bool = False
+"""Read ``enable_real_llm`` from ``config.yaml`` at module load time."""
+try:
+    _config_path = Path("config/config.yaml")
+    if _config_path.exists():
+        with open(_config_path) as _f:
+            _raw = yaml.safe_load(_f)
+        _ENABLE_REAL_LLM_BY_CONFIG = bool(_raw.get("enable_real_llm", False))
+except Exception:
+    _ENABLE_REAL_LLM_BY_CONFIG = False
+
+ENABLE_REAL_LLM: bool = _ENABLE_REAL_LLM_BY_CONFIG
 """Master kill-switch.
 
+Reads ``config.yaml:enable_real_llm`` at module load time (default ``False``).
 Set to ``True`` only when all readiness checks pass (Phase 2.14.6).
-Default ``False`` prevents any real LLM call.
 """
 
 

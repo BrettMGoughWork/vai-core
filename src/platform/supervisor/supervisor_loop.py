@@ -22,6 +22,11 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
+from src.platform.observability.logging import log_supervisor_action, log_worker_activity
+from src.platform.observability.metrics import emit_metric
+from src.platform.observability.tracing import emit_segment_trace as _emit_seg
+from src.platform.supervisor.system_alerts import alert_async as _alert_async
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -334,6 +339,20 @@ class SupervisorLoop:
         for wid, health in unhealthy_workers.items():
             restart_ev = self._schedule_restart(wid, health.status, ts)
             decision.restarts.append(restart_ev)
+            _emit_seg("", "health", "repair", "supervisor_loop",
+                      extra_fields={"worker_id": wid, "status": health.status})
+            log_supervisor_action(
+                "repair",
+                f"Worker {wid} {health.status}: {health.reason}",
+                worker_id=wid,
+            )
+            _alert_async(
+                severity="error",
+                source="supervisor_loop",
+                summary=f"Worker {wid} {health.status}",
+                details=health.reason,
+                metadata={"worker_id": wid, "status": health.status},
+            )
 
         decision.active_unhealthy = len(unhealthy_workers)
 
@@ -348,6 +367,9 @@ class SupervisorLoop:
 
             for _ in range(missing_after_restart):
                 fresh_worker_id = self._fresh_worker_id()
+                _emit_seg("", "pool", "repair", "supervisor_loop",
+                          extra_fields={"new_worker_id": fresh_worker_id,
+                                       "reason": "pool_maintenance"})
                 # We need a restart-like event for new workers too, but
                 # with empty old_worker_id since nobody was replaced.
                 decision.restarts.append(
@@ -369,6 +391,16 @@ class SupervisorLoop:
             self._record_restarts(ts)
             for escalation in self._check_escalation(ts):
                 decision.escalations.append(escalation)
+                _emit_seg("", "escalation", "repair", "supervisor_loop",
+                          extra_fields={"reason": escalation.reason,
+                                       "severity": escalation.severity})
+                _alert_async(
+                    severity="critical",
+                    source="supervisor_loop",
+                    summary=f"Escalation threshold exceeded: {escalation.reason}",
+                    details=escalation.reason,
+                    metadata={"severity": escalation.severity},
+                )
 
         # Step 5: Global heartbeat stop detection
         if active_worker_ids is not None and len(active_worker_ids) > 0:
@@ -376,14 +408,24 @@ class SupervisorLoop:
                 1 for h in health_map.values() if h.status == HEALTHY
             )
             if tracked == 0:
-                decision.escalations.append(
-                    SupervisorEscalation(
-                        timestamp=_iso_timestamp(ts),
-                        reason=(
-                            f"All {len(active_worker_ids)} workers unhealthy; "
-                            f"heartbeats stopped globally"
-                        ),
-                    )
+                escalation = SupervisorEscalation(
+                    timestamp=_iso_timestamp(ts),
+                    reason=(
+                        f"All {len(active_worker_ids)} workers unhealthy; "
+                        f"heartbeats stopped globally"
+                    ),
+                )
+                decision.escalations.append(escalation)
+                log_supervisor_action(
+                    "panic",
+                    f"All {len(active_worker_ids)} workers unhealthy; heartbeats stopped globally",
+                )
+                _alert_async(
+                    severity="critical",
+                    source="supervisor_loop",
+                    summary="All workers unhealthy — heartbeats stopped globally",
+                    details=escalation.reason,
+                    metadata={"worker_count": len(active_worker_ids)},
                 )
 
         return decision
@@ -408,6 +450,11 @@ class SupervisorLoop:
         """
         hb = self._heartbeats.get(worker_id)
         if hb is None:
+            emit_metric("s4.worker.health", 1, {
+                "worker_id": worker_id,
+                "status": "unhealthy",
+            })
+            log_worker_activity(worker_id, "unresponsive")
             return WorkerHealth(
                 worker_id=worker_id,
                 status=UNRESPONSIVE,
@@ -416,6 +463,14 @@ class SupervisorLoop:
             )
         elapsed = now - hb.timestamp
         if elapsed > self.config.heartbeat_timeout:
+            emit_metric("s4.worker.health", 1, {
+                "worker_id": worker_id,
+                "status": "unhealthy",
+            })
+            emit_metric("s4.repair.count", 1, {
+                "repairtype": "heartbeattimeout",
+            })
+            log_worker_activity(worker_id, "timeout")
             return WorkerHealth(
                 worker_id=worker_id,
                 status=UNRESPONSIVE,
@@ -426,12 +481,14 @@ class SupervisorLoop:
                 ),
             )
         if hb.status == DEGRADED:
+            log_worker_activity(worker_id, "degraded")
             return WorkerHealth(
                 worker_id=worker_id,
                 status=DEGRADED,
                 last_seen=hb.timestamp,
                 reason="Worker reported degraded status",
             )
+        log_worker_activity(worker_id, "healthy")
         return WorkerHealth(
             worker_id=worker_id,
             status=HEALTHY,

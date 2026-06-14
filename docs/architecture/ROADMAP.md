@@ -2000,8 +2000,9 @@ Goal: Add system‑level monitoring and self‑healing.
 - Auto‑repair or escalate.
 
 ✅ 4.7.4 — System‑Level Alerts
-- Emit alerts to Slack/email.  
+- Emit alerts to Slack/email.
 - Structured alert payloads.
+- Implementation: `src/platform/supervisor/system_alerts.py`
 - ⚠️ Mail selected as default system-alert, with a devsmtp service used for testing 
 - ⚠️ Opinionated selection for testing is currently MailHog, but that's easily swappable with an smtp service or smtp4dev, or slack
 
@@ -2019,7 +2020,7 @@ S4 becomes self‑healing and production‑ready.
 
 ---
 
-⬜ 4.7.6 — Real LLM Dispatch + Interactive Channels
+✅ 4.7.6 — Real LLM Dispatch + Interactive Channels
 - Replace `_mock_execute` in `src/platform/runtime/worker.py:43` with a
   real `ChatProvider.chat()` call that hits an actual LLM backend.
 - Wire the existing `ChatProvider` protocol (`src/strategy/llm/providers/_base.py`)
@@ -2045,31 +2046,33 @@ User can interact with VAI end-to-end via CLI, TUI, or Web channels.
 ## PHASE 4.8 — Observability & Telemetry
 Goal: Add visibility into S4 behaviour.
 
-4.8.1 — Metrics
+✅ 4.8.1 — Metrics
 - Job counts  
 - Worker health  
 - Queue depth  
 - Execution time  
 - Drift/repair frequency
 
-4.8.2 — Logging
+✅ 4.8.2 — Logging
 - Structured logs  
 - Correlation IDs  
 - Trace IDs
 
-4.8.3 — Tracing
+✅ 4.8.3 — Tracing
 - Per‑job trace  
 - Per‑cycle trace  
 - Per‑segment trace
 
-4.8.4 — Health Checks
+✅ 4.8.4 — Health Checks
 - Liveness  
 - Readiness  
 - Worker pool health
 
-4.8.5 — Observability Dashboard
-- Web UI or TUI  
-- Job list, worker list, traces, metrics
+✅ 4.8.5 — Observability Dashboard
+- Web UI (SSE-streamed, single-page HTML/JS at http://localhost:8765)  
+- Job list, worker list, trace viewer (hierarchical), metrics (histograms, drift), health
+- Consumes S4 observability events via stdin/file pipe, never modifies state  
+- `python -m src.platform.observability.dashboard` (stdin) or `--from-file events.jsonl`  
 
 Outcome:  
 S4 becomes inspectable, debuggable, and diagnosable.
@@ -2124,6 +2127,21 @@ S4 is production‑ready.
 S5 is the only cognitive layer.  
 It owns agents, planning, skills, and the translation of cognition into S4 jobs.
 
+### PHASE 5.0 — S5 Conversational Response Contract
+- Define `S5Response` schema:
+  - `reply: str | None` — natural language response (e.g. haiku, answer, explanation)
+  - `actions: list[Action]` — structured actions (tool calls, S4 jobs, agent steps)
+  - `metadata: dict` — correlation IDs, confidence, agent provenance
+- Define `S5Request` schema:
+  - `message: str` — the user's input
+  - `context: dict` — channel metadata, conversation history, agent routing hints
+  - `capabilities: list[str]` — what this agent can do
+- S5 must reply with `S5Response` (not S1's drift/repair JSON)
+- S5 must never produce S1-structured output for user-facing replies
+- S5 may call S1 internally for plan analysis and fold results into `actions`
+
+Outcome: S5 has a formal contract for conversational I/O, distinct from S1's analytical schema.
+
 ### PHASE 5.1 — Agent Registry & Identity
 - Agent registration  
 - Agent metadata schema  
@@ -2161,9 +2179,35 @@ Outcome: S5 can turn cognitive steps into S4 jobs and consume results.
 
 Outcome: S5 is stable, resumable, and debuggable.
 
+### PHASE 5.6 — Agent State Persistence Boundary
+- Define `AgentStateStore` interface:
+  - `load(agent_id) -> AgentState | None`
+  - `save(agent_id, AgentState) -> None`
+- Initial implementations: in-memory, file-backed, or SQLite
+- Future: adapter that uses S2 as a generic KV/metadata backend
+- S2 never knows what an "agent" is — it stores opaque blobs
+
+Outcome: S5 gets durable memory without infecting S2 with agent concepts.
+
 ## STRATUM 6 — Workflow Layer (User Interaction + Orchestration)
 S6 is not cognitive.  
 It orchestrates workflows and delegates all thinking to S5.
+
+### PHASE 6.0 — Workflow Trigger Router
+- Subscribe to S4 event substrate
+- Identify workflow‑trigger events (`workflow.start`, `workflow.resume`, `workflow.timeout`, `workflow.external_input`, `workflow.scheduled_trigger`)
+- Map events to workflow instances
+- Route to workflow engine for start/resume
+
+Trigger sources, all via S4:
+- **A. User‑initiated**: user → S4 channel → S4 event substrate → S6 trigger router → workflow engine
+- **B. System‑initiated**: cron/timer → S4 event substrate → S6 trigger router → workflow engine
+- **C. Workflow‑internal**: S6 step completes → S4 event substrate → S6 trigger router → resume workflow
+
+S4 owns transport, normalization, queueing, durability, supervision.
+S6 owns trigger interpretation and workflow routing.
+
+Outcome: S6 has a clean, universal ingress through S4 without owning any transport.
 
 ### PHASE 6.1 — Workflow Definition Model
 - Workflow schema  

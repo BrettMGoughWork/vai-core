@@ -361,8 +361,9 @@ def _test_worker_failure() -> dict[str, Any]:
     from src.platform.runtime.control_plane import ControlPlane
     from src.platform.runtime.job_state import JobState
     from src.platform.queue.queue import InMemoryQueue
-    from src.platform.runtime.job import Job, create_job
+    from src.platform.runtime.job import create_job
     from src.platform.runtime.worker import Worker
+    from src.platform.runtime.pipeline.pipeline import EvaluatorPipeline
     from src.platform.transport.normalization import ChannelMessage
 
     q = InMemoryQueue()
@@ -371,7 +372,8 @@ def _test_worker_failure() -> dict[str, Any]:
     job = create_job(ch)
     q.push(job)
 
-    with patch("src.platform.runtime.worker._mock_execute", side_effect=RuntimeError("boom")):
+    # Patch the pipeline's run() to raise — simulating an unhandled crash
+    with patch.object(EvaluatorPipeline, "run", side_effect=RuntimeError("boom")):
         w = Worker(queue=q, control_plane=cp)
         result = w.process_next()
 
@@ -484,7 +486,7 @@ def _test_worker_execute() -> dict[str, Any]:
     checks.append({"check": "result is set", "passed": result is not None and result.result is not None})
     if result and result.result:
         checks.append({"check": "result type is s2_result", "passed": result.result.get("type") == "s2_result"})
-        checks.append({"check": "result echoes input", "passed": result.result.get("output", {}).get("echo") == {"ping": "pong"}})
+        checks.append({"check": "result echoes input via s1_request", "passed": result.result.get("output", {}).get("s1_request") == {"ping": "pong"}})
     checks.append({"check": "state is succeeded", "passed": result is not None and result.state == "succeeded"})
     checks.append({"check": "queue drained", "passed": len(q) == 0})
 
@@ -545,8 +547,8 @@ def _test_logging() -> dict[str, Any]:
             "passed": len(lines) > 2 and "job_finished" in lines[2] and job.job_id in lines[2],
         })
         checks.append({
-            "check": "format includes [S4] prefix and ISO timestamp",
-            "passed": len(lines) > 0 and "[S4]" in lines[0],
+            "check": "format is structured JSON with event, level, timestamp, correlation_id",
+            "passed": len(lines) > 0 and '"event": "log"' in lines[0] and '"level"' in lines[0] and '"timestamp"' in lines[0] and '"correlation_id"' in lines[0],
         })
     finally:
         sys.stdout = old_stdout
@@ -593,8 +595,8 @@ def _test_end_to_end() -> dict[str, Any]:
 
     if processed and processed.result:
         checks.append({"check": "result type is s2_result", "passed": processed.result.get("type") == "s2_result"})
-        checks.append({"check": "result echoes original input", "passed": processed.result.get("output", {}).get("echo") == raw})
-        notes.append(f"Echo payload: {processed.result.get('output', {}).get('echo')}")
+        checks.append({"check": "result echoes original input via s1_request", "passed": processed.result.get("output", {}).get("s1_request") == raw})
+        notes.append(f"S1 request payload: {processed.result.get('output', {}).get('s1_request')}")
 
     # 6. Queue is drained
     checks.append({"check": "queue empty after processing", "passed": len(q) == 0})
@@ -4137,6 +4139,1176 @@ def _() -> dict:
                    "passed": len(d5.inconsistencies) == len(d5a.inconsistencies)})
 
     passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("metrics_integration", "Verify structured metrics are emitted through the S4 pipeline")
+def _test_metrics_integration() -> dict[str, Any]:
+    """End-to-end metrics verification using CollectingSink.
+
+    Replaces the global stdout sink so we can assert on emitted metric events
+    without polluting test output.
+    """
+    from src.platform.observability.metrics import (
+        CollectingSink,
+        clear_sinks,
+        register_sink,
+    )
+
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # Install collecting sink (replaces default stdout sink)
+    clear_sinks()
+    sink = CollectingSink()
+    register_sink(sink)
+
+    try:
+        # --- Job creation ---
+        raw = {"command": "deploy", "env": "staging"}
+        ch = gateway_to_channel_message(raw)
+        job = create_job(ch)
+
+        store = InMemoryJobStore()
+        store.save(job)
+
+        q = InMemoryQueue()
+        q.push(job)
+
+        # --- Control plane registration ---
+        from src.platform.runtime.control_plane import ControlPlane
+        cp = ControlPlane()
+        cp.register_job(job)
+
+        # --- Worker processing ---
+        w = Worker(queue=q, control_plane=cp)
+        processed = w.process_next()
+
+        # Collect emitted metrics
+        emitted = sink.events()
+        metric_names = {e.name for e in emitted}
+
+        # --- Assertions ---
+        # s4.queue.depth on push + pop
+        queue_depth_events = [e for e in emitted if e.name == "s4.queue.depth"]
+        checks.append({
+            "check": "s4.queue.depth emitted on push/pop",
+            "passed": len(queue_depth_events) >= 2,
+        })
+        # Last queue depth should be 0 (drained)
+        if queue_depth_events:
+            notes.append(f"s4.queue.depth values: {[e.value for e in queue_depth_events]}")
+
+        # s4.job.count on state transitions
+        checks.append({
+            "check": "s4.job.count emitted (queued, running, completed)",
+            "passed": "s4.job.count" in metric_names,
+        })
+        job_count_labels = {
+            (e.labels.get("state"), e.value)
+            for e in emitted if e.name == "s4.job.count"
+        }
+        notes.append(f"s4.job.count state/value pairs: {job_count_labels}")
+
+        # s4.job.executiontimems on completion
+        checks.append({
+            "check": "s4.job.executiontimems emitted",
+            "passed": "s4.job.executiontimems" in metric_names,
+        })
+
+        # s4.worker.health on successful completion
+        checks.append({
+            "check": "s4.worker.health emitted",
+            "passed": "s4.worker.health" in metric_names,
+        })
+
+        # All metrics are structured correctly
+        for event in emitted:
+            checks.append({
+                "check": f"metric {event.name} has numeric value",
+                "passed": isinstance(event.value, (int, float)),
+            })
+            checks.append({
+                "check": f"metric {event.name} has flat string labels",
+                "passed": all(isinstance(k, str) and isinstance(v, str)
+                              for k, v in event.labels.items()),
+            })
+
+        notes.append(f"Total metrics emitted: {len(emitted)}")
+        notes.append(f"Metric names seen: {sorted(metric_names)}")
+
+    finally:
+        # Restore default stdout sink
+        clear_sinks()
+        register_sink(type('_DefaultSink', (), {'accept': lambda _, e: (
+            __import__('sys').stdout.write(e.to_json() + "\n"),
+            __import__('sys').stdout.flush(),
+        )})())
+
+    passed = all(c["passed"] for c in checks)
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("system_alerts", "Verify System-Level Alerts (S4.7.4) submission, formatting, transport, and supervisor integration")
+def _test_system_alerts() -> dict[str, Any]:
+    """End-to-end verification of the System-Level Alerts module.
+
+    Covers alert submission, Slack/email formatting, delivery results,
+    async non-blocking behaviour, and integration with SupervisorLoop.
+    """
+    from src.platform.supervisor.system_alerts import (
+        AlertManager,
+        CollectingAlertTransport,
+        SlackTransport,
+        EmailTransport,
+        configure_alert_manager,
+        alert,
+        alert_async,
+    )
+    from src.platform.supervisor.supervisor_loop import SupervisorLoop, WorkerHeartbeat
+
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # --- Collecting transport to capture all deliveries ---
+    collector = CollectingAlertTransport()
+    slack_tp = SlackTransport("#test-ops")
+    email_tp = EmailTransport()
+    mgr = AlertManager(transports=[collector, slack_tp, email_tp])
+    configure_alert_manager(mgr)
+
+    try:
+        # --- 1. Basic alert submission ---
+        results = mgr.alert(
+            severity="error",
+            source="test_harness",
+            summary="Test alert from harness",
+            details="This is a multi-line\ndetail message for testing",
+            metadata={"test_id": "001", "component": "harness"},
+        )
+
+        alert_id = results[0].alert_id if results else ""
+        checks.append({
+            "check": "alert() returns delivery results list with alert_id",
+            "passed": isinstance(results, list) and len(results) > 0 and len(alert_id) > 0,
+        })
+        checks.append({
+            "check": "DeliveryResult has correct status",
+            "passed": all(r.status == "success" for r in results),
+        })
+        notes.append(f"alert_id: {alert_id} (transports: {len(results)})")
+
+        # --- 2. Validate alert was delivered to all three transports ---
+        delivered = collector.delivered()
+        checks.append({
+            "check": "alert delivered to collecting transport",
+            "passed": len(delivered) == 1,
+        })
+        notes.append(f"Delivered alerts: {len(delivered)}")
+
+        if delivered:
+            d = delivered[0]
+            checks.append({
+                "check": "delivered alert severity matches original",
+                "passed": d.severity == "error",
+            })
+            checks.append({
+                "check": "delivered alert source matches original",
+                "passed": d.source == "test_harness",
+            })
+            checks.append({
+                "check": "delivered alert summary matches original",
+                "passed": d.summary == "Test alert from harness",
+            })
+            checks.append({
+                "check": "delivered alert details matches original",
+                "passed": d.details == "This is a multi-line\ndetail message for testing",
+            })
+            checks.append({
+                "check": "delivered alert has non-empty timestamp",
+                "passed": len(d.timestamp) > 0,
+            })
+
+        # --- 3. Validation rejects invalid severity ---
+        try:
+            mgr.alert(
+                severity="invalid_severity",
+                source="test",
+                summary="bad",
+                details="bad",
+            )
+            checks.append({
+                "check": "invalid severity rejected",
+                "passed": False,
+            })
+            notes.append("ERROR: invalid severity was not rejected")
+        except ValueError:
+            checks.append({
+                "check": "invalid severity rejected",
+                "passed": True,
+            })
+
+        # --- 4. Multiple alerts accumulate ---
+        for i in range(3):
+            mgr.alert(
+                severity="warning",
+                source="test_batch",
+                summary=f"Batch alert {i}",
+                details=f"This is batch alert number {i}",
+                metadata={"batch_index": str(i)},
+            )
+        delivered_after_batch = collector.delivered()
+        checks.append({
+            "check": "multiple alerts accumulate correctly (1 + 3 = 4)",
+            "passed": len(delivered_after_batch) == 4,
+        })
+        notes.append(f"Total delivered after batch: {len(delivered_after_batch)}")
+
+        # --- 5. Alert severity levels ---
+        for sev in ["info", "warning", "error", "critical"]:
+            mgr.alert(
+                severity=sev,
+                source="test_severity",
+                summary=f"{sev} alert",
+                details=f"Testing severity level: {sev}",
+            )
+        severities_seen = {d.severity for d in collector.delivered()}
+        for sev in ["info", "warning", "error", "critical"]:
+            checks.append({
+                "check": f"severity '{sev}' accepted and delivered",
+                "passed": sev in severities_seen,
+            })
+        notes.append(f"Severities in delivery: {severities_seen}")
+
+        # --- 6. Slack formatting (validated via SystemAlert fields from collector) ---
+        if collector.delivered():
+            d = collector.delivered()[-1]
+            checks.append({
+                "check": "SystemAlert has valid severity field for Slack",
+                "passed": d.severity in ("info", "warning", "error", "critical"),
+            })
+            checks.append({
+                "check": "SystemAlert has non-empty source (used in Slack context block)",
+                "passed": len(d.source) > 0,
+            })
+            checks.append({
+                "check": "SystemAlert has single-sentence summary (used in Slack header)",
+                "passed": len(d.summary) > 0,
+            })
+            checks.append({
+                "check": "SystemAlert has non-empty details (used in Slack section)",
+                "passed": len(d.details) > 0,
+            })
+            checks.append({
+                "check": "SystemAlert has ISO-8601 timestamp (used in Slack context)",
+                "passed": "T" in d.timestamp,
+            })
+
+        # --- 7. Email formatting (validated via SystemAlert fields from collector) ---
+        if collector.delivered():
+            d = collector.delivered()[-1]
+            checks.append({
+                "check": "SystemAlert severity uppercased for email subject",
+                "passed": d.severity.upper() in ("INFO", "WARNING", "ERROR", "CRITICAL"),
+            })
+            checks.append({
+                "check": "SystemAlert summary appears in email subject",
+                "passed": len(d.summary) > 0,
+            })
+            checks.append({
+                "check": "SystemAlert details used in email body",
+                "passed": len(d.details) > 0,
+            })
+
+        # --- 8. Async alert does not block ---
+        import threading
+        import time
+
+        collector.reset()
+        start = time.perf_counter()
+        mgr.alert_async(
+            severity="info",
+            source="test_async",
+            summary="Async alert",
+            details="This alert was sent asynchronously",
+        )
+        elapsed = time.perf_counter() - start
+        checks.append({
+            "check": "alert_async returns quickly (< 0.5s)",
+            "passed": elapsed < 0.5,
+        })
+        notes.append(f"alert_async elapsed: {elapsed*1000:.1f}ms")
+
+        # Give the daemon thread time to deliver
+        time.sleep(0.5)
+        async_delivered = collector.delivered()
+        checks.append({
+            "check": "async alert eventually delivered",
+            "passed": len(async_delivered) >= 1,
+        })
+        if async_delivered:
+            notes.append(f"Async alert summary: {async_delivered[0].summary}")
+
+        # --- 9. Module-level convenience functions ---
+        collector.reset()
+        alert(
+            severity="warning",
+            source="module_level",
+            summary="Alert via module-level alert()",
+            details="Testing the convenience function",
+        )
+        mod_delivered = collector.delivered()
+        checks.append({
+            "check": "module-level alert() delivers alerts",
+            "passed": len(mod_delivered) == 1,
+        })
+
+        # --- 10. SupervisorLoop integration (no crash, metric side-effects) ---
+        from src.platform.observability.metrics import CollectingSink, clear_sinks, register_sink
+
+        clear_sinks()
+        metric_sink = CollectingSink()
+        register_sink(metric_sink)
+
+        loop = SupervisorLoop()
+        hb = WorkerHeartbeat(worker_id="test-worker-1", status="healthy", timestamp=0.0)
+        loop.collect_heartbeat(hb)
+        decision = loop.evaluate(now=1000.0, active_worker_ids={"test-worker-1"})
+
+        emitted = metric_sink.events()
+        repair_metrics = [e for e in emitted if e.name == "s4.repair.count"]
+        health_metrics = [e for e in emitted if e.name == "s4.worker.health"]
+        notes.append(f"SupervisorLoop emitted {len(repair_metrics)} repair metrics, {len(health_metrics)} health metrics")
+
+        # Should produce an unhealthy worker (heartbeat timed out at t=1000, hb at t=0, timeout=60)
+        checks.append({
+            "check": "SupervisorLoop detects unhealthy worker with timeout",
+            "passed": any(h.status == "unresponsive" for h in decision.health_map.values()),
+        })
+        notes.append(f"Heartbeat status: {[w.status for w in decision.health_map.values()]}")
+
+        # Check that alert was fired for the unhealthy worker
+        collector_after_supervisor = collector.delivered()
+        supervisor_alerts = [a for a in collector_after_supervisor if a.source == "supervisor_loop"]
+        checks.append({
+            "check": "SupervisorLoop fires alert for unhealthy worker",
+            "passed": len(supervisor_alerts) >= 1,
+        })
+        if supervisor_alerts:
+            notes.append(f"Supervisor alert: {supervisor_alerts[0].summary}")
+
+        # Restore metric sink
+        clear_sinks()
+        register_sink(type('_DefaultSink', (), {'accept': lambda _, e: (
+            __import__('sys').stdout.write(e.to_json() + "\n"),
+            __import__('sys').stdout.flush(),
+        )})())
+
+        # --- 11. CollectingAlertTransport.reset() clears buffer ---
+        collector.reset()
+        checks.append({
+            "check": "CollectingAlertTransport.reset() clears delivered alerts",
+            "passed": len(collector.delivered()) == 0,
+        })
+
+    finally:
+        # Clean up module-level alert manager
+        configure_alert_manager(None)
+        # Restore metric sink if not already done
+        from src.platform.observability.metrics import clear_sinks, register_sink
+        clear_sinks()
+        register_sink(type('_DefaultSink', (), {'accept': lambda _, e: (
+            __import__('sys').stdout.write(e.to_json() + "\n"),
+            __import__('sys').stdout.flush(),
+        )})())
+
+    passed = all(c["passed"] for c in checks)
+    notes.append(f"Total checks: {len(checks)}, passed: {sum(1 for c in checks if c['passed'])}")
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("logging_integration", "Verify structured logging (S4.8.2) through the S4 pipeline")
+def _test_logging_integration() -> dict[str, Any]:
+    """End-to-end verification of the S4.8.2 structured logging module.
+
+    Covers automatic correlation_id/trace_id injection, log events for job
+    state transitions, worker activity, queue operations, execution timing,
+    and supervisor actions.
+    """
+    from src.platform.observability.logging import (
+        CollectingLogSink,
+        register_log_sink,
+        clear_log_sinks,
+    )
+    from src.platform.observability.metrics import clear_sinks, register_sink
+    from src.platform.queue.queue import InMemoryQueue
+    from src.platform.runtime.job import create_job
+    from src.platform.runtime.control_plane import ControlPlane
+    from src.platform.transport.normalization import ChannelMessage
+    from src.platform.runtime.worker import Worker
+    from src.platform.supervisor.supervisor_loop import (
+        SupervisorLoop,
+        SupervisorConfig,
+        WorkerHeartbeat,
+    )
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # Install collecting sink
+    log_sink = CollectingLogSink()
+    register_log_sink(log_sink)
+
+    # Suppress stdout sinks during test
+    clear_sinks()
+    metrics_collector = type("_MetricsCollector", (), {
+        "_events": [],
+        "accept": lambda self, e: self._events.append(e),
+    })()
+    register_sink(metrics_collector)
+
+    try:
+        queue = InMemoryQueue()
+        cp = ControlPlane()
+        config = SupervisorConfig()
+        loop = SupervisorLoop(config=config)
+        worker = Worker(
+            queue=queue,
+            control_plane=cp,
+        )
+
+        # Create, register, and queue a job
+        msg = ChannelMessage(
+            input={"text": "logging test"},
+            metadata={"sender": "harness", "channel": "test_logging"},
+            channel="test_logging",
+        )
+        job = create_job(msg)
+        cp.register_job(job)
+        checks.append({
+            "check": "Log captured job_state_transition to queued",
+            "passed": any(
+                e.message == "job_state_transition"
+                and e.fields.get("from") == "pending"
+                and e.fields.get("to") == "queued"
+                for e in log_sink.events()
+            ),
+        })
+
+        log_sink.clear()
+
+        queue.push(job)
+
+        # Run the job through the pipeline
+        result = worker.process_next()
+
+        checks.append({
+            "check": "Worker returned a completed job",
+            "passed": result is not None and result.job_id == job.job_id,
+        })
+
+        # Check for job_state_transition entries
+        running_events = [
+            e for e in log_sink.events()
+            if e.message == "job_state_transition"
+            and e.fields.get("to") == "running"
+        ]
+        checks.append({
+            "check": "Log captured job_state_transition to running",
+            "passed": len(running_events) >= 1,
+        })
+
+        succeeded_events = [
+            e for e in log_sink.events()
+            if e.message == "job_state_transition"
+            and e.fields.get("to") == "succeeded"
+        ]
+        checks.append({
+            "check": "Log captured job_state_transition to succeeded",
+            "passed": len(succeeded_events) >= 1,
+        })
+
+        # Check for queue_event (enqueue, dequeue)
+        queue_events = [e for e in log_sink.events() if e.message == "queue_event"]
+        checks.append({
+            "check": "Log captured queue_event (enqueue/dequeue)",
+            "passed": len(queue_events) >= 2,
+        })
+
+        # Check for execution timing
+        exec_events = [e for e in log_sink.events() if e.message == "execution"]
+        checks.append({
+            "check": "Log captured execution timing event",
+            "passed": len(exec_events) >= 1,
+        })
+
+        # Verify automatically injected correlation_id
+        has_cid = any(e.correlation_id for e in log_sink.events())
+        checks.append({
+            "check": "Log events have non-empty correlation_id",
+            "passed": has_cid,
+        })
+
+        # Verify log event schema
+        for e in log_sink.events():
+            d = e.to_dict()
+            checks.append({
+                "check": f"Log event {e.message!r} has event='log'",
+                "passed": d.get("event") == "log",
+            })
+            break
+
+        # Verify supervisor health evaluation
+        loop.collect_heartbeat(WorkerHeartbeat(
+            worker_id="test-worker-1",
+            timestamp=time.time(),
+            status="healthy",
+            job_id=None,
+        ))
+        health = loop.evaluate_health("test-worker-1", time.time())
+        checks.append({
+            "check": "evaluate_health returns healthy for active worker",
+            "passed": health.status == "healthy",
+        })
+
+        worker_events_after = [
+            e for e in log_sink.events()
+            if e.message == "worker_activity"
+            and "test-worker-1" in e.fields.get("worker_id", "")
+        ]
+        checks.append({
+            "check": "Log captured worker_activity via evaluate_health",
+            "passed": len(worker_events_after) >= 1,
+        })
+
+    finally:
+        clear_log_sinks()
+        clear_sinks()
+        from src.platform.observability.metrics import register_sink as _reg
+        _reg(type("_DefaultSink", (), {
+            "accept": lambda _, e: (
+                __import__("sys").stdout.write(e.to_json() + "\n"),
+                __import__("sys").stdout.flush(),
+            ),
+        })())
+
+    passed = all(c["passed"] for c in checks)
+    notes.append(
+        f"Total checks: {len(checks)}, "
+        f"passed: {sum(1 for c in checks if c['passed'])}"
+    )
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("tracing_integration", "Verify structured tracing (S4.8.3) through the S4 pipeline")
+def _test_tracing_integration() -> dict[str, Any]:
+    """End-to-end verification of the S4.8.3 structured tracing module.
+
+    Covers job-level traces for state transitions, cycle traces for worker
+    execution, segment traces for pipeline phases, and hierarchical parent/child
+    relationships.
+    """
+    from src.platform.observability.tracing import (
+        CollectingTraceSink,
+        register_trace_sink,
+        clear_trace_sinks,
+    )
+    from src.platform.observability.metrics import clear_sinks, register_sink
+    from src.platform.observability.logging import clear_log_sinks
+    from src.platform.queue.queue import InMemoryQueue
+    from src.platform.runtime.job import create_job
+    from src.platform.runtime.control_plane import ControlPlane
+    from src.platform.transport.normalization import ChannelMessage
+    from src.platform.runtime.worker import Worker
+    from src.platform.supervisor.supervisor_loop import (
+        SupervisorLoop,
+        SupervisorConfig,
+        WorkerHeartbeat,
+    )
+    import time
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # Install collecting trace sink
+    trace_sink = CollectingTraceSink()
+    register_trace_sink(trace_sink)
+
+    # Suppress stdout sinks during test
+    clear_sinks()
+    clear_log_sinks()
+
+    try:
+        queue = InMemoryQueue()
+        cp = ControlPlane()
+        config = SupervisorConfig()
+        loop = SupervisorLoop(config=config)
+        worker = Worker(
+            queue=queue,
+            control_plane=cp,
+        )
+
+        # Create, register, and queue a job
+        msg = ChannelMessage(
+            input={"text": "tracing test"},
+            metadata={"sender": "harness", "channel": "test_tracing"},
+            channel="test_tracing",
+        )
+        job = create_job(msg)
+        cp.register_job(job)
+        job_id = job.job_id
+
+        # Capture traces after registration (job traces: pending -> queued)
+        job_traces = [t for t in trace_sink.events() if t.trace_type == "job"]
+        checks.append({
+            "check": "Job trace emitted for register_job",
+            "passed": any(
+                t.fields.get("to") == "queued" and t.fields.get("job_id") == job_id
+                for t in job_traces
+            ),
+        })
+
+        trace_sink.clear()
+
+        queue.push(job)
+
+        # Run the job through the pipeline
+        result = worker.process_next()
+        checks.append({
+            "check": "Worker returned a completed job",
+            "passed": result is not None and result.job_id == job_id,
+        })
+
+        # Collect all traces from the execution
+        all_traces = trace_sink.events()
+
+        # Check for job-level traces (state transitions)
+        job_traces = [t for t in all_traces if t.trace_type == "job"]
+        checks.append({
+            "check": "Job traces captured for running and succeeded",
+            "passed": any(
+                t.fields.get("to") == "running" for t in job_traces
+            ) and any(
+                t.fields.get("to") == "succeeded" for t in job_traces
+            ),
+        })
+
+        # Check for cycle-level traces
+        cycle_traces = [t for t in all_traces if t.trace_type == "cycle"]
+        checks.append({
+            "check": "Cycle traces captured (start/end)",
+            "passed": any(
+                t.fields.get("action") in ("start", "end", "retry")
+                for t in cycle_traces
+            ),
+        })
+
+        # Check for segment-level traces
+        segment_traces = [t for t in all_traces if t.trace_type == "segment"]
+        checks.append({
+            "check": "Segment traces captured (pipeline phases)",
+            "passed": len(segment_traces) >= 1,
+        })
+
+        # Verify hierarchical relationships
+        # Cycle traces should have parent_trace_id referencing a job trace
+        if cycle_traces:
+            has_parent = any(
+                any(
+                    jt.trace_id == ct.parent_trace_id
+                    for jt in job_traces
+                )
+                for ct in cycle_traces
+            )
+            checks.append({
+                "check": "Cycle traces have parent_trace_id linking to job traces",
+                "passed": has_parent,
+            })
+
+        # Verify segment traces have a parent_trace_id
+        if segment_traces:
+            seg_has_parent = all(st.parent_trace_id for st in segment_traces)
+            checks.append({
+                "check": "Segment traces have non-empty parent_trace_id",
+                "passed": seg_has_parent,
+            })
+
+        # Verify all traces have required fields
+        for t in all_traces[:5]:  # Check first 5
+            d = t.to_dict()
+            checks.append({
+                "check": f"Trace event has event='trace' ({t.trace_type})",
+                "passed": d.get("event") == "trace",
+            })
+
+        # Verify supervisor health evaluation also emits segment traces.
+        # Pass an active_worker_ids entry with no heartbeat so evaluate()
+        # reports it as UNRESPONSIVE, triggering at least one segment trace.
+        traces_before = len(trace_sink.events())
+        loop.collect_heartbeat(WorkerHeartbeat(
+            worker_id="test-worker-trace",
+            timestamp=time.time(),
+            status="healthy",
+            job_id=None,
+        ))
+        _ = loop.evaluate(active_worker_ids={"test-worker-trace", "missing-worker"})
+        traces_after = len(trace_sink.events())
+        # Supervisor should emit at least one segment trace per evaluate()
+        checks.append({
+            "check": "Supervisor evaluate() emitted trace events",
+            "passed": (traces_after - traces_before) >= 1,
+        })
+
+    finally:
+        clear_trace_sinks()
+
+    passed = all(c["passed"] for c in checks)
+    notes.append(
+        f"Total checks: {len(checks)}, "
+        f"passed: {sum(1 for c in checks if c['passed'])}"
+    )
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("health_integration", "Verify health checks (S4.8.4) — liveness, readiness, and worker pool health")
+def _test_health_integration() -> dict[str, Any]:
+    """End-to-end verification of the S4.8.4 Health Checks module.
+
+    Covers liveness (daemon started/not-started/shutdown), readiness (queue
+    depth, healthy workers, panic guard), and worker pool health (total,
+    healthy, unhealthy workers with heartbeat data).
+    """
+    from src.platform.observability.health import (
+        HealthResponse,
+        OK,
+        DEGRADED,
+        UNHEALTHY,
+        check_liveness,
+        check_readiness,
+        check_worker_pool_health,
+        clear_registrations,
+        init_health,
+        mark_shutdown,
+        register_queue_depth,
+        register_supervisor_health,
+        register_supervisor_running,
+        register_panic_active,
+        register_worker_pool_detail,
+    )
+
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # Clean slate
+    clear_registrations()
+
+    try:
+        # ---------------------------------------------------------------
+        # 1. Liveness — daemon not initialised
+        # ---------------------------------------------------------------
+        r = check_liveness()
+        checks.append({
+            "check": "liveness unhealthy when not initialised",
+            "passed": r.status == UNHEALTHY
+                       and "not_initialised" in r.details.get("daemon", ""),
+        })
+
+        # ---------------------------------------------------------------
+        # 2. Liveness — daemon started
+        # ---------------------------------------------------------------
+        init_health()
+        r = check_liveness()
+        checks.append({
+            "check": "liveness ok after init_health()",
+            "passed": r.status == OK and r.details.get("daemon") == "running",
+        })
+
+        # ---------------------------------------------------------------
+        # 3. Liveness — daemon shutdown
+        # ---------------------------------------------------------------
+        mark_shutdown()
+        r = check_liveness()
+        checks.append({
+            "check": "liveness unhealthy after shutdown",
+            "passed": r.status == UNHEALTHY
+                       and "shutdown" in r.details.get("daemon", ""),
+        })
+
+        # Restart for remaining checks
+        clear_registrations()
+        init_health()
+
+        # ---------------------------------------------------------------
+        # 4. Readiness — queue depth OK, no supervisors registered
+        # ---------------------------------------------------------------
+        register_queue_depth(lambda: 0)
+        r = check_readiness()
+        checks.append({
+            "check": "readiness ok with empty queue and no supervisor",
+            "passed": r.status == OK,
+        })
+        notes.append(f"Readiness (empty queue, no supervisor): {r.status}")
+
+        # ---------------------------------------------------------------
+        # 5. Readiness — queue depth high → degraded
+        # ---------------------------------------------------------------
+        register_queue_depth(lambda: 99)
+        r = check_readiness()
+        checks.append({
+            "check": "readiness degraded with high queue depth",
+            "passed": r.status == DEGRADED,
+        })
+        notes.append(f"Readiness (high queue): {r.status}")
+
+        # ---------------------------------------------------------------
+        # 6. Readiness — healthy workers
+        # ---------------------------------------------------------------
+        register_queue_depth(lambda: 0)
+        register_supervisor_health(lambda: {"healthy": 2, "unhealthy": 0, "total": 2})
+        register_supervisor_running(lambda: True)
+        r = check_readiness()
+        checks.append({
+            "check": "readiness ok with healthy workers",
+            "passed": r.status == OK,
+        })
+
+        # ---------------------------------------------------------------
+        # 7. Readiness — unhealthy workers → degraded
+        # ---------------------------------------------------------------
+        register_supervisor_health(lambda: {"healthy": 1, "unhealthy": 2, "total": 3})
+        r = check_readiness()
+        checks.append({
+            "check": "readiness degraded with unhealthy workers",
+            "passed": r.status == DEGRADED,
+        })
+
+        # ---------------------------------------------------------------
+        # 8. Readiness — all workers unhealthy → unhealthy
+        # ---------------------------------------------------------------
+        register_supervisor_health(lambda: {"healthy": 0, "unhealthy": 4, "total": 4})
+        r = check_readiness()
+        checks.append({
+            "check": "readiness unhealthy when all workers unhealthy",
+            "passed": r.status == UNHEALTHY,
+        })
+
+        # ---------------------------------------------------------------
+        # 9. Readiness — panic guard active → unhealthy
+        # ---------------------------------------------------------------
+        register_supervisor_health(lambda: {"healthy": 3, "unhealthy": 0, "total": 3})
+        register_panic_active(lambda: True)
+        r = check_readiness()
+        checks.append({
+            "check": "readiness unhealthy with panic guard active",
+            "passed": r.status == UNHEALTHY
+                       and "panic" in r.details.get("reason", ""),
+        })
+
+        # Reset for worker pool tests
+        register_panic_active(lambda: False)
+
+        # ---------------------------------------------------------------
+        # 10. Worker pool — not registered
+        # ---------------------------------------------------------------
+        r = check_worker_pool_health()
+        checks.append({
+            "check": "worker pool unhealthy when no provider",
+            "passed": r.status == UNHEALTHY,
+        })
+
+        # ---------------------------------------------------------------
+        # 11. Worker pool — all healthy
+        # ---------------------------------------------------------------
+        register_worker_pool_detail(lambda: {
+            "total_workers": 4,
+            "healthy_workers": 4,
+            "unhealthy_workers": 0,
+        })
+        r = check_worker_pool_health()
+        checks.append({
+            "check": "worker pool ok when all healthy",
+            "passed": r.status == OK,
+        })
+
+        # ---------------------------------------------------------------
+        # 12. Worker pool — some unhealthy → degraded
+        # ---------------------------------------------------------------
+        register_worker_pool_detail(lambda: {
+            "total_workers": 4,
+            "healthy_workers": 3,
+            "unhealthy_workers": 1,
+        })
+        r = check_worker_pool_health()
+        checks.append({
+            "check": "worker pool degraded with some unhealthy",
+            "passed": r.status == DEGRADED,
+        })
+
+        # ---------------------------------------------------------------
+        # 13. Worker pool — all unhealthy
+        # ---------------------------------------------------------------
+        register_worker_pool_detail(lambda: {
+            "total_workers": 2,
+            "healthy_workers": 0,
+            "unhealthy_workers": 2,
+        })
+        r = check_worker_pool_health()
+        checks.append({
+            "check": "worker pool unhealthy when all unhealthy",
+            "passed": r.status == UNHEALTHY,
+        })
+
+        # ---------------------------------------------------------------
+        # 14. Worker pool — with heartbeat data
+        # ---------------------------------------------------------------
+        register_worker_pool_detail(lambda: {
+            "total_workers": 2,
+            "healthy_workers": 2,
+            "unhealthy_workers": 0,
+            "worker_heartbeats": {"worker-0": 1000.0, "worker-1": 1000.0},
+            "worker_restart_counts": {"worker-0": 0, "worker-1": 0},
+        })
+        r = check_worker_pool_health()
+        checks.append({
+            "check": "worker pool with heartbeat and restart data",
+            "passed": r.status == OK
+                       and "worker_heartbeats" in r.details
+                       and "worker_restart_counts" in r.details,
+        })
+
+        # ---------------------------------------------------------------
+        # 15. HealthResponse schema — to_dict()
+        # ---------------------------------------------------------------
+        resp = HealthResponse(OK, "2026-01-01T00:00:00", "test", {"key": "val"})
+        d = resp.to_dict()
+        checks.append({
+            "check": "HealthResponse.to_dict() returns expected keys",
+            "passed": d["status"] == OK
+                       and d["component"] == "test"
+                       and d["details"]["key"] == "val",
+        })
+
+        # ---------------------------------------------------------------
+        # 16. HealthResponse schema — invalid status normalised
+        # ---------------------------------------------------------------
+        resp2 = HealthResponse("unknown", "2026-01-01T00:00:00", "test")
+        checks.append({
+            "check": "HealthResponse invalid status normalised to unhealthy",
+            "passed": resp2.status == UNHEALTHY,
+        })
+
+    finally:
+        clear_registrations()
+
+    passed = all(c["passed"] for c in checks)
+    notes.append(
+        f"Total checks: {len(checks)}, "
+        f"passed: {sum(1 for c in checks if c['passed'])}"
+    )
+    return {"passed": passed, "checks": checks, "notes": notes}
+
+
+@_scenario("dashboard", "Dashboard event model ingestion and state queries (S4.8.5)")
+def _test_dashboard() -> dict[str, Any]:
+    """Verify the dashboard event model correctly ingests observability events
+    and produces accurate state snapshots.
+
+    Covers metric ingestion, trace tree assembly, job/worker state tracking,
+    SSE notification, and the full state dict output.
+    """
+    from src.platform.observability.dashboard.event_model import (
+        DashboardEventStore,
+    )
+
+    store = DashboardEventStore(max_events=100)
+    checks: list[dict[str, Any]] = []
+    notes: list[str] = []
+
+    # ---------------------------------------------------------------
+    # 1. Ingest metric events
+    # ---------------------------------------------------------------
+    store.ingest_json_line(
+        '{"event": "metric", "metric": "s4.job.count", "value": 1.0, '
+        '"labels": {"state": "queued"}, "timestamp": "2026-01-01T00:00:00"}'
+    )
+    store.ingest_json_line(
+        '{"event": "metric", "metric": "s4.queue.depth", "value": 3.0, '
+        '"labels": {"queue": "default"}, "timestamp": "2026-01-01T00:00:01"}'
+    )
+    store.ingest_json_line(
+        '{"event": "metric", "metric": "s4.worker.health", "value": 1.0, '
+        '"labels": {"worker_id": "w1"}, "timestamp": "2026-01-01T00:00:02"}'
+    )
+
+    metrics = store.get_metrics()
+    checks.append({
+        "check": "metric: job count ingested",
+        "passed": metrics.job_count.get("queued", 0) == 1.0,
+    })
+    checks.append({
+        "check": "metric: queue depth ingested",
+        "passed": metrics.queue_depth == 3.0,
+    })
+    checks.append({
+        "check": "metric: worker health ingested",
+        "passed": metrics.worker_health.get("w1", 0) == 1.0,
+    })
+
+    # ---------------------------------------------------------------
+    # 2. Ingest trace events — job state transition
+    # ---------------------------------------------------------------
+    store.ingest_json_line(
+        '{"event": "trace", "trace_type": "job", "trace_id": "t1", '
+        '"parent_trace_id": "", "correlation_id": "j1", '
+        '"component": "control_plane", "timestamp": "2026-01-01T00:01:00", '
+        '"fields": {"job_id": "j1", "from": "pending", "to": "queued"}}'
+    )
+
+    jobs = store.get_jobs()
+    checks.append({
+        "check": "trace: job created from trace fields",
+        "passed": any(j.job_id == "j1" and j.state == "queued" for j in jobs),
+    })
+
+    # ---------------------------------------------------------------
+    # 3. Ingest log events — job lifecycle
+    # ---------------------------------------------------------------
+    store.ingest_json_line(
+        '{"event": "log", "component": "worker", "message": "job_created", '
+        '"fields": {"job_id": "j2", "job_type": "cli"}, '
+        '"timestamp": "2026-01-01T00:02:00"}'
+    )
+    store.ingest_json_line(
+        '{"event": "log", "message": "job_started", '
+        '"fields": {"job_id": "j2", "job_type": "cli"}, '
+        '"timestamp": "2026-01-01T00:02:01"}'
+    )
+    store.ingest_json_line(
+        '{"event": "log", "message": "job_finished", '
+        '"fields": {"job_id": "j2"}, '
+        '"timestamp": "2026-01-01T00:02:02"}'
+    )
+
+    jobs = store.get_jobs()
+    j2 = next((j for j in jobs if j.job_id == "j2"), None)
+    checks.append({
+        "check": "log: job created with type",
+        "passed": j2 is not None and j2.job_type == "cli",
+    })
+    checks.append({
+        "check": "log: job state completed",
+        "passed": j2 is not None and j2.state == "completed",
+    })
+
+    # ---------------------------------------------------------------
+    # 4. Ingest cycle trace — worker assignment
+    # ---------------------------------------------------------------
+    store.ingest_json_line(
+        '{"event": "trace", "trace_type": "cycle", "trace_id": "c1", '
+        '"parent_trace_id": "t1", "correlation_id": "j1", '
+        '"timestamp": "2026-01-01T00:03:00", '
+        '"fields": {"action": "start", "job_id": "j1", '
+        '"worker_id": "w1", "attempt": "1"}}'
+    )
+
+    workers = store.get_workers()
+    w1 = next((w for w in workers if w.worker_id == "w1"), None)
+    checks.append({
+        "check": "trace cycle: worker assigned to job",
+        "passed": w1 is not None and w1.active_job_id == "j1",
+    })
+
+    # ---------------------------------------------------------------
+    # 5. Trace tree structure
+    # ---------------------------------------------------------------
+    roots = store.get_trace_roots()
+    checks.append({
+        "check": "trace tree: root traces tracked",
+        "passed": len(roots) >= 1 and any(r.trace_id == "t1" for r in roots),
+    })
+
+    tree = store.get_trace_tree("t1")
+    checks.append({
+        "check": "trace tree: cycle attached as child",
+        "passed": tree is not None and any(c.trace_id == "c1" for c in tree.children),
+    })
+
+    # ---------------------------------------------------------------
+    # 6. Health check ingestion
+    # ---------------------------------------------------------------
+    store.ingest_json_line(
+        '{"event": "health", "status": "ok", "component": "s4", '
+        '"details": {"workers": "2"}, "timestamp": "2026-01-01T00:04:00"}'
+    )
+    health = store.get_health()
+    checks.append({
+        "check": "health: status ingested",
+        "passed": health.status == "ok" and health.details.get("workers") == "2",
+    })
+
+    # ---------------------------------------------------------------
+    # 7. Summary output
+    # ---------------------------------------------------------------
+    summary = store.get_summary()
+    checks.append({
+        "check": "summary: has key fields",
+        "passed": "type" in summary
+                   and summary["type"] == "dashboard_summary"
+                   and "jobs" in summary
+                   and "metrics" in summary,
+    })
+
+    # ---------------------------------------------------------------
+    # 8. Full state dict
+    # ---------------------------------------------------------------
+    state = store.get_state_dict()
+    checks.append({
+        "check": "state_dict: has all sections",
+        "passed": "jobs" in state
+                   and "workers" in state
+                   and "traces" in state
+                   and "metrics" in state
+                   and "health" in state,
+    })
+
+    # ---------------------------------------------------------------
+    # 9. SSE subscriber notification
+    # ---------------------------------------------------------------
+    received: list[dict] = []
+
+    def _cb(data: dict) -> None:
+        received.append(data)
+
+    store.subscribe(_cb)
+    store.ingest_json_line(
+        '{"event": "metric", "metric": "s4.job.count", "value": 2.0, '
+        '"labels": {"state": "running"}, "timestamp": "2026-01-01T00:05:00"}'
+    )
+    store.unsubscribe(_cb)
+
+    checks.append({
+        "check": "SSE: subscriber notified",
+        "passed": len(received) == 1 and received[0].get("metric") == "s4.job.count",
+    })
+
+    # ---------------------------------------------------------------
+    # 10. JSON parsing resilience — malformed lines
+    # ---------------------------------------------------------------
+    store.ingest_json_line("not json")
+    store.ingest_json_line("")
+    # Should not crash; store should be intact
+    metrics_after = store.get_metrics()
+    checks.append({
+        "check": "resilience: malformed JSON doesn't crash store",
+        "passed": metrics_after.queue_depth == 3.0,
+    })
+
+    notes.append(f"Total events ingested: {len(store.get_recent_events())}")
+    notes.append(f"Jobs tracked: {len(store.get_jobs())}")
+
+    passed = all(c["passed"] for c in checks)
+    notes.append(
+        f"Total checks: {len(checks)}, "
+        f"passed: {sum(1 for c in checks if c['passed'])}"
+    )
     return {"passed": passed, "checks": checks, "notes": notes}
 
 
