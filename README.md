@@ -8,6 +8,40 @@ The core idea is simple: give LLMs structured jobs, not free rein. The runtime f
 
 ---
 
+## 🏗️ Architecture
+
+vai-core is organised into six strata with strict dependency rules:
+
+```
+  External world (CLI, HTTP, WebSocket, webhook, cron)
+         │
+         ▼
+  S4 ── Platform (channels, queue, worker pool, supervision, config, security, observability)
+         │
+         ▼
+  S3 ── Capabilities (primitives, skills, registry, quarantine)
+         │
+         ▼
+  S2 ── Strategy (planning, cognition — pure function, no I/O)
+         │
+         ▼
+  S1 ── Runtime (execution engine, retry, panic guard, degraded mode)
+
+  S5 ── Agents (planned)
+  S6 ── Workflow Engine (planned)
+```
+
+**Key invariants:**
+- **S4 is the universal ingress**. Channels normalize external events and push them to the S4 event substrate. S5/S6 subscribe to S4 — they never own transport.
+- **S2 is pure**. No I/O, no tool calls, no side effects. Identical inputs → identical outputs.
+- **S4 must not depend on S2 or S5/S6**. Platform is infrastructure — it cannot import cognition or agent layers.
+- **Config is immutable after load**. Frozen at startup, never mutated at runtime.
+- **No silent fallback**. Every code path either succeeds or fails explicitly.
+
+See [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) for the full architecture.
+
+---
+
 ## 📡 Channels
 
 `vai-core` uses a channel abstraction (Stratum-4) to decouple ingress/egress from runtime logic.
@@ -335,15 +369,46 @@ When an LLM agent authors a new skill at runtime, the skill passes through a mul
 
 **⚠️ Human governance step required.** A quarantined skill will **never** execute until a human (or automated governance agent) explicitly approves it via `python -m tools.quarantine_cli approve`. There is currently no cross‑channel notification to alert a human that a skill is waiting for review — this is deferred to Stratum 4. Until then, operators must poll `python -m tools.quarantine_cli list` or check the quarantine manually.
 
-Repository Layout
+## 📁 Repository Layout
 
-src/strategy/ — planning, types, contracts, runtime orchestration  
-src/capabilities/primitives/ — reusable building blocks (Python, CLI, MCP)  
-src/capabilities/skills/ — reusable agent behaviours  
-src/capabilities/registry/ — primitive & skill registries, loaders, safety validators, quarantine  
-src/runtime/ — agent-host communication, TUI, memory substrate  
-src/strategy/planning/adapters/ — S2→S3 boundary adapter  
-docs/architecture/ — deep technical docs
+```
+src/
+├── runtime/        (S1) Execution engine, pipeline, retry, panic guard, degraded mode
+├── strategy/       (S2) Planning, cognition, memory — pure function, no I/O
+├── capabilities/   (S3) Primitives, skills, registry, safety validators, quarantine
+├── platform/       (S4) Channels, queue, worker pool, supervision, config, security,
+│                         observability, deployment, daemon
+├── agents/         (S5) Agent layer (placeholder)
+├── workflow/       (S6) Workflow engine (placeholder)
+└── release/            Release checklist and gating
+docs/
+├── architecture/   ARCHITECTURE.md, BOUNDARIES.md, ROADMAP.md, control plane, worker pool, ...
+├── api/            API documentation per component
+├── channels/       Channel documentation per transport
+└── lifecycle/      Lifecycle state machines
+tools/              Developer tooling, testing harness, channels CLIs, quarantine CLI
+tests/
+├── unit/           Fast, isolated tests per component
+└── integration/    Cross-module end-to-end tests
+```
+
+### Quick reference
+
+| Path | Responsibility |
+|---|---|
+| `src/runtime/` | S1 — execution substrate, pipeline, retry/recovery, panic guard |
+| `src/strategy/` | S2 — cognitive planning (pure, no I/O) |
+| `src/capabilities/primitives/` | S3 — reusable building blocks (Python, CLI, MCP) |
+| `src/capabilities/skills/` | S3 — reusable agent behaviours |
+| `src/capabilities/registry/` | S3 — registries, loaders, safety validators, quarantine |
+| `src/platform/config/` | S4 — configuration system (env, file, overrides) |
+| `src/platform/security/` | S4 — auth, rate limiting, input validation, sandbox |
+| `src/platform/deployment/` | S4 — local and container deployment targets |
+| `src/platform/daemon/` | S4 — daemon entrypoint, instruction dispatch |
+| `src/release/` | S4 — release checklist and gating |
+| `docs/architecture/` | Architecture documentation |
+| `docs/api/` | API documentation |
+| `docs/channels/` | Channel documentation |
 
 
 

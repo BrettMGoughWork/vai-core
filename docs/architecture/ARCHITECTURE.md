@@ -1,520 +1,180 @@
 # Architecture Overview
 
-Vai-core is organised into six strata (S1–S6), each with a single, bounded responsibility. Data flows cleanly between layers through well-defined interfaces.
+Vai-core is organised into six strata (S1–S6), each with a single, bounded responsibility.
+Data flows cleanly between layers through well-defined interfaces.
 
 ```
 External world
      │
      ▼
 Channels (S4) ───→ Event Substrate (S4) ───→ S6.0 Trigger Router ───→ S6.2 Workflow Engine
-                                                      │                      │
-                                                      │                 ┌────┘
-                                                      ▼                 ▼
-                                               S6.1 Definition ←─ S6.3 Agent Selection
-                                                                          │
-                                                                          ▼
-                                                                    S5 Cognitive Layer
-                                                                          │
-                                                                          ▼
-                                                                    S4 Jobs (execution)
+                                                       │                      │
+                                                       │                 ┌────┘
+                                                       ▼                 ▼
+                                                S6.1 Definition ←─ S6.3 Agent Selection
+                                                                           │
+                                                                           ▼
+                                                                     S5 Cognitive Layer
+                                                                           │
+                                                                           ▼
+                                                                     S4 Jobs (execution)
 
 Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S6.0 Trigger Router
 ```
 
 **Strata summary:**
 - **S1** — Foundation: config, LLM transport, types, execution engine, governance, observability, policy, telemetry
-- **S2** — Planning & persistence: task decomposition, continuity, state management
+- **S2** — Strategy: planning, task decomposition, continuity, state management
 - **S3** — Capabilities: primitives, skills, discovery, filtering, ranking
-- **S4** — Execution & runtime: channels (universal ingress), job system, event substrate, supervision, durability
-- **S5** — Cognition: agent registry, activation, planning loop, job interface, state persistence boundary
-- **S6** — Workflows: trigger router, definition model, engine, agent selection, user interaction, supervisor
+- **S4** — Platform: channels (universal ingress), job system, event substrate, supervision, durability, worker pool
+- **S5** — Agents: agent registry, activation, planning loop, job interface, state persistence boundary
+- **S6** — Workflow: trigger router, definition model, engine, agent selection, user interaction, supervisor
 
-S4 is the universal ingress for all external stimuli. S6 subscribes to S4 events but owns no transport. S5 is the only cognitive layer. Each stratum delegates down and notifies up through S4.
-
----
-
-## Project Structure
-
-This layout is organised around a clear separation of concerns:
-- **Core runtime + abstractions**
-- **Execution and governance**
-- **Capabilities and skills**
-- **Observability and policy**
-- **Tooling and enforcement layers**
-
-Each directory defines a *bounded responsibility*. Avoid cross-cutting logic outside intended layers.
+S4 is the universal ingress for all external stimuli. S6 subscribes to S4 events but owns no
+transport. S5 is the only cognitive layer. Each stratum delegates down and notifies up through S4.
 
 ---
+
+## Directory Structure
+
 ```
-config/                 # S1 - Runtime configuration files (YAML/JSON/env overrides)
-main.py                 # S1 - CLI entrypoint (bootstraps config → agent → execution)
+config/              # S1 - Runtime configuration files (YAML/JSON/env overrides)
+main.py              # S1 - CLI entrypoint (bootstraps config → agent → execution)
 
 src/
-  core/                 # Fundamental abstractions and shared runtime primitives
-    agent/              # S5 - Agent orchestration (main control loop, lifecycle)
-    config/             # S1 - Typed config models + loaders/validators
-    llm/                # S1 - LLM interfaces and transport layer (no business logic)
-      providers/        # S1 - Concrete LLM provider implementations (OpenAI, etc.)
-    planning/           # S2 - Planning strategies (task decomposition, sequencing)
-    types/              # S1 - Core shared types (pure, dependency-free)
-      errors/           # S1 - Error models and exception hierarchy
-      validation/       # S1 - Input/output validation utilities
+  __init__.py
 
-  execution/            # S1 - Execution engine
-                        # - Runs a *single selected skill*
-                        # - Enforces execution contract and lifecycle
-                        # - No planning, only execution
+  runtime/           # S1 - Execution engine, retry, recovery, tool wrapper
+    pipeline/        # S1 - Pipeline-based execution flow
+    recovery/        # S1 - Crash recovery
+    retry/           # S1 - Retry policies and poison handling
+    safety/          # S1 - Panic guard, degraded mode
+    tokens/          # S1 - Token chain management
 
-  governance/           # S1 - Guardrails and decision constraints
-                        # - Tool/skill selection boundaries
-                        # - Safety and policy enforcement hooks
+  strategy/          # S2 - Planning & persistence
+    memory/          # S2 - Episodic, working, long-term memory
+    planning/        # S2 - Task decomposition, sequencing, plan model
 
-  observability/        # S1 - Structured logging and trace emission
-                        # - No business logic
-                        # - Designed for debugging + monitoring
+  capabilities/      # S3 - Primitive skills, discovery, ranking
+    primitives/      # S3 - Atomic capability implementations
+    skills/          # S3 - Markdown skill instruction sets
+    registry/        # S3 - Skill registration and discovery
 
-  policy/               # S1 - Runtime policy hooks
-                        # - Extendable rules applied during execution
-                        # - Complements governance (more dynamic/custom)
+  platform/          # S4 - Execution & runtime platform
+    adapter/         # S4 - External service adapters
+    config/          # S4 - Configuration system (S4Config, env vars, overrides)
+    daemon/          # S4 - Daemon process (instruction dispatch)
+    deployment/      # S4 - Local + container deployment targets
+    observability/   # S4 - Structured logging, metrics, tracing, health
+    queue/           # S4 - Event substrate (in-memory, Redis-backed)
+    runtime/         # S4 - Channel registry, control plane, heartbeat, job store, worker pool
+    security/        # S4 - Authentication, rate limiting, input validation, sandbox
+    supervisor/      # S4 - Worker supervision, control plane, system alerts
+    telemetry/       # S4 - Telemetry collection
+    transport/       # S4 - HTTP transport layer, normalization
+    util/            # S4 - Shared platform utilities
 
-  primitives/
-    runtime/            # S3 - Capability discovery and filtering
-                        # - Ranking, scoring, and selection helpers
-                        # - Defines *what can be done*, not *how to do it*
-
-                        # S3 - Primitive implementations (atomic units of work)
-    standard/           # S3 - Built-in, maintained primitive set
-    custom/             # S3 - User/plugin-defined primitives (extension point)
-
-  skills/
-    library/            # S3 - markdown instruction sets
-    custom/             # S3 - custom instruction sets
-    registry/           # S3 - registration of skills
-
-  telemetry/            # S1 - Metrics and usage reporting hooks
-                        # - Performance, cost, and usage tracking
+  agents/            # S5 - Agent registry, activation, planning loop (placeholder)
+  workflow/          # S6 - Workflow trigger router, engine, definition model (placeholder)
+  release/           # S4 - Release checklist and sign-off procedures
 
 tests/
-  unit/                 # Isolated unit tests (fast, no external deps)
-  integration/          # End-to-end and cross-module tests
+  unit/              # Isolated unit tests (fast, no external deps)
+  integration/       # End-to-end and cross-module tests
 
-util/                   # S1 - General-purpose helpers (keep minimal and stateless)
-                        # Prefer placing logic in core or features when possible
-
-tools/                  # Developer tooling and enforcement scripts
-  code_analysers/           
-    shared/             # S1 - Shared analyser utilities
-    stratum1/           # S1 - S1 invariant enforcement (strict, foundational rules)
-    planning/adapters/  # S2→S3 boundary adapter
-
----
-
-## Architectural Guidelines
-
-### 1. Layer
-
-```md
-# Architecture Overview
-
-This repository is structured around a modular agent runtime, with clear separation between planning, execution, governance, and supporting systems.
-
-## Root
-
-- `config/`  
-  Runtime configuration files (models, providers, environment settings).
-
-- `main.py`  
-  CLI entrypoint. Responsible for bootstrapping the application, loading config, and invoking the agent runtime.
-
----
-
-## Source (`src/`)
-
-### Core
-
-Fundamental building blocks for the agent system.
-
-- `core/agent/`  
-  Agent runtime orchestration (main control loop, lifecycle management).
-
-- `core/config/`  
-  Configuration models and loaders. Handles parsing, validation, and normalisation of runtime config.
-
-- `core/llm/`  
-  LLM abstraction layer (interfaces, shared types, request/response handling).
-
-  - `providers/`  
-    Concrete implementations for different LLM providers (e.g. OpenAI, Azure, local models).
-
-- `core/planning/`  
-  Planning logic: transforms user intent into executable plans or steps.
-
-- `core/types/`  
-  Shared domain types used across the system.
-
-  - `errors/`  
-    Standardised error definitions and handling strategy.
-
-  - `validation/`  
-    Input/output validation utilities and schemas.
-
----
-
-### Execution
-
-- `execution/`  
-  Execution engine responsible for running plans.
-
-  Includes:
-  - Execution contracts/interfaces
-  - Single-skill executor logic
-  - Step orchestration and result handling
-
----
-
-### Governance
-
-- `governance/`  
-  Decision layer for:
-  - Tool/skill selection
-  - Guardrails and safety constraints
-  - Enforcement of execution policies
-
----
-
-### Capabilities & Skills
-
-- `primitives/runtime/`  
-  Capability discovery and ranking:
-  - "Skill" filtering
-  - Relevance scoring
-  - Built-in capability definitions
-
-- `primitives/`  
-  Executable primitive skills used by the agent.
-
-  - `standard/`  
-    Built-in, supported primitive skills shipped with the system.
-
-  - `custom/`  
-    Extension point for user-defined or plugin-based primitive skills.
-
-- `skills/`
-  Markdown skill instruction sets used by the agent.
-
-  - `library/`
-    Built-in, supported library of skill instructions shipped with the system.
-
-  - `custom/`
-    Extension point for user- or agent-defined or plugin-based instruction sets
-
-  - `registry/`
-    Registration logic that defines allowed instruction sets
----
-
-### Policy
-
-- `policy/`  
-  Runtime policy hooks:
-  - Pre/post execution checks
-  - Custom enforcement logic
-  - Dynamic behavioural overrides
-
----
-
-### Observability
-
-- `observability/`  
-  Structured logging and diagnostics:
-  - Log formatting
-  - Context propagation
-  - Debug support
-
----
-
-### Telemetry
-
-- `telemetry/`  
-  Metrics and instrumentation:
-  - Usage tracking
-  - Performance data
-  - External telemetry integrations
-
----
-
-## Tests
-
-- `tests/unit/`  
-  Fast, isolated tests for individual components.
-
-- `tests/integration/`  
-  End-to-end and cross-module tests validating system behaviour.
-
----
-
-## Utilities & Tooling
-
-- `util/`  
-  Shared helper functions and utilities (non-domain-specific).
-
-- `tools/`  
-  Developer tooling and static analysis utilities.
-
-  - `code_analysers/`  
-    Code analysis tools used to enforce architectural rules.
-
-    - `shared/`  
-      Common logic used by analysers.
-
-    - `stratum1/`  
-      CLI tools enforcing **S1 invariants** (low-level architecture rules).
-
-    - `planning/adapters/`  
-      CLI tools enforcing **S2 invariants** (higher-level architectural constraints).
+tools/
+  code_analysers/    # CI-enforced architectural invariant checkers
+    shared/          # Shared analyser utilities
+    stratum1/        # S1 invariant enforcement
+    planning/        # S2→S3 boundary adapters
+  testing_harness/   # S4 MVP integration test harness
+```
 
 ---
 
 ## Design Principles
 
-- **Separation of concerns**: Planning, execution, and governance are strictly isolated.
-- **Extensibility**: Skills and providers can be added without modifying core logic.
-- **Observability-first**: All major flows should be traceable via logs and telemetry.
-- **Policy-driven behaviour**: Runtime behaviour can be modified without changing execution logic.
+- **Separation of concerns**: Each stratum has a single, bounded responsibility.
+- **Extensibility**: Channels, skills, and providers plug in without modifying core logic.
+- **Observability-first**: All major flows are traceable via structured logs, metrics, and traces.
+- **Deterministic by default**: The system produces identical outputs given identical inputs.
+- **Fail-fast**: Invalid configuration, malformed inputs, and invariant violations fail immediately.
+- **No silent fallback**: Every code path either succeeds or fails explicitly.
 
 ---
 
-### Cognitive Contract (Stratum‑1 ↔ Stratum‑2 Interface)
+## Key Architectural Properties
 
-1. Purpose
+| Property | Guarantee |
+|---|---|
+| **Import acyclicity** | No circular imports between strata |
+| **Purity** | S2 (cognition) is a pure function — no I/O, no side effects |
+| **Determinism** | Same inputs → same outputs across all components |
+| **Immutable config** | Config is frozen after load; no runtime mutation |
+| **Panic safety** | Worker panics are caught, classified, and supervised |
+| **Poison isolation** | Poison jobs are quarantined — they cannot destabilise the system |
+| **Backpressure** | Channels and queues apply backpressure under load |
+| **Idempotency** | Retried operations are safe to replay |
 
-The Cognitive Contract defines the pure, deterministic, side‑effect‑free interface between:
+---
 
-- Stratum 1 — execution, tools, environment, effects  
-- Stratum 2 — reasoning, planning, classification, cognition  
+## Strata Contracts
+
+### S1 → S2 Boundary (Cognitive Contract)
+
+Defined in detail in `docs/contracts/s2_s3_boundary_v1.0.md`.
 
 Stratum 2 must behave as a pure function:
 
-`
+```
 PureInput → PureCognition → PureOutput
-`
+```
 
-No execution, no tool calls, no environment access, no mutation.
+- S2 receives: `StepState`, `StepResult`, `MemorySnapshot`
+- S2 returns exactly one of: `classification`, `subgoal`, `segment`, `plan`, `structured_error`
+- S2 must not: call tools, mutate memory, perform I/O, depend on environment
 
----
+### S2 → S3 Boundary
 
-2. Inputs Provided to Stratum 2
+S3 provides capabilities discovered by S2:
+- S2 proposes intent → S3 resolves to available skills
+- S3 returns ranked capability list → S2 selects which to invoke
 
-Stratum 2 receives exactly three pure, deterministic inputs.
+### S3 → S4 Boundary
 
-2.1 StepState (current cognitive state)
+S4 executes what S3 selects:
+- S3 submits a job request → S4 queues and executes it
+- S4 returns execution result → S3 feeds back to S2
 
-A frozen, JSON‑pure object containing:
+### S4 → S5/S6 Boundary
 
-- step_id
-- parent_id
-- cognitive_input
-- last_result
-- status
-- created_at (logical time)
-- attempt
-- trace
-- canonical_hash
-
-This is the only state Stratum 2 may read.
-
----
-
-2.2 Last StepResult (optional)
-
-If the previous step produced a result, Stratum 2 receives:
-
-- outcome
-- reason
-- payload
-- trace
-- canonical_hash
-
-Always pure and immutable.
+S4 is the universal ingress. S5/S6 never own transport:
+- S5/S6 subscribe to S4 event substrate
+- S5/S6 never listen on ports or own channels
+- S4 delivers events; S5/S6 interpret them
 
 ---
 
-2.3 Memory Snapshot (read‑only)
+## Related Documents
 
-A pure JSON structure representing:
-
-- long‑term memory  
-- working memory  
-- episodic memory  
-- agent configuration  
-- tool metadata  
-
-Memory is read‑only.  
-Stratum 2 cannot mutate memory; it may only propose memory updates via structured outputs.
-
----
-
-3. Outputs Stratum 2 Must Return
-
-Stratum 2 must return exactly one of the following pure objects.
-
-3.1 Classification
-
-Used when the cognitive step is complete.
-
-`json
-{
-  "type": "classification",
-  "outcome": "success|failure|tool_needed|continue",
-  "reason": "string",
-  "payload": {}
-}
-`
+| Document | Description |
+|---|---|
+| [BOUNDARIES.md](BOUNDARIES.md) | Formal boundaries and invariants per stratum |
+| [EVENT_SUBSTRATE.md](EVENT_SUBSTRATE.md) | Event substrate architecture and guarantees |
+| [CONTROL_PLANE.md](CONTROL_PLANE.md) | Control plane responsibilities and state model |
+| [WORKER_POOL.md](WORKER_POOL.md) | Worker pool architecture and concurrency model |
+| [LIFECYCLE.md](LIFECYCLE.md) | Lifecycle state machines for all components |
+| [CHANNELS.md](CHANNELS.md) | Channel model and pluggable transports |
+| [OBSERVABILITY.md](OBSERVABILITY.md) | Logging, metrics, tracing, and health checks |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Local and container deployment targets |
+| [ROADMAP.md](ROADMAP.md) | Current roadmap and future phases |
 
 ---
 
-3.2 Subgoal
+## Cognitive Contract (S1 ↔ S2 Interface)
 
-A single atomic cognitive objective.
+For the full contract specification, see `docs/contracts/s2_s3_boundary_v1.0.md`.
 
-`json
-{
-  "type": "subgoal",
-  "goal": "string",
-  "context": {}
-}
-`
+**Summary:**
 
----
-
-3.3 Segment
-
-A multi‑step cognitive unit.
-
-`json
-{
-  "type": "segment",
-  "steps": [],
-  "context": {}
-}
-`
-
----
-
-3.4 Plan
-
-A hierarchical plan.
-
-`json
-{
-  "type": "plan",
-  "root": {},
-  "nodes": [],
-  "metadata": {}
-}
-`
-
----
-
-3.5 Structured Error
-
-Stratum 2 never throws exceptions; it returns structured errors.
-
-`json
-{
-  "type": "error",
-  "error_type": "validation|planning|classification|unknown",
-  "message": "string",
-  "details": {}
-}
-`
-
-Stratum 1 decides how to handle errors.
-
----
-
-4. Purity & Side‑Effect Rules
-
-Stratum 2 must obey the following constraints.
-
-4.1 No execution
-
-Stratum 2 cannot:
-
-- call tools  
-- run code  
-- perform I/O  
-- access environment state  
-
----
-
-4.2 No side effects
-
-Stratum 2 cannot mutate:
-
-- StepState  
-- memory  
-- global state  
-- external systems  
-
-Trace is allowed but must be pure JSON.
-
----
-
-4.3 Pure function requirement
-
-Given identical inputs, Stratum 2 must produce bit‑identical outputs.
-
-This is enforced by:
-
-- deterministic StepState  
-- deterministic StepResult  
-- deterministic OutcomeClassifier  
-- canonical hashing  
-- purity validation  
-
----
-
-5. Allowed Input/Output Shapes
-
-Stratum 2 may only read/write:
-
-- dict  
-- list  
-- str  
-- int  
-- float  
-- bool  
-- null  
-
-No custom objects, classes, functions, datetimes, or bytes.
-
-Everything must be JSON‑pure.
-
----
-
-6. Contract Summary
-
-Stratum 2 is a pure cognitive engine.
-
-It receives:
-
-- StepState  
-- Last StepResult  
-- Memory snapshot  
-
-It returns exactly one:
-
-- classification  
-- subgoal  
-- segment  
-- plan  
-- structured error  
-
-It must not:
-
-- execute tools  
-- mutate memory  
-- perform side effects  
-- depend on environment state  
-
-It must be pure, deterministic, and replayable.
+Stratum 2 is a pure cognitive engine. It receives StepState, StepResult, and MemorySnapshot. It returns exactly one of: classification, subgoal, segment, plan, or structured error. It must not execute tools, mutate memory, perform side effects, or depend on environment state. It must be pure, deterministic, and replayable.
