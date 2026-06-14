@@ -1,0 +1,55 @@
+# Demo workflow: simple conversational chain
+# Triggered when a user sends a message via any channel.
+workflow_id: demo_chat
+name: "Demo Chat Workflow"
+description: "A simple multi-step conversational workflow for demonstration"
+version: "1.0.0"
+trigger_on:
+  - "workflow.start"
+input_schema:
+  type: object
+  properties:
+    message:
+      type: string
+
+steps:
+  greet:
+    step_id: greet
+    step_type: llm_call
+    label: "Greet the user"
+    description: "Generate a warm greeting and acknowledge the user's message"
+    config:
+      system_prompt: >
+        You are a helpful assistant. Greet the user warmly and acknowledge
+        their message: {context.message}
+      model: gpt-4o
+    transitions:
+      on_success: process_input
+
+  process_input:
+    step_id: process_input
+    step_type: llm_call
+    label: "Process user input"
+    description: "Analyse the user's message and generate a thoughtful reply"
+    config:
+      system_prompt: >
+        Based on the conversation so far, provide a helpful and detailed
+        response. Context: {context.last_output}
+      model: gpt-4o
+    transitions:
+      on_success: summarize
+
+  summarize:
+    step_id: summarize
+    step_type: llm_call
+    label: "Summarise the interaction"
+    description: "Create a concise summary of what was discussed"
+    config:
+      system_prompt: >
+        Summarise this conversation in 2-3 sentences.
+        Conversation: {context.last_output}
+      model: gpt-4o-mini
+    transitions:
+      on_success: __end__
+
+start_step: greet

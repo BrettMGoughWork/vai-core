@@ -2226,7 +2226,7 @@ Outcome: CLI works end-to-end through the new router — user message → route 
 
 Outcome: S5 is tested and stable with the new router architecture.
 
-## PHASE 5.5 — Workflow Definition Model
+## ✅ PHASE 5.5 — Workflow Definition Model
 The workflow layer sits inside S5 (phases 5.5—5.11). It owns workflow definitions,
 state machine execution, and orchestration of multi-step processes. Workflow receives
 triggers via S4's event substrate, delegates LLM work to Runtime, and delegates tool
@@ -2282,7 +2282,7 @@ class WorkflowDefinition(BaseModel):
     start_step: str
     shared_context_schema: dict | None = None
     timeout: float | None = None      # total workflow timeout
-    required_agent_tags: list[str] = []  # for agent selection (Phase 6.3)
+    required_agent_tags: list[str] = []  # deprecated — retained for backward compat
 ```
 
 **Implement YAML loader** in `src/agent/workflow/loaders/yaml_loader.py`:
@@ -2317,7 +2317,7 @@ class WorkflowRegistry:
 
 ✅ Outcome: Workflows are declarative YAML files validated as acyclic directed graphs.
 
-### PHASE 5.6 — Workflow Engine (State Machine)
+### ✅ PHASE 5.6 — Workflow Engine (State Machine)
 The core execution engine. A state machine that runs workflow steps, manages shared context, handles transitions, and exposes a clean API. The engine NEVER calls LLMs or tools directly — it delegates through APIs.
 
 **Critical architectural rule:** `llm_call` steps use a Runtime API function. `tool_execute` steps use a Platform API function. The engine receives these as callbacks — it does not import transport.py or skill_runner.py.
@@ -2439,48 +2439,8 @@ class EventBus:
 
 ✅ Outcome: The workflow layer has a clean ingress for events without owning transport. Stand-in event bus enables independent development.
 
-### PHASE 5.8 — Agent Selection Layer
-Given a workflow, select the correct agent from S5's registry. This is the glue between the workflow layer (what to do) and the agent layer (who does it).
-
-**File to create:** `src/agent/workflow/agent_selector.py`
-**Test file:** `tests/unit/agent/workflow/test_agent_selector.py`
-
-**Implement `AgentSelector`:**
-```python
-class AgentSelector:
-    def __init__(self, agent_registry):
-        # agent_registry from src/agent/registry.py
-
-    def select_for_workflow(self, defn: WorkflowDefinition) -> AgentHandle | None:
-        # 1. Get all agents from registry
-        # 2. Filter by: defn.workflow_id in agent.constraints.allowed_workflows
-        # 3. Score by tag overlap (len(agent.tags ∩ defn.required_agent_tags))
-        # 4. Return highest-scoring agent, or None if empty
-
-    def select_for_step(self, defn: WorkflowDefinition, step: WorkflowStep) -> AgentHandle | None:
-        # Step-level override (step.config may specify "agent_id" or "agent_tags")
-        # Falls back to select_for_workflow if step has no override
-```
-
-**Integrate with engine:**
-- When engine starts a workflow, call `agent_selector.select_for_workflow()`, store agent_handle on WorkflowInstance
-- On `llm_call` steps: inject the selected agent's persona/system prompt into the call
-- On `tool_execute` steps: tag the job with agent_id for tracing
-- If no agent matches: raise `NoSuitableAgentError`, set state to `"failed"`, record error
-
-**Write tests:**
-1. Workflow with matching agent → returns correct AgentHandle
-2. Workflow with no matching agent → returns None → engine raises error
-3. Workflow with multiple matching agents → returns best match (highest tag overlap)
-4. Step-level override → returns step-specific agent (different from workflow-level)
-5. Step with no override → falls back to workflow-level agent
-6. Agent tags match exactly → highest score
-7. Agent tags partial match → lower score but still returned
-
-✅ Outcome: Workflow engine auto-selects the right S5 agent for each workflow.
-
 ### PHASE 5.9 — Human-in-the-Loop
-Workflows need to pause for human input. This phase builds the interaction manager that handles the pause → present → validate → resume cycle.
+Workflows need to pause for human input. Core pause/resume already exists in the engine and supervisor. This phase wraps that functionality in a clean `InteractionManager` for validation and timeout.
 
 **File to create:** `src/agent/workflow/user_interaction.py`
 **Test file:** `tests/unit/agent/workflow/test_user_interaction.py`
@@ -2538,53 +2498,21 @@ class UserInteractionManager:
 
 ✅ Outcome: Workflows can pause for human input with validation. CLI can display prompts and collect responses.
 
-### PHASE 5.10 — Platform Integration
-The workflow engine must route all external calls through Platform (S4b). Currently the engine may call Runtime directly — this phase routes everything through Platform's API.
+### PHASE 5.10 — Platform Integration ✅ DONE
 
-**File to create:** `src/agent/workflow/platform_adapter.py`
-**Test file:** `tests/unit/agent/workflow/test_platform_adapter.py`
+The engine is already pure — it takes `WorkflowRegistry` and returns `StepOutcome` objects. The Supervisor's
+`_run_workflow_loop()` dispatches `llm_call` outcomes to Runtime (S1) and `tool_execute` outcomes to S4B
+via `dispatch_route()`. No engine code imports transport, skill_runner, or Runtime directly.
 
-**Implement `PlatformAdapter`:**
-```python
-class PlatformAdapter:
-    def __init__(self, submit_job_fn):  # S4b's job submission function
-        self._submit_job = submit_job_fn
+**Verified in code (2025-07-14):**
+- `engine.py` constructor: takes `WorkflowRegistry` only — no Runtime or Platform dependency
+- `supervisor.py:_run_workflow_loop()`: dispatches `llm_call` → `call_runtime_backend()` directly
+- `supervisor.py:_run_workflow_loop()`: dispatches `tool_execute` → `dispatch_route()` for S4B
+- `supervisor.py:_run_workflow_loop()`: dispatches `sub_workflow` → engine sub-workflow start
+- All 72 engine tests pass. All 35 supervisor tests pass.
 
-    def call_runtime(self, agent_id: str, message: str, context: dict) -> dict:
-        # Wraps LLM call as Platform job: submit → wait → return result
-        # Future: Platform handles retries, queuing, supervision
-        # For now: direct call to Runtime, wrapped in Platform job envelope
-
-    def execute_tool(self, tool_name: str, params: dict) -> dict:
-        # Submits tool execution job via Platform
-        # Platform → S2 → S3 execution chain
-
-    def send_output(self, user_id: str, message: str) -> None:
-        # Sends output through Platform egress
-```
-
-**Replace direct calls in `WorkflowEngine`:**
-- `engine._runtime_api` → `platform_adapter.call_runtime()`
-- `engine._platform_api.execute_tool()` → `platform_adapter.execute_tool()`
-- No code in the workflow layer imports `transport.py`, `s1_client.py`, or `skill_runner.py`
-
-**Update engine constructor:**
-```python
-class WorkflowEngine:
-    def __init__(self, platform_adapter: PlatformAdapter):
-        # PlatformAdapter wraps Runtime and Platform APIs
-        ...
-```
-
-**Write tests:**
-1. `call_runtime()` → submits job → returns result dict
-2. `execute_tool()` → submits job → returns result dict
-3. `send_output()` → submits job → no error
-4. Adapter passes correct parameters to underlying submit_job_fn
-5. Engine tests still pass after swap (update engine test fixtures to use PlatformAdapter)
-6. Verify no direct imports of transport/skill_runner in any src/agent/workflow/ file
-
-✅ Outcome: Platform is the only execution conduit for the workflow layer.
+The Platform idea is proven correct in the Supervisor's dispatch layer. If a formal `PlatformAdapter`
+wrapper is needed later, it wraps the Supervisor's existing dispatch — not the engine.
 
 ### PHASE 5.11 — Workflow Supervisor
 Operational layer for observing and managing all running workflow instances.

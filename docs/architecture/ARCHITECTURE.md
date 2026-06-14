@@ -8,16 +8,13 @@ External world
      │
      ▼
 Channels (S4) ───→ Event Substrate (S4) ───→ S5 Trigger Router ───→ S5 Workflow Engine
-                                                       │                      │
-                                                       │                 ┌────┘
-                                                       ▼                 ▼
-                                                S5 Definition  ←─ S5 Agent Selection
-                                                                           │
-                                                                           ▼
-                                                                  S5 Cognitive Layer
-                                                                           │
-                                                                           ▼
-                                                                     S4 Jobs (execution)
+                                                                             │
+                                                                        Supervisor
+                                                                        Dispatch
+                                                                             │
+                                                                        ┌────┴────┐
+                                                                        ▼         ▼
+                                                                   S4 Jobs   Runtime (S1)
 
 Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S5 Trigger Router
 ```
@@ -27,11 +24,12 @@ Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S5 Trigger Router
 - **S2** — Strategy: planning, task decomposition, continuity, state management
 - **S3** — Capabilities: primitives, skills, discovery, filtering, ranking
 - **S4** — Platform: channels (universal ingress), job system, event substrate, supervision, durability, worker pool
-- **S5** — Agents: agent registry, activation, routing, workflow engine, agent selection, job interface, state persistence, planning loop
+- **S5** — Agents: agent registry, activation, routing, workflow engine, supervisor dispatch, job interface, state persistence
 
 S4 is the universal ingress for all external stimuli. S5 contains both the agent/routing layer and the
-workflow layer (multi-step orchestration). S5 subscribes to S4 events but owns no transport. S5 is the
-only cognitive layer. Each stratum delegates down and notifies up through S4.
+workflow layer (multi-step orchestration). S5 subscribes to S4 events but owns no transport. The engine is
+deterministic — it returns StepOutcomes and the Supervisor dispatches to S1 (Runtime) or S4 (Jobs.
+Each stratum delegates down and notifies up through S4.
 
 ---
 
