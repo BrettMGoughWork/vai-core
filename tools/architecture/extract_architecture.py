@@ -79,6 +79,9 @@ STRATUM_RULES: list[tuple[str, str]] = [
     ("agent\\", "adapter"),
     ("planning/adapters/", "adapter"),
     ("planning\\adapters\\", "adapter"),
+    # S1 → Runtime — LLM contract layer (must be infrastructure, not utility)
+    ("strategy/planning/s1_contract", "infrastructure"),
+    ("strategy\\planning\\s1_contract", "infrastructure"),
     # ── utility (catch-all for the rest) ──
     ("strategy/planning", "utility"),            # catch-all after specific sub-directories
     ("strategy\\planning", "utility"),

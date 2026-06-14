@@ -116,3 +116,11 @@ class S1Error:
             "message": self.message,
             "details": self.details,
         }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Domain-name aliases (Runtime, not S1)
+# ──────────────────────────────────────────────────────────────────────────────
+
+LLMBackendError = S1Error
+"""Domain alias — S1Error is the canonical Runtime LLM-backend error type."""

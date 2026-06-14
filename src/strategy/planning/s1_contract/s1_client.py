@@ -5,7 +5,8 @@ Phase 2.14.7 — S1 Client Router
 Pure routing function that dispatches PromptRequests to the
 appropriate S1 backend (simulation or real_llm).
 
-- ``backend="simulation"`` → deterministic mock (Phase 2.14.3)
+- ``backend="simulation"`` → deterministic planner mock (Phase 2.14.3)
+- ``backend="mock"``      → conversational stub for the S5 CLI demo
 - ``backend="real_llm"``  → real LLM provider behind kill‑switch (Phase 2.14.7)
 
 All raw LLM output is validated through ``validate_llm_response``
@@ -32,7 +33,7 @@ from src.strategy.planning.s1_contract.s1_simulation_fixtures import (
 )
 
 
-_ALLOWED_BACKENDS = {"simulation", "real_llm"}
+_ALLOWED_BACKENDS = {"simulation", "mock", "conversational", "real_llm"}
 
 
 def _generate_real_llm_raw_response(request: PromptRequest) -> str:
@@ -54,6 +55,29 @@ def _generate_real_llm_raw_response(request: PromptRequest) -> str:
         **DEFAULT_PLAN_SHAPING_OUTPUT,
     }
     return json.dumps(response_dict)
+
+
+def _mock_response(message: str, agent_id: str) -> str:
+    """Produce a simple conversational mock response for the CLI demo.
+
+    This is **not** a real LLM response — it's a deterministic stub
+    that exercises the full S5 pipeline (supervisor, cognitive loop,
+    state persistence) with human-readable output.
+    """
+    haikus = [
+        "Silent code compiles,\nA single bug lies waiting,\nThe evening grows long.",
+        "Lights blink on the board,\nData streams across the wire,\nAll systems are go.",
+        "An error message,\nDeep in the terminal logs,\nSpring rain on the roof.",
+    ]
+    import random
+    haiku = random.choice(haikus)
+    return (
+        f"[{agent_id} v1.0] Here's your haiku:\n\n"
+        f"{haiku}\n\n"
+        f"---\n"
+        f"_This is a mock response from the S5 agent pipeline. "
+        f"The cognitive loop, supervisor, and state store are all wired correctly._"
+    )
 
 
 def _resolve_model(llm_raw: dict) -> str:
@@ -139,6 +163,62 @@ def call_s1_backend(
     if backend == "simulation":
         return simulate_prompt_response(request)
 
+    if backend == "mock":
+        message = request.prompt.get("message", "(no message)")
+        agent_id = request.prompt.get("agent_id", "unknown")
+        return PromptResponse(
+            output={
+                "is_complete": True,
+                "message": _mock_response(message, agent_id),
+                "confidence": 0.95,
+            },
+        )
+
+    # ── conversational path ───────────────────────────────────────────────
+    # Sends the user message directly to a real LLM and wraps the response
+    # into the format the S5 supervisor expects.
+    if backend == "conversational":
+        transport = _get_llm_transport()
+        if transport is None:
+            return S1Error(
+                type="llm_transport_unavailable",
+                message="No LLM transport configured. Ensure llm.provider is set in config.yaml.",
+                details={"hint": "Check config/config.yaml llm section"},
+            )
+
+        user_message = request.prompt.get("message", "")
+        agent_id = request.prompt.get("agent_id", "assistant")
+        agent_name = (
+            request.prompt.get("agent_metadata", {})
+            .get("name", agent_id)
+        )
+        description = request.prompt.get("agent_metadata", {}).get("description", "")
+
+        system_prompt = (
+            f"You are {agent_name}, an AI assistant in the VAI platform.\n"
+            f"{description}\n\n"
+            "Respond conversationally. Be concise, helpful, and accurate."
+        )
+
+        try:
+            raw_text = transport.complete(
+                f"{system_prompt}\n\nUser: {user_message}\n{agent_name}:"
+            )
+            import time
+            return PromptResponse(
+                output={
+                    "is_complete": True,
+                    "message": raw_text.strip(),
+                    "confidence": 0.95,
+                },
+            )
+        except Exception as exc:
+            return S1Error(
+                type="conversational_llm_failure",
+                message=f"Conversational LLM call failed: {str(exc)}",
+                details={"exception_type": type(exc).__name__},
+            )
+
     # ── real_llm path ────────────────────────────────────────────────────
 
     # 1. Kill‑switch — check before any network call
@@ -167,3 +247,7 @@ def call_s1_backend(
 
     # 3. Validate → PromptResponse | S1Error
     return validate_llm_response(raw_text)
+
+
+# Domain-name alias — call_runtime_backend is the canonical name.
+call_runtime_backend = call_s1_backend
