@@ -7,9 +7,17 @@ from src.agent.workflow.engine import (
     WorkflowStatus,
 )
 from src.agent.workflow.registry import WorkflowRegistry
+from src.agent.workflow.user_interaction import (
+    InteractionRequest,
+    InteractionResponse,
+    UserInteractionManager,
+)
 
 __all__ = [
+    "InteractionRequest",
+    "InteractionResponse",
     "StepOutcome",
+    "UserInteractionManager",
     "WorkflowEngine",
     "WorkflowExecutionState",
     "WorkflowRegistry",
