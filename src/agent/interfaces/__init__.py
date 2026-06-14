@@ -61,7 +61,7 @@ from src.agent.job_interface import (
 from src.agent.router import (
     DEST_RUNTIME as DEST_RUNTIME,
     DEST_S4B as DEST_S4B,
-    DEST_S6 as DEST_S6,
+    DEST_WORKFLOW as DEST_WORKFLOW,
     Route as Route,
     route_message as route_message,
 )
@@ -109,7 +109,7 @@ __all__ = [
     # Router (S5.2)
     "DEST_RUNTIME",
     "DEST_S4B",
-    "DEST_S6",
+    "DEST_WORKFLOW",
     "Route",
     "route_message",
     # Supervisor (S5.5)

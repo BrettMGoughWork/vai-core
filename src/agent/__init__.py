@@ -4,8 +4,8 @@ Stratum 5 — Agent Layer
 
 The S5 conversational layer is the highest stratum in the runtime.  
 It routes incoming messages to the appropriate destination via the  
-Agent Router (S5.2) — Runtime (LLM conversations), S6 (workflows),  
-or S4B (capability execution).
+Agent Router (S5.2) — Runtime (LLM conversations), Workflow Engine
+(multi-step / orchestration), or S4B (capability execution).
 
 Sub-modules  
 -----------  
@@ -19,7 +19,7 @@ activation (S5.2)
     and the ``activate_agent()`` entry point.  
 router (S5.2)  
     Pattern-based message router — inspects incoming messages and  
-    determines destination (Runtime / S6 / S4B).  
+    determines destination (Runtime / Workflow / S4B).
 
 Exports  
 -------  
@@ -51,7 +51,7 @@ from src.agent.contracts import (
 from src.agent.router import (  
     DEST_RUNTIME,  
     DEST_S4B,  
-    DEST_S6,  
+    DEST_WORKFLOW,
     Route,  
     route_message,  
 )  
@@ -74,7 +74,6 @@ from src.agent.supervisor import (
 from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
 from src.agent.adapters.file_agent_state_store import FileAgentStateStore
 from src.agent.adapters.sqlite_agent_state_store import SQLiteAgentStateStore
-from src.agent.adapters.strategy_agent_state_store import StrategyAgentStateStore
 from src.agent.loaders.yaml_loader import (
     load_agent_manifest,
 )
@@ -157,7 +156,7 @@ __all__ = [
     # ── Router (S5.2) ─────────────────────────────────────────────────
     "DEST_RUNTIME",
     "DEST_S4B",
-    "DEST_S6",
+    "DEST_WORKFLOW",
     "Route",
     "route_message",
     # ── Supervisor (S5.5) ──────────────────────────────────────────────
@@ -175,5 +174,4 @@ __all__ = [
     "MemoryAgentStateStore",
     "SQLiteAgentStateStore",
     "StoreError",
-    "StrategyAgentStateStore",
 ]

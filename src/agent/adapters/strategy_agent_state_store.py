@@ -18,18 +18,17 @@ from src.agent.interfaces.agent_state_store import AgentStateStore
 
 
 class StrategyAgentStateStore(AgentStateStore):
-    """Future Strategy-backed agent state store.
+    """Deprecated — left as a placeholder for S4-backed agent state.
 
-    When Strategy exposes a generic KV/metadata interface, this adapter
-    will serialise ``AgentState`` to JSON blobs and store them under
-    the key ``agentstate/<agent_id>``.
-
-    Strategy remains ignorant of agent semantics.
+    .. deprecated::
+        This stub was never implemented. It is no longer exported from
+        ``src.agent``.  Use ``MemoryAgentStateStore``, ``FileAgentStateStore``,
+        or ``SQLiteAgentStateStore`` instead.
     """
 
     def __init__(self) -> None:
         raise NotImplementedError(
-            "StrategyAgentStateStore is not yet implemented. "
+            "StrategyAgentStateStore is deprecated and no longer exported. "
             "Use MemoryAgentStateStore, FileAgentStateStore, or "
             "SQLiteAgentStateStore instead."
         )

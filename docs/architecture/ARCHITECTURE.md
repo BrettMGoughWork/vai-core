@@ -1,25 +1,25 @@
 # Architecture Overview
 
-Vai-core is organised into six strata (S1–S6), each with a single, bounded responsibility.
+Vai-core is organised into five strata (S1–S5), each with a single, bounded responsibility.
 Data flows cleanly between layers through well-defined interfaces.
 
 ```
 External world
      │
      ▼
-Channels (S4) ───→ Event Substrate (S4) ───→ S6.0 Trigger Router ───→ S6.2 Workflow Engine
+Channels (S4) ───→ Event Substrate (S4) ───→ S5 Trigger Router ───→ S5 Workflow Engine
                                                        │                      │
                                                        │                 ┌────┘
                                                        ▼                 ▼
-                                                S6.1 Definition ←─ S6.3 Agent Selection
+                                                S5 Definition  ←─ S5 Agent Selection
                                                                            │
                                                                            ▼
-                                                                     S5 Cognitive Layer
+                                                                  S5 Cognitive Layer
                                                                            │
                                                                            ▼
                                                                      S4 Jobs (execution)
 
-Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S6.0 Trigger Router
+Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S5 Trigger Router
 ```
 
 **Strata summary:**
@@ -27,11 +27,11 @@ Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S6.0 Trigger Rout
 - **S2** — Strategy: planning, task decomposition, continuity, state management
 - **S3** — Capabilities: primitives, skills, discovery, filtering, ranking
 - **S4** — Platform: channels (universal ingress), job system, event substrate, supervision, durability, worker pool
-- **S5** — Agents: agent registry, activation, planning loop, job interface, state persistence boundary
-- **S6** — Workflow: trigger router, definition model, engine, agent selection, user interaction, supervisor
+- **S5** — Agents: agent registry, activation, routing, workflow engine, agent selection, job interface, state persistence, planning loop
 
-S4 is the universal ingress for all external stimuli. S6 subscribes to S4 events but owns no
-transport. S5 is the only cognitive layer. Each stratum delegates down and notifies up through S4.
+S4 is the universal ingress for all external stimuli. S5 contains both the agent/routing layer and the
+workflow layer (multi-step orchestration). S5 subscribes to S4 events but owns no transport. S5 is the
+only cognitive layer. Each stratum delegates down and notifies up through S4.
 
 ---
 
@@ -74,8 +74,7 @@ src/
     transport/       # S4 - HTTP transport layer, normalization
     util/            # S4 - Shared platform utilities
 
-  agents/            # S5 - Agent registry, activation, planning loop (placeholder)
-  workflow/          # S6 - Workflow trigger router, engine, definition model (placeholder)
+  agent/             # S5 - Agent registry, activation, router, supervisor, workflow engine
   release/           # S4 - Release checklist and sign-off procedures
 
 tests/
@@ -146,12 +145,12 @@ S4 executes what S3 selects:
 - S3 submits a job request → S4 queues and executes it
 - S4 returns execution result → S3 feeds back to S2
 
-### S4 → S5/S6 Boundary
+### S4 → S5 Boundary
 
-S4 is the universal ingress. S5/S6 never own transport:
-- S5/S6 subscribe to S4 event substrate
-- S5/S6 never listen on ports or own channels
-- S4 delivers events; S5/S6 interpret them
+S4 is the universal ingress. S5 never owns transport:
+- S5 subscribes to S4 event substrate
+- S5 never listens on ports or owns channels
+- S4 delivers events; S5 interprets them
 
 ---
 

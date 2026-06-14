@@ -51,7 +51,7 @@ from src.agent.interfaces.agent_state import (
 from src.agent.interfaces.agent_state_store import AgentStateStore
 from src.agent.job_interface import JobDispatchResult, dispatch_route
 from src.agent.registry import AgentRegistry, AgentNotFoundError
-from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_S6, Route, route_message
+from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
 from src.runtime.interfaces import (
     PromptRequest,
     PromptResponse,
@@ -232,7 +232,7 @@ class Supervisor:
         2. Route the message via ``route_message()`` (S5.2)
         3. Based on destination:
            - ``DEST_RUNTIME``  → call LLM backend → produce AgentResponse
-           - ``DEST_S6``      → mark as WAITING (workflow dispatch TBD)
+           - ``DEST_WORKFLOW`` → mark as WAITING (workflow dispatch TBD)
            - ``DEST_S4B``     → dispatch jobs via ``dispatch_route()`` → WAITING
         4. Return updated state
 
@@ -414,14 +414,14 @@ class Supervisor:
                 "message": "Route matched S4B but no jobs were dispatched",
             })
 
-        if route.destination == DEST_S6:
+        if route.destination == DEST_WORKFLOW:
             # Workflow execution path — not yet implemented
             return self._persist(state.with_(
                 lifecycle_state=LifecycleState.WAITING,
                 route_result=route,
                 errors=new_errors,
                 supervisor_metadata=meta,
-                _reason="Workflow dispatch not yet implemented (DEST_S6)",
+                _reason="Workflow dispatch not yet implemented (DEST_WORKFLOW)",
                 _details={"route_destination": route.destination},
             ))
 

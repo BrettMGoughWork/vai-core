@@ -9,7 +9,7 @@ inbound message should be dispatched based on content and agent metadata.
 Destinations
 ------------
 - ``runtime`` — conversational / chat (→ Runtime stratum)
-- ``s6``      — multi-step workflow (→ Workflow Engine)
+- ``workflow`` — multi-step workflow (→ Workflow Engine)
 - ``s4b``     — direct platform job execution (→ Platform stratum)
 """
 
@@ -29,7 +29,7 @@ ROUTER_VERSION = "1.0"
 
 # Route destinations
 DEST_RUNTIME = "runtime"  # → conversational LLM (chat / assistant)
-DEST_S6 = "s6"            # → workflow engine (multi-step / orchestration)
+DEST_WORKFLOW = "workflow"  # → workflow engine (multi-step / orchestration)
 DEST_S4B = "s4b"          # → platform job (direct tool execution)
 
 # Keywords that hint at workflow intent
@@ -72,7 +72,7 @@ class Route:
     confidence: float = 1.0
 
     def __post_init__(self) -> None:
-        valid = {DEST_RUNTIME, DEST_S6, DEST_S4B}
+        valid = {DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B}
         if self.destination not in valid:
             raise ValueError(
                 f"destination must be one of {sorted(valid)}, "
@@ -119,10 +119,10 @@ def route_message(
     _ = ctx  # reserved for future context-based routing
     msg_lower = message.strip().lower()
 
-    # ── 1. Workflow keywords → S6 ────────────────────────────────────
+    # ── 1. Workflow keywords → DEST_WORKFLOW ─────────────────────────
     if any(kw in msg_lower for kw in _WORKFLOW_KEYWORDS):
         return Route(
-            destination=DEST_S6,
+            destination=DEST_WORKFLOW,
             payload={
                 "message": message,
                 "trigger": "workflow_request",

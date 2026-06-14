@@ -19,7 +19,7 @@ from unittest import mock
 import pytest
 
 from src.agent.job_interface import JobDispatchResult, dispatch_route
-from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_S6, Route
+from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -92,9 +92,9 @@ class TestDispatchRouteHappyPath:
         assert result.errors == []
 
     def test_s6_route_is_noop(self):
-        """DEST_S6 → no dispatch, no errors."""
+        """DEST_WORKFLOW → no dispatch, no errors."""
         route = Route(
-            destination=DEST_S6,
+            destination=DEST_WORKFLOW,
             payload={"message": "start workflow", "trigger": "workflow_request"},
             agent_id="test-agent",
             confidence=0.8,
