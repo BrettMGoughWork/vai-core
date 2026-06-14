@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 from src.agent.activation import ActivatedAgentContext, ActivationContext, ActivationEnvelope
-from src.agent.contracts import AgentMessage, AgentResponse, ActionIntent
+from src.agent.contracts import AgentMessage, AgentResponse
 from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
 from src.agent.interfaces.agent_state import AgentState, LifecycleState
 from src.agent.interfaces.agent_state_store import AgentStateStore
@@ -263,15 +263,15 @@ class TestActivateAgent:
 
 class TestRunAgentStep:
     def test_activated_to_completed(self) -> None:
-        """Full happy path: activated agent runs through cognitive loop and
-        completes via terminal intents (conversational response)."""
+        """Full happy path: activated agent is routed to Runtime and
+        produces a conversational response."""
         sup = _make_supervisor()
         state = _make_activated_state()
         result = sup.run_agent_step(state)
-        # With simulation backend and CAP_CONVERSATIONAL, the loop produces a
-        # conversational reply → should transition to COMPLETED
+        # With default routing and CAP_CONVERSATIONAL, the message is
+        # routed to Runtime → should transition to COMPLETED
         assert result.lifecycle_state in (LifecycleState.COMPLETED, LifecycleState.WAITING)
-        assert result.cognitive_result is not None
+        assert result.route_result is not None
         assert result.version > state.version
 
     def test_activated_to_waiting_with_jobs(
@@ -286,6 +286,7 @@ class TestRunAgentStep:
             LifecycleState.COMPLETED,
             LifecycleState.WAITING,
         )
+        assert result.route_result is not None
 
     def test_terminal_state_raises(self) -> None:
         sup = _make_supervisor()
@@ -335,7 +336,7 @@ class TestRunAgentStep:
         state = _make_activated_state()
         # First step
         step1 = sup.run_agent_step(state)
-        assert step1.cognitive_result is not None
+        assert step1.route_result is not None
 
         # If WAITING, simulate a continuation
         if step1.lifecycle_state == LifecycleState.WAITING:
@@ -471,7 +472,7 @@ class TestCompleteAgent:
     def test_complete_from_any_non_terminal(self) -> None:
         sup = _make_supervisor()
         state = _make_created_state()
-        response = AgentResponse(reply="Done!", actions=[], metadata={})
+        response = AgentResponse(reply="Done!", metadata={})
         completed = sup.complete_agent(state, response)
         assert completed.lifecycle_state == LifecycleState.COMPLETED
         assert completed.final_response is not None
@@ -480,7 +481,7 @@ class TestCompleteAgent:
     def test_terminal_state_raises(self) -> None:
         sup = _make_supervisor()
         terminal = _make_terminal_state()
-        response = AgentResponse(reply="Done!", actions=[], metadata={})
+        response = AgentResponse(reply="Done!", metadata={})
         with pytest.raises(AgentInTerminalStateError):
             sup.complete_agent(terminal, response)
 
@@ -499,7 +500,7 @@ class TestQueryMethods:
     def test_get_response_after_complete(self) -> None:
         sup = _make_supervisor()
         state = _make_created_state()
-        response = AgentResponse(reply="Hello!", actions=[], metadata={})
+        response = AgentResponse(reply="Hello!", metadata={})
         completed = sup.complete_agent(state, response)
         assert sup.get_response(completed) is not None
         assert sup.get_response(completed).reply == "Hello!"
@@ -549,7 +550,7 @@ class TestFullLifecycle:
             LifecycleState.COMPLETED,
             LifecycleState.WAITING,
         )
-        assert state.cognitive_result is not None
+        assert state.route_result is not None
 
     def test_create_cancel(self) -> None:
         """CREATED → CANCELLED (FAILED) cycle."""

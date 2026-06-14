@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.agent.contracts import ACTION_REQUEST_S4_JOB_INTENT, AgentMessage
+from src.agent.contracts import AgentMessage
 from src.agent.registry import (
     CAP_CONVERSATIONAL,
     CAP_PLANNING,

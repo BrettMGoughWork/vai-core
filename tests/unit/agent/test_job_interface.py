@@ -2,136 +2,24 @@
 Phase 5.4 — Agent → Platform Job Interface Unit Tests
 ======================================================
 
-Tests for ``JobDispatchResult`` and ``dispatch_action_intents()``.
+Tests for ``JobDispatchResult`` and ``dispatch_route()`` (replaces the old
+``dispatch_action_intents()`` / ``CognitiveLoopResult`` pipeline).
 
 These tests verify:
 - ``JobDispatchResult`` structure and defaults
-- ``dispatch_action_intents()`` happy path (CALL_TOOL, S4_JOB, AGENT_STEP)
-- error handling (S1 errors, unsupported intents, missing submitter, submitter raises)
-- the ``_translate_intent_to_channel_message`` translation fidelity
+- ``dispatch_route()`` happy path (S4B dispatch)
+- ``dispatch_route()`` no-op for Runtime / S6 destinations
+- error handling (no submitter, submitter raises)
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict
 from unittest import mock
 
 import pytest
 
-from src.agent.activation import (
-    ActivatedAgentContext,
-    ActivationContext,
-    ActivationEnvelope,
-)
-from src.agent.cognitive_loop import CognitiveLoopResult
-from src.agent.contracts import (
-    ACTION_AGENT_STEP_INTENT,
-    ACTION_CALL_TOOL_INTENT,
-    ACTION_REQUEST_S4_JOB_INTENT,
-    ActionIntent,
-    AgentMessage,
-)
-from src.agent.job_interface import (
-    JobDispatchResult,
-    _translate_intent_to_channel_message,
-    dispatch_action_intents,
-)
-from src.agent.registry import (
-    CAP_CONVERSATIONAL,
-    CAP_JOB_SUBMISSION,
-    CAP_TOOL_USE,
-    AgentConstraints,
-    AgentIdentity,
-    AgentMetadata,
-)
-from src.platform.transport.normalization import ChannelMessage
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Helpers
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-def _make_identity(
-    agent_id: str = "test-agent",
-    name: str = "Test Agent",
-) -> AgentIdentity:
-    return AgentIdentity(
-        agent_id=agent_id,
-        name=name,
-        description="A test agent",
-        version="1.0.0",
-    )
-
-
-def _make_metadata(
-    capabilities: list[str] | None = None,
-    agent_id: str = "test-agent",
-    name: str = "Test Agent",
-) -> AgentMetadata:
-    return AgentMetadata(
-        identity=_make_identity(agent_id=agent_id, name=name),
-        capabilities=capabilities or [CAP_CONVERSATIONAL],
-        inputs=["text"],
-        outputs=["text", "action_intents"],
-        constraints=AgentConstraints(max_tokens=4096, timeout_ms=30000),
-    )
-
-
-def _make_activated_context(
-    agent_id: str = "test-agent",
-    channel: str = "cli",
-    capabilities: list[str] | None = None,
-) -> ActivatedAgentContext:
-    caps = capabilities or [CAP_CONVERSATIONAL]
-    metadata = _make_metadata(capabilities=caps, agent_id=agent_id)
-    msg = AgentMessage(
-        message="Hello",
-        context={"channel": channel},
-        capabilities=caps,
-    )
-    env = ActivationEnvelope(
-        agent_id=agent_id,
-        message=msg,
-        activation_context={
-            "timestamp": "2024-01-01T00:00:00Z",
-            "channel": channel,
-            "correlation_id": "test-correlation-id",
-            "trace_id": "test-trace-id",
-        },
-    )
-    ctx = ActivationContext(
-        agent_metadata=metadata,
-        resolved_capabilities=caps,
-        conversation_history=[],
-        system_constraints={
-            "max_tokens": 4096,
-            "timeout_ms": 30000,
-            "sandbox": "none",
-        },
-    )
-    return ActivatedAgentContext(envelope=env, context=ctx)
-
-
-def _make_call_tool_intent(tool: str = "test_tool") -> ActionIntent:
-    return ActionIntent(
-        type=ACTION_CALL_TOOL_INTENT,
-        payload={"tool": tool, "args": {"key": "value"}},
-    )
-
-
-def _make_s4_job_intent(job_type: str = "test_job") -> ActionIntent:
-    return ActionIntent(
-        type=ACTION_REQUEST_S4_JOB_INTENT,
-        payload={"job_type": job_type, "params": {"key": "value"}},
-    )
-
-
-def _make_step_intent() -> ActionIntent:
-    return ActionIntent(
-        type=ACTION_AGENT_STEP_INTENT,
-        payload={"reasoning": "conversational_reply"},
-    )
+from src.agent.job_interface import JobDispatchResult, dispatch_route
+from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_S6, Route
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -146,21 +34,18 @@ class TestJobDispatchResult:
         """Fully default-constructed result."""
         result = JobDispatchResult()
         assert result.dispatched_jobs == {}
-        assert result.terminal_intents == []
         assert result.errors == []
 
     def test_happy_path(self):
         """Result with all fields populated."""
-        intent = _make_step_intent()
         result = JobDispatchResult(
-            dispatched_jobs={"job-1": _make_call_tool_intent()},
-            terminal_intents=[intent],
-            errors=[("ACTION_AGENT_STEP_INTENT", "something went wrong")],
+            dispatched_jobs={"job-1": "s4b"},
+            errors=[("s4b", "something went wrong")],
         )
         assert len(result.dispatched_jobs) == 1
-        assert result.terminal_intents == [intent]
+        assert result.dispatched_jobs["job-1"] == "s4b"
         assert len(result.errors) == 1
-        assert result.errors[0][0] == "ACTION_AGENT_STEP_INTENT"
+        assert result.errors[0][0] == "s4b"
 
     def test_is_frozen(self):
         """Cannot mutate fields after construction."""
@@ -170,282 +55,94 @@ class TestJobDispatchResult:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# dispatch_action_intents — Happy paths
+# dispatch_route — Happy paths
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-class TestDispatchHappyPath:
-    """dispatch_action_intents() dispatches supported intents correctly."""
+class TestDispatchRouteHappyPath:
+    """dispatch_route() dispatches S4B routes correctly."""
 
-    def test_call_tool_intent_dispatched(self):
-        """ACTION_CALL_TOOL_INTENT → job submitted → in dispatched_jobs."""
-        context = _make_activated_context(capabilities=[CAP_CONVERSATIONAL, CAP_TOOL_USE])
-        intent = _make_call_tool_intent()
-        result = CognitiveLoopResult(
-            thought={"is_complete": False, "reasoning": "call a tool"},
-            action_intents=[intent],
-            confidence=0.9,
+    def test_s4b_with_submitter_dispatches_job(self):
+        """S4B route with a submitter → job submitted → in dispatched_jobs."""
+        route = Route(
+            destination=DEST_S4B,
+            payload={"action": "direct_execution", "message": "run this"},
+            agent_id="test-agent",
+            confidence=0.7,
         )
-
         submitter = mock.Mock(return_value="job-123")
-        dispatch_result = dispatch_action_intents(result, context, submit_job_callable=submitter)
+        result = dispatch_route(route, submit_job_callable=submitter)
 
-        assert len(dispatch_result.dispatched_jobs) == 1
-        assert "job-123" in dispatch_result.dispatched_jobs
-        assert dispatch_result.dispatched_jobs["job-123"] is intent
-        assert dispatch_result.terminal_intents == []
-        assert dispatch_result.errors == []
-        submitter.assert_called_once()
+        assert len(result.dispatched_jobs) == 1
+        assert "job-123" in result.dispatched_jobs
+        assert result.dispatched_jobs["job-123"] == DEST_S4B
+        assert result.errors == []
+        submitter.assert_called_once_with(route.payload)
 
-    def test_s4_job_intent_dispatched(self):
-        """ACTION_REQUEST_S4_JOB_INTENT → job submitted → in dispatched_jobs."""
-        context = _make_activated_context(capabilities=[CAP_CONVERSATIONAL, CAP_JOB_SUBMISSION])
-        intent = _make_s4_job_intent()
-        result = CognitiveLoopResult(
-            thought={"is_complete": False, "reasoning": "submit a job"},
-            action_intents=[intent],
-            confidence=0.85,
+    def test_runtime_route_is_noop(self):
+        """DEST_RUNTIME → no dispatch, no errors."""
+        route = Route(
+            destination=DEST_RUNTIME,
+            payload={"message": "hello"},
+            agent_id="test-agent",
         )
+        result = dispatch_route(route, submit_job_callable=mock.Mock())
 
-        submitter = mock.Mock(return_value="job-456")
-        dispatch_result = dispatch_action_intents(result, context, submit_job_callable=submitter)
+        assert result.dispatched_jobs == {}
+        assert result.errors == []
 
-        assert len(dispatch_result.dispatched_jobs) == 1
-        assert dispatch_result.dispatched_jobs["job-456"] is intent
-        assert dispatch_result.errors == []
-        submitter.assert_called_once()
-
-    def test_step_intent_is_terminal(self):
-        """ACTION_AGENT_STEP_INTENT → no job → goes to terminal_intents."""
-        context = _make_activated_context()
-        intent = _make_step_intent()
-        result = CognitiveLoopResult(
-            thought={"is_complete": True, "reasoning": "done"},
-            action_intents=[intent],
-            confidence=0.95,
-        )
-
-        dispatch_result = dispatch_action_intents(result, context, submit_job_callable=mock.Mock())
-
-        assert dispatch_result.dispatched_jobs == {}
-        assert dispatch_result.terminal_intents == [intent]
-        assert dispatch_result.errors == []
-
-    def test_multiple_intents_mixed(self):
-        """Mixed intents are dispatched correctly."""
-        context = _make_activated_context(capabilities=[CAP_CONVERSATIONAL, CAP_TOOL_USE, CAP_JOB_SUBMISSION])
-        tool_intent = _make_call_tool_intent()
-        job_intent = _make_s4_job_intent()
-        step_intent = _make_step_intent()
-
-        result = CognitiveLoopResult(
-            thought={"is_complete": False, "reasoning": "various work"},
-            action_intents=[tool_intent, step_intent, job_intent],
+    def test_s6_route_is_noop(self):
+        """DEST_S6 → no dispatch, no errors."""
+        route = Route(
+            destination=DEST_S6,
+            payload={"message": "start workflow", "trigger": "workflow_request"},
+            agent_id="test-agent",
             confidence=0.8,
         )
+        result = dispatch_route(route, submit_job_callable=mock.Mock())
 
-        submitter = mock.Mock(side_effect=["job-001", "job-002"])
-        dispatch_result = dispatch_action_intents(result, context, submit_job_callable=submitter)
-
-        assert len(dispatch_result.dispatched_jobs) == 2
-        assert dispatch_result.terminal_intents == [step_intent]
-        assert dispatch_result.errors == []
-
-    def test_empty_intents(self):
-        """Empty intent list → everything empty."""
-        context = _make_activated_context()
-        result = CognitiveLoopResult(
-            thought={"is_complete": True, "reasoning": "nothing to do"},
-            action_intents=[],
-            confidence=1.0,
-        )
-
-        dispatch_result = dispatch_action_intents(result, context, submit_job_callable=mock.Mock())
-
-        assert dispatch_result.dispatched_jobs == {}
-        assert dispatch_result.terminal_intents == []
-        assert dispatch_result.errors == []
+        assert result.dispatched_jobs == {}
+        assert result.errors == []
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# dispatch_action_intents — Error & edge-case paths
+# dispatch_route — Error & edge-case paths
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-class TestDispatchErrors:
-    """dispatch_action_intents() handles errors gracefully."""
+class TestDispatchRouteErrors:
+    """dispatch_route() handles errors gracefully."""
 
-    def test_cognitive_loop_errors_returns_early(self):
-        """If CognitiveLoopResult has errors, dispatch returns them immediately."""
-        context = _make_activated_context()
-        result = CognitiveLoopResult(
-            thought={"is_complete": False, "reasoning": "errored"},
-            action_intents=[],
-            confidence=0.0,
-            errors=[ValueError("S1 failed"), RuntimeError("timeout")],
+    def test_s4b_without_submitter_errors(self):
+        """S4B route without a submitter → error recorded."""
+        route = Route(
+            destination=DEST_S4B,
+            payload={"message": "run this"},
+            agent_id="test-agent",
+            confidence=0.7,
         )
+        result = dispatch_route(route, submit_job_callable=None)
 
-        dispatch_result = dispatch_action_intents(
-            result,
-            context,
-            submit_job_callable=mock.Mock(),
-        )
-
-        assert dispatch_result.dispatched_jobs == {}
-        assert dispatch_result.terminal_intents == []
-        assert len(dispatch_result.errors) == 2
-        assert all(e[0] == "cognitive_loop" for e in dispatch_result.errors)
+        assert result.dispatched_jobs == {}
+        assert len(result.errors) == 1
+        assert result.errors[0][0] == "s4b"
+        assert "No submit_job_callable provided" in result.errors[0][1]
 
     def test_submitter_raises_error(self):
-        """submitter exception → error recorded, dispatch continues."""
-        context = _make_activated_context()
-        intents = [
-            _make_call_tool_intent("tool_1"),
-            _make_call_tool_intent("tool_2"),
-        ]
-        result = CognitiveLoopResult(
-            thought={"is_complete": False, "reasoning": "call two tools"},
-            action_intents=intents,
-            confidence=0.9,
-        )
-
-        def _failing_submitter(msg: ChannelMessage) -> str:
-            action_intent = msg.input.get("action_intent", {})
-            if isinstance(action_intent, dict) and action_intent.get("payload", {}).get("tool") == "tool_1":
-                raise RuntimeError("Queue full")
-            return "job-002"
-
-        dispatch_result = dispatch_action_intents(
-            result, context, submit_job_callable=_failing_submitter,
-        )
-
-        assert len(dispatch_result.dispatched_jobs) == 1
-        assert len(dispatch_result.errors) == 1
-        assert dispatch_result.errors[0][0] == ACTION_CALL_TOOL_INTENT
-        assert "Queue full" in dispatch_result.errors[0][1]
-
-    def test_no_submitter_provided(self):
-        """No submitter → error for actionable intents."""
-        context = _make_activated_context()
-        intent = _make_call_tool_intent()
-        result = CognitiveLoopResult(
-            thought={"is_complete": False, "reasoning": "need to call tool"},
-            action_intents=[intent],
-            confidence=0.9,
-        )
-
-        dispatch_result = dispatch_action_intents(result, context, submit_job_callable=None)
-
-        assert dispatch_result.dispatched_jobs == {}
-        assert len(dispatch_result.errors) == 1
-        assert "No submit_job_callable provided" in dispatch_result.errors[0][1]
-        assert dispatch_result.errors[0][0] == ACTION_CALL_TOOL_INTENT
-
-    def test_unsupported_intent_type(self):
-        """Unknown intent type → error recorded."""
-        context = _make_activated_context()
-        # Bypass frozen dataclass + validation to test unsupported type handling.
-        bad_intent = object.__new__(ActionIntent)
-        object.__setattr__(bad_intent, "type", "UNKNOWN_INTENT_TYPE")
-        object.__setattr__(bad_intent, "payload", {})
-        object.__setattr__(bad_intent, "description", "")
-        result = CognitiveLoopResult(
-            thought={"is_complete": False, "reasoning": "unknown intent"},
-            action_intents=[bad_intent],
-            confidence=0.5,
-        )
-
-        dispatch_result = dispatch_action_intents(
-            result, context, submit_job_callable=mock.Mock(),
-        )
-
-        assert dispatch_result.dispatched_jobs == {}
-        assert len(dispatch_result.errors) == 1
-        assert "Unsupported intent type" in dispatch_result.errors[0][1]
-
-    def test_no_submitter_and_step_intent_ok(self):
-        """Step intents are terminal even without a submitter."""
-        context = _make_activated_context()
-        step_intent = _make_step_intent()
-        result = CognitiveLoopResult(
-            thought={"is_complete": True, "reasoning": "done"},
-            action_intents=[step_intent],
-            confidence=0.95,
-        )
-
-        dispatch_result = dispatch_action_intents(result, context, submit_job_callable=None)
-
-        assert dispatch_result.terminal_intents == [step_intent]
-        assert dispatch_result.dispatched_jobs == {}
-        assert dispatch_result.errors == []
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Channel message translation
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-class TestChannelMessageTranslation:
-    """The internal ``_translate_intent_to_channel_message`` produces correct
-    ``ChannelMessage`` instances."""
-
-    def test_channel_from_context(self):
-        """Channel is sourced from the activation context."""
-        ctx = _make_activated_context(channel="http")
-        intent = _make_call_tool_intent()
-        msg = _translate_intent_to_channel_message(intent, ctx)
-        assert msg.channel == "http"
-
-    def test_default_channel_when_missing(self):
-        """Falls back to 'system' if channel is absent in context."""
-        metadata = _make_metadata()
-        agent_msg = AgentMessage(
-            message="Hi",
-            context={},
-            capabilities=[CAP_CONVERSATIONAL],
-        )
-        env = ActivationEnvelope(
+        """Submitter exception → error recorded."""
+        route = Route(
+            destination=DEST_S4B,
+            payload={"message": "run this"},
             agent_id="test-agent",
-            message=agent_msg,
-            activation_context={
-                "timestamp": "2024-01-01T00:00:00Z",
-                # no "channel" key
-                "correlation_id": "test-correlation-id",
-                "trace_id": "test-trace-id",
-            },
+            confidence=0.7,
         )
-        ctx = ActivationContext(
-            agent_metadata=metadata,
-            resolved_capabilities=[CAP_CONVERSATIONAL],
-            conversation_history=[],
-            system_constraints={},
-        )
-        aac = ActivatedAgentContext(envelope=env, context=ctx)
-        intent = _make_call_tool_intent()
-        result = _translate_intent_to_channel_message(intent, aac)
-        assert result.channel == "system"
 
-    def test_source_in_metadata(self):
-        """Source is set in metadata, derived from agent_id."""
-        ctx = _make_activated_context(agent_id="my-custom-agent")
-        intent = _make_call_tool_intent()
-        msg = _translate_intent_to_channel_message(intent, ctx)
-        assert msg.metadata.get("source") == "agent/my-custom-agent"
+        def _failing_submitter(_: dict) -> str:
+            raise RuntimeError("Queue full")
 
-    def test_intent_serialised_in_input(self):
-        """The action intent is serialised into the message input."""
-        ctx = _make_activated_context()
-        intent = _make_call_tool_intent(tool="my_tool")
-        msg = _translate_intent_to_channel_message(intent, ctx)
-        assert "action_intent" in msg.input
-        assert msg.input["action_intent"]["payload"]["tool"] == "my_tool"
+        result = dispatch_route(route, submit_job_callable=_failing_submitter)
 
-    def test_intent_contains_correct_type(self):
-        """Serialised intent includes the original action type."""
-        ctx = _make_activated_context()
-        plain_intent = ActionIntent(
-            type=ACTION_CALL_TOOL_INTENT,
-            payload={"tool": "plain"},
-        )
-        msg = _translate_intent_to_channel_message(plain_intent, ctx)
-        assert msg.input["action_intent"]["type"] == ACTION_CALL_TOOL_INTENT
+        assert result.dispatched_jobs == {}
+        assert len(result.errors) == 1
+        assert result.errors[0][0] == DEST_S4B
+        assert "Queue full" in result.errors[0][1]
