@@ -115,9 +115,9 @@ are made by the supervisor layer.
 
 ## Subscription Model
 
-- **S5 (agents)** and **S6 (workflows)** subscribe to S4 events via the event
-  substrate. They never own or operate the transport directly.
-- The queue is owned by S4. S5/S6 receive event callbacks.
+- **S5 (agents + workflows)** subscribes to S4 events via the event
+  substrate. It never owns or operates the transport directly.
+- The queue is owned by S4. S5 receives event callbacks.
 - `Channel`s are registered in a `ChannelRegistry` (name → `Channel` adapter).
 - Workers call `channel.normalize()` to convert `InboundChannelMessage` into
   canonical job payloads, then route responses via `ChannelRegistry`.

@@ -2131,14 +2131,13 @@ External world
 Gateway (CLI, HTTP, Slack, Cron, …)
     │   Ingress/egress, protocol normalization, external API surface
     ▼
-S5: Agent Layer
+S5: Agent + Workflow Layer
   ├── Agent definitions (YAML) — "I handle these workflow types"
-  ├── Router — inspect input → pick agent → pick workflow → dispatch
+  ├── Router — inspect input → pick agent → pick destination
   ├── State / History — conversation state, persona continuity
+  ├── Workflow engine — orchestration, state machines, step execution
   │
-  ├──► Runtime — cross-cutting LLM service (used by S5, S6, S2)
-  │
-  └──► S6: Workflow Engine — orchestration, state machines, step execution
+  └──► Runtime — cross-cutting LLM service (used by S5, S2)
                 │
                 ▼
           S4b: Platform (queues, workers, supervision, durability)
@@ -2153,16 +2152,17 @@ S5: Agent Layer
 | Layer | Responsibility | Key invariant |
 |---|---|---|
 | **Gateway** | Ingress/egress, protocol normalization, external API | Never interprets content |
-| **S5** | Agent definitions, routing, state | Never calls LLM directly |
-| **S6** | Workflow orchestration, step execution | Never owns transport |
+| **S5** | Agent definitions, routing, state, workflow orchestration | Never calls LLM directly, never owns transport |
 | **S4b** | Queues, workers, supervision, durability | Never knows about agents |
 | **S2** | Planning, drift detection, tool orchestration | Never knows about workflows |
 | **S3** | Skills and primitives | Never initiates work |
 | **Runtime** | Cross-cutting LLM service | Every layer above S4b calls it |
 
-## STRATUM 5 — Agent Layer (Routing + Persona + Dispatch)
-S5 is not cognitive. It owns agent definitions, routing logic, and conversation state.
-Every LLM call is delegated to Runtime. Every tool call is delegated to Platform.
+## STRATUM 5 — Agent Layer (Routing + Persona + Dispatch + Workflow)
+S5 owns agent definitions, routing logic, conversation state, and workflow orchestration
+(multi-step processes). Every LLM call is delegated to Runtime. Every tool call is delegated to Platform.
+Every event is received from S4's event substrate. The workflow layer (phases 5.5+) handles
+trigger routing, state machine execution, agent selection, and human-in-the-loop.
 
 ### PHASE 5.0 — Agent Definition Model + YAML Manifest (✅ Done)
 **Implemented in**: `src/agent/registry.py`, `src/agent/loaders/yaml_loader.py`, `config/agents.yaml`
@@ -2178,156 +2178,69 @@ Outcome: Agents are declarative — create by editing a YAML file, no code chang
 
 Outcome: Agents have durable, resumable state with three storage backends.
 
-### PHASE 5.2 — Agent Router (Replace Cognitive Loop)
-The current S5 has a heavy `cognitive_loop.py` that produces ActionIntents from LLM output. In the revised architecture, agents do NOT call the LLM — they route. This phase strips out the cognitive loop and replaces it with a thin router.
+### PHASE 5.2 — Agent Router (Replace Cognitive Loop) (✅ Done)
+**Implemented in**: `src/agent/router.py`, `src/agent/supervisor.py`, `src/agent/job_interface.py`, `src/agent/contracts.py`
 
-**What to do:**
+**Files changed**:
+- `src/agent/router.py` — CREATED (Route dataclass, route_message() with deterministic keyword matching, 3 destinations)
+- `src/agent/supervisor.py` — MODIFIED (simplified: removed cognitive loop, added route_and_dispatch())
+- `src/agent/cognitive_loop.py` — DELETED
+- `src/agent/contracts.py` — MODIFIED (removed ActionIntent, ACTION_CALL_TOOL_INTENT, ACTION_AGENT_STEP_INTENT, ACTION_REQUEST_S4_JOB_INTENT, VALID_ACTION_INTENT_TYPES)
+- `src/agent/job_interface.py` — MODIFIED (dispatch_route() replaces dispatch_action_intents(); submit_job_callable pattern retained)
+- `src/agent/__init__.py` — MODIFIED (updated exports)
+- `tests/unit/agent/test_router.py` — CREATED (38 tests)
+- `tests/unit/agent/test_supervisor.py` — MODIFIED (6 fixes: removed actions=[] params, cognitive_result→route_result)
+- `tests/unit/agent/test_job_interface.py` — MODIFIED (rewritten for dispatch_route() API)
+- `tests/unit/agent/test_cognitive_loop.py` — DELETED
+- `tests/unit/agent/test_contracts.py` — MODIFIED (removed ActionIntent class tests)
+- `tests/unit/agent/test_activation.py` — MODIFIED (removed stale ACTION_REQUEST_S4_JOB_INTENT import)
+- `tests/unit/agent/test_agent_state_store.py` — MODIFIED (removed ActionIntent/Action types)
 
-1. **Create `src/agent/router.py`** with a single `Route` dataclass and `route_message()` function:
-   ```python
-   @dataclass(frozen=True)
-   class Route:
-       destination: str  # "runtime" | "s6" | "s4b"
-       payload: dict     # the message + routing metadata
-       agent_id: str
-       confidence: float
-   ```
-   - `route_message(message: str, agent: AgentMetadata, context: dict) -> Route`
-   - Logic: inspect message → match intent → decide destination
-     - Simple chat/greeting → Route(destination="runtime")
-     - Complex/multi-step → Route(destination="s6")
-     - Known tool pattern → Route(destination="s4b")
-   - Pure dispatch — NO LLM calls, NO intent production
+**Status**: ✅ Complete
 
-2. **Remove** `src/agent/cognitive_loop.py` entirely:
-   - Delete the file
-   - Remove `ACTION_CALL_TOOL_INTENT` from `src/agent/contracts.py` (tools are called via Platform, not agents)
-   - Remove `ACTION_AGENT_STEP_INTENT` and `ACTION_REQUEST_S4_JOB_INTENT` from contracts — agents no longer produce intents
-   - Remove `VALID_ACTION_INTENT_TYPES` (no longer needed)
-   - Remove `call_s1_backend()` imports from agent code (Runtime owns LLM calls)
+Outcome: Agent is a thin router — inspect, match, dispatch. No cognitive loop, no intent types, no LLM calls in agent code. All 206 agent tests pass.
 
-3. **Simplify `src/agent/supervisor.py`**:
-   - Remove `run_cognitive_loop()` call from `run_agent_step()`
-   - Replace with: load agent state → call router → dispatch to destination → record result
-   - Keep state persistence (lifecycle transitions, conversation history) — that's still valid
-   - Keep `create_agent()` / `activate_agent()` — lifecycle management is still needed
-   - Remove `_produce_action_intents()`, `_process_action_intents()`, and `dispatch_action_intents()`
+### PHASE 5.3 — CLI Channel Integration (✅ Done)
+**Implemented in**: `tools/agent/cli_app.py`
 
-4. **Update `src/agent/job_interface.py`**: The `submit_job_callable` pattern stays — it's how S5 dispatches to S4b. But the call site moves from the supervisor's intent processor to the router's "route to S4b" path.
+**Files changed**:
+- `tools/agent/cli_app.py` — MODIFIED (rewired from cognitive loop to `supervisor.run_agent_step()`; uses `call_s1_backend(backend="conversational")` as Runtime stand-in; interactive REPL, pipe mode, and agent selection retained)
 
-5. **Verify file structure**:
-   - `src/agent/router.py` — NEW (thin router)
-   - `src/agent/supervisor.py` — MODIFIED (simplified)
-   - `src/agent/cognitive_loop.py` — DELETED
-   - `src/agent/contracts.py` — MODIFIED (remove intent types)
-   - `src/agent/job_interface.py` — MODIFIED (keep submit pattern, remove intent dispatch)
-   - `src/agent/__init__.py` — MODIFIED (update exports)
+**Status**: ✅ Complete
 
-**Expected outcome after this phase:**
-```
-Agent receives message
-  → router.route_message(message, agent_metadata)
-  → Route(destination="runtime" | "s6" | "s4b", ...)
-  → supervisor dispatches accordingly
-  → return response
-```
-No cognitive loop, no intent production, no LLM calls in agent code.
+Outcome: CLI works end-to-end through the new router — user message → route → dispatch → response. No cognitive loop dependency. `vai> ` interactive mode and `echo "hello" | python -m tools.agent.cli_app` pipe mode both function.
 
-Also update `src/agent/__init__.py` to export only:
-- `AgentMetadata`, `AgentIdentity`, `AgentConstraints` (from contracts)
-- `AgentState`, `LifecycleState`, `LifecycleEvent` (from interfaces)
-- `AgentStateStore`, stores (memory, file, sqlite) (from adapters)
-- `Route`, `route_message` (from router)
-- `Supervisor` (from supervisor)
+### PHASE 5.4 — Integration Tests (✅ Done)
+**Implemented in**: `tests/unit/agent/`
 
-Outcome: Agent is a thin router — inspect, match, dispatch. No cognitive loop, no intent types, no LLM calls.
+**Files changed**:
+- `tests/unit/agent/test_router.py` — CREATED (38 tests covering Route dataclass validation, routing decisions, keyword matching, capability gating)
+- `tests/unit/agent/test_supervisor.py` — MODIFIED (6 fixes: removed cognitive loop references, cognitive_result→route_result)
+- `tests/unit/agent/test_job_interface.py` — MODIFIED (rewritten for dispatch_route() API, 8 tests)
+- `tests/unit/agent/test_cognitive_loop.py` — DELETED
+- `tests/unit/agent/test_contracts.py` — MODIFIED (removed ActionIntent class tests)
+- `tests/unit/agent/test_activation.py` — MODIFIED (removed stale ACTION_REQUEST_S4_JOB_INTENT import)
+- `tests/unit/agent/test_agent_state_store.py` — MODIFIED (removed ActionIntent/Action types)
 
-### PHASE 5.3 — CLI Channel Integration
-The existing `tools/agent/cli_app.py` currently uses the old cognitive loop path (supervisor → cognitive_loop → call_s1_backend). Rewire it to use the new router and the "conversational" backend via Runtime.
-
-**What to do:**
-
-1. **Rewrite `tools/agent/cli_app.py` entry point**:
-   - On init: load agents from YAML, create Supervisor, create Runtime client
-   - On message: call `supervisor.route_message()` instead of running the cognitive loop
-   - If Route(destination="runtime"): call `runtime.call()` with the message and agent persona
-   - If Route(destination="s6"): print "workflow dispatch not yet implemented" (S6 doesn't exist yet)
-   - If Route(destination="s4b"): submit job via `submit_job_callable` and display result
-   - Display response text to user in the existing formatted UI
-
-2. **Keep existing UX features**:
-   - Interactive REPL with prompt
-   - Pipe mode (single message via stdin → print → exit)
-   - Agent selection (`vai> tell me about...` uses default agent, `:agent assistant` switches)
-   - Help command
-   - Formatted output (box borders, section headers)
-
-3. **Wire Runtime as the LLM backend**:
-   - Import and use the real `transport.complete()` from `src/strategy/llm/transport.py`
-   - For now, continue using `call_s1_backend(..., backend="conversational")` as the Runtime stand-in until Runtime is built
-   - Later (Phase R.2), this switches to the formal Runtime API
-
-4. **Default behavior**:
-   - `default_backend="conversational"` — use real LLM
-   - `max_iterations` is no longer relevant (no cognitive loop) — remove it
-   - Remove `--backend` CLI flag if it only controlled the cognitive loop
-
-5. **Test**:
-   - `python -m tools.agent.cli_app` — interactive mode works
-   - `echo "hello" | python -m tools.agent.cli_app` — pipe mode works
-   - Real DeepSeek responses appear in the output
-
-Outcome: CLI works end-to-end through the new router, no cognitive loop dependency.
-
-### PHASE 5.4 — Integration Tests
-Write tests covering the new router-based agent layer.
-
-**What to do:**
-
-1. **Create `tests/unit/agent/test_router.py`**:
-   - `test_route_conversational_message()` — simple chat → Route(destination="runtime")
-   - `test_route_complex_request()` — multi-step → Route(destination="s6")
-   - `test_route_tool_pattern()` — known tool intent → Route(destination="s4b")
-   - `test_route_empty_message()` — empty input → Route(destination="runtime") with error context
-   - `test_route_unknown_agent()` — non-existent agent_id → raises or returns error route
-   - `test_route_injects_agent_metadata()` — payload contains agent_id, name, persona
-
-2. **Update `tests/unit/agent/test_supervisor.py`**:
-   - Remove tests that depend on cognitive loop / intent production
-   - Add tests for the simplified supervisor:
-     - `test_create_agent()` — still valid
-     - `test_activate_agent()` — still valid
-     - `test_agent_lifecycle_transitions()` — still valid
-     - `test_route_and_dispatch()` — supervisor calls router and dispatches correctly
-   - Verify all old tests that reference deleted code are removed or updated
-
-3. **Update `tests/unit/agent/test_job_interface.py`**:
-   - Remove tests for intent-based dispatch
-   - Keep tests for `submit_job_callable` pattern (still valid for S4b dispatch)
-   - Add test for direct job submission through the router
-
-4. **Run full test suite**:
-   ```
-   python -m pytest tests/unit/agent/ -v
-   ```
-   All tests pass.
+**Status**: ✅ Complete — all 206 agent tests pass.
 
 Outcome: S5 is tested and stable with the new router architecture.
 
-## STRATUM 6 — Workflow Layer (Orchestration + State Machines)
-S6 is the workflow engine. It owns workflow definitions, state machine execution, and
-orchestration of multi-step processes. S6 receives triggers via S4's event substrate.
-S6 delegates LLM work to Runtime. S6 delegates tool execution to Platform.
+## PHASE 5.5 — Workflow Definition Model
+The workflow layer sits inside S5 (phases 5.5—5.11). It owns workflow definitions,
+state machine execution, and orchestration of multi-step processes. Workflow receives
+triggers via S4's event substrate, delegates LLM work to Runtime, and delegates tool
+execution to Platform.
 
-### PHASE 6.0 — Workflow Definition Model
-Design the workflow schema. A workflow is a directed graph of steps that share context. This phase produces the data model and YAML loader — no execution yet.
+Design the workflow schema. A workflow is a directed graph of steps that share context.
+This phase produces the data model and YAML loader — no execution yet.
 
 **Files to create:**
-- `src/workflow/workflow_definition.py` — pydantic models
-- `src/workflow/loaders/yaml_loader.py` — YAML parser with validation
-- `src/workflow/registry.py` — WorkflowRegistry (in-memory)
+- `src/agent/workflow/workflow_definition.py` — pydantic models
+- `src/agent/workflow/loaders/yaml_loader.py` — YAML parser with validation
+- `src/agent/workflow/registry.py` — WorkflowRegistry (in-memory)
 - `config/workflows/demo_chat.yaml` — sample workflow
-- `tests/unit/workflow/test_workflow_definition.py` — tests
+- `tests/unit/agent/workflow/test_workflow_definition.py` — tests
 
 **Step types:**
 | Step Type | Purpose | Config Fields |
@@ -2372,7 +2285,7 @@ class WorkflowDefinition(BaseModel):
     required_agent_tags: list[str] = []  # for agent selection (Phase 6.3)
 ```
 
-**Implement YAML loader** in `src/workflow/loaders/yaml_loader.py`:
+**Implement YAML loader** in `src/agent/workflow/loaders/yaml_loader.py`:
 ```python
 def load_workflow(path: str) -> WorkflowDefinition:
     # 1. Read YAML file
@@ -2381,7 +2294,7 @@ def load_workflow(path: str) -> WorkflowDefinition:
     # 4. Return validated definition or raise ValidationError
 ```
 
-**Implement `WorkflowRegistry`** in `src/workflow/registry.py`:
+**Implement `WorkflowRegistry`** in `src/agent/workflow/registry.py`:
 ```python
 class WorkflowRegistry:
     def register(self, defn: WorkflowDefinition) -> None: ...
@@ -2390,7 +2303,7 @@ class WorkflowRegistry:
     def find_by_trigger(self, event_type: str) -> list[WorkflowDefinition]: ...
 ```
 
-**Write tests** (`tests/unit/workflow/test_workflow_definition.py`):
+**Write tests** (`tests/unit/agent/workflow/test_workflow_definition.py`):
 1. Create valid workflow → all fields match input
 2. Missing start_step → raises ValidationError
 3. Transition to non-existent step → raises ValidationError
@@ -2404,14 +2317,14 @@ class WorkflowRegistry:
 
 ✅ Outcome: Workflows are declarative YAML files validated as acyclic directed graphs.
 
-### PHASE 6.1 — Workflow Engine (State Machine)
+### PHASE 5.6 — Workflow Engine (State Machine)
 The core execution engine. A state machine that runs workflow steps, manages shared context, handles transitions, and exposes a clean API. The engine NEVER calls LLMs or tools directly — it delegates through APIs.
 
 **Critical architectural rule:** `llm_call` steps use a Runtime API function. `tool_execute` steps use a Platform API function. The engine receives these as callbacks — it does not import transport.py or skill_runner.py.
 
 **Files to create:**
-- `src/workflow/engine.py` — WorkflowEngine, WorkflowInstance, StepResult
-- `tests/unit/workflow/test_engine.py` — comprehensive tests
+- `src/agent/workflow/engine.py` — WorkflowEngine, WorkflowInstance, StepResult
+- `tests/unit/agent/workflow/test_engine.py` — comprehensive tests
 
 **Implement `WorkflowInstance`:**
 ```python
@@ -2457,7 +2370,7 @@ class WorkflowEngine:
 6. On timeout: follow `transitions["on_timeout"]` if defined, else set state to `"timeout"`.
 7. Record `StepResult` in `instance.step_history` after each step.
 
-**Write tests** (`tests/unit/workflow/test_engine.py`):
+**Write tests** (`tests/unit/agent/workflow/test_engine.py`):
 1. Linear workflow (3 llm_call steps) → executes all in order → state="succeeded"
 2. Workflow with condition step → follows correct path based on context value
 3. Workflow with tool_execute → calls platform_api with correct params
@@ -2471,13 +2384,13 @@ class WorkflowEngine:
 
 ✅ Outcome: Fully functional workflow state machine. Tested across all step types, transitions, and error paths.
 
-### PHASE 6.2 — Workflow Trigger Router
-S6 needs to receive events from S4's event substrate. This phase builds the trigger router that subscribes, filters, and maps events to workflow instances.
+### PHASE 5.7 — Workflow Trigger Router
+The workflow layer receives signals from S4's event substrate. This phase builds the trigger router that subscribes, filters, and maps events to workflow instances.
 
 **Files to create:**
-- `src/workflow/trigger_router.py` — TriggerRouter, WorkflowEvent
-- `src/workflow/event_bus.py` — lightweight in-process event bus (stand-in for S4b)
-- `tests/unit/workflow/test_trigger_router.py` — tests
+- `src/agent/workflow/trigger_router.py` — TriggerRouter, WorkflowEvent
+- `src/agent/workflow/event_bus.py` — lightweight in-process event bus (stand-in for S4b)
+- `tests/unit/agent/workflow/test_trigger_router.py` — tests
 
 **Implement `WorkflowEvent` and `TriggerRouter`:**
 ```python
@@ -2516,7 +2429,7 @@ class EventBus:
 - On event publish: route through TriggerRouter.handle_event()
 - Log all routing decisions
 
-**Write tests** (`tests/unit/workflow/test_trigger_router.py`):
+**Write tests** (`tests/unit/agent/workflow/test_trigger_router.py`):
 1. Publish matching event → workflow instance created → instance_id returned
 2. Publish non-matching event → no workflow instance → returns None
 3. Multiple workflows match same event type → all start → list of instance_ids
@@ -2524,13 +2437,13 @@ class EventBus:
 5. Event with matching correlation_id → instance has correlation_id in context
 6. Resume event for paused workflow → engine.resume() called instead of engine.start()
 
-✅ Outcome: S6 has a clean ingress for events without owning transport. Stand-in event bus enables independent development.
+✅ Outcome: The workflow layer has a clean ingress for events without owning transport. Stand-in event bus enables independent development.
 
-### PHASE 6.3 — Agent Selection Layer
-Given a workflow, select the correct agent from S5's registry. This is the glue between S6 (what to do) and S5 (who does it).
+### PHASE 5.8 — Agent Selection Layer
+Given a workflow, select the correct agent from S5's registry. This is the glue between the workflow layer (what to do) and the agent layer (who does it).
 
-**File to create:** `src/workflow/agent_selector.py`
-**Test file:** `tests/unit/workflow/test_agent_selector.py`
+**File to create:** `src/agent/workflow/agent_selector.py`
+**Test file:** `tests/unit/agent/workflow/test_agent_selector.py`
 
 **Implement `AgentSelector`:**
 ```python
@@ -2566,11 +2479,11 @@ class AgentSelector:
 
 ✅ Outcome: Workflow engine auto-selects the right S5 agent for each workflow.
 
-### PHASE 6.4 — Human-in-the-Loop
+### PHASE 5.9 — Human-in-the-Loop
 Workflows need to pause for human input. This phase builds the interaction manager that handles the pause → present → validate → resume cycle.
 
-**File to create:** `src/workflow/user_interaction.py`
-**Test file:** `tests/unit/workflow/test_user_interaction.py`
+**File to create:** `src/agent/workflow/user_interaction.py`
+**Test file:** `tests/unit/agent/workflow/test_user_interaction.py`
 
 **Implement `UserInteractionManager`:**
 ```python
@@ -2625,11 +2538,11 @@ class UserInteractionManager:
 
 ✅ Outcome: Workflows can pause for human input with validation. CLI can display prompts and collect responses.
 
-### PHASE 6.5 — Platform Integration
-Enforce the rule that all external calls from S6 go through Platform (S4b). Currently the engine may call Runtime directly — this phase routes everything through Platform's API.
+### PHASE 5.10 — Platform Integration
+The workflow engine must route all external calls through Platform (S4b). Currently the engine may call Runtime directly — this phase routes everything through Platform's API.
 
-**File to create:** `src/workflow/platform_adapter.py`
-**Test file:** `tests/unit/workflow/test_platform_adapter.py`
+**File to create:** `src/agent/workflow/platform_adapter.py`
+**Test file:** `tests/unit/agent/workflow/test_platform_adapter.py`
 
 **Implement `PlatformAdapter`:**
 ```python
@@ -2653,7 +2566,7 @@ class PlatformAdapter:
 **Replace direct calls in `WorkflowEngine`:**
 - `engine._runtime_api` → `platform_adapter.call_runtime()`
 - `engine._platform_api.execute_tool()` → `platform_adapter.execute_tool()`
-- No code in S6 imports `transport.py`, `s1_client.py`, or `skill_runner.py`
+- No code in the workflow layer imports `transport.py`, `s1_client.py`, or `skill_runner.py`
 
 **Update engine constructor:**
 ```python
@@ -2669,15 +2582,15 @@ class WorkflowEngine:
 3. `send_output()` → submits job → no error
 4. Adapter passes correct parameters to underlying submit_job_fn
 5. Engine tests still pass after swap (update engine test fixtures to use PlatformAdapter)
-6. Verify no direct imports of transport/skill_runner in any src/workflow/ file
+6. Verify no direct imports of transport/skill_runner in any src/agent/workflow/ file
 
-✅ Outcome: Platform is the only execution conduit for S6.
+✅ Outcome: Platform is the only execution conduit for the workflow layer.
 
-### PHASE 6.6 — Workflow Supervisor
+### PHASE 5.11 — Workflow Supervisor
 Operational layer for observing and managing all running workflow instances.
 
-**File to create:** `src/workflow/supervisor.py`
-**Test file:** `tests/unit/workflow/test_supervisor.py`
+**File to create:** `src/agent/workflow/supervisor.py`
+**Test file:** `tests/unit/agent/workflow/test_supervisor.py`
 
 **Implement `WorkflowSupervisor`:**
 ```python
@@ -2726,13 +2639,13 @@ class WorkflowSupervisor:
 
 ## Runtime — Cross-Cutting LLM Service
 
-Runtime is not a stratum — it is a service used by S5, S6, and S2.
+Runtime is not a stratum — it is a service used by S5 and S2.
 Every layer above S4b calls Runtime when it needs LLM cognition.
 
 **Note on naming:** The existing `src/strategy/planning/s1_contract/` directory and `s1_real_client.py` are legacy names from when Runtime was "Strategy 1". They need to be renamed (but rename is done in Phase R.2 — keep functional changes separate from renames).
 
 ### PHASE R.1 — Runtime Contract
-Define the Runtime API that all calling layers (S5, S6, S2) will use. This is a contract-first phase — no implementation changes yet.
+Define the Runtime API that all calling layers (S5, S2) will use. This is a contract-first phase — no implementation changes yet.
 
 **File to create:** `src/runtime/contract.py`
 

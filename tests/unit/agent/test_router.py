@@ -6,7 +6,7 @@ Tests for the deterministic pattern-matching message router.
 
 Covers:
 - Route dataclass construction and validation
-- route_message routing decisions (DEST_RUNTIME, DEST_S6, DEST_S4B)
+- route_message routing decisions (DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B)
 - Keyword matching and case insensitivity
 - Capability-gated execution routing
 - Edge cases (empty messages, unknown agents)
@@ -21,7 +21,7 @@ import pytest
 from src.agent.router import (
     DEST_RUNTIME,
     DEST_S4B,
-    DEST_S6,
+    DEST_WORKFLOW,
     Route,
     route_message,
 )
@@ -84,7 +84,7 @@ class TestRouteConstruction:
     """Route is a frozen dataclass with post-init validation."""
 
     def test_valid_destinations(self) -> None:
-        for dest in (DEST_RUNTIME, DEST_S6, DEST_S4B):
+        for dest in (DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B):
             r = Route(destination=dest, agent_id="a1")
             assert r.destination == dest
             assert r.payload == {}
@@ -171,7 +171,7 @@ class TestRouteMessageDefaults:
 
 
 class TestRouteMessageS6:
-    """Workflow keywords route to DEST_S6 irrespective of capabilities."""
+    """Workflow keywords route to DEST_WORKFLOW irrespective of capabilities."""
 
     @pytest.mark.parametrize(
         "msg",
@@ -190,7 +190,7 @@ class TestRouteMessageS6:
         self, msg: str, default_agent: AgentMetadata
     ) -> None:
         route = route_message(msg, default_agent)
-        assert route.destination == DEST_S6
+        assert route.destination == DEST_WORKFLOW
         assert route.confidence == 0.8
         assert route.payload.get("trigger") == "workflow_request"
 
@@ -199,7 +199,7 @@ class TestRouteMessageS6:
     ) -> None:
         """Keyword can appear anywhere in the message."""
         route = route_message("I need to start workflow daily-report", default_agent)
-        assert route.destination == DEST_S6
+        assert route.destination == DEST_WORKFLOW
 
     def test_s6_carries_agent_id(self, default_agent: AgentMetadata) -> None:
         route = route_message("run workflow", default_agent)
@@ -246,7 +246,7 @@ class TestRouteMessageS4B:
     ) -> None:
         """Workflow keywords are checked first and take priority."""
         route = route_message("run workflow", job_capable_agent)
-        assert route.destination == DEST_S6  # not S4B
+        assert route.destination == DEST_WORKFLOW  # not S4B
 
     def test_s4b_carries_agent_id(
         self, job_capable_agent: AgentMetadata

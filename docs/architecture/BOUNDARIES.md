@@ -1,6 +1,6 @@
 # Boundaries — Stratum Isolation and Invariants
 
-**Purpose:** Define the formal boundaries, import rules, and architectural invariants that govern all six strata of the vai-core runtime.
+**Purpose:** Define the formal boundaries, import rules, and architectural invariants that govern all five strata of the vai-core runtime.
 
 ---
 
@@ -12,8 +12,7 @@
 | S2      | `src/strategy/`     | Planning, memory, task decomposition                |
 | S3      | `src/capabilities/` | Primitives, skills, registry                        |
 | S4      | `src/platform/`     | Queue, supervision, control plane, daemon, channels |
-| S5      | `src/agents/`       | Agents (placeholder)                                |
-| S6      | `src/workflow/`     | Workflows (placeholder)                             |
+| S5      | `src/agent/`        | Agents, workflows, router, supervisor               |
 
 ---
 
@@ -22,22 +21,19 @@
 The dependency graph between strata is a strict DAG. Violations are build errors.
 
 ```
-S1 ← S2 ← S3 ← S4 → S5, S6
-                 ↓
-            (no import)
+S1 ← S2 ← S3 ← S4 → S5
 ```
 
 | Rule | Description |
 |------|-------------|
 | **S4 → S2** | S4 **must not** import S2. The control plane dispatches instructions to S2 via the adapter layer, never by importing S2 modules directly. |
 | **S4 → S5** | S4 **must not** import S5. S5 subscribes to S4 events; S4 has no knowledge of S5. |
-| **S4 → S6** | S4 **must not** import S6. Same subscription model as S5. |
 | **S2 → S1** | S2 can import S1 utilities (e.g. primitive types). |
 | **S3 → S2** | S3 can import S2 for strategy context. |
 | **S1 ↔ S0** | No stratum below S1 exists. S1 is leaf code. |
 
 ```python
-# ControlPlane (S4) — NO imports from S2, S5, or S6
+# ControlPlane (S4) — NO imports from S2, or S5
 from src.platform.runtime.job_state import JobState, transition  # ✓ same stratum
 from src.platform.observability.logging import log_job_state_transition  # ✓ same stratum
 from src.platform.supervisor.system_alerts import alert_async  # ✓ same stratum

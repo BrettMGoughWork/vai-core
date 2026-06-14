@@ -30,7 +30,9 @@ from __future__ import annotations
 import argparse
 import sys
 import traceback
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from src.agent import (
     AgentMessage,
@@ -65,8 +67,27 @@ DEFAULT_AGENT_ID = "assistant"
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Dry-run submit-job callback
+# ---------------------------------------------------------------------------
+
+
+def _dry_run_submit_job(payload: dict) -> str:
+    """Print what would be dispatched to S4B and return a fake job ID."""
+    print(f"  [s4b] would dispatch job to: {payload.get('destination', '?')}")
+    print(f"  [s4b] payload: {payload}")
+    return "dry-run-job-00000000-0000-0000-0000-000000000000"
+
+
+# ---------------------------------------------------------------------------
+# Bootstrap
+# ---------------------------------------------------------------------------
+
+
 def _bootstrap(
     manifest_path: str | Path | None = None,
+    *,
+    submit_job_callable: Callable[[Any], str] | None = None,
 ) -> tuple[Supervisor, AgentRegistry]:
     """Load the agent manifest, build the registry, and create a Supervisor.
 
@@ -97,6 +118,7 @@ def _bootstrap(
     supervisor = Supervisor(
         registry=registry,
         store=store,
+        submit_job_callable=submit_job_callable,
         auto_persist=True,
     )
 
@@ -274,13 +296,19 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Path to agent manifest YAML (default: config/agents.yaml)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print S4B dispatch info instead of submitting real jobs",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
 
-    supervisor, registry = _bootstrap(args.manifest)
+    submit_job_callable = _dry_run_submit_job if args.dry_run else None
+    supervisor, registry = _bootstrap(args.manifest, submit_job_callable=submit_job_callable)
 
     if not registry.has_agent(args.agent):
         available = ", ".join(
@@ -288,6 +316,9 @@ def main() -> None:
         ) or "(none)"
         print(f"Unknown agent {args.agent!r}. Available: {available}")
         sys.exit(1)
+
+    if args.dry_run:
+        print("  [init] dry-run mode — S4B jobs will be printed, not submitted")
 
     if args.text:
         run_single(args.text, args.agent, supervisor, registry)
