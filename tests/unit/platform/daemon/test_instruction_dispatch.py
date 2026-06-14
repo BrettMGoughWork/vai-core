@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.daemon.instruction_dispatch import (
+from src.platform.daemon.instruction_dispatch import (
     DEFAULT_ACTION_MAP,
     VALID_ACTIONS,
     InstructionDispatchConfig,

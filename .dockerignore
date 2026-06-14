@@ -1,0 +1,34 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Build artifacts
+dist/
+build/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Local dev / tests
+tests/
+docs/
+agent_traces/
+tools/dev/*.exe
+
+# Config — container uses its own config
+config.local.yaml
