@@ -54,6 +54,7 @@ from src.agent.registry import AgentRegistry, AgentNotFoundError
 from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
 from src.agent.workflow import WorkflowEngine, WorkflowRegistry
 from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
+from src.agent.workflow.user_interaction import UserInteractionManager
 from src.runtime.interfaces import (
     PromptRequest,
     PromptResponse,
@@ -104,12 +105,14 @@ class Supervisor:
         *,
         submit_job_callable: Optional[Callable[[Any], str]] = None,
         workflow_registry: Optional[WorkflowRegistry] = None,
+        interaction_manager: Optional[UserInteractionManager] = None,
         auto_persist: bool = True,
     ) -> None:
         self._registry = registry
         self._store = store
         self._submit_job = submit_job_callable
         self._workflow_registry = workflow_registry
+        self._interaction_manager = interaction_manager
         self._auto_persist = auto_persist
 
     # ── 1. create_agent ────────────────────────────────────────────────
@@ -442,11 +445,26 @@ class Supervisor:
                 wf_state = _restore_wf_state(wf_dict)
                 waiting_for = meta.get("workflow_waiting_for", "")
                 if waiting_for == "user_input":
-                    wf_state, _outcome = engine.resume_with_input(
-                        wf_state, input_text,
-                    )
-                    # The step() inside resume_with_input may return
-                    # continue — the loop below processes it.
+                    request_id = meta.get("workflow_interaction_request_id", "")
+                    if request_id and self._interaction_manager is not None:
+                        valid, err, result = self._interaction_manager.submit_response(
+                            request_id, {"text": input_text}, wf_state,
+                        )
+                        if not valid:
+                            new_errors.append({
+                                "type": "interaction_error",
+                                "message": err or "Invalid interaction response",
+                            })
+                            # Fall back to raw resume so the workflow doesn't stall
+                            wf_state, _outcome = engine.resume_with_input(
+                                wf_state, input_text,
+                            )
+                        else:
+                            wf_state, _outcome = result
+                    else:
+                        wf_state, _outcome = engine.resume_with_input(
+                            wf_state, input_text,
+                        )
                 elif waiting_for == "tool_result":
                     result = meta.get("workflow_last_result", {})
                     last_step = meta.get("workflow_last_step_id", "")
@@ -824,6 +842,22 @@ class Supervisor:
             if outcome.type == "waiting_for_input":
                 meta["workflow_state"] = _freeze_wf_state(wf_state)
                 meta["workflow_waiting_for"] = "user_input"
+
+                # Register an interaction request with the manager
+                if self._interaction_manager is not None:
+                    step_config = outcome.config or {}
+                    prompt = step_config.get("prompt", "Please provide input:")
+                    schema = step_config.get("input_schema", {})
+                    req = self._interaction_manager.request_input(
+                        instance_id=wf_state.workflow_id,
+                        step_id=outcome.step_id,
+                        prompt=prompt,
+                        schema=schema,
+                        timeout_seconds=step_config.get("timeout_seconds"),
+                    )
+                    meta["workflow_interaction_request_id"] = req.request_id
+                    meta["workflow_interaction_prompt"] = prompt
+
                 return self._persist(state.with_(
                     lifecycle_state=LifecycleState.WAITING,
                     route_result=route,

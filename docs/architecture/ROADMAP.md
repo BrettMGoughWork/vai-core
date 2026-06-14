@@ -2565,6 +2565,36 @@ class WorkflowSupervisor:
 
 ✅ Outcome: Operations team can observe, manage, and debug running workflows.
 
+---
+
+### PHASE 5.12 — Gateway / Platform Formal Split
+
+**Goal:** Physically separate the Gateway (transport boundary) from Platform (runtime) to enforce architectural layering. Gateway and Platform are both S4 components, but they should be independently testable and replaceable.
+
+**5.12.1 — Gateway Package**
+- Move `src/platform/transport/` to `src/gateway/` as a standalone package
+- Gateway owns: FastAPI app, protocol normalization (CLI/HTTP/WS/Webhook/SMTP), `ChannelMessage`, and external API surface
+- Gateway has zero visibility into Platform internals — no imports of `src.platform.runtime.*`, `src.platform.queue.*`, or `src.platform.supervisor.*`
+
+**5.12.2 — Platform Package Cleanup**
+- `src/platform/` becomes pure Platform runtime only
+- Remove any Gateway-adjacent code (transport adapters, channel message normalizers that are transport concerns)
+- Platform owns: control plane, worker pool, queue, supervision, durability, retry, job lifecycle
+
+**5.12.3 — Gateway ↔ Platform Interface**
+- Define a single `GatewayPlatformAdapter` (or equivalent protocol) that Gateway calls to submit jobs
+- Platform implements the adapter — Gateway never imports Platform internals
+- Adapter lives in `src/gateway/adapters/` or similar boundary
+
+**5.12.4 — Channel Registry Ownership**
+- Channels are Platform concerns (they produce `ChannelMessage` → `Job`)
+- The registry stays in `src/platform/runtime/channels/`
+- Gateway uses the registry through the adapter, not directly
+
+✅ **Outcome:** Gateway and Platform are physically separate packages with a defined boundary interface, matching the architectural diagram.
+
+---
+
 ## Runtime — Cross-Cutting LLM Service
 
 Runtime is not a stratum — it is a service used by S5 and S2.
