@@ -52,6 +52,8 @@ from src.agent.interfaces.agent_state_store import AgentStateStore
 from src.agent.job_interface import JobDispatchResult, dispatch_route
 from src.agent.registry import AgentRegistry, AgentNotFoundError
 from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
+from src.agent.workflow import WorkflowEngine, WorkflowRegistry
+from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.runtime.interfaces import (
     PromptRequest,
     PromptResponse,
@@ -101,11 +103,13 @@ class Supervisor:
         store: AgentStateStore,
         *,
         submit_job_callable: Optional[Callable[[Any], str]] = None,
+        workflow_registry: Optional[WorkflowRegistry] = None,
         auto_persist: bool = True,
     ) -> None:
         self._registry = registry
         self._store = store
         self._submit_job = submit_job_callable
+        self._workflow_registry = workflow_registry
         self._auto_persist = auto_persist
 
     # ── 1. create_agent ────────────────────────────────────────────────
@@ -415,15 +419,67 @@ class Supervisor:
             })
 
         if route.destination == DEST_WORKFLOW:
-            # Workflow execution path — not yet implemented
-            return self._persist(state.with_(
-                lifecycle_state=LifecycleState.WAITING,
-                route_result=route,
-                errors=new_errors,
-                supervisor_metadata=meta,
-                _reason="Workflow dispatch not yet implemented (DEST_WORKFLOW)",
-                _details={"route_destination": route.destination},
-            ))
+            if self._workflow_registry is None:
+                new_errors.append({
+                    "type": "workflow_not_configured",
+                    "message": "Workflow route matched but no workflow registry configured",
+                })
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.COMPLETED,
+                    route_result=route,
+                    errors=new_errors,
+                    supervisor_metadata=meta,
+                    _reason="Workflow registry not configured",
+                    _details={"route_destination": route.destination},
+                ))
+
+            workflow_id = route.payload.get("workflow_id") or state.agent_id
+            engine = WorkflowEngine(self._workflow_registry)
+
+            # ── Resume path (workflow state exists in metadata) ────────
+            wf_dict = meta.get("workflow_state")
+            if wf_dict is not None:
+                wf_state = _restore_wf_state(wf_dict)
+                waiting_for = meta.get("workflow_waiting_for", "")
+                if waiting_for == "user_input":
+                    wf_state, _outcome = engine.resume_with_input(
+                        wf_state, input_text,
+                    )
+                    # The step() inside resume_with_input may return
+                    # continue — the loop below processes it.
+                elif waiting_for == "tool_result":
+                    result = meta.get("workflow_last_result", {})
+                    last_step = meta.get("workflow_last_step_id", "")
+                    wf_state, _outcome = engine.resume_with_result(
+                        wf_state, last_step, result,
+                    )
+                # else: just run step() on the restored state
+                return self._run_workflow_loop(
+                    state, engine, wf_state, route, meta, new_errors,
+                )
+
+            # ── Start path ───────────────────────────────────────────
+            try:
+                wf_state = engine.start_workflow(
+                    workflow_id, context={"input": input_text},
+                )
+            except ValueError as exc:
+                new_errors.append({
+                    "type": "workflow_not_found",
+                    "message": str(exc),
+                })
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.FAILED,
+                    route_result=route,
+                    errors=new_errors,
+                    supervisor_metadata=meta,
+                    _reason=str(exc),
+                    _details={"route_destination": route.destination},
+                ))
+
+            return self._run_workflow_loop(
+                state, engine, wf_state, route, meta, new_errors,
+            )
 
         # Fallback: completed with no output
         return self._persist(state.with_(
@@ -618,6 +674,213 @@ class Supervisor:
         """Return the full lifecycle event history for audit/debug."""
         return list(state.lifecycle_history)
 
+    # ── ─ Workflow execution loop ───────────────────────────────────────
+
+    _WF_MAX_ITERATIONS = 50
+    """Safety limit on sequential step iterations within one call."""
+
+    def _run_workflow_loop(
+        self,
+        state: AgentState,
+        engine: WorkflowEngine,
+        wf_state: WorkflowExecutionState,
+        route: Route,
+        meta: Dict[str, Any],
+        new_errors: List[Dict[str, Any]],
+    ) -> AgentState:
+        """Deterministic step-processing loop.
+
+        Processes steps until a blocking outcome (tool_execute,
+        waiting_for_input) or a terminal outcome (completed, failed)
+        is reached.
+        """
+        iteration = 0
+
+        while iteration < self._WF_MAX_ITERATIONS:
+            iteration += 1
+            wf_state, outcome = engine.step(wf_state)
+
+            # ── Deterministic transitions ──────────────────────────
+            if outcome.type == "continue":
+                continue
+
+            # ── Terminal ───────────────────────────────────────────
+            if outcome.type == "completed":
+                meta.pop("workflow_state", None)
+                meta.pop("workflow_waiting_for", None)
+                final_msg = (
+                    wf_state.context.get("_workflow_result")
+                    or "Workflow completed successfully."
+                )
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.COMPLETED,
+                    route_result=route,
+                    final_response=AgentResponse(
+                        reply=str(final_msg),
+                        metadata={
+                            "correlation_id": state.correlation_id,
+                            "trace_id": state.trace_id,
+                            "agent_id": state.agent_id,
+                            "workflow_id": wf_state.workflow_id,
+                            "route_destination": route.destination,
+                        },
+                    ),
+                    supervisor_metadata=meta,
+                    _reason="Workflow completed",
+                    _details={
+                        "workflow_id": wf_state.workflow_id,
+                        "execution_id": wf_state.execution_id,
+                    },
+                ))
+
+            if outcome.type == "failed":
+                meta.pop("workflow_state", None)
+                meta.pop("workflow_waiting_for", None)
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.FAILED,
+                    route_result=route,
+                    errors=(list(state.errors) + new_errors + [{
+                        "type": "workflow_step_failed",
+                        "step_id": outcome.step_id,
+                        "message": outcome.error or "Unknown workflow error",
+                    }]),
+                    supervisor_metadata=meta,
+                    _reason=f"Workflow failed: {outcome.error}",
+                    _details={
+                        "workflow_id": wf_state.workflow_id,
+                        "step_id": outcome.step_id,
+                    },
+                ))
+
+            # ── LLM call → call Runtime → resume → loop ────────────
+            if outcome.type == "llm_call":
+                runtime_request = PromptRequest(
+                    prompt=outcome.config,
+                    memory={},
+                    plan_context={},
+                    tool_context=[],
+                )
+                runtime_response = call_runtime_backend(
+                    runtime_request, backend="conversational",
+                )
+                if isinstance(runtime_response, PromptResponse):
+                    wf_state, _ = engine.resume_with_result(
+                        wf_state, outcome.step_id, runtime_response.output,
+                    )
+                else:
+                    wf_state, _ = engine.fail_step(
+                        wf_state, outcome.step_id, str(runtime_response),
+                    )
+                continue
+
+            # ── Tool execute → dispatch to S4B → WAITING ──────────
+            if outcome.type == "tool_execute":
+                tool_route = Route(
+                    destination=DEST_S4B,
+                    payload=outcome.config,
+                    agent_id=state.agent_id,
+                )
+                dispatch_result = dispatch_route(
+                    route=tool_route,
+                    submit_job_callable=self._submit_job,
+                )
+                if dispatch_result.errors:
+                    for _jid, err_msg in dispatch_result.errors:
+                        new_errors.append({
+                            "type": "workflow_dispatch_error",
+                            "step_id": outcome.step_id,
+                            "message": err_msg,
+                        })
+
+                if dispatch_result.dispatched_jobs:
+                    meta["workflow_state"] = _freeze_wf_state(wf_state)
+                    meta["workflow_waiting_for"] = "tool_result"
+                    meta["workflow_last_step_id"] = outcome.step_id
+                    meta["workflow_last_result"] = {}
+                    return self._persist(state.with_(
+                        lifecycle_state=LifecycleState.WAITING,
+                        route_result=route,
+                        dispatch_result=dispatch_result,
+                        errors=(list(state.errors) + new_errors),
+                        supervisor_metadata=meta,
+                        _reason=(
+                            f"Workflow dispatched "
+                            f"{len(dispatch_result.dispatched_jobs)} jobs"
+                        ),
+                        _details={
+                            "workflow_id": wf_state.workflow_id,
+                            "step_id": outcome.step_id,
+                        },
+                    ))
+
+                # No jobs dispatched → treat as step failure
+                wf_state, _ = engine.fail_step(
+                    wf_state, outcome.step_id,
+                    "tool_execute dispatched zero jobs",
+                )
+                continue
+
+            # ── User input → WAITING ───────────────────────────────
+            if outcome.type == "waiting_for_input":
+                meta["workflow_state"] = _freeze_wf_state(wf_state)
+                meta["workflow_waiting_for"] = "user_input"
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.WAITING,
+                    route_result=route,
+                    errors=(list(state.errors) + new_errors),
+                    supervisor_metadata=meta,
+                    _reason="Workflow waiting for user input",
+                    _details={
+                        "workflow_id": wf_state.workflow_id,
+                        "step_id": outcome.step_id,
+                    },
+                ))
+
+            # ── Sub-workflow → start and loop ──────────────────────
+            if outcome.type == "sub_workflow":
+                sub_id = outcome.workflow_id or ""
+                try:
+                    wf_state = engine.start_workflow(
+                        sub_id, context=dict(wf_state.context),
+                    )
+                except ValueError as exc:
+                    wf_state, _ = engine.fail_step(
+                        wf_state, outcome.step_id,
+                        f"sub-workflow {sub_id!r}: {exc}",
+                    )
+                continue
+
+            # ── Unreachable guard ───────────────────────────────────
+            meta.pop("workflow_state", None)
+            meta.pop("workflow_waiting_for", None)
+            return self._persist(state.with_(
+                lifecycle_state=LifecycleState.FAILED,
+                route_result=route,
+                errors=(list(state.errors) + new_errors + [{
+                    "type": "workflow_unknown_outcome",
+                    "message": f"Unknown outcome type {outcome.type!r}",
+                }]),
+                supervisor_metadata=meta,
+                _reason=f"Unknown outcome type {outcome.type!r}",
+            ))
+
+        # ── Iteration limit ────────────────────────────────────────
+        meta.pop("workflow_state", None)
+        meta.pop("workflow_waiting_for", None)
+        return self._persist(state.with_(
+            lifecycle_state=LifecycleState.FAILED,
+            route_result=route,
+            errors=(list(state.errors) + new_errors + [{
+                "type": "workflow_iteration_limit",
+                "message": (
+                    f"Workflow exceeded "
+                    f"{self._WF_MAX_ITERATIONS} iterations"
+                ),
+            }]),
+            supervisor_metadata=meta,
+            _reason=f"Exceeded {self._WF_MAX_ITERATIONS} step iterations",
+        ))
+
     # ── Internal helpers ───────────────────────────────────────────────
 
     def _require_not_terminal(self, state: AgentState) -> None:
@@ -653,3 +916,36 @@ class Supervisor:
             return delta.total_seconds() * 1000.0
         except (ValueError, TypeError):
             return 0.0
+
+
+# ── Workflow state serialisation helpers ─────────────────────────────
+
+
+def _freeze_wf_state(wf_state: WorkflowExecutionState) -> Dict[str, Any]:
+    """Serialise ``WorkflowExecutionState`` to a JSON-safe dict.
+
+    The result is stored in ``supervisor_metadata["workflow_state"]``
+    to survive WAITING → resume cycles.
+    """
+    return {
+        "execution_id": wf_state.execution_id,
+        "workflow_id": wf_state.workflow_id,
+        "current_step_id": wf_state.current_step_id,
+        "context": dict(wf_state.context),
+        "step_results": dict(wf_state.step_results),
+        "status": wf_state.status.value,
+        "error": wf_state.error,
+    }
+
+
+def _restore_wf_state(d: Dict[str, Any]) -> WorkflowExecutionState:
+    """Deserialise a dict back into a ``WorkflowExecutionState``."""
+    return WorkflowExecutionState(
+        execution_id=d["execution_id"],
+        workflow_id=d["workflow_id"],
+        current_step_id=d.get("current_step_id"),
+        context={k: v for k, v in d.get("context", {}).items()},
+        step_results={k: v for k, v in d.get("step_results", {}).items()},
+        status=WorkflowStatus(d["status"]),
+        error=d.get("error"),
+    )
