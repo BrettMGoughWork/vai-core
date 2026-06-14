@@ -1,63 +1,60 @@
-"""
-Stratum 5 — Agent Layer
-========================
+"""  
+Stratum 5 — Agent Layer  
+========================  
 
-The S5 conversational layer is the highest stratum in the runtime.
-It produces natural-language replies and declarative action intents,
-offloading planning (S5.3), execution dispatch (S5.4), and all model
-calls (S1) to downstream layers.
+The S5 conversational layer is the highest stratum in the runtime.  
+It routes incoming messages to the appropriate destination via the  
+Agent Router (S5.2) — Runtime (LLM conversations), S6 (workflows),  
+or S4B (capability execution).
 
-Sub-modules
------------
-contracts (S5.0)
-    AgentMessage, AgentResponse, ActionIntent types and validation.
-registry (S5.1)
-    Agent identity, metadata, capability declarations, and static
-    agent registry.
-activation (S5.2)
-    Activation envelope, context injection, capability resolution,
-    and the ``activate_agent()`` entry point.
-cognitive_loop (S5.3)
-    Pure orchestrator that uses S1 (PromptRequest / PromptResponse)
-    and S3 (SkillRunner) to run a bounded cognitive loop, producing
-    ActionIntents for downstream resolution.
+Sub-modules  
+-----------  
+contracts (S5.0)  
+    AgentMessage, AgentResponse types and validation.  
+registry (S5.1)  
+    Agent identity, metadata, capability declarations, and static  
+    agent registry.  
+activation (S5.2)  
+    Activation envelope, context injection, capability resolution,  
+    and the ``activate_agent()`` entry point.  
+router (S5.2)  
+    Pattern-based message router — inspects incoming messages and  
+    determines destination (Runtime / S6 / S4B).  
 
-Exports
--------
-All public types and functions from each sub-module are re-exported
-here for convenience.
-"""
+Exports  
+-------  
+All public types and functions from each sub-module are re-exported  
+here for convenience.  
+"""  
 
-from src.agent.activation import (
-    CHANNEL_CLI,
-    CHANNEL_HTTP,
-    CHANNEL_TUI,
-    CHANNEL_WEB,
-    CHANNEL_SYSTEM,
-    VALID_CHANNELS,
-    ACTIVATION_AUTHORIZED_CHANNELS,
-    ActivationContext,
-    ActivatedAgentContext,
-    ActivationEnvelope,
-    ActivationError,
-    UnauthorizedChannelError,
-    activate_agent,
-    resolve_capabilities,
-)
-from src.agent.cognitive_loop import (
-    CognitiveLoopResult,
-    run_cognitive_loop,
-)
-from src.agent.contracts import (
-    ACTION_CALL_TOOL_INTENT,
-    ACTION_REQUEST_S4_JOB_INTENT,
-    ACTION_AGENT_STEP_INTENT,
-    VALID_ACTION_INTENT_TYPES,
-    S5_CONTRACT_VERSION,
-    ActionIntent,
-    AgentMessage,
-    AgentResponse,
-)
+from src.agent.activation import (  
+    CHANNEL_CLI,  
+    CHANNEL_HTTP,  
+    CHANNEL_TUI,  
+    CHANNEL_WEB,  
+    CHANNEL_SYSTEM,  
+    VALID_CHANNELS,  
+    ACTIVATION_AUTHORIZED_CHANNELS,  
+    ActivationContext,  
+    ActivatedAgentContext,  
+    ActivationEnvelope,  
+    ActivationError,  
+    UnauthorizedChannelError,  
+    activate_agent,  
+    resolve_capabilities,  
+)  
+from src.agent.contracts import (  
+    S5_CONTRACT_VERSION,  
+    AgentMessage,  
+    AgentResponse,  
+)  
+from src.agent.router import (  
+    DEST_RUNTIME,  
+    DEST_S4B,  
+    DEST_S6,  
+    Route,  
+    route_message,  
+)  
 from src.agent.interfaces.agent_state import (
     AgentState,
     LifecycleEvent,
@@ -112,12 +109,7 @@ from src.agent.registry import (
 
 __all__ = [
     # ── Contracts (S5.0) ──────────────────────────────────────────────
-    "ACTION_CALL_TOOL_INTENT",
-    "ACTION_REQUEST_S4_JOB_INTENT",
-    "ACTION_AGENT_STEP_INTENT",
-    "VALID_ACTION_INTENT_TYPES",
     "S5_CONTRACT_VERSION",
-    "ActionIntent",
     "AgentMessage",
     "AgentResponse",
     # ── Registry (S5.1) ───────────────────────────────────────────────
@@ -162,9 +154,12 @@ __all__ = [
     "UnauthorizedChannelError",
     "activate_agent",
     "resolve_capabilities",
-    # ── Cognitive Loop (S5.3) ─────────────────────────────────────────
-    "CognitiveLoopResult",
-    "run_cognitive_loop",
+    # ── Router (S5.2) ─────────────────────────────────────────────────
+    "DEST_RUNTIME",
+    "DEST_S4B",
+    "DEST_S6",
+    "Route",
+    "route_message",
     # ── Supervisor (S5.5) ──────────────────────────────────────────────
     "AgentInTerminalStateError",
     "AgentNotActiveError",

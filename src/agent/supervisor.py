@@ -3,8 +3,8 @@ Phase 5.5 — Agent Runtime Supervisor
 ======================================
 
 The supervisor is the **top-level agent execution orchestrator**.  It owns
-the full lifecycle of an agent instance — creation, activation, cognitive
-loop execution, job dispatch, suspension, cancellation, and completion.
+the full lifecycle of an agent instance — creation, activation, message
+routing, job dispatch, suspension, cancellation, and completion.
 
 S5.5 does **not**:
 - call LLMs
@@ -14,14 +14,15 @@ S5.5 does **not**:
 - mutate S4 state
 - define new execution semantics
 
-S5.5 coordinates S5.3 (cognitive loop) and S5.4 (job interface) via their
-existing public APIs.
+S5.5 coordinates the Agent Router (S5.2) and the job interface (S5.4) to
+route incoming messages to the appropriate destination: Runtime (LLM
+conversation), S6 (workflow orchestration), or S4B (capability execution).
 
 Public API
 ----------
 - ``create_agent``  — instantiate runtime state for a registered agent
 - ``activate_agent`` — delegate to S5.2 to build activation context
-- ``run_agent_step`` — one complete think -> dispatch iteration
+- ``run_agent_step`` — route message -> dispatch to Runtime/S6/S4B
 - ``suspend_agent`` — pause agent execution (timeout / external signal)
 - ``resume_agent`` — restore a suspended agent to RUNNING
 - ``cancel_agent`` — terminate agent execution (manual or system)
@@ -41,24 +42,22 @@ from src.agent.activation import (
     ActivatedAgentContext,
     activate_agent as s52_activate_agent,
 )
-from src.agent.cognitive_loop import (
-    CognitiveLoopResult,
-    run_cognitive_loop,
-)
-from src.agent.contracts import AgentMessage, AgentResponse, ActionIntent
+from src.agent.contracts import AgentMessage, AgentResponse
 from src.agent.interfaces.agent_state import (
     AgentState,
     LifecycleEvent,
     LifecycleState,
 )
 from src.agent.interfaces.agent_state_store import AgentStateStore
-from src.agent.job_interface import (
-    JobDispatchResult,
-    dispatch_action_intents,
-)
+from src.agent.job_interface import JobDispatchResult, dispatch_route
 from src.agent.registry import AgentRegistry, AgentNotFoundError
-from src.capabilities.interfaces import SkillRunner
-from src.platform.transport.normalization import ChannelMessage
+from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_S6, Route, route_message
+from src.runtime.interfaces import (
+    PromptRequest,
+    PromptResponse,
+    S1Error,
+    call_runtime_backend,
+)
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -101,18 +100,12 @@ class Supervisor:
         registry: AgentRegistry,
         store: AgentStateStore,
         *,
-        skill_runner: Optional[SkillRunner] = None,
-        submit_job_callable: Optional[Callable[[ChannelMessage], str]] = None,
-        default_backend: str = "simulation",
-        default_max_iterations: int = 5,
+        submit_job_callable: Optional[Callable[[Any], str]] = None,
         auto_persist: bool = True,
     ) -> None:
         self._registry = registry
         self._store = store
-        self._skill_runner = skill_runner
         self._submit_job = submit_job_callable
-        self._default_backend = default_backend
-        self._default_max_iterations = default_max_iterations
         self._auto_persist = auto_persist
 
     # ── 1. create_agent ────────────────────────────────────────────────
@@ -147,12 +140,8 @@ class Supervisor:
             correlation_id=str(uuid.uuid4()),
             trace_id=str(uuid.uuid4()),
             supervisor_metadata={
-                "backend": self._default_backend,
-                "max_iterations": metadata.constraints.max_iterations
-                if metadata.constraints.max_iterations > 0
-                else self._default_max_iterations,
                 "timeout_ms": metadata.constraints.timeout_ms,
-                "total_iterations": 0,
+                "total_routes": 0,
             },
             lifecycle_history=[
                 LifecycleEvent(
@@ -235,27 +224,22 @@ class Supervisor:
         self,
         state: AgentState,
         *,
-        backend: Optional[str] = None,
-        max_iterations: Optional[int] = None,
+        message: Optional[str] = None,
     ) -> AgentState:
-        """Execute one complete agent iteration: think -> dispatch.
+        """Execute one agent iteration: route -> dispatch.
 
         1. Transition to RUNNING
-        2. Call S5.3 ``run_cognitive_loop()`` with the activation snapshot
-        3. Store ``CognitiveLoopResult`` in state
-        4. Call S5.4 ``dispatch_action_intents()`` with the result
-        5. Store ``JobDispatchResult`` in state
-        6. Determine next lifecycle state:
-           - If pending jobs were dispatched -> WAITING
-           - If terminal intents produced -> check for final response
-           - If errors -> SUSPENDED or FAILED depending on severity
-        7. Return new state
+        2. Route the message via ``route_message()`` (S5.2)
+        3. Based on destination:
+           - ``DEST_RUNTIME``  → call LLM backend → produce AgentResponse
+           - ``DEST_S6``      → mark as WAITING (workflow dispatch TBD)
+           - ``DEST_S4B``     → dispatch jobs via ``dispatch_route()`` → WAITING
+        4. Return updated state
 
         Args:
             state: Current agent state (must be ACTIVATED or RUNNING/WAITING
                    for continuation).
-            backend: S1 backend override.
-            max_iterations: Cognitive loop iterations override.
+            message: Incoming message text to route.
 
         Returns:
             Updated ``AgentState`` with the result of this step.
@@ -290,8 +274,6 @@ class Supervisor:
         # 2. Ensure we have an activation snapshot
         ctx = state.activation_snapshot
         if ctx is None:
-            # This should not happen if the lifecycle is respected, but
-            # guard against it.
             return self._persist(state.with_(
                 lifecycle_state=LifecycleState.FAILED,
                 errors=state.errors + [
@@ -302,130 +284,151 @@ class Supervisor:
                         ),
                     }
                 ],
-                _reason="Missing activation snapshot — cannot run cognitive loop",
+                _reason="Missing activation snapshot — cannot run agent step",
             ))
 
-        # 3. Run cognitive loop (S5.3)
-        cognitive_backend = backend or self._default_backend
-        loop_iterations = max_iterations or state.supervisor_metadata.get(
-            "max_iterations", self._default_max_iterations
+        # 3. Route the message
+        input_text = message or ctx.envelope.message.message
+        route = route_message(
+            message=input_text,
+            agent=ctx.context.agent_metadata,
         )
 
-        cognitive_result = run_cognitive_loop(
-            context=ctx,
-            max_iterations=loop_iterations,
-            backend=cognitive_backend,
-            skill_runner=self._skill_runner,
-        )
-
-        # 4. Dispatch action intents (S5.4)
-        dispatch_result = dispatch_action_intents(
-            result=cognitive_result,
-            context=ctx,
-            submit_job_callable=self._submit_job,
-        )
-
-        total_iterations = (
-            state.supervisor_metadata.get("total_iterations", 0)
-            + 1
-        )
-
-        # 5. Determine next state
+        # 4. Dispatch based on destination
         new_errors = list(state.errors)
-        if cognitive_result.errors:
-            for err in cognitive_result.errors:
-                new_errors.append({
-                    "type": "cognitive_loop_error",
-                    "message": err.get("message", str(err)),
-                    "details": err.get("details", {}),
-                })
-        if dispatch_result.errors:
-            for intent_type, err_msg in dispatch_result.errors:
-                new_errors.append({
-                    "type": "dispatch_error",
-                    "intent_type": intent_type,
-                    "message": err_msg,
-                })
-
-        has_fatal_errors = any(
-            e.get("type") in ("cognitive_loop_error",)
-            and e.get("message", "").startswith("Safe fallback")
-            for e in new_errors[len(state.errors):]
-        )
-
-        # Collect pending intents from both sources
-        pending: List[ActionIntent] = list(cognitive_result.action_intents)
-
-        # Determine if there are dispatched jobs (means we're waiting)
-        has_dispatched = len(dispatch_result.dispatched_jobs) > 0
-
-        # Determine if there are terminal intents (conversational reply)
-        has_terminal = len(dispatch_result.terminal_intents) > 0
-
-        # Build base metadata
         meta = dict(state.supervisor_metadata)
-        meta["total_iterations"] = total_iterations
+        meta["total_routes"] = meta.get("total_routes", 0) + 1
 
-        if has_fatal_errors:
-            # Unrecoverable — transition to FAILED
-            return self._persist(state.with_(
-                lifecycle_state=LifecycleState.FAILED,
-                cognitive_result=cognitive_result,
-                dispatch_result=dispatch_result,
-                errors=new_errors,
-                supervisor_metadata=meta,
-                _reason="Cognitive loop encountered unrecoverable error",
-                _details={"error_count": len(new_errors)},
-            ))
-
-        if has_dispatched:
-            # Jobs submitted — transition to WAITING
-            return self._persist(state.with_(
-                lifecycle_state=LifecycleState.WAITING,
-                cognitive_result=cognitive_result,
-                dispatch_result=dispatch_result,
-                pending_intents=pending,
-                errors=new_errors,
-                supervisor_metadata=meta,
-                _reason=f"Dispatched {len(dispatch_result.dispatched_jobs)} jobs — awaiting results",
-                _details={
-                    "dispatched_count": len(dispatch_result.dispatched_jobs),
+        if route.destination == DEST_RUNTIME:
+            # LLM conversation path — call Runtime backend
+            agent_meta = ctx.context.agent_metadata
+            runtime_request = PromptRequest(
+                prompt={
+                    "message": input_text,
+                    "agent_id": agent_meta.identity.agent_id,
+                    "agent_metadata": {
+                        "name": agent_meta.identity.name,
+                        "description": agent_meta.identity.description,
+                    },
                 },
-            ))
+                memory={},
+                plan_context={},
+                tool_context=[],
+            )
 
-        if has_terminal:
-            # No jobs needed, agent produced a conversational response
+            runtime_response = call_runtime_backend(
+                runtime_request, backend="conversational"
+            )
+
+            if isinstance(runtime_response, PromptResponse):
+                reply = runtime_response.output.get(
+                    "message", "I'm not sure how to respond."
+                )
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.COMPLETED,
+                    route_result=route,
+                    final_response=AgentResponse(
+                        reply=reply,
+                        metadata={
+                            "correlation_id": state.correlation_id,
+                            "trace_id": state.trace_id,
+                            "agent_id": state.agent_id,
+                            "confidence": route.confidence,
+                            "route_destination": route.destination,
+                        },
+                    ),
+                    supervisor_metadata=meta,
+                    _reason="Agent produced conversational response via Runtime route",
+                    _details={
+                        "confidence": route.confidence,
+                        "route_destination": route.destination,
+                    },
+                ))
+
+            # S1Error — fall back to mock backend
+            fallback = call_runtime_backend(runtime_request, backend="mock")
+            fallback_reply = "I'm not sure how to respond."
+            if isinstance(fallback, PromptResponse):
+                fallback_reply = fallback.output.get("message", fallback_reply)
+            else:
+                fallback_reply = (
+                    f"[Runtime unavailable: {runtime_response.message}]"
+                )
+
             return self._persist(state.with_(
                 lifecycle_state=LifecycleState.COMPLETED,
-                cognitive_result=cognitive_result,
-                dispatch_result=dispatch_result,
-                pending_intents=None,
+                route_result=route,
                 final_response=AgentResponse(
-                    reply=cognitive_result.thought.get("message"),
-                    actions=cognitive_result.action_intents,
+                    reply=fallback_reply,
                     metadata={
                         "correlation_id": state.correlation_id,
                         "trace_id": state.trace_id,
                         "agent_id": state.agent_id,
-                        "confidence": cognitive_result.confidence,
-                        "iteration_count": cognitive_result.iteration_count,
+                        "confidence": route.confidence,
+                        "route_destination": route.destination,
+                        "runtime_fallback": True,
+                        "runtime_error": runtime_response.message,
                     },
                 ),
-                errors=new_errors,
                 supervisor_metadata=meta,
-                _reason="Agent produced final conversational response",
+                _reason="Agent produced conversational response via mock fallback",
                 _details={
-                    "confidence": cognitive_result.confidence,
-                    "iteration_count": cognitive_result.iteration_count,
+                    "confidence": route.confidence,
+                    "route_destination": route.destination,
+                    "runtime_fallback": True,
                 },
             ))
 
-        # No dispatched jobs and no terminal intents — edge case, treat as
-        # completed with no output.
+        if route.destination == DEST_S4B:
+            # Capability execution path — dispatch jobs
+            dispatch_result = dispatch_route(
+                route=route,
+                submit_job_callable=self._submit_job,
+            )
+            has_dispatched = len(dispatch_result.dispatched_jobs) > 0
+
+            if dispatch_result.errors:
+                for job_id, err_msg in dispatch_result.errors:
+                    new_errors.append({
+                        "type": "dispatch_error",
+                        "job_id": job_id,
+                        "message": err_msg,
+                    })
+
+            if has_dispatched:
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.WAITING,
+                    route_result=route,
+                    dispatch_result=dispatch_result,
+                    errors=new_errors,
+                    supervisor_metadata=meta,
+                    _reason=f"Dispatched {len(dispatch_result.dispatched_jobs)} jobs — awaiting results",
+                    _details={
+                        "dispatched_count": len(dispatch_result.dispatched_jobs),
+                    },
+                ))
+
+            # No jobs dispatched — fall through to completed
+            new_errors.append({
+                "type": "dispatch_empty",
+                "message": "Route matched S4B but no jobs were dispatched",
+            })
+
+        if route.destination == DEST_S6:
+            # Workflow execution path — not yet implemented
+            return self._persist(state.with_(
+                lifecycle_state=LifecycleState.WAITING,
+                route_result=route,
+                errors=new_errors,
+                supervisor_metadata=meta,
+                _reason="Workflow dispatch not yet implemented (DEST_S6)",
+                _details={"route_destination": route.destination},
+            ))
+
+        # Fallback: completed with no output
         return self._persist(state.with_(
             lifecycle_state=LifecycleState.COMPLETED,
-            cognitive_result=cognitive_result,
-            dispatch_result=dispatch_result,
+            route_result=route,
             final_response=AgentResponse(
                 reply="Agent completed without producing output.",
                 metadata={
@@ -594,7 +597,6 @@ class Supervisor:
             _reason="Agent completed with final response",
             _details={
                 "has_reply": response.reply is not None,
-                "action_count": len(response.actions),
             },
         ))
 

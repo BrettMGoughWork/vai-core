@@ -97,8 +97,6 @@ def _bootstrap(
     supervisor = Supervisor(
         registry=registry,
         store=store,
-        default_backend="conversational",
-        default_max_iterations=3,
         auto_persist=True,
     )
 
@@ -131,19 +129,14 @@ def _handle_message(
         )
         state = supervisor.activate_agent(state, message, channel="cli")
 
-        # 3. Run one cognitive step (think → dispatch)
-        state = supervisor.run_agent_step(state)
+        # 3. Run one routing step (route -> dispatch)
+        state = supervisor.run_agent_step(state, message=text)
 
         # 4. Retrieve the final response
         response = Supervisor.get_response(state)
         if response is not None:
             if response.reply:
                 print(response.reply)
-            if response.actions and not response.reply:
-                # Only show action intents if there's no reply text
-                print(f"  [actions] {len(response.actions)} intent(s) produced")
-                for a in response.actions:
-                    print(f"    - {a.type}: {a.description or a.payload}")
             if response.metadata:
                 print(f"  [meta] agent={response.metadata.get('agent_id', '?')} "
                       f"confidence={response.metadata.get('confidence', '?')}")

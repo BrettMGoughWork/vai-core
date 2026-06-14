@@ -21,11 +21,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from src.agent.activation import ActivatedAgentContext
-from src.agent.contracts import ActionIntent, AgentResponse
+from src.agent.contracts import AgentResponse
 from src.agent.job_interface import JobDispatchResult
-
-if TYPE_CHECKING:
-    from src.agent.cognitive_loop import CognitiveLoopResult
 
 # ---------------------------------------------------------------------------
 # LifecycleState
@@ -121,10 +118,8 @@ class AgentState:
         Current lifecycle state (see ``LifecycleState``).
     activation_snapshot:
         Snapshot of the activated agent context from S5.2.
-    cognitive_result:
-        Most recent cognitive loop result from S5.3 (None before first run).
-    pending_intents:
-        Action intents awaiting dispatch (None if none pending).
+    route_result:
+        Most recent route result from the Agent Router (None before first run).
     dispatch_result:
         Most recent job dispatch result from S5.4 (None before first dispatch).
     final_response:
@@ -152,8 +147,7 @@ class AgentState:
 
     # Composed S5 types
     activation_snapshot: Optional[ActivatedAgentContext] = None
-    cognitive_result: Optional[Any] = None        # CognitiveLoopResult
-    pending_intents: Optional[List[ActionIntent]] = None
+    route_result: Optional[Any] = None        # Route
     dispatch_result: Optional[JobDispatchResult] = None
     final_response: Optional[AgentResponse] = None
 

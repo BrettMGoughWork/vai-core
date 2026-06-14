@@ -31,10 +31,6 @@ from src.agent.activation import (
 
 from src.agent.contracts import (
     AgentMessage as AgentMessage,
-    ActionIntent as ActionIntent,
-    ACTION_AGENT_STEP_INTENT as ACTION_AGENT_STEP_INTENT,
-    ACTION_CALL_TOOL_INTENT as ACTION_CALL_TOOL_INTENT,
-    ACTION_REQUEST_S4_JOB_INTENT as ACTION_REQUEST_S4_JOB_INTENT,
 )
 
 # ── Registry Types ────────────────────────────────────────────────────────
@@ -60,7 +56,14 @@ from src.agent.registry import (
 
 from src.agent.job_interface import (
     JobDispatchResult as JobDispatchResult,
-    dispatch_action_intents as dispatch_action_intents,
+    dispatch_route as dispatch_route,
+)
+from src.agent.router import (
+    DEST_RUNTIME as DEST_RUNTIME,
+    DEST_S4B as DEST_S4B,
+    DEST_S6 as DEST_S6,
+    Route as Route,
+    route_message as route_message,
 )
 
 # ── Supervisor Types (S5.5) ─────────────────────────────────────────────
@@ -91,10 +94,6 @@ __all__ = [
     "CHANNEL_SYSTEM",
     # Contracts
     "AgentMessage",
-    "ActionIntent",
-    "ACTION_AGENT_STEP_INTENT",
-    "ACTION_CALL_TOOL_INTENT",
-    "ACTION_REQUEST_S4_JOB_INTENT",
     # Registry
     "AgentRegistry",
     "AgentMetadata",
@@ -106,7 +105,13 @@ __all__ = [
     "CAP_JOB_SUBMISSION",
     # Job Interface (S5.4)
     "JobDispatchResult",
-    "dispatch_action_intents",
+    "dispatch_route",
+    # Router (S5.2)
+    "DEST_RUNTIME",
+    "DEST_S4B",
+    "DEST_S6",
+    "Route",
+    "route_message",
     # Supervisor (S5.5)
     "AgentState",
     "LifecycleState",
