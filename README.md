@@ -451,7 +451,7 @@ so daemon actions (panic, fail, degrade, etc.) automatically produce alerts:
 
 ```python
 from src.platform.runtime.alerting import notify_on_dispatch
-from src.daemon.instruction_dispatch import default_dispatcher
+from src.platform.daemon.instruction_dispatch import default_dispatcher
 
 action, event, alert = notify_on_dispatch(
     {"type": "PanicInstruction", "reason": "OOM detected"},
@@ -597,3 +597,31 @@ Scenarios are defined as JSON files in `tests/statistical/scenarios/` and includ
     • `tiny_plan2x2` — 2 subgoals, 2 segments each (multi-subgoal)
 
 Add new scenarios by creating a JSON file in that directory with the same shape.
+
+
+### Deployment Targets (S4.9.2)
+
+Stratum-4 supports two deployment targets: **local** and **container**.
+Cloud deployment is acknowledged but intentionally deferred.
+
+**Local mode** runs S4 directly as a bare Python process:
+
+```powershell
+python -m src.platform.deployment --mode local
+```
+
+**Container mode** packages S4 as a single OCI image:
+
+```powershell
+# Build
+docker build -t s4:latest .
+
+# Run
+docker run --rm -it s4:latest
+```
+
+The image is pinned to `python:3.12-slim-bookworm`, logs to stdout/stderr,
+and handles SIGTERM for graceful shutdown. Configuration is driven entirely
+by environment variables via the S4.9.1 Config System (`S4_` prefix).
+
+Entrypoint: `/entrypoint.sh` → `python -m src.platform.deployment --mode container`

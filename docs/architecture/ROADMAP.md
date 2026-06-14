@@ -2082,17 +2082,17 @@ S4 becomes inspectable, debuggable, and diagnosable.
 ## PHASE 4.9 — Deployment, Packaging, and Hardening
 Goal: Make S4 shippable and maintainable.
 
-4.9.1 — Configuration System
+✅ 4.9.1 — Configuration System
 - env vars  
 - config files  
 - runtime overrides
 
-4.9.2 — Deployment Targets
+✅ 4.9.2 — Deployment Targets
 - local  
 - container  
-- cloud
+  - ℹ️ cloud was intentionally deferred
 
-4.9.3 — Security Hardening
+✅ 4.9.3 — Security Hardening
 - auth  
 - rate limiting  
 - input validation  

@@ -72,22 +72,30 @@ SCHEMA: Dict[str, Any] = {
             },
         },
     },
+    "auth": {
+        "type": dict,
+        "fields": {
+            "enabled": {"type": bool, "default": False},
+            "token": {"type": str, "default": ""},
+        },
+    },
+    "rate_limit": {
+        "type": dict,
+        "fields": {
+            "enabled": {"type": bool, "default": False},
+            "maxrequestsper_minute": {"type": int, "default": 60},
+        },
+    },
 }
 
 ENV_PREFIX = "S4"
 
 # Pre‑computed env‑var → (section, field) mapping
 _ENV_MAP: Dict[str, Tuple[str, str]] = {}
-for _section, _section_def in SCHEMA["fields"].items() if "fields" in SCHEMA else SCHEMA.items():
-    # SCHEMA is a flat top‑level dict of sections, each with "fields"
-    pass
-
-# Actually build the env map properly:
-_ENV_MAP = {}
 for _sec_name, _sec_def in SCHEMA.items():
     _fields = _sec_def.get("fields", {})
     for _field_name in _fields:
-        _env_key = f"{ENV_PREFIX}{_sec_name.upper()}{_field_name.upper()}"
+        _env_key = f"{ENV_PREFIX}{_sec_name.upper().replace('_', '')}{_field_name.upper()}"
         _ENV_MAP[_env_key] = (_sec_name, _field_name)
 
 
@@ -104,7 +112,7 @@ class UnknownKeyError(ConfigError):
     """Raised when an unknown configuration key is encountered."""
 
 
-class ValidationError(ConfigError):
+class ConfigValidationError(ConfigError):
     """Raised when a configuration value fails validation."""
 
 
@@ -128,7 +136,7 @@ def _build_defaults() -> Dict[str, Any]:
 def _validate_parsed(raw: Dict[str, Any], path: str = "") -> None:
     """Validate parsed configuration against the schema.
 
-    Raises ``UnknownKeyError`` or ``ValidationError`` on any violation.
+    Raises ``UnknownKeyError`` or ``ConfigValidationError`` on any violation.
     """
     for key, value in raw.items():
         current_path = f"{path}.{key}" if path else key
@@ -138,7 +146,7 @@ def _validate_parsed(raw: Dict[str, Any], path: str = "") -> None:
             # Section — recurse
             sec_def = SCHEMA[key]
             if not isinstance(value, dict):
-                raise ValidationError(
+                raise ConfigValidationError(
                     f"{current_path}: expected dict, got {type(value).__name__}"
                 )
             if sec_def.get("type") is dict:
@@ -164,34 +172,34 @@ def _validate_parsed(raw: Dict[str, Any], path: str = "") -> None:
             # Type check
             if expected_type is list:
                 if not isinstance(value, list):
-                    raise ValidationError(
+                    raise ConfigValidationError(
                         f"{current_path}: expected list, got {type(value).__name__}"
                     )
                 # Item value check
                 if item_valid_values is not None:
                     for item in value:
                         if item not in item_valid_values:
-                            raise ValidationError(
+                            raise ConfigValidationError(
                                 f"{current_path}: invalid value {item!r}, "
                                 f"must be one of {item_valid_values}"
                             )
             elif expected_type is bool:
                 if not isinstance(value, bool):
-                    raise ValidationError(
+                    raise ConfigValidationError(
                         f"{current_path}: expected bool, got {type(value).__name__}"
                     )
             elif expected_type is int:
                 if not isinstance(value, int) or isinstance(value, bool):
-                    raise ValidationError(
+                    raise ConfigValidationError(
                         f"{current_path}: expected int, got {type(value).__name__}"
                     )
             elif expected_type is str:
                 if not isinstance(value, str):
-                    raise ValidationError(
+                    raise ConfigValidationError(
                         f"{current_path}: expected str, got {type(value).__name__}"
                     )
                 if valid_values is not None and value not in valid_values:
-                    raise ValidationError(
+                    raise ConfigValidationError(
                         f"{current_path}: invalid value {value!r}, "
                         f"must be one of {valid_values}"
                     )
@@ -218,7 +226,7 @@ def _parse_env_value(raw: str, field_def: Dict[str, Any]) -> Any:
         if item_valid_values is not None:
             for item in parsed:
                 if item not in item_valid_values:
-                    raise ValidationError(
+                    raise ConfigValidationError(
                         f"Environment variable value {item!r} not in {item_valid_values}"
                     )
         return parsed
@@ -229,7 +237,7 @@ def _parse_env_value(raw: str, field_def: Dict[str, Any]) -> Any:
             return True
         elif lower == "false":
             return False
-        raise ValidationError(
+        raise ConfigValidationError(
             f"Expected bool ('true' or 'false'), got {raw!r}"
         )
 
@@ -237,12 +245,12 @@ def _parse_env_value(raw: str, field_def: Dict[str, Any]) -> Any:
         try:
             return int(raw.strip())
         except ValueError:
-            raise ValidationError(f"Expected int, got {raw!r}")
+            raise ConfigValidationError(f"Expected int, got {raw!r}")
 
     # str — check valid_values if present
     valid_values = field_def.get("valid_values")
     if valid_values is not None and raw.strip() not in valid_values:
-        raise ValidationError(
+        raise ConfigValidationError(
             f"Value {raw!r} not in valid values {valid_values}"
         )
     return raw.strip()
@@ -311,7 +319,7 @@ def _load_yaml_file(path: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-class Config:
+class S4Config:
     """Read‑only S4 configuration.
 
     Constructed by ``load_config()``.  Access values via ``.get()``.
@@ -350,13 +358,13 @@ class Config:
         if name in ("_data",):
             super().__setattr__(name, value)
         else:
-            raise TypeError("Config is read‑only")
+            raise TypeError("S4Config is read‑only")
 
     def __delattr__(self, name: str) -> None:
-        raise TypeError("Config is read‑only")
+        raise TypeError("S4Config is read‑only")
 
     def __repr__(self) -> str:
-        return f"Config({self._data!r})"
+        return f"S4Config({self._data!r})"
 
 
 def _deep_freeze(value: Any) -> Any:
@@ -377,8 +385,8 @@ def _deep_freeze(value: Any) -> Any:
 def load_config(
     config_file: Optional[str] = None,
     overrides: Optional[Dict[str, Any]] = None,
-) -> Config:
-    """Load, validate, and return a read‑only ``Config``.
+) -> S4Config:
+    """Load, validate, and return a read‑only ``S4Config``.
 
     Loading order (later overrides earlier):
 
@@ -392,12 +400,12 @@ def load_config(
         overrides:    Optional dict of dotted‑key → value overrides.
 
     Returns:
-        An immutable ``Config`` instance.
+        An immutable ``S4Config`` instance.
 
     Raises:
         ConfigError:  If the config file cannot be read or parsed.
         UnknownKeyError: If an unknown key is encountered.
-        ValidationError: If a value fails type or range validation.
+        ConfigValidationError: If a value fails type or range validation.
     """
     # 1. Start with defaults
     merged = _build_defaults()
@@ -430,4 +438,4 @@ def load_config(
         _validate_parsed(parsed_overrides)
         _merge_dict(merged, parsed_overrides)
 
-    return Config(merged)
+    return S4Config(merged)

@@ -2731,7 +2731,7 @@ def _test_instruction_dispatch() -> dict[str, Any]:
     """
     from datetime import datetime, timezone
 
-    from src.daemon.instruction_dispatch import (
+    from src.platform.daemon.instruction_dispatch import (
         InstructionDispatchConfig,
         UnifiedInstructionDispatcher,
         default_dispatcher,
