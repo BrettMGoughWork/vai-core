@@ -2098,7 +2098,7 @@ Goal: Make S4 shippable and maintainable.
 - input validation  
 - sandboxing
 
-4.9.4 — Release Checklist
+✅ 4.9.4 — Release Checklist
 - invariants  
 - determinism  
 - safety  
@@ -2107,7 +2107,7 @@ Goal: Make S4 shippable and maintainable.
 - channels  
 - observability  
 
-4.9.5 — Documentation
+✅ 4.9.5 — Documentation
 - architecture  
 - API  
 - channels  
@@ -2117,7 +2117,6 @@ Goal: Make S4 shippable and maintainable.
 
 Outcome:  
 S4 is production‑ready.
-
 
 ---
 🚀 Release 6 — "Multi-Agent System"
@@ -2144,6 +2143,8 @@ It owns agents, planning, skills, and the translation of cognition into S4 jobs.
 
 Outcome: S5 has a formal contract for conversational I/O, distinct from S1's analytical schema.
 
+⚠️ Concern to address: 5.0's `actions: list[Action]` includes tool calls, S4 jobs, and agent steps — the same concerns covered by 5.3 (planning/cognitive loop) and 5.4 (S5→S4 job interface). The boundary between "conversational action", "planned cognitive step", and "S4 job" is fuzzy and risks building the same dispatch mechanism three times. Needs clarification before 5.3/5.4 are implemented.
+
 ### PHASE 5.1 — Agent Registry & Identity
 - Agent registration  
 - Agent metadata schema  
@@ -2159,8 +2160,8 @@ Outcome: S5 knows what agents exist and what they can do.
 
 Outcome: S5 can activate an agent deterministically.
 
-⚠️ Concern: Activation direction is ambiguous — is this agent-push (S5 activates an agent) or agent-pull (agent selects itself via capabilities)? Needs clarification during implementation.
-⚠️ Concern: Model provider abstraction is not yet defined — S5.2/S5.3 currently assume an LLM but don't specify how the provider is selected, configured, or swapped. Should be addressed before or during S5.2.
+⚠️ Concern to address: Activation direction is underspecified. Can S4 channels talk to S5 directly? Or is S5 only activated by S6 (via S6.3)? The roadmap says S5 is the "only cognitive layer" and S6 delegates thinking to it — but the activation contract doesn't say who the caller is. Needs clarification before S5.2 is implemented, as it affects whether S5 has its own ingress or is purely an S6 dependency.
+⚠️ Concern to address: Model provider abstraction is not yet defined — S5.2/S5.3 currently assume an LLM but don't specify how the provider is selected, configured, or swapped. Should be addressed before or during S5.2.
 
 ### PHASE 5.3 — Planning & Cognitive Loop
 - LLM planning contract (⚠️ depends on model provider abstraction from S5.2)
@@ -2169,6 +2170,8 @@ Outcome: S5 can activate an agent deterministically.
 - Error handling + fallback  
 
 Outcome: S5 can “think” on behalf of an agent.
+
+⚠️ Concern to address: Missing — there is no model provider abstraction phase. S5.3 says "LLM planning contract" but doesn't define how S5 switches between OpenAI, Anthropic, local models, or future providers. This should be an explicit abstraction layer, not implicit in the planning contract. Needs to be added — possibly as a sub-phase of 5.3 or a new 5.3.x.
 
 ### PHASE 5.4 — S5 → S4 Job Interface
 - Job envelope schema  
@@ -2194,7 +2197,7 @@ Outcome: S5 is stable, resumable, and debuggable.
 
 Outcome: S5 gets durable memory without infecting S2 with agent concepts.
 
-⚠️ Concern: Persistence is deferred to S5.6 — agents built before this phase will have no durable state. Consider whether a minimal AgentStateStore should be introduced earlier (e.g., alongside S5.2 or S5.3) to avoid a painful migration later.
+⚠️ Concern to address: Phase 5.6 (state persistence) is positioned after 5.3 (planning loop) and 5.4 (job interface), but planning loops and conversation context both need durable memory. Persistence should come before or alongside the cognitive loop, not three phases later. Consider promoting 5.6 to before 5.3, or splitting it into an earlier foundation phase (in-memory) followed by the S2-backed phase (5.6).
 
 ## STRATUM 6 — Workflow Layer (User Interaction + Orchestration)
 S6 is not cognitive.  
