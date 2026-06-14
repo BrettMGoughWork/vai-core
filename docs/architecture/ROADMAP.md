@@ -2240,7 +2240,7 @@ Also update `src/agent/__init__.py` to export only:
 - `Route`, `route_message` (from router)
 - `Supervisor` (from supervisor)
 
-✅ Outcome: Agent is a thin router — inspect, match, dispatch. No cognitive loop, no intent types, no LLM calls.
+Outcome: Agent is a thin router — inspect, match, dispatch. No cognitive loop, no intent types, no LLM calls.
 
 ### PHASE 5.3 — CLI Channel Integration
 The existing `tools/agent/cli_app.py` currently uses the old cognitive loop path (supervisor → cognitive_loop → call_s1_backend). Rewire it to use the new router and the "conversational" backend via Runtime.
@@ -2277,7 +2277,7 @@ The existing `tools/agent/cli_app.py` currently uses the old cognitive loop path
    - `echo "hello" | python -m tools.agent.cli_app` — pipe mode works
    - Real DeepSeek responses appear in the output
 
-✅ Outcome: CLI works end-to-end through the new router, no cognitive loop dependency.
+Outcome: CLI works end-to-end through the new router, no cognitive loop dependency.
 
 ### PHASE 5.4 — Integration Tests
 Write tests covering the new router-based agent layer.
@@ -2312,7 +2312,7 @@ Write tests covering the new router-based agent layer.
    ```
    All tests pass.
 
-✅ Outcome: S5 is tested and stable with the new router architecture.
+Outcome: S5 is tested and stable with the new router architecture.
 
 ## STRATUM 6 — Workflow Layer (Orchestration + State Machines)
 S6 is the workflow engine. It owns workflow definitions, state machine execution, and
