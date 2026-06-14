@@ -148,8 +148,8 @@ class Supervisor:
             trace_id=str(uuid.uuid4()),
             supervisor_metadata={
                 "backend": self._default_backend,
-                "max_iterations": metadata.constraints.max_tokens
-                if metadata.constraints.max_tokens > 0
+                "max_iterations": metadata.constraints.max_iterations
+                if metadata.constraints.max_iterations > 0
                 else self._default_max_iterations,
                 "timeout_ms": metadata.constraints.timeout_ms,
                 "total_iterations": 0,

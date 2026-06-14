@@ -42,6 +42,7 @@ agents:
       - markdown
     constraints:
       max_tokens: 4096
+      max_iterations: 10
       timeout_ms: 30000
       sandbox: none
 
@@ -61,5 +62,6 @@ agents:
       - text
     constraints:
       max_tokens: 2048
+      max_iterations: 5
       timeout_ms: 15000
       sandbox: none

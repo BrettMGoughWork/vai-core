@@ -133,6 +133,7 @@ def _parse_entry(entry: dict) -> AgentMetadata:
     constraints_dict = entry.get("constraints", {})
     constraints = AgentConstraints(
         max_tokens=constraints_dict.get("max_tokens", 0),
+        max_iterations=constraints_dict.get("max_iterations", 10),
         timeout_ms=constraints_dict.get("timeout_ms", 0),
         sandbox=constraints_dict.get("sandbox", "none"),
     )

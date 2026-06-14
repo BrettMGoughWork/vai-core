@@ -114,19 +114,26 @@ class AgentConstraints:
     ------
     max_tokens:
         Maximum token budget per response.  0 means unlimited.
+    max_iterations:
+        Maximum cognitive-loop iterations per activation.  0 means unlimited.
     timeout_ms:
-        Maximum wall‑clock time in milliseconds.  0 means unlimited.
+        Maximum wall-clock time in milliseconds.  0 means unlimited.
     sandbox:
         Isolation level — one of VALID_SANDBOX_LEVELS.
     """
 
     max_tokens: int = 0
+    max_iterations: int = 10
     timeout_ms: int = 0
     sandbox: str = SANDBOX_NONE
 
     def __post_init__(self) -> None:
         if self.max_tokens < 0:
             raise ValueError(f"max_tokens must be >= 0, got {self.max_tokens}")
+        if self.max_iterations < 0:
+            raise ValueError(
+                f"max_iterations must be >= 0, got {self.max_iterations}"
+            )
         if self.timeout_ms < 0:
             raise ValueError(f"timeout_ms must be >= 0, got {self.timeout_ms}")
         if self.sandbox not in VALID_SANDBOX_LEVELS:
