@@ -2139,6 +2139,8 @@ It owns agents, planning, skills, and the translation of cognition into S4 jobs.
 - S5 must reply with `S5Response` (not S1's drift/repair JSON)
 - S5 must never produce S1-structured output for user-facing replies
 - S5 may call S1 internally for plan analysis and fold results into `actions`
+- ✅ Implemented as `src/agent/contracts.py` — `AgentMessage`, `AgentResponse`, `ActionIntent` (frozen dataclasses with JSON-compatibility enforcement)
+- ✅ S5 emits declarative action intents (not executable instructions), resolving the S5.0/5.3/5.4 dispatch overlap concern
 
 Outcome: S5 has a formal contract for conversational I/O, distinct from S1's analytical schema.
 
@@ -2157,8 +2159,11 @@ Outcome: S5 knows what agents exist and what they can do.
 
 Outcome: S5 can activate an agent deterministically.
 
+⚠️ Concern: Activation direction is ambiguous — is this agent-push (S5 activates an agent) or agent-pull (agent selects itself via capabilities)? Needs clarification during implementation.
+⚠️ Concern: Model provider abstraction is not yet defined — S5.2/S5.3 currently assume an LLM but don't specify how the provider is selected, configured, or swapped. Should be addressed before or during S5.2.
+
 ### PHASE 5.3 — Planning & Cognitive Loop
-- LLM planning contract  
+- LLM planning contract (⚠️ depends on model provider abstraction from S5.2)
 - Agent step evaluation  
 - Skill invocation semantics  
 - Error handling + fallback  
@@ -2188,6 +2193,8 @@ Outcome: S5 is stable, resumable, and debuggable.
 - S2 never knows what an "agent" is — it stores opaque blobs
 
 Outcome: S5 gets durable memory without infecting S2 with agent concepts.
+
+⚠️ Concern: Persistence is deferred to S5.6 — agents built before this phase will have no durable state. Consider whether a minimal AgentStateStore should be introduced earlier (e.g., alongside S5.2 or S5.3) to avoid a painful migration later.
 
 ## STRATUM 6 — Workflow Layer (User Interaction + Orchestration)
 S6 is not cognitive.  
