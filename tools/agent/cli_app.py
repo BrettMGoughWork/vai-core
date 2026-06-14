@@ -97,7 +97,7 @@ def _bootstrap(
     supervisor = Supervisor(
         registry=registry,
         store=store,
-        default_backend="simulation",
+        default_backend="conversational",
         default_max_iterations=3,
         auto_persist=True,
     )
