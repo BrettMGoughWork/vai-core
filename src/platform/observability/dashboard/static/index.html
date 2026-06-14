@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S4 — Observability Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 12px; }
+  h1 small { font-size: 0.8rem; color: var(--muted); font-weight: normal; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .card h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.75rem; }
+  .state-pending   { color: var(--yellow); }
+  .state-running   { color: var(--blue); }
+  .state-completed,
+  .state-succeeded { color: var(--green); }
+  .state-failed,
+  .state-poisoned  { color: var(--red); }
+  .healthy     { color: var(--green); }
+  .unhealthy   { color: var(--red); }
+  .unknown     { color: var(--muted); }
+  .trace-tree { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 0.75rem; }
+  .trace-tree ul { list-style: none; padding-left: 16px; }
+  .trace-tree li { padding: 2px 0; }
+  .trace-tree .node { cursor: default; }
+  .trace-tree .node:hover { background: rgba(255,255,255,0.03); }
+  .trace-tree .type-badge {
+    display: inline-block; padding: 0 4px; border-radius: 3px; font-size: 0.65rem;
+    margin-right: 4px;
+  }
+  .type-job    { background: #1f6feb33; color: var(--blue); }
+  .type-cycle  { background: #3fb95033; color: var(--green); }
+  .type-segment { background: #bc8cff33; color: var(--purple); }
+  .metric-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .metric-tile {
+    background: rgba(255,255,255,0.03); border-radius: 6px; padding: 8px 12px;
+    min-width: 100px; text-align: center;
+  }
+  .metric-tile .value { font-size: 1.4rem; font-weight: 600; }
+  .metric-tile .label { font-size: 0.7rem; color: var(--muted); }
+  .hist-bar {
+    display: inline-block; height: 12px; border-radius: 2px;
+    background: var(--blue); margin-right: 4px;
+  }
+  .status-bar {
+    display: flex; gap: 16px; padding: 8px 0; font-size: 0.8rem; border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .status-bar .stat { color: var(--muted); }
+  .status-bar .stat strong { color: var(--text); }
+  .scroll { max-height: 400px; overflow-y: auto; }
+  .scroll::-webkit-scrollbar { width: 6px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>Stratum-4 <small>Observability Dashboard</small></h1>
+
+<div class="status-bar" id="statusBar">
+  <span class="stat">Jobs: <strong id="statJobs">0</strong></span>
+  <span class="stat">Workers: <strong id="statWorkers">0</strong></span>
+  <span class="stat">Queue: <strong id="statQueue">0</strong></span>
+  <span class="stat">Health: <strong id="statHealth">—</strong></span>
+  <span class="stat">Updated: <span id="statUpdated">—</span></span>
+</div>
+
+<div class="grid">
+  <!-- Job List Panel -->
+  <div class="card">
+    <h2>Jobs</h2>
+    <div class="scroll" id="jobList"><div style="color:var(--muted)">Waiting for data...</div></div>
+  </div>
+
+  <!-- Worker List Panel -->
+  <div class="card">
+    <h2>Workers</h2>
+    <div class="scroll" id="workerList"><div style="color:var(--muted)">Waiting for data...</div></div>
+  </div>
+
+  <!-- Trace Viewer Panel -->
+  <div class="card" style="grid-column: span 2;">
+    <h2>Traces</h2>
+    <div class="scroll" id="traceTree" style="max-height: 300px;"><div style="color:var(--muted)">Waiting for data...</div></div>
+  </div>
+
+  <!-- Metrics Panel -->
+  <div class="card" style="grid-column: span 2;">
+    <h2>Metrics</h2>
+    <div class="metric-row" id="metricPanel"></div>
+    <div style="margin-top: 8px; font-size: 0.8rem;">
+      <strong>Execution Time Histogram</strong>
+      <div id="histogram" style="margin-top: 4px;">
+        <div style="color:var(--muted); font-size:0.75rem;">Waiting for data...</div>
+      </div>
+    </div>
+    <div style="margin-top: 8px; font-size: 0.8rem;">
+      <strong>Drift / Repair</strong>
+      <span id="driftInfo" style="color:var(--muted); margin-left: 8px;">—</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// S4 Dashboard — Single Page App
+// ══════════════════════════════════════════════════════════════════════════
+
+let state = { jobs: [], workers: [], traces: [], metrics: {}, health: {} };
+
+// ── Renderers ────────────────────────────────────────────────────────────
+
+function renderJobs() {
+  const el = document.getElementById('jobList');
+  if (!state.jobs || state.jobs.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted)">No jobs</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>ID</th><th>Type</th><th>State</th><th>Worker</th><th>Age</th></tr></thead><tbody>';
+  for (const j of state.jobs.slice(0, 100)) {
+    const cls = 'state-' + (j.state || 'pending').toLowerCase();
+    const age = j.created_at ? timeAgo(j.created_at) : '—';
+    html += `<tr><td title="${j.job_id}">${shorten(j.job_id)}</td><td>${j.job_type || '—'}</td><td class="${cls}">${j.state}</td><td>${shorten(j.worker_id) || '—'}</td><td>${age}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function renderWorkers() {
+  const el = document.getElementById('workerList');
+  if (!state.workers || state.workers.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted)">No workers</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>Worker ID</th><th>Status</th><th>Active Job</th><th>Restarts</th><th>Last Heartbeat</th></tr></thead><tbody>';
+  for (const w of state.workers) {
+    const cls = w.healthy ? 'healthy' : 'unhealthy';
+    const hb = w.last_heartbeat ? timeAgo(w.last_heartbeat) : '—';
+    html += `<tr><td>${shorten(w.worker_id)}</td><td class="${cls}">${w.status}</td><td>${shorten(w.active_job_id) || '—'}</td><td>${w.restart_count}</td><td>${hb}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function renderTraces() {
+  const el = document.getElementById('traceTree');
+  if (!state.traces || state.traces.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted)">No traces</div>';
+    return;
+  }
+  let html = '<div class="trace-tree"><ul>';
+  for (const root of state.traces.slice(-20)) {
+    html += renderTraceNode(root);
+  }
+  html += '</ul></div>';
+  el.innerHTML = html;
+}
+
+function renderTraceNode(node) {
+  if (!node) return '';
+  const typeCls = 'type-' + (node.trace_type || 'unknown');
+  const label = `${node.trace_type || '?'} — ${node.correlation_id || node.trace_id ? shorten(node.trace_id) : 'root'}`;
+  const duration = node.duration_ms ? `<span style="color:var(--muted);font-size:0.7rem"> ${node.duration_ms}ms</span>` : '';
+  let html = `<li><span class="node"><span class="type-badge ${typeCls}">${node.trace_type}</span>${label}${duration}</span>`;
+  if (node.children && node.children.length > 0) {
+    html += '<ul>';
+    for (const c of node.children) {
+      html += renderTraceNode(c);
+    }
+    html += '</ul>';
+  }
+  html += '</li>';
+  return html;
+}
+
+function renderMetrics() {
+  const m = state.metrics || {};
+  const el = document.getElementById('metricPanel');
+
+  if (!m.job_count || Object.keys(m.job_count).length === 0) {
+    el.innerHTML = '<div style="color:var(--muted)">Waiting for metrics...</div>';
+    return;
+  }
+
+  // Job count tiles
+  let html = '';
+  for (const [k, v] of Object.entries(m.job_count)) {
+    html += `<div class="metric-tile"><div class="value">${v}</div><div class="label">${k}</div></div>`;
+  }
+
+  // Queue depth
+  html += `<div class="metric-tile"><div class="value">${m.queue_depth ?? 0}</div><div class="label">queue depth</div></div>`;
+
+  // Worker health
+  if (m.worker_health) {
+    const healthy = Object.values(m.worker_health).filter(v => v >= 1).length;
+    const total = Object.keys(m.worker_health).length;
+    html += `<div class="metric-tile"><div class="value">${healthy}/${total}</div><div class="label">workers healthy</div></div>`;
+  }
+
+  el.innerHTML = html;
+
+  // Histogram
+  const histEl = document.getElementById('histogram');
+  const execTimes = m.execution_times || [];
+  if (execTimes.length === 0) {
+    histEl.innerHTML = '<div style="color:var(--muted);font-size:0.75rem;">No execution data yet</div>';
+  } else {
+    // Build simple histogram buckets
+    const buckets = {'<10ms': 0, '<50ms': 0, '<200ms': 0, '<1s': 0, '>=1s': 0};
+    for (const t of execTimes) {
+      if (t < 10) buckets['<10ms']++;
+      else if (t < 50) buckets['<50ms']++;
+      else if (t < 200) buckets['<200ms']++;
+      else if (t < 1000) buckets['<1s']++;
+      else buckets['>=1s']++;
+    }
+    const maxVal = Math.max(...Object.values(buckets), 1);
+    let histHtml = '<table><tr>';
+    for (const [label, count] of Object.entries(buckets)) {
+      const pct = (count / maxVal) * 100;
+      histHtml += `<td style="padding:4px 8px;min-width:60px;">
+        <div style="display:flex;align-items:end;gap:4px;">
+          <span style="font-size:0.75rem;color:var(--muted)">${label}</span>
+        </div>
+        <div><span class="hist-bar" style="width:${Math.max(4, pct)}px"></span><span style="font-size:0.75rem">${count}</span></div>
+      </td>`;
+    }
+    histHtml += '</tr></table>';
+    histEl.innerHTML = histHtml;
+  }
+
+  // Drift info
+  const driftEl = document.getElementById('driftInfo');
+  if (m.drift_frequency != null) {
+    driftEl.textContent = `frequency: ${(m.drift_frequency * 100).toFixed(1)}%  |  total completed: ${m.total_jobs_completed || 0}  |  last updated: ${m.last_updated ? timeAgo(m.last_updated) : '—'}`;
+  }
+}
+
+function renderStatusBar() {
+  document.getElementById('statJobs').textContent = state.jobs ? state.jobs.length : 0;
+  document.getElementById('statWorkers').textContent = state.workers ? state.workers.length : 0;
+  const qd = (state.metrics && state.metrics.queue_depth != null) ? state.metrics.queue_depth : '—';
+  document.getElementById('statQueue').textContent = qd;
+  const hStatus = (state.health && state.health.status) || '—';
+  document.getElementById('statHealth').textContent = hStatus;
+  document.getElementById('statUpdated').textContent = state.timestamp ? new Date(state.timestamp).toLocaleTimeString() : '—';
+}
+
+function renderAll() {
+  renderJobs();
+  renderWorkers();
+  renderTraces();
+  renderMetrics();
+  renderStatusBar();
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function shorten(s) {
+  if (!s || s.length < 12) return s || '';
+  return s.substring(0, 8) + '…';
+}
+
+function timeAgo(ts) {
+  if (!ts) return '—';
+  const ms = Date.now() - new Date(ts).getTime();
+  if (ms < 1000) return 'now';
+  if (ms < 60000) return Math.floor(ms / 1000) + 's';
+  if (ms < 3600000) return Math.floor(ms / 60000) + 'm';
+  return Math.floor(ms / 3600000) + 'h';
+}
+
+// ── SSE Connection ───────────────────────────────────────────────────────
+
+function connectSSE() {
+  const evtSource = new EventSource('/api/events/stream');
+
+  evtSource.onmessage = function(event) {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'full_state' && msg.payload) {
+        state = msg.payload;
+        renderAll();
+      } else if (msg.type === 'event') {
+        // Merge incremental event into state
+        // For simplicity, refetch full state periodically
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  };
+
+  evtSource.onerror = function() {
+    evtSource.close();
+    setTimeout(connectSSE, 2000);
+  };
+}
+
+// ── Periodic Polling (fallback if SSE fails) ────────────────────────────
+
+async function pollState() {
+  try {
+    const resp = await fetch('/api/state');
+    if (resp.ok) {
+      state = await resp.json();
+      renderAll();
+    }
+  } catch (e) {
+    // Server not ready yet
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+
+connectSSE();
+
+// Poll every 3s as fallback
+pollState();
+setInterval(pollState, 3000);
+
+</script>
+</body>
+</html>

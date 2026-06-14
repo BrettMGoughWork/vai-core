@@ -56,12 +56,16 @@ _queue: InMemoryQueue = InMemoryQueue()
 _cp: ControlPlane = ControlPlane()
 
 
-def _process_one() -> None:
+def _process_one(registry: ChannelRegistry | None = None) -> None:
     """Run one worker cycle if there is a pending job."""
-    worker = Worker(queue=_queue, control_plane=_cp)
+    worker = Worker(
+        queue=_queue,
+        control_plane=_cp,
+        channel_registry=registry,
+    )
     job = worker.process_next()
     if job is not None:
-        print(f"\n  [worker] {job.job_id:<8} → {job.state.value}")
+        print(f"\n  [worker] {job.job_id:<8} -> {job.state.value}")
         if job.result:
             print(f"  [result] {job.result}")
 
@@ -88,7 +92,7 @@ def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None
     print(f"  channel:  {result['channel']}")
 
     # Run one worker cycle to process the new job
-    _process_one()
+    _process_one(registry)
 
     # Re-fetch the completed job for the result
     from src.platform.runtime.job_store import job_store
@@ -113,23 +117,35 @@ def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None
 
 
 def run_interactive(registry: ChannelRegistry) -> None:
-    """Read commands from stdin in a continuous interactive loop."""
-    print(HEADER)
-    print(PROMPT, end="", flush=True)
+    """Read commands from stdin in a continuous interactive loop.
+
+    When stdout is a TTY (interactive mode) the header and prompt are shown.
+    When stdout is piped (``| python -m dashboard``), header and prompt are
+    suppressed so only structured JSON lines reach the downstream consumer.
+    """
+    is_piped = not sys.stdout.isatty()
+
+    if not is_piped:
+        print(HEADER)
+        print(PROMPT, end="", flush=True)
 
     try:
         for line in sys.stdin:
             text = line.strip()
             if not text:
-                print(PROMPT, end="", flush=True)
+                if not is_piped:
+                    print(PROMPT, end="", flush=True)
                 continue
             if text.lower() in (":quit", ":exit", "quit", "exit"):
-                print("Goodbye.")
+                if not is_piped:
+                    print("Goodbye.")
                 break
             run_single(text, None, registry)
-            print(PROMPT, end="", flush=True)
+            if not is_piped:
+                print(PROMPT, end="", flush=True)
     except (KeyboardInterrupt, EOFError):
-        print("\nGoodbye.")
+        if not is_piped:
+            print("\nGoodbye.")
 
 
 # ---------------------------------------------------------------------------

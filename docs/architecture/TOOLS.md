@@ -91,6 +91,46 @@ Options: `--trace-dir` (default: `agent_traces/`)
 
 ---
 
+## Observability Dashboard (`src/platform/observability/dashboard/`)
+
+Read-only web UI for monitoring Stratum‑4 runtime state in real time. Consumes S4 observability events (metrics, traces, logs, health) via stdin pipe or JSONL file replay — never modifies S4 internals.
+
+### `__init__.py` (entry point)
+
+Launches the dashboard as a standalone HTTP server with SSE streaming.
+
+```powershell
+# Pipe live S4 CLI output
+python -m tools.channels.cli_app | python -m src.platform.observability.dashboard
+
+# Replay recorded events
+python -m src.platform.observability.dashboard --from-file events.jsonl
+
+# Custom host/port
+python -m src.platform.observability.dashboard --host 0.0.0.0 --port 8080
+```
+
+Options: `--mode` (default `web`), `--from-file`, `--host` (`127.0.0.1`), `--port` (`8765`), `--max-events` (`10000`)
+
+### Supporting modules (import-only)
+
+| Module | Purpose |
+|--------|---------|
+| `event_model.py` | `DashboardEventStore` — thread-safe in-memory state, event ingestion, trace tree assembly, SSE subscriber system |
+| `web_server.py` | `DashboardWebServer` — HTTP routes (`/api/state`, `/api/summary`, `/api/events/stream`, `/api/events/recent`) and static file serving |
+| `static/index.html` | Single-page dark-theme frontend: Job List, Worker List, Trace Tree, Metrics panels with SSE + polling fallback |
+
+### Dashboard panels
+
+| Panel | Data |
+|-------|------|
+| Jobs | job_id, type, state, retries, age, worker assignment |
+| Workers | worker_id, status, last heartbeat, restarts, active job |
+| Traces | Expandable per-job/per-cycle/per-segment tree with durations, drift/repair markers |
+| Metrics | Job counts, queue depth, execution time histogram (5 buckets), drift frequency |
+
+---
+
 ## Testing Harness (`tools/testing_harness/`)
 
 End-to-end and plumbing test tools for the agent pipeline.
@@ -181,7 +221,7 @@ python -m tools.testing_harness.s4_mvp_harness --json
 python -m tools.testing_harness.s4_mvp_harness --list
 ```
 
-Available scenarios: `normalization`, `job_creation`, `queue_fifo`, `job_store`, `worker_empty`, `worker_execute`, `adapter`, `logging`, `end_to_end`, `gateway_post`, `gateway_get`
+Available scenarios: `normalization`, `job_creation`, `queue_fifo`, `job_store`, `worker_empty`, `worker_execute`, `adapter`, `logging`, `end_to_end`, `gateway_post`, `gateway_get`, `dashboard`, and 47 more (59 total — run `--list` for full list)
 
 Options: `--name` / `-n`, `--json` / `-j`, `--list` / `-l`
 

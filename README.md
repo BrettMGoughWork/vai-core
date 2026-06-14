@@ -472,6 +472,35 @@ Usage:
 Optional arguments allow you to specify a trace directory or enable live watching.
 
 
+### Observability Dashboard (S4.8.5)
+
+The S4 Observability Dashboard is a read-only **web UI** for monitoring Stratum‑4 runtime state in real time. It consumes S4's existing observability events (metrics, traces, logs, health checks) via stdin or file pipe — never importing or modifying S4 internals.
+
+```powershell
+# Pipe live S4 output directly into the dashboard
+python -m tools.channels.cli_app | python -m src.platform.observability.dashboard
+
+# Or replay a recorded session from a JSONL file
+python -m src.platform.observability.dashboard --from-file events.jsonl
+```
+
+The dashboard opens at **http://localhost:8765** with four live panels:
+
+| Panel | Content |
+|-------|---------|
+| Jobs | job_id, type, state, retries, age, worker assignment |
+| Workers | worker_id, status, last heartbeat, restart count, active job |
+| Traces | Hierarchical tree: per-job → per-cycle → per-segment with durations |
+| Metrics | Job counts, queue depth, worker health, execution time histogram, drift frequency |
+
+Key features:
+- **SSE live streaming** — panels update as events arrive, with 15s keepalive
+- **Poll fallback** — auto-reconnects on SSE disconnect (3s interval)
+- **Dark theme** — deterministic, read-only
+- **Zero external dependencies** — pure Python stdlib (`http.server`, `json`, `threading`)
+- **Configurable** — `--host`, `--port`, `--max-events` for the event ring buffer
+
+
 ### Fetch Test Harness (`tools/fetch_harness/`)
 
 A scenario-driven test harness for the HTTP fetch subsystem. Define websites by

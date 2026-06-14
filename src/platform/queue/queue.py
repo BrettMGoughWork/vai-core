@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from collections import deque
 
+from src.platform.observability.logging import log_queue_event
+from src.platform.observability.metrics import emit_metric
 from src.platform.runtime.job import Job
 
 
@@ -65,6 +67,8 @@ class InMemoryQueue(Queue):
     def push(self, job: Job) -> str:
         """Append *job* and return its ``job_id``."""
         self._items.append(job)
+        emit_metric("s4.queue.depth", float(len(self._items)), {"queue": "default"})
+        log_queue_event("default", "enqueue", len(self._items))
         return job.job_id
 
     def pop(self) -> Job | None:
@@ -76,6 +80,8 @@ class InMemoryQueue(Queue):
         try:
             job = self._items.popleft()
             self._in_flight[job.job_id] = job
+            emit_metric("s4.queue.depth", float(len(self._items)), {"queue": "default"})
+            log_queue_event("default", "dequeue", len(self._items))
             return job
         except IndexError:
             return None
