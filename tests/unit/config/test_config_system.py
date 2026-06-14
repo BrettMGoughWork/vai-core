@@ -21,11 +21,11 @@ from typing import Any, Dict
 
 import pytest
 
-from src.platform.config.config_system import (
-    S4Config,
+from src.config.config_system import (
+    Config,
     ConfigError,
     UnknownKeyError,
-    ConfigValidationError,
+    ValidationError,
     load_config,
 )
 
@@ -50,7 +50,7 @@ class TestDefaults:
     def test_load_defaults(self):
         """Should produce a valid Config with no file or overrides."""
         cfg = load_config()
-        assert isinstance(cfg, S4Config)
+        assert isinstance(cfg, Config)
         assert cfg.get("logging.level") == "info"
         assert cfg.get("metrics.enabled") is True
         assert cfg.get("metrics.exporter") == "stdout"
@@ -59,10 +59,6 @@ class TestDefaults:
         assert cfg.get("workers.heartbeatintervalms") == 5000
         assert cfg.get("workers.heartbeattimeoutms") == 15000
         assert cfg.get("alerts.transports") == ["none"]
-        assert cfg.get("auth.enabled") is False
-        assert cfg.get("auth.token") == ""
-        assert cfg.get("rate_limit.enabled") is False
-        assert cfg.get("rate_limit.maxrequestsper_minute") == 60
 
     def test_defaults_are_independent(self):
         """Each call to load_config should return independent defaults."""
@@ -112,23 +108,6 @@ class TestConfigFile:
         with pytest.raises(ConfigError, match="Failed to parse"):
             load_config(config_file=str(config_path))
 
-    def test_load_yaml_auth_section(self, tmp_path: Path):
-        config_path = tmp_path / "config.yaml"
-        _write_yaml(config_path, {"auth": {"enabled": True, "token": "file-token"}})
-        cfg = load_config(config_file=str(config_path))
-        assert cfg.get("auth.enabled") is True
-        assert cfg.get("auth.token") == "file-token"
-
-    def test_load_yaml_rate_limit_section(self, tmp_path: Path):
-        config_path = tmp_path / "config.yaml"
-        _write_yaml(
-            config_path,
-            {"rate_limit": {"enabled": True, "maxrequestsper_minute": 30}},
-        )
-        cfg = load_config(config_file=str(config_path))
-        assert cfg.get("rate_limit.enabled") is True
-        assert cfg.get("rate_limit.maxrequestsper_minute") == 30
-
 
 # -------------------------------------------------------------------
 # Environment variables
@@ -167,26 +146,6 @@ class TestEnvironmentVariables:
         cfg = load_config()
         assert cfg.get("logging.level") == "info"
 
-    def test_env_override_auth_enabled(self, monkeypatch):
-        monkeypatch.setenv("S4AUTHENABLED", "true")
-        cfg = load_config()
-        assert cfg.get("auth.enabled") is True
-
-    def test_env_override_auth_token(self, monkeypatch):
-        monkeypatch.setenv("S4AUTHTOKEN", "my-secret")
-        cfg = load_config()
-        assert cfg.get("auth.token") == "my-secret"
-
-    def test_env_override_rate_limit_enabled(self, monkeypatch):
-        monkeypatch.setenv("S4RATELIMITENABLED", "true")
-        cfg = load_config()
-        assert cfg.get("rate_limit.enabled") is True
-
-    def test_env_override_rate_limit_max(self, monkeypatch):
-        monkeypatch.setenv("S4RATELIMITMAXREQUESTSPER_MINUTE", "120")
-        cfg = load_config()
-        assert cfg.get("rate_limit.maxrequestsper_minute") == 120
-
 
 # -------------------------------------------------------------------
 # Runtime overrides
@@ -215,22 +174,6 @@ class TestRuntimeOverrides:
         monkeypatch.setenv("S4WORKERSCOUNT", "2")
         cfg = load_config(overrides={"workers.count": 10})
         assert cfg.get("workers.count") == 10
-
-    def test_override_auth_enabled(self):
-        cfg = load_config(overrides={"auth.enabled": True})
-        assert cfg.get("auth.enabled") is True
-
-    def test_override_auth_token(self):
-        cfg = load_config(overrides={"auth.token": "override-token"})
-        assert cfg.get("auth.token") == "override-token"
-
-    def test_override_rate_limit_enabled(self):
-        cfg = load_config(overrides={"rate_limit.enabled": True})
-        assert cfg.get("rate_limit.enabled") is True
-
-    def test_override_rate_limit_max(self):
-        cfg = load_config(overrides={"rate_limit.maxrequestsper_minute": 30})
-        assert cfg.get("rate_limit.maxrequestsper_minute") == 30
 
 
 # -------------------------------------------------------------------
@@ -292,40 +235,30 @@ class TestValidation:
             load_config(overrides={"nonsense.foo": "bar"})
 
     def test_invalid_string_value_raises(self):
-        with pytest.raises(ConfigValidationError, match="invalid value"):
+        with pytest.raises(ValidationError, match="invalid value"):
             load_config(overrides={"logging.level": "verbose"})
 
     def test_invalid_int_value_raises(self):
-        with pytest.raises(ConfigValidationError):
+        with pytest.raises(ValidationError):
             load_config(overrides={"workers.count": "notanint"})
 
     def test_invalid_bool_value_raises(self):
-        with pytest.raises(ConfigValidationError):
+        with pytest.raises(ValidationError):
             load_config(overrides={"metrics.enabled": "yes"})
 
     def test_invalid_list_item_raises(self):
-        with pytest.raises(ConfigValidationError):
+        with pytest.raises(ValidationError):
             load_config(overrides={"alerts.transports": ["pagerduty"]})
 
     def test_type_mismatch_list_raises(self):
         """Passing a string where list is expected should fail."""
-        with pytest.raises(ConfigValidationError):
+        with pytest.raises(ValidationError):
             load_config(overrides={"alerts.transports": "slack"})
 
     def test_override_nonexistent_dotted_key(self):
         """A dotted key with an unknown section should fail."""
         with pytest.raises(UnknownKeyError):
             load_config(overrides={"nonexistent.foo": "bar"})
-
-    def test_invalid_auth_enabled_type_raises(self):
-        """auth.enabled must be a bool."""
-        with pytest.raises(ConfigValidationError):
-            load_config(overrides={"auth.enabled": "yes"})
-
-    def test_invalid_rate_limit_max_type_raises(self):
-        """rate_limit.maxrequestsper_minute must be an int."""
-        with pytest.raises(ConfigValidationError):
-            load_config(overrides={"rate_limit.maxrequestsper_minute": "many"})
 
 
 # -------------------------------------------------------------------
@@ -373,11 +306,7 @@ class TestToDict:
         assert "queues" in d
         assert "workers" in d
         assert "alerts" in d
-        assert "auth" in d
-        assert "rate_limit" in d
         assert d["logging"]["level"] == "info"
-        assert d["auth"]["enabled"] is False
-        assert d["rate_limit"]["maxrequestsper_minute"] == 60
 
     def test_to_dict_is_independent(self):
         cfg = load_config(overrides={"workers.count": 6})
