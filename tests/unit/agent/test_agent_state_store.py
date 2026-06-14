@@ -25,10 +25,6 @@ from typing import Generator
 
 import pytest
 
-from src.agent.contracts import (
-    ACTION_REQUEST_S4_JOB_INTENT,
-    ActionIntent,
-)
 from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
 from src.agent.adapters.file_agent_state_store import FileAgentStateStore
 from src.agent.adapters.sqlite_agent_state_store import SQLiteAgentStateStore
@@ -77,12 +73,6 @@ def populated_agent_state() -> AgentState:
     return AgentState(
         agent_id="active-agent",
         lifecycle_state=LifecycleState.WAITING,
-        pending_intents=[
-            ActionIntent(
-                type=ACTION_REQUEST_S4_JOB_INTENT,
-                payload={"job_type": "test", "params": {"x": 1}},
-            ),
-        ],
         timestamps={
             "created_at": "2024-01-01T00:00:00+00:00",
             "activated_at": "2024-01-01T00:00:01+00:00",
@@ -169,9 +159,6 @@ class TestMemoryAgentStateStore:
         assert loaded is not None
         assert loaded.agent_id == "active-agent"
         assert loaded.lifecycle_state == LifecycleState.WAITING
-        assert loaded.pending_intents is not None
-        assert len(loaded.pending_intents) == 1
-        assert loaded.pending_intents[0].type == ACTION_REQUEST_S4_JOB_INTENT
         assert loaded.version == 3
         assert loaded.supervisor_metadata.get("total_iterations") == 2
 
@@ -215,16 +202,13 @@ class TestFileAgentStateStore:
         assert sorted(ids) == ["agent-a", "agent-b"]
 
     def test_rich_state_roundtrip(self, tmp_dir: Path, populated_agent_state: AgentState) -> None:
-        """Verify that nested types (ActionIntent, LifecycleEvent) survive file serialisation."""
+        """Verify that nested types survive file serialisation."""
         store = FileAgentStateStore(tmp_dir)
         store.save("active-agent", populated_agent_state)
         loaded = store.load("active-agent")
         assert loaded is not None
         assert loaded.agent_id == "active-agent"
         assert loaded.lifecycle_state == LifecycleState.WAITING
-        assert loaded.pending_intents is not None
-        assert len(loaded.pending_intents) == 1
-        assert loaded.pending_intents[0].type == ACTION_REQUEST_S4_JOB_INTENT
 
     # ── Edge cases ───────────────────────────────────────────────────────
 
@@ -321,9 +305,6 @@ class TestSQLiteAgentStateStore:
         assert loaded is not None
         assert loaded.agent_id == "active-agent"
         assert loaded.lifecycle_state == LifecycleState.WAITING
-        assert loaded.pending_intents is not None
-        assert len(loaded.pending_intents) == 1
-        assert loaded.pending_intents[0].type == ACTION_REQUEST_S4_JOB_INTENT
         assert loaded.version == 3
 
     # ── Edge cases ───────────────────────────────────────────────────────

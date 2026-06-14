@@ -11,71 +11,12 @@ from __future__ import annotations
 import pytest
 
 from src.agent.contracts import (
-    ACTION_AGENT_STEP_INTENT,
-    ACTION_CALL_TOOL_INTENT,
-    ACTION_REQUEST_S4_JOB_INTENT,
     S5_CONTRACT_VERSION,
-    ActionIntent,
     AgentMessage,
     AgentResponse,
 )
 
 
-# ===========================================================================
-# ActionIntent
-# ===========================================================================
-
-
-class TestActionIntent:
-    def test_call_tool_intent(self) -> None:
-        intent = ActionIntent(
-            type=ACTION_CALL_TOOL_INTENT,
-            payload={"tool": "read_file", "args": {"path": "/tmp/x"}},
-            description="Read a file",
-        )
-        assert intent.type == ACTION_CALL_TOOL_INTENT
-        assert intent.payload["tool"] == "read_file"
-        assert intent.description == "Read a file"
-
-    def test_request_s4_job_intent(self) -> None:
-        intent = ActionIntent(
-            type=ACTION_REQUEST_S4_JOB_INTENT,
-            payload={"job_type": "execute", "params": {"cmd": "ls"}},
-        )
-        assert intent.type == ACTION_REQUEST_S4_JOB_INTENT
-        assert intent.payload["job_type"] == "execute"
-
-    def test_agent_step_intent(self) -> None:
-        intent = ActionIntent(
-            type=ACTION_AGENT_STEP_INTENT,
-            payload={"steps": ["analyze", "summarize"]},
-        )
-        assert intent.type == ACTION_AGENT_STEP_INTENT
-
-    def test_default_payload_and_description(self) -> None:
-        intent = ActionIntent(type=ACTION_CALL_TOOL_INTENT)
-        assert intent.payload == {}
-        assert intent.description == ""
-
-    def test_invalid_type_raises(self) -> None:
-        with pytest.raises(ValueError, match="action_intent.type"):
-            ActionIntent(type="execute")
-
-    def test_non_dict_payload_raises(self) -> None:
-        with pytest.raises(ValueError, match="action_intent.payload"):
-            ActionIntent(type=ACTION_CALL_TOOL_INTENT, payload="not-a-dict")  # type: ignore[arg-type]
-
-    def test_is_frozen(self) -> None:
-        intent = ActionIntent(type=ACTION_CALL_TOOL_INTENT)
-        with pytest.raises(Exception):
-            intent.type = "other"  # type: ignore[misc]
-
-    def test_payload_must_be_json_compatible(self) -> None:
-        with pytest.raises(ValueError, match="action_intent.payload"):
-            ActionIntent(
-                type=ACTION_CALL_TOOL_INTENT,
-                payload={"fn": lambda: None},  # type: ignore[dict-item]
-            )
 
 
 # ===========================================================================
@@ -143,45 +84,11 @@ class TestAgentResponse:
     def test_reply_only(self) -> None:
         resp = AgentResponse(reply="Hello, I'm S5.")
         assert resp.reply == "Hello, I'm S5."
-        assert resp.actions == []
         assert resp.contract_version == S5_CONTRACT_VERSION
 
-    def test_actions_only(self) -> None:
-        intent = ActionIntent(
-            type=ACTION_CALL_TOOL_INTENT,
-            payload={"tool": "read_file"},
-        )
-        resp = AgentResponse(actions=[intent])
-        assert resp.reply is None
-        assert len(resp.actions) == 1
-
-    def test_reply_and_actions(self) -> None:
-        intent = ActionIntent(type=ACTION_AGENT_STEP_INTENT)
-        resp = AgentResponse(
-            reply="Let me analyze that for you.",
-            actions=[intent],
-            metadata={"correlation_id": "abc", "confidence": 0.95, "agent": "assistant"},
-        )
-        assert resp.reply == "Let me analyze that for you."
-        assert len(resp.actions) == 1
-        assert resp.metadata["confidence"] == 0.95
-
-    def test_neither_reply_nor_actions_raises(self) -> None:
-        with pytest.raises(
-            ValueError, match="at least one of reply or actions"
-        ):
-            AgentResponse()
-
     def test_non_string_reply_raises(self) -> None:
-        with pytest.raises(ValueError, match="reply must be a string"):
+        with pytest.raises(ValueError, match="reply must be a string or None"):
             AgentResponse(reply=42)  # type: ignore[arg-type]
-
-    def test_non_list_actions_raises(self) -> None:
-        with pytest.raises(ValueError, match="actions must be a list"):
-            AgentResponse(
-                reply="hi",
-                actions="not-a-list",  # type: ignore[arg-type]
-            )
 
     def test_non_dict_metadata_raises(self) -> None:
         with pytest.raises(ValueError, match="metadata must be a dict"):
@@ -214,18 +121,6 @@ class TestAgentResponse:
 
 class TestS5BoundaryEnforcement:
     """S5 must never emit S1/S4/planner structures."""
-
-    def test_action_intent_is_not_executable(self) -> None:
-        """Action intents must not look like executable instructions."""
-        intent = ActionIntent(
-            type=ACTION_CALL_TOOL_INTENT,
-            payload={"tool": "read_file", "args": {"path": "/tmp/x"}},
-        )
-        # An intent has no `dispatch`, `execute`, or `submit` semantics.
-        # It is declarative — the *absence* of execution fields is the test.
-        assert "dispatch" not in intent.payload
-        assert "submit" not in intent.payload
-        assert "execute" not in intent.payload
 
     def test_agent_response_has_no_s1_fields(self) -> None:
         """AgentResponse must not contain S1 drift/repair fields."""
