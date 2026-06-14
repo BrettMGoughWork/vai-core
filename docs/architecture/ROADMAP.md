@@ -2138,10 +2138,10 @@ It owns agents, planning, skills, and the translation of cognition into S4 jobs.
 - S5 must reply with `S5Response` (not S1's drift/repair JSON)
 - S5 must never produce S1-structured output for user-facing replies
 - S5 may call S1 internally for plan analysis and fold results into `actions`
-- ✅ Implemented as `src/agent/contracts.py` — `AgentMessage`, `AgentResponse`, `ActionIntent` (frozen dataclasses with JSON-compatibility enforcement)
-- ✅ S5 emits declarative action intents (not executable instructions), resolving the S5.0/5.3/5.4 dispatch overlap concern
+- Implemented as `src/agent/contracts.py` — `AgentMessage`, `AgentResponse`, `ActionIntent` (frozen dataclasses with JSON-compatibility enforcement)
+- S5 emits declarative action intents (not executable instructions), resolving the S5.0/5.3/5.4 dispatch overlap concern
 
-Outcome: S5 has a formal contract for conversational I/O, distinct from S1's analytical schema.
+✅ Outcome: S5 has a formal contract for conversational I/O, distinct from S1's analytical schema.
 
 ⚠️ Concern to address: 5.0's `actions: list[Action]` includes tool calls, S4 jobs, and agent steps — the same concerns covered by 5.3 (planning/cognitive loop) and 5.4 (S5→S4 job interface). The boundary between "conversational action", "planned cognitive step", and "S4 job" is fuzzy and risks building the same dispatch mechanism three times. Needs clarification before 5.3/5.4 are implemented.
 
@@ -2151,19 +2151,19 @@ Outcome: S5 has a formal contract for conversational I/O, distinct from S1's ana
 - Capability declarations  
 - Agent discovery API  
 
-Outcome: S5 knows what agents exist and what they can do.
+✅ Outcome: S5 knows what agents exist and what they can do.
 
 ### PHASE 5.2 — Agent Activation Contract
 - Activation envelope  
 - Context injection  
 - Skill availability resolution  
 
-Outcome: S5 can activate an agent deterministically.
+✅ Outcome: S5 can activate an agent deterministically.
 
 ⚠️ Concern to address: Activation direction is underspecified. Can S4 channels talk to S5 directly? Or is S5 only activated by S6 (via S6.3)? The roadmap says S5 is the "only cognitive layer" and S6 delegates thinking to it — but the activation contract doesn't say who the caller is. Needs clarification before S5.2 is implemented, as it affects whether S5 has its own ingress or is purely an S6 dependency.
 ⚠️ Concern to address: Model provider abstraction is not yet defined — S5.2/S5.3 currently assume an LLM but don't specify how the provider is selected, configured, or swapped. Should be addressed before or during S5.2.
 
-### PHASE 5.3 — Planning & Cognitive Loop
+✅ ### PHASE 5.3 — Planning & Cognitive Loop
 - LLM planning contract (⚠️ depends on model provider abstraction from S5.2)
 - Agent step evaluation  
 - Skill invocation semantics  
