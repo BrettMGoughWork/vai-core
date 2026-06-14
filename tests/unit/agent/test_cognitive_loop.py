@@ -436,7 +436,7 @@ class TestRunCognitiveLoopErrors:
         ctx = _make_activated_context_from_scratch()
 
         with mock.patch(
-            "src.agent.cognitive_loop.call_s1_backend",
+            "src.agent.cognitive_loop.call_runtime_backend",
             return_value=S1Error(
                 type="timeout",
                 message="S1 timed out",
@@ -453,11 +453,11 @@ class TestRunCognitiveLoopErrors:
     def test_s1_error_retry_then_succeed(self):
         """S1 error triggers a retry; if retry succeeds, loop continues."""
         ctx = _make_activated_context_from_scratch()
-        from src.strategy.planning.s1_contract.s1_client import call_s1_backend as real_call_s1_backend
+        from src.runtime.interfaces import call_runtime_backend
 
         # Build a PromptRequest and call the real backend for a success response
         request = build_prompt_request(ctx)
-        success_response = real_call_s1_backend(request, backend="simulation")
+        success_response = call_runtime_backend(request, backend="simulation")
 
         call_count: list[int] = [0]
 
@@ -468,7 +468,7 @@ class TestRunCognitiveLoopErrors:
             return success_response
 
         with mock.patch(
-            "src.agent.cognitive_loop.call_s1_backend",
+            "src.agent.cognitive_loop.call_runtime_backend",
             side_effect=_side_effect,
         ):
             result = run_cognitive_loop(ctx)
@@ -482,7 +482,7 @@ class TestRunCognitiveLoopErrors:
         ctx = _make_activated_context_from_scratch()
 
         with mock.patch(
-            "src.agent.cognitive_loop.call_s1_backend",
+            "src.agent.cognitive_loop.call_runtime_backend",
             return_value=PromptResponse(output={"bad": object()}),
         ):
             result = run_cognitive_loop(ctx)
@@ -533,7 +533,7 @@ class TestRunCognitiveLoopSkills:
         runner = FakeSkillRunner()
         ctx = _make_activated_context_from_scratch()
 
-        # Inject skill_refs into the simulation output by patching call_s1_backend
+        # Inject skill_refs into the simulation output by patching call_runtime_backend
         skill_response = PromptResponse(
             output={
                 "is_complete": True,
@@ -545,7 +545,7 @@ class TestRunCognitiveLoopSkills:
         )
 
         with mock.patch(
-            "src.agent.cognitive_loop.call_s1_backend",
+            "src.agent.cognitive_loop.call_runtime_backend",
             return_value=skill_response,
         ):
             result = run_cognitive_loop(ctx, skill_runner=runner)
@@ -578,7 +578,7 @@ class TestRunCognitiveLoopSkills:
         )
 
         with mock.patch(
-            "src.agent.cognitive_loop.call_s1_backend",
+            "src.agent.cognitive_loop.call_runtime_backend",
             return_value=skill_response,
         ):
             result = run_cognitive_loop(ctx, skill_runner=FailingSkillRunner())

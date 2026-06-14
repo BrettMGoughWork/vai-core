@@ -167,3 +167,7 @@ def call_s1_backend(
 
     # 3. Validate → PromptResponse | S1Error
     return validate_llm_response(raw_text)
+
+
+# Domain-name alias — call_runtime_backend is the canonical name.
+call_runtime_backend = call_s1_backend

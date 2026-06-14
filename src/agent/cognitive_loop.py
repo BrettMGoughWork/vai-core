@@ -22,18 +22,27 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from src.agent.activation import ActivatedAgentContext
-from src.agent.contracts import (
+from src.agent.interfaces import (
+    ActivatedAgentContext,
+    ActionIntent,
     ACTION_CALL_TOOL_INTENT,
     ACTION_REQUEST_S4_JOB_INTENT,
     ACTION_AGENT_STEP_INTENT,
-    ActionIntent,
+    CAP_CONVERSATIONAL,
+    CAP_TOOL_USE,
+    CAP_JOB_SUBMISSION,
 )
-from src.agent.registry import CAP_CONVERSATIONAL, CAP_TOOL_USE, CAP_JOB_SUBMISSION
-from src.capabilities.contracts import SkillCallRequest, SkillResult
-from src.capabilities.runtime.skill_runner import SkillRunner
-from src.strategy.planning.s1_contract.s1_client import call_s1_backend
-from src.strategy.planning.s1_contract.types import PromptRequest, PromptResponse, S1Error
+from src.runtime.interfaces import (
+    PromptRequest,
+    PromptResponse,
+    S1Error,
+    call_runtime_backend,
+)
+from src.capabilities.interfaces import (
+    SkillCallRequest,
+    SkillResult,
+    SkillRunner,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -323,7 +332,7 @@ def run_cognitive_loop(
     2. Calls S1 (simulation or real_llm) for reasoning
     3. Interprets the model's output
     4. Optionally invokes skills via S3
-    5. Produces declarative ``ActionIntent``\ s
+    5. Produces declarative ``ActionIntent``s
     6. Repeats up to ``max_iterations`` times
 
     Parameters
@@ -378,7 +387,7 @@ def run_cognitive_loop(
         s1_error: Optional[S1Error] = None
 
         for attempt in range(2):  # retry once
-            result = call_s1_backend(request, backend=backend)
+            result = call_runtime_backend(request, backend=backend)
 
             if isinstance(result, S1Error):
                 s1_error = result

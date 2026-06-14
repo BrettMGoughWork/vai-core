@@ -58,6 +58,29 @@ from src.agent.contracts import (
     AgentMessage,
     AgentResponse,
 )
+from src.agent.interfaces.agent_state import (
+    AgentState,
+    LifecycleEvent,
+    LifecycleState,
+)
+from src.agent.interfaces.agent_state_store import (
+    AgentStateStore,
+    StoreError,
+)
+from src.agent.supervisor import (
+    AgentInTerminalStateError,
+    AgentNotActiveError,
+    AgentNotSuspendedError,
+    Supervisor,
+    SupervisorError,
+)
+from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
+from src.agent.adapters.file_agent_state_store import FileAgentStateStore
+from src.agent.adapters.sqlite_agent_state_store import SQLiteAgentStateStore
+from src.agent.adapters.strategy_agent_state_store import StrategyAgentStateStore
+from src.agent.loaders.yaml_loader import (
+    load_agent_manifest,
+)
 from src.agent.registry import (
     AGENT_REGISTRY_VERSION,
     CAP_ANALYSIS,
@@ -142,4 +165,20 @@ __all__ = [
     # ── Cognitive Loop (S5.3) ─────────────────────────────────────────
     "CognitiveLoopResult",
     "run_cognitive_loop",
+    # ── Supervisor (S5.5) ──────────────────────────────────────────────
+    "AgentInTerminalStateError",
+    "AgentNotActiveError",
+    "AgentNotSuspendedError",
+    "Supervisor",
+    "SupervisorError",
+    # ── Agent State Store (S5.6) ───────────────────────────────────────
+    "AgentState",
+    "AgentStateStore",
+    "FileAgentStateStore",
+    "LifecycleEvent",
+    "LifecycleState",
+    "MemoryAgentStateStore",
+    "SQLiteAgentStateStore",
+    "StoreError",
+    "StrategyAgentStateStore",
 ]

@@ -2163,13 +2163,13 @@ It owns agents, planning, skills, and the translation of cognition into S4 jobs.
 ⚠️ Concern to address: Activation direction is underspecified. Can S4 channels talk to S5 directly? Or is S5 only activated by S6 (via S6.3)? The roadmap says S5 is the "only cognitive layer" and S6 delegates thinking to it — but the activation contract doesn't say who the caller is. Needs clarification before S5.2 is implemented, as it affects whether S5 has its own ingress or is purely an S6 dependency.
 ⚠️ Concern to address: Model provider abstraction is not yet defined — S5.2/S5.3 currently assume an LLM but don't specify how the provider is selected, configured, or swapped. Should be addressed before or during S5.2.
 
-✅ ### PHASE 5.3 — Planning & Cognitive Loop
+### PHASE 5.3 — Planning & Cognitive Loop
 - LLM planning contract (⚠️ depends on model provider abstraction from S5.2)
 - Agent step evaluation  
 - Skill invocation semantics  
 - Error handling + fallback  
 
-Outcome: S5 can “think” on behalf of an agent.
+✅ Outcome: S5 can “think” on behalf of an agent.
 
 ⚠️ Concern to address: Missing — there is no model provider abstraction phase. S5.3 says "LLM planning contract" but doesn't define how S5 switches between OpenAI, Anthropic, local models, or future providers. This should be an explicit abstraction layer, not implicit in the planning contract. Needs to be added — possibly as a sub-phase of 5.3 or a new 5.3.x.
 
@@ -2178,14 +2178,14 @@ Outcome: S5 can “think” on behalf of an agent.
 - Result interpretation  
 - Agent step continuation  
 
-Outcome: S5 can turn cognitive steps into S4 jobs and consume results.
+✅ Outcome: S5 can turn cognitive steps into S4 jobs and consume results.
 
 ### PHASE 5.5 — Agent Runtime Supervisor
 - Agent lifecycle  
 - Agent state tracking  
 - Timeouts + cancellation  
 
-Outcome: S5 is stable, resumable, and debuggable.
+✅ Outcome: S5 is stable, resumable, and debuggable.
 
 ### PHASE 5.6 — Agent State Persistence Boundary
 - Define `AgentStateStore` interface:
@@ -2197,7 +2197,63 @@ Outcome: S5 is stable, resumable, and debuggable.
 
 Outcome: S5 gets durable memory without infecting S2 with agent concepts.
 
-⚠️ Concern to address: Phase 5.6 (state persistence) is positioned after 5.3 (planning loop) and 5.4 (job interface), but planning loops and conversation context both need durable memory. Persistence should come before or alongside the cognitive loop, not three phases later. Consider promoting 5.6 to before 5.3, or splitting it into an earlier foundation phase (in-memory) followed by the S2-backed phase (5.6).
+⚠️ Concern to address: ~~Phase 5.6 (state persistence) is positioned after 5.3 (planning loop) and 5.4 (job interface), but planning loops and conversation context both need durable memory. Persistence should come before or alongside the cognitive loop, not three phases later. Consider promoting 5.6 to before 5.3, or splitting it into an earlier foundation phase (in-memory) followed by the S2-backed phase (5.6).~~
+✅ Resolved: S5.6 now ships with three immediate backends (in-memory, file, SQLite) alongside the S5.5 Supervisor. The S2-backed adapter (StrategyAgentStateStore) is defined as a future placeholder. The Supervisor accepts an AgentStateStore at construction and auto-persists on every lifecycle transition, making persistence available to S5.3 and S5.4 from their first invocation.
+
+### PHASE 5.7 — S5 Cleanup & High Issue Resolution
+Resolve all remaining architecture audit high-severity issues before S6 begins.
+
+**5.7.0 — YAML agent manifest loader**
+- Implement `src/agent/loaders/yaml_loader.py` to parse `config/agents.yaml`
+- Map YAML fields to `AgentIdentity`, `AgentConstraints`, `AgentMetadata` (frozen dataclasses)
+- Validate agent entries at load time (non-empty names, valid capabilities, safe version strings)
+- Register validated agents into `AgentRegistry` via a single `load_agent_manifest(registry, path)` call
+- Error handling: missing file, bad YAML, missing `agents` key, invalid entries — each reports the offending agent_id
+- Keep the Python `register_agent()` API as the lower-level escape hatch
+- Outcome: agents become declarative — create by editing a YAML file, no code changes required
+
+**5.7.1 — Resolve duplicate class names (5 high issues)**
+- `Config` — defined in both `src/config/config_system.py` and `src/strategy/config/loader.py`
+  - Rename the Strategy-scoped variant to `StrategyConfig` or consolidate into a single shared definition
+- `ConfigError` — defined in both `src/config/config_system.py` and `src/platform/config/config_system.py`
+  - Extract into a shared errors module or rename Platform variant to `PlatformConfigError`
+- `UnknownCapabilityError` — defined in both `src/agent/registry.py` and `src/strategy/types/errors/plan_errors.py`
+  - Capabilities are an S5 concern — move Strategy's usage to reference S5's definition, or consolidate into a single errors module
+- `UnknownKeyError` — defined in both `src/config/config_system.py` and `src/platform/config/config_system.py`
+  - Extract into a shared errors module alongside `ConfigError`
+- `ValidationError` — defined in both `src/config/config_system.py` and `src/strategy/types/errors/ValidationError.py`
+  - Rename or alias to avoid collision (e.g., `StrategyValidationError`)
+- Run `ci_architecture_check.py` to confirm all high issues resolved
+
+**5.7.2 — Verify stratum interface boundaries**
+- Confirm all inter-stratum interfaces (`/src/runtime/integrations/`, `/src/capabilities/integrations/`, `/src/platform/integrations/`, `/src/agent/integrations/`) use domain names (Runtime, Capabilities, Platform, Agent) not stratum numbers (S1, S3, S4, S5)
+- Run CI architecture check to ensure no regressions
+
+**5.7.3 — Test gap closure**
+- Audit test coverage across all S5 phases (5.0–5.6)
+- Fill gaps identified by coverage report
+- Ensure edge cases for activation, cognitive loop, and job dispatch are covered
+
+**5.7.4 — Integration tests**
+- Write cross-phase integration tests that exercise full S5 pipelines end-to-end:
+  - Activation → Cognitive Loop → Job Dispatch → Result Interpretation
+  - Supervisor lifecycle across multiple steps
+  - Persistence round-trip (save → load → resume)
+  - Timeout → Suspend → Resume cycle
+- Test real boundary crossings (S5 → S4 through execution interface, S5 → AgentStateStore)
+- Keep integration tests in `tests/integration/agent/` directory
+
+**5.7.5 — Potential test harness**
+- Evaluate whether a dedicated test harness is needed for S5 integration scenarios
+- Considerations:
+  - Pre-built mock S4 ExecutionProvider for deterministic job execution
+  - Pre-built mock AgentStateStore backends (in-memory, file, SQLite)
+  - Ability to inject fake CognitiveLoopResult and JobDispatchResult
+  - Reusable fixture for a "fully activated agent" with known state
+- If warranted, build a lightweight harness in `tests/harness/agent_harness.py`
+- Do not over-engineer — start with shared fixtures, graduate to harness only if test boilerplate becomes excessive
+
+Outcome: S5 closes with zero high-severity architecture issues, clean stratum boundaries, thorough test coverage, cross-phase integration confidence, and a lean test harness if justified.
 
 ## STRATUM 6 — Workflow Layer (User Interaction + Orchestration)
 S6 is not cognitive.  
