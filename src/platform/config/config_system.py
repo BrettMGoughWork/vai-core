@@ -102,14 +102,11 @@ for _sec_name, _sec_def in SCHEMA.items():
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+# Re-exported from the canonical src.config.config_system to eliminate
+# duplicate class definitions across strata.
 
-
-class ConfigError(Exception):
-    """Raised when configuration loading or validation fails."""
-
-
-class UnknownKeyError(ConfigError):
-    """Raised when an unknown configuration key is encountered."""
+from src.config.config_system import ConfigError as ConfigError  # noqa: F401
+from src.config.config_system import UnknownKeyError as UnknownKeyError  # noqa: F401
 
 
 class ConfigValidationError(ConfigError):

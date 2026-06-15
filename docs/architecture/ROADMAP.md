@@ -3258,52 +3258,252 @@ Remove the temporary re-exports added in R.2.1:
 
 ---
 
-### PHASE R.7 — Documentation
+### PHASE R.7 — Documentation + Audit Cleanup
 
-**Goal:** Update ARCHITECTURE.md to reflect the refactored stratum boundaries. Clean up any remaining dead code.
+**Goal:** Update ARCHITECTURE.md and README.md to reflect the refactored stratum boundaries. Fix architecture audit CI issues (duplicate class definitions, missing exemptions). Clean up any remaining dead code items confirmed safe to remove.
 
-**R.7.1 — Update ARCHITECTURE.md**
+**R.7.1 — Fix Architecture Audit Issues**
 
-- Update stratum descriptions:
-  - S4: "Generic Durable Execution Engine" (was "Platform Runtime")
-  - S5: "Agent Workflow Orchestrator" with Strategy Router description
-  - Gateway: New standalone package description
-  - S2: "Pure Planner" — no longer owns LLM or capabilities
-  - S1: "Runtime — Cross-Cutting LLM Service"
-- Update the flow diagram at the top to show the new architecture
-- Update the Responsibility Table
-- Add Gateway/Platform adapter interface documentation
-- Add StrategyRouter to the S5 interface documentation
+**Context:** `tools/architecture/audit.py` runs in CI and reported 7 high-severity issues — 3 genuine duplicate class definitions and 4 false positives that share names but have distinct semantic meaning.
 
-**R.7.2 — Remove Dead Code**
+**R.7.1a — Fix genuine duplicates (3 of 7)**
 
-- `src/strategy/planning/adapters/` — empty or deleted
-- `src/strategy/planning/s1_contract/` — empty or deleted  
-- `src/platform/transport/` — moved to Gateway
-- `src/platform/runtime/channels/` — moved to Gateway
-- `src/platform/runtime/gateway_entrypoint.py` — moved to Gateway
-- Any backward-compat stubs left over from R.6.4
+Files changed:
+- `src/platform/transport/normalization.py`: Replace `ChannelMessage` class definition with re-export from `src.gateway.normalization`
+- `src/platform/config/config_system.py`: Replace `ConfigError` / `UnknownKeyError` class definitions with re-exports from `src.config.config_system`
 
-**R.7.3 — Final Verification**
+**R.7.1b — Exempt false-positive duplicates (4 of 7)**
+
+Files changed:
+- `tools/architecture/audit.py`: Add `EXEMPTED_DUPLICATES` set (`{"Config", "StepOutcome", "UnknownCapabilityError", "ValidationError"}`) with early-continue logic in `find_duplicates()`
+
+**R.7.1c — Fix S4 test harness syntax error**
+
+Files changed:
+- `tools/testing_harness/s4_mvp_harness.py`: Fix orphaned `try:` at line 1651 (`_test_degraded_mode_in_worker()`) — add `except Exception as exc:` with `job.notes.append(...)` handler
+
+**R.7.2 — Update Documentation**
+
+Files changed:
+- `docs/architecture/ARCHITECTURE.md`: Update flow diagram, stratum descriptions, directory structure, responsibility table
+- `README.md`: Update architecture diagram, repository layout, quick reference table
+
+**R.7.3 — Remove Dead Code**
+
+- `src/strategy/planning/adapters/` — confirmed empty, deleted (not in use)
+- `src/strategy/planning/s1_contract/` — **preserved** (7+ consumers in strategy, agent, test files)
+- `src/platform/runtime/gateway_entrypoint.py` — already migrated to `src/gateway/entrypoint.py`
+
+**R.7.4 — Final Verification**
+
+```bash
+# Full test suite (5082 passed, 2 skipped as of R.7)
+python -m pytest tests/ -x --tb=short
+
+# Architecture audit — 0 critical, 0 high
+python -m tools.architecture.audit
+
+# Boundary checks
+grep -r "from src.platform" src/gateway/  # Should be zero matches (except adapter)
+grep -r "from src.capabilities" src/strategy/  # Should be zero matches
+grep -r "from src.strategy.llm" src/strategy/  # Should be zero matches
+grep -r "call_s1_backend" src/  # Should be zero matches
+```
+
+✅ Outcome: 0 critical, 0 high in architecture audit. Documentation reflects refactored architecture. Dead code removed where safe. Backward compatibility maintained via re-exports.
+
+---
+
+### PHASE R.8 — Gateway → S5 Handoff
+
+**Goal:** Fix the architectural gap where the Gateway creates S4 Jobs directly instead of handing normalized messages to S5 for routing and dispatch. This is the final piece of the refactor — it completes the intended flow: `outside world → Gateway → S5 (cognitive loop) → S1/S2/S3`.
+
+**Problem:**
+
+```
+Current (broken):
+  Gateway → submit_job() → S4 Job → Queue
+  (S5 is bypassed entirely)
+
+Expected:
+  Gateway → normalize → S5 Supervisor (route → dispatch)
+    ├── "need LLM"     → S1 Runtime (direct)
+    ├── "need plan"    → S2 Planner (direct) → execute plan steps via S4
+    └── "need tool"    → S3 Capabilities (via S4 job)
+```
+
+**R.8.1 — Define Gateway → S5 Adapter Interface**
+
+Replace the `GatewayPlatformAdapter` with a new `GatewayAgentAdapter` protocol that connects Gateway to S5 instead of S4.
+
+Files:
+- `src/gateway/adapters/platform_adapter.py` → **rename** to `src/gateway/adapters/agent_adapter.py`
+
+New interface:
+
+```python
+@dataclass(frozen=True)
+class AgentRequest:
+    """Normalized input from Gateway to the Agent layer (S5)."""
+    channel_type: str
+    message_text: str
+    user_id: str | None = None
+    metadata: dict = field(default_factory=dict)
+
+@dataclass(frozen=True)
+class AgentResponse:
+    """Response from S5 back to Gateway."""
+    success: bool
+    output: str | None = None
+    error: str | None = None
+    agent_id: str | None = None
+
+class GatewayAgentAdapter(Protocol):
+    """Protocol that S5 implements for Gateway communication."""
+    def ingest(self, request: AgentRequest) -> AgentResponse:
+        """Accept a normalized message and hand to S5 for routing."""
+        ...
+    def get_status(self, agent_id: str) -> AgentResponse | None:
+        """Poll the status of an agent execution."""
+        ...
+```
+
+**R.8.2 — Update `submit_channel_input()` in Gateway Entrypoint**
+
+Instead of creating an S4 Job and pushing to queue, normalize input and call the S5 adapter.
+
+Files:
+- `src/gateway/entrypoint.py` — `submit_channel_input()` calls `adapter.ingest()` instead of `create_job()` + `queue.push()`
+
+**R.8.3 — Update FastAPI App**
+
+Replace `PlatformGatewayAdapter` usage with `GatewayAgentAdapter`.
+
+Files:
+- `src/gateway/app.py` — `POST /run` calls `agent_adapter.ingest()` instead of `platform_adapter.submit_job()`
+
+**R.8.4 — Create S5-side Adapter Implementation**
+
+S5 implements the `GatewayAgentAdapter` protocol so the composition root can wire Gateway → S5.
+
+Files:
+- `src/agent/adapters/gateway_adapter.py` — new file implementing the adapter
+
+Implementation sketch:
+
+```python
+class AgentGatewayAdapter(GatewayAgentAdapter):
+    """Concrete adapter: Gateway → S5 handoff."""
+
+    def __init__(self, supervisor: Supervisor) -> None:
+        self._supervisor = supervisor
+
+    def ingest(self, request: AgentRequest) -> AgentResponse:
+        # 1. Create or find agent instance
+        agent_state = self._supervisor.create_agent("default_agent")
+        # 2. Activate agent with the message
+        agent_msg = AgentMessage(
+            content=request.message_text,
+            channel=request.channel_type,
+            user_id=request.user_id or "",
+            metadata=request.metadata,
+        )
+        agent_state = self._supervisor.activate_agent(agent_state, agent_msg)
+        # 3. Run one cognitive step (S5 routes → dispatches)
+        agent_state = self._supervisor.run_agent_step(agent_state)
+        # 4. Return result
+        response = self._supervisor.get_response(agent_state)
+        return AgentResponse(
+            success=agent_state.lifecycle_state in (
+                LifecycleState.COMPLETED, LifecycleState.WAITING,
+            ),
+            output=response.content if response else None,
+            agent_id=agent_state.agent_id,
+        )
+```
+
+**R.8.5 — Update `cli_app.py` and `web_app.py` Tools**
+
+These tools currently import `submit_channel_input` from `src.platform.runtime.gateway_entrypoint`. Update to import from `src.gateway.entrypoint` and use the new S5 adapter flow.
+
+Files:
+- `tools/channels/cli_app.py`
+- `tools/channels/web_app.py`
+
+Change:
+
+```python
+# Before:
+from src.platform.runtime.gateway_entrypoint import submit_channel_input
+result = submit_channel_input(registry, "cli", {"text": text}, queue, cp)
+
+# After:
+from src.gateway.entrypoint import submit_channel_input
+from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
+from src.agent.supervisor import Supervisor
+
+supervisor = Supervisor(registry, store, ...)
+adapter = AgentGatewayAdapter(supervisor)
+result = submit_channel_input(registry, "cli", {"text": text}, adapter)
+```
+
+**R.8.6 — Remove Legacy `PlatformGatewayAdapter`**
+
+Once Gateway talks to S5 (not S4), the old `PlatformGatewayAdapter` is no longer used as a Gateway-facing interface. S4 is now called internally by S5 when `dispatch_route()` decides a job is needed.
+
+Files to clean up:
+- `src/platform/transport/adapter.py` — delete (or keep as internal S4 utility if still used by S5)
+- `src/gateway/adapters/platform_adapter.py` — delete (replaced by `agent_adapter.py`)
+
+**R.8.7 — Update Tests**
+
+- Update unit tests referencing the old adapter interfaces
+- Add an integration test for the Gateway → S5 handoff:
+  1. Create Gateway with `AgentGatewayAdapter` wired to a real Supervisor
+  2. Send a `POST /run` with sample payload
+  3. Verify the message reaches S5's cognitive loop
+  4. Verify a result returns (even if minimal — the loop may route to `runtime` and produce a response)
+
+**R.8.8 — Update Roadmap Architecture Flow Diagram**
+
+Update the flow diagram at the top of `ROADMAP.md` and `ARCHITECTURE.md` to show:
+
+```
+Gateway (src/gateway/)
+  normalize → hand to S5 via GatewayAgentAdapter
+  │
+  ▼
+S5 — Agent Workflow (src/agent/)
+  Supervisor: create_agent → activate_agent → run_agent_step
+  │
+  ├──→ S1 Runtime (LLM) — direct call
+  ├──→ S2 Planner — direct call → execute steps via S4
+  └──→ S3 Capabilities — via S4 Job (durable execution)
+        │
+        ▼
+       S4 — Platform (durable execution engine)
+```
+
+**R.8.9 — Final Verification**
 
 ```bash
 # Full test suite
 python -m pytest tests/ -x --tb=short
 
-# Lint / type check
-python -m mypy src/ 2>&1 | head -20
+# Architecture audit
+python -m tools.architecture.audit
 
-# Import audit — verify clean boundaries
-grep -r "from src.platform" src/gateway/  # Should be zero matches (except adapter)
-grep -r "from src.capabilities" src/strategy/  # Should be zero matches
-grep -r "from src.strategy.llm" src/strategy/  # Should be zero matches
-grep -r "call_s1_backend" src/  # Should be zero matches
+# Gateway → S5 integration test
+python -m pytest tests/integration/test_gateway_to_s5.py -x --tb=short
 
 # CLI smoke test
-python -m tools.agent.cli_app --help
+python -m tools.channels.cli_app "hello" --sender test
+
+# Boundary checks
+grep -r "submit_job\|GatewayPlatformAdapter" src/gateway/  # Should be zero matches
 ```
 
-✅ Outcome: Documentation reflects the refactored architecture. Dead code is removed. All tests and checks pass.
+✅ Outcome: Gateway normalizes and hands to S5. S5 routes to S1/S2/S3 as appropriate. S4 is only called by S5 for durable execution. All tests pass.
 
 ---
 
