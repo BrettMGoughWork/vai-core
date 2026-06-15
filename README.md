@@ -24,12 +24,12 @@ vai-core is organised into six strata (S1–S6) plus a Gateway layer with strict
   │
   ├──────────────────┐
   ▼                  ▼
-  S5 Agents        S6 Workflow Engine (future)
+  S5 Agents        S6 Workflow Engine
   (agent registry,  (trigger router, workflow state machine,
-   activation,       agent selection, user interaction)
-   routing,
-   strategy skills,
-   cognitive loop)
+   activation,       agent selection, user interaction,
+   routing,          instance store, WorkflowOps:
+   strategy skills,   list, cancel, retry, dead-letter
+   cognitive loop)    queue, metrics)
   │                  │
   └──────┬───────────┘
          ▼
@@ -45,6 +45,8 @@ vai-core is organised into six strata (S1–S6) plus a Gateway layer with strict
 **Key invariants:**
 - **Gateway is the single entry point**. Channels live in the gateway — they normalise inbound events into ChannelMessages and forward them to S4. Gateway interfaces with S5 for dispatch. No knowledge of workflows or S6.
 - **S4 is the universal job system**. It wraps everything in jobs for reliable execution, durability, and future fan-in/fan-out. S4 never owns cognition or workflow logic.
+- **S6 owns workflow orchestration**. Trigger router maps events to workflows, engine runs the state machine, WorkflowOps provides cross-instance management — list, cancel, retry, dead-letter queue, and metrics.
+- **Workflow instance state is persisted**. Every mutation in the engine's state machine is saved to WorkflowInstanceStore automatically by the agent supervisor.
 - **S2 is pure**. No I/O, no tool calls, no side effects. Identical inputs → identical outputs.
 - **S4 must not depend on S2, S5, or S6**. Platform is infrastructure — it cannot import cognition or agent layers.
 - **Config is immutable after load**. Frozen at startup, never mutated at runtime.
@@ -391,8 +393,9 @@ src/
 ├── capabilities/    (S3) Primitives, skills, registry, safety validators, quarantine
 ├── platform/        (S4) Job system, queue, worker pool, supervision, config, security,
 │                         observability, deployment, daemon
-├── agent/           (S5) Agent registry, activation, routing, strategy integration, skills
-├── workflow/        (S6) Workflow engine (placeholder)
+├── agent/           (S5/S6) Agent registry, activation, routing, strategy skills,
+│   │                       workflow engine, trigger router, WorkflowOps
+│   └── workflow/    (S6) Workflow engine, instance store, WorkflowOps
 └── release/             Release checklist and gating
 docs/
 ├── architecture/   ARCHITECTURE.md, BOUNDARIES.md, ROADMAP.md, control plane, worker pool, ...
@@ -420,6 +423,7 @@ tests/
 | `src/platform/deployment/` | S4 — local and container deployment targets |
 | `src/platform/daemon/` | S4 — daemon entrypoint, instruction dispatch |
 | `src/release/` | S4 — release checklist and gating |
+| `src/agent/workflow/` | S6 — workflow engine, loaders, trigger router, instance store, WorkflowOps |
 | `docs/architecture/` | Architecture documentation |
 | `docs/api/` | API documentation |
 | `docs/channels/` | Channel documentation |

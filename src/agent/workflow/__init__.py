@@ -6,6 +6,11 @@ from src.agent.workflow.engine import (
     WorkflowExecutionState,
     WorkflowStatus,
 )
+from src.agent.workflow.instance_store import (
+    WorkflowInstanceRecord,
+    WorkflowInstanceStore,
+)
+from src.agent.workflow.ops import WorkflowOps
 from src.agent.workflow.registry import WorkflowRegistry
 from src.agent.workflow.user_interaction import (
     InteractionRequest,
@@ -20,6 +25,9 @@ __all__ = [
     "UserInteractionManager",
     "WorkflowEngine",
     "WorkflowExecutionState",
+    "WorkflowInstanceRecord",
+    "WorkflowInstanceStore",
+    "WorkflowOps",
     "WorkflowRegistry",
     "WorkflowStatus",
 ]
