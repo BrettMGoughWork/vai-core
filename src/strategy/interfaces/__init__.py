@@ -12,6 +12,15 @@ The Strategy stratum owns:
 
 from __future__ import annotations
 
+# ── S2 — Planning Interface ────────────────────────────────────────────────
+
+from src.strategy.interfaces.planning import (
+    PlanRequest as PlanRequest,
+    PlanResult as PlanResult,
+    StepNode as StepNode,
+    Planner as Planner,
+)
+
 # ── Agent Planner ─────────────────────────────────────────────────────────
 
 from src.strategy.planning.contracts.agent_plan import (
@@ -38,9 +47,18 @@ from src.strategy.state.state import (
 )
 
 __all__ = [
+    # S2 — Planning Interface
+    "PlanRequest",
+    "PlanResult",
+    "StepNode",
+    "Planner",
+    # Agent Planner
     "AgentPlan",
+    # Core execution
     "CoreStep",
+    # Signals
     "GovernedSignal",
     "SignalSeverity",
+    # Conversation
     "ConversationState",
 ]

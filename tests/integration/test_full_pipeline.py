@@ -82,7 +82,7 @@ def _make_governance(
 
 def _make_planner(plan_memory: PlanMemory) -> AgentPlanner:
     """Create an AgentPlanner backed by MockLLM with the given PlanMemory."""
-    return AgentPlanner(llm=MockLLM(), plan_memory=plan_memory)
+    return AgentPlanner(llm_complete=MockLLM().make_complete(), plan_memory=plan_memory)
 
 
 def _create_plan(governance: MemoryGovernance, plan_memory: PlanMemory) -> AgentPlan:

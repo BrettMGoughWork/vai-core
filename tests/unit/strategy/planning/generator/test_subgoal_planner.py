@@ -1,4 +1,4 @@
-﻿"""Tests for src.strategy.planning.generator.subgoal_planner — plan hydration and decomposition."""
+"""Tests for src.strategy.planning.generator.subgoal_planner — plan hydration and decomposition."""
 from __future__ import annotations
 
 import time
@@ -48,7 +48,7 @@ class TestSubgoalPlannerHydration:
 
     def test_plan_written_to_plan_memory(self):
         governance, _, _, pm = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         plan_id = planner.plan_for_subgoal(SG_ID, "test goal", governance, TIMESTAMP)
         record = pm.get_latest_for_subgoal(SG_ID)
         assert record is not None
@@ -56,7 +56,7 @@ class TestSubgoalPlannerHydration:
 
     def test_segments_written_to_segment_memory(self):
         governance, _, seg_mem, _ = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         planner.plan_for_subgoal(SG_ID, "test goal", governance, TIMESTAMP)
         snap = seg_mem.snapshot()
         # All LLM steps are grouped into one PlanSegment
@@ -64,7 +64,7 @@ class TestSubgoalPlannerHydration:
 
     def test_plan_content_matches_mock_response(self):
         governance, _, _, pm = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         planner.plan_for_subgoal(SG_ID, "test goal", governance, TIMESTAMP)
         record = pm.get_latest_for_subgoal(SG_ID)
         assert record.intent == MOCK_PLAN_RESPONSE["plan"]["subgoal"]
@@ -72,7 +72,7 @@ class TestSubgoalPlannerHydration:
 
     def test_segment_steps_match_mock_response(self):
         governance, _, seg_mem, _ = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         planner.plan_for_subgoal(SG_ID, "test goal", governance, TIMESTAMP)
         snap = seg_mem.snapshot()
         assert len(snap.records) == 1
@@ -82,7 +82,7 @@ class TestSubgoalPlannerHydration:
 
     def test_plan_references_all_segment_ids(self):
         governance, _, seg_mem, pm = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         planner.plan_for_subgoal(SG_ID, "test goal", governance, TIMESTAMP)
         record = pm.get_latest_for_subgoal(SG_ID)
         known_segment_ids = {r.segment_id for r in seg_mem.snapshot().records}
@@ -95,7 +95,7 @@ class TestSubgoalPlannerDeterminism:
     def test_plan_id_is_deterministic_for_same_timestamp(self):
         governance1, _, _, pm1 = _make_governance(sg_id=stable_hash({"t": "det1"}))
         governance2, _, _, pm2 = _make_governance(sg_id=stable_hash({"t": "det1"}))
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         sg_id = stable_hash({"t": "det1"})
         id1 = planner.plan_for_subgoal(sg_id, "test", governance1, TIMESTAMP)
         id2 = planner.plan_for_subgoal(sg_id, "test", governance2, TIMESTAMP)
@@ -105,7 +105,7 @@ class TestSubgoalPlannerDeterminism:
         sg_id = stable_hash({"t": "det2"})
         governance1, _, seg1, _ = _make_governance(sg_id=sg_id)
         governance2, _, seg2, _ = _make_governance(sg_id=sg_id)
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         planner.plan_for_subgoal(sg_id, "test", governance1, TIMESTAMP)
         planner.plan_for_subgoal(sg_id, "test", governance2, TIMESTAMP)
         ids1 = {r.segment_id for r in seg1.snapshot().records}
@@ -116,7 +116,7 @@ class TestSubgoalPlannerDeterminism:
         sg_id = stable_hash({"t": "det3"})
         governance1, _, _, _ = _make_governance(sg_id=sg_id)
         governance2, _, _, _ = _make_governance(sg_id=sg_id)
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         id1 = planner.plan_for_subgoal(sg_id, "test", governance1, "2025-01-01T00:00:00+00:00")
         id2 = planner.plan_for_subgoal(sg_id, "test", governance2, "2025-01-02T00:00:00+00:00")
         assert id1 != id2
@@ -128,13 +128,13 @@ class TestSubgoalPlannerGovernanceEnforcement:
         """Governance rejects segment write if subgoal_id doesn't exist."""
         sm = SubgoalMemory()
         governance = MemoryGovernance(sm, SegmentMemory(), PlanMemory(), DriftMemory())
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         with pytest.raises(MemoryGovernanceError):
             planner.plan_for_subgoal("nonexistent-sg-id", "test", governance, TIMESTAMP)
 
     def test_hallucination_plan_missing_fields_raises(self):
         """Hallucinated plan missing targetskillid/reasoning_summary raises on parse/governance."""
         governance, _, _, _ = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM(simulate_hallucination=True))
+        planner = SubgoalPlanner(llm_complete=MockLLM(simulate_hallucination=True).make_complete())
         with pytest.raises((KeyError, MemoryGovernanceError)):
             planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)

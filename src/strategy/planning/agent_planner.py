@@ -7,9 +7,9 @@ Wraps SubgoalPlanner and PlanMemory to provide a single
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import List
 
-from src.strategy.llm.providers._base import ChatProvider
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.memory.plan_memory import PlanMemory
 from src.strategy.planning.contracts.agent_plan import AgentPlan
@@ -28,8 +28,15 @@ class AgentPlanner:
 
     Usage::
 
+        def llm_complete(sys: str, usr: str) -> str:
+            raw = provider.chat(model="gpt-4", messages=[
+                {"role": "system", "content": sys},
+                {"role": "user", "content": usr},
+            ])
+            return raw["choices"][0]["message"]["content"]
+
         planner = AgentPlanner(
-            llm=chat_provider,
+            llm_complete=llm_complete,
             plan_memory=plan_memory,
             s3_adapter=s3_adapter,
         )
@@ -43,16 +50,14 @@ class AgentPlanner:
 
     def __init__(
         self,
-        llm: ChatProvider,
-        plan_memory: PlanMemory,
-        model: str = "mock",
+        llm_complete: Callable[[str, str], str] | None = None,
+        plan_memory: PlanMemory | None = None,
         s3_adapter: S3Adapter | None = None,
         segment_manager: PlanSegmentManager | None = None,
         subgoal_manager: SubgoalManager | None = None,
     ) -> None:
         self._subgoal_planner = SubgoalPlanner(
-            llm=llm,
-            model=model,
+            llm_complete=llm_complete,
             s3_adapter=s3_adapter,
             segment_manager=segment_manager,
         )
