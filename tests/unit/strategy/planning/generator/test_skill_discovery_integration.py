@@ -1,4 +1,4 @@
-﻿"""Integration tests for Phase 3.8.6 — wiring S3 skill discovery into S2 planning.
+"""Integration tests for Phase 3.8.6 — wiring S3 skill discovery into S2 planning.
 
 Tests A–D verify that:
   A. SubgoalPlanner calls S3Adapter.discover_skills() with the correct query.
@@ -73,7 +73,7 @@ class TestPlannerCallsDiscoverSkills:
         mock_adapter = Mock()
         mock_adapter.discover_skills.return_value = _make_mock_discovery([])
 
-        planner = SubgoalPlanner(llm=MockLLM(), s3_adapter=mock_adapter)
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete(), s3_adapter=mock_adapter)
         goal = "Integrate skill discovery into planning"
         planner.plan_for_subgoal(SG_ID, goal, governance, TIMESTAMP)
 
@@ -87,7 +87,7 @@ class TestPlannerCallsDiscoverSkills:
     def test_adapter_not_called_when_none(self):
         """When no S3Adapter is provided, discover_skills is never called."""
         governance, _, _, _ = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         planner.plan_for_subgoal(SG_ID, "test goal", governance, TIMESTAMP)
         # No adapter → no discovery call (should not crash)
 
@@ -106,7 +106,7 @@ class TestSegmentStoresSkillNames:
             ("file.read", "Read file contents", 0.44),
         ])
 
-        planner = SubgoalPlanner(llm=MockLLM(), s3_adapter=mock_adapter)
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete(), s3_adapter=mock_adapter)
         planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         snap = seg_mem.snapshot()
@@ -117,7 +117,7 @@ class TestSegmentStoresSkillNames:
     def test_segment_skills_empty_when_no_adapter(self):
         """Without an adapter, segment.skills stays empty."""
         governance, _, seg_mem, _ = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         snap = seg_mem.snapshot()
@@ -130,7 +130,7 @@ class TestSegmentStoresSkillNames:
         mock_adapter = Mock()
         mock_adapter.discover_skills.return_value = _make_mock_discovery([])
 
-        planner = SubgoalPlanner(llm=MockLLM(), s3_adapter=mock_adapter)
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete(), s3_adapter=mock_adapter)
         planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         snap = seg_mem.snapshot()
@@ -152,7 +152,7 @@ class TestDeterministicOrdering:
             ("skill.c", "Lowest score", 0.01),
         ])
 
-        planner = SubgoalPlanner(llm=MockLLM(), s3_adapter=mock_adapter)
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete(), s3_adapter=mock_adapter)
         planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         snap = seg_mem.snapshot()
@@ -171,8 +171,8 @@ class TestDeterministicOrdering:
         adapter2 = Mock()
         adapter2.discover_skills.return_value = _make_mock_discovery(skills)
 
-        planner1 = SubgoalPlanner(llm=MockLLM(), s3_adapter=adapter1)
-        planner2 = SubgoalPlanner(llm=MockLLM(), s3_adapter=adapter2)
+        planner1 = SubgoalPlanner(llm_complete=MockLLM().make_complete(), s3_adapter=adapter1)
+        planner2 = SubgoalPlanner(llm_complete=MockLLM().make_complete(), s3_adapter=adapter2)
         planner1.plan_for_subgoal(sg_id, "test", governance1, TIMESTAMP)
         planner2.plan_for_subgoal(sg_id, "test", governance2, TIMESTAMP)
 
@@ -195,7 +195,7 @@ class TestPlanTargetSkillIdUsesFirstSkill:
             ("json.pretty", "Pretty-print JSON", 0.61),
         ])
 
-        planner = SubgoalPlanner(llm=MockLLM(), s3_adapter=mock_adapter)
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete(), s3_adapter=mock_adapter)
         plan_id = planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         record = pm.get_latest_for_subgoal(SG_ID)
@@ -210,7 +210,7 @@ class TestPlanTargetSkillIdUsesFirstSkill:
     def test_targetskillid_falls_back_when_no_discovery(self):
         """Without discovery, targetskillid falls back to LLM capability."""
         governance, _, _, pm = _make_governance()
-        planner = SubgoalPlanner(llm=MockLLM())
+        planner = SubgoalPlanner(llm_complete=MockLLM().make_complete())
         plan_id = planner.plan_for_subgoal(SG_ID, "test", governance, TIMESTAMP)
 
         record = pm.get_latest_for_subgoal(SG_ID)

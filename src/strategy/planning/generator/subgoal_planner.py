@@ -1,21 +1,30 @@
 """
-SubgoalPlanner — calls a ChatProvider to generate a Plan and PlanSegments for a subgoal.
+SubgoalPlanner — generates a Plan and PlanSegments for a subgoal via an injected
+``llm_complete`` callback.
 
 Used by agent_planner.AgentPlanner when an active subgoal has no plan in PlanMemory.
 All hydration and decomposition use existing types and memory substrates; no new abstractions.
 
-Response parsing expects an OpenAI-shaped chat completion
-(choices[0]["message"]["content"] must be a JSON string conforming to MOCK_PLAN_RESPONSE).
+The ``llm_complete`` callback receives (system_prompt, user_message) and must return
+the JSON content string (plain str, not wrapped in the OpenAI response envelope).
 
-To switch to a live LLM, pass any ChatProvider at construction:
-    SubgoalPlanner(llm=llm_factory.create("openai", model="gpt-4"), model="gpt-4")
+To switch to a live LLM, wrap any ChatProvider in an ``llm_complete`` callable::
+
+    def _complete(sys: str, usr: str) -> str:
+        raw = provider.chat(model="gpt-4", messages=[
+            {"role": "system", "content": sys},
+            {"role": "user", "content": usr},
+        ])
+        return raw["choices"][0]["message"]["content"]
+
+    SubgoalPlanner(llm_complete=_complete)
 """
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any, Dict, List
 
-from src.strategy.llm.providers._base import ChatProvider
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.planning.models.plan import Plan
 from src.strategy.planning.segments.manager import PlanSegmentManager
@@ -131,13 +140,11 @@ class SubgoalPlanner:
 
     def __init__(
         self,
-        llm: ChatProvider,
-        model: str = "mock",
+        llm_complete: Callable[[str, str], str] | None = None,
         s3_adapter: S3Adapter | None = None,
         segment_manager: PlanSegmentManager | None = None,
     ) -> None:
-        self._llm = llm
-        self._model = model
+        self._llm_complete = llm_complete
         self._s3_adapter = s3_adapter
         self._segment_manager = segment_manager
 
@@ -171,15 +178,10 @@ class SubgoalPlanner:
         # ── 2. Build schema‑aware system prompt ──
         system_prompt = _build_system_prompt(discovered_skills if discovered_skills else None)
 
-        # ── 3. Call the LLM ──
-        raw = self._llm.chat(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": goal},
-            ],
-        )
-        content: str = raw["choices"][0]["message"]["content"]
+        # ── 3. Call the LLM via injected callback ──
+        if self._llm_complete is None:
+            raise RuntimeError("SubgoalPlanner has no llm_complete callback configured")
+        content: str = self._llm_complete(system_prompt, goal)
         # Strip markdown code fences if the LLM wraps the JSON in them
         content = content.strip()
         if content.startswith("```"):

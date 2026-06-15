@@ -20,7 +20,7 @@ from __future__ import annotations
 
 # ── LLM Backend Contract (S1 contract, owned by Runtime) ──────────────────
 
-from src.strategy.planning.s1_contract.types import (
+from src.runtime.interfaces.contract import (
     PromptRequest as PromptRequest,
     PromptResponse as PromptResponse,
     ToolCallRequest as ToolCallRequest,

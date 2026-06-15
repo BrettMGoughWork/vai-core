@@ -214,7 +214,14 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
         llm = _create_real_llm()
         model = os.environ.get("LLM_MODEL", os.environ.get("OPENAI_MODEL", "gpt-4"))
 
-    planner = SubgoalPlanner(llm=llm, model=model, s3_adapter=s3_adapter)
+    def _llm_complete(sys_prompt: str, user_msg: str) -> str:
+        raw = llm.chat(model=model, messages=[
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_msg},
+        ])
+        return raw["choices"][0]["message"]["content"]
+
+    planner = SubgoalPlanner(llm_complete=_llm_complete, s3_adapter=s3_adapter)
 
     # S2: plan executor (dispatcher mocked -- real dispatcher requires ConversationState)
     executor = PlanExecutor(

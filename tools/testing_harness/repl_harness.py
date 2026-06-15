@@ -731,7 +731,14 @@ def main() -> None:
         runner = SkillRunner(registry=skill_registry, embedder=embedder)
         s3_adapter = S3Adapter(runner)
 
-    planner = AgentPlanner(llm=llm, plan_memory=pm, model=model, s3_adapter=s3_adapter)
+    def _llm_complete(sys_prompt: str, user_msg: str) -> str:
+        raw = llm.chat(model=model, messages=[
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_msg},
+        ])
+        return raw["choices"][0]["message"]["content"]
+
+    planner = AgentPlanner(llm_complete=_llm_complete, plan_memory=pm, s3_adapter=s3_adapter)
 
     repair = PlanRepair()
     ctx = ConversationContext()

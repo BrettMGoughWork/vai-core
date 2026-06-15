@@ -82,7 +82,16 @@ def main():
         drift_memory = DriftMemory()
         governance = MemoryGovernance(subgoal_memory, segment_memory, plan_memory, drift_memory)
 
-        planner = SubgoalPlanner(llm=llm, model="deepseek-chat", s3_adapter=s3_adapter)
+        model = "deepseek-chat"
+
+        def _llm_complete(sys_prompt: str, user_msg: str) -> str:
+            raw = llm.chat(model=model, messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_msg},
+            ])
+            return raw["choices"][0]["message"]["content"]
+
+        planner = SubgoalPlanner(llm_complete=_llm_complete, s3_adapter=s3_adapter)
 
         subgoal_id = f"json-parse-{rep}"
         subgoal_memory.put(Subgoal(

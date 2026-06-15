@@ -4,8 +4,14 @@ MockLLM — deterministic ChatProvider for Stratum-2 planning pipeline tests.
 Implements the ChatProvider protocol so it is injectable wherever a real provider is used.
 Updating MOCK_PLAN_RESPONSE changes the golden plan path for all downstream tests and traces.
 
-To swap to a live LLM, replace MockLLM() with any ChatProvider at the injection point:
-    SubgoalPlanner(llm=llm_factory.create("openai", model="gpt-4"), model="gpt-4")
+To swap to a live LLM, wrap a ChatProvider in an ``llm_complete`` callable:
+    def llm_complete(sys: str, usr: str) -> str:
+        raw = provider.chat(model="gpt-4", messages=[
+            {"role": "system", "content": sys},
+            {"role": "user", "content": usr},
+        ])
+        return raw["choices"][0]["message"]["content"]
+    SubgoalPlanner(llm_complete=llm_complete)
 """
 from __future__ import annotations
 
@@ -80,3 +86,30 @@ class MockLLM:
                 }
             ]
         }
+
+    def make_complete(self) -> Callable[[str, str], str]:
+        """Return an ``llm_complete``-compatible callable wrapping this mock.
+
+        The returned callable has the signature
+        ``(system_prompt: str, user_message: str) -> str`` expected by
+        ``SubgoalPlanner`` and ``AgentPlanner``.
+
+        Usage::
+
+            planner = SubgoalPlanner(
+                llm_complete=MockLLM().make_complete(),
+            )
+        """
+        from collections.abc import Callable as _Callable
+
+        def _complete(_sys: str, _usr: str) -> str:
+            raw = self.chat(
+                model="mock",
+                messages=[
+                    {"role": "system", "content": _sys},
+                    {"role": "user", "content": _usr},
+                ],
+            )
+            return raw["choices"][0]["message"]["content"]
+
+        return _complete

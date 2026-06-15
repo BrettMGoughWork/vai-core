@@ -197,7 +197,15 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
 
         # ── 6. Wire up SubgoalPlanner ────────────────────────────────────
         from src.strategy.planning.generator.subgoal_planner import SubgoalPlanner
-        planner = SubgoalPlanner(llm=llm, model=model, s3_adapter=s3_adapter)
+
+        def _llm_complete(sys_prompt: str, user_msg: str) -> str:
+            raw = llm.chat(model=model, messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_msg},
+            ])
+            return raw["choices"][0]["message"]["content"]
+
+        planner = SubgoalPlanner(llm_complete=_llm_complete, s3_adapter=s3_adapter)
 
         # ── 7. Register subgoal + generate plan ──────────────────────────
         from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
