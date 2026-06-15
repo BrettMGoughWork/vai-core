@@ -55,12 +55,7 @@ from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route
 from src.agent.workflow import WorkflowEngine, WorkflowRegistry
 from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.agent.workflow.user_interaction import UserInteractionManager
-from src.runtime.interfaces import (
-    PromptRequest,
-    PromptResponse,
-    S1Error,
-    call_runtime_backend,
-)
+from src.agent.strategy_router import RouterOutcome, StrategyRouter
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -106,6 +101,7 @@ class Supervisor:
         submit_job_callable: Optional[Callable[[Any], str]] = None,
         workflow_registry: Optional[WorkflowRegistry] = None,
         interaction_manager: Optional[UserInteractionManager] = None,
+        strategy_router: Optional[StrategyRouter] = None,
         auto_persist: bool = True,
     ) -> None:
         self._registry = registry
@@ -113,6 +109,7 @@ class Supervisor:
         self._submit_job = submit_job_callable
         self._workflow_registry = workflow_registry
         self._interaction_manager = interaction_manager
+        self._strategy_router = strategy_router or StrategyRouter()
         self._auto_persist = auto_persist
 
     # ── 1. create_agent ────────────────────────────────────────────────
@@ -307,82 +304,55 @@ class Supervisor:
         meta["total_routes"] = meta.get("total_routes", 0) + 1
 
         if route.destination == DEST_RUNTIME:
-            # LLM conversation path — call Runtime backend
+            # LLM conversation path — route via StrategyRouter
             agent_meta = ctx.context.agent_metadata
-            runtime_request = PromptRequest(
-                prompt={
-                    "message": input_text,
-                    "agent_id": agent_meta.identity.agent_id,
-                    "agent_metadata": {
-                        "name": agent_meta.identity.name,
-                        "description": agent_meta.identity.description,
-                    },
-                },
-                memory={},
-                plan_context={},
-                tool_context=[],
-            )
-
-            runtime_response = call_runtime_backend(
-                runtime_request, backend="conversational"
-            )
-
-            if isinstance(runtime_response, PromptResponse):
-                reply = runtime_response.output.get(
-                    "message", "I'm not sure how to respond."
-                )
-                return self._persist(state.with_(
-                    lifecycle_state=LifecycleState.COMPLETED,
-                    route_result=route,
-                    final_response=AgentResponse(
-                        reply=reply,
-                        metadata={
-                            "correlation_id": state.correlation_id,
-                            "trace_id": state.trace_id,
-                            "agent_id": state.agent_id,
-                            "confidence": route.confidence,
-                            "route_destination": route.destination,
+            outcome = RouterOutcome(
+                type="llm_call",
+                payload={
+                    "prompt": {
+                        "message": input_text,
+                        "agent_id": agent_meta.identity.agent_id,
+                        "agent_metadata": {
+                            "name": agent_meta.identity.name,
+                            "description": agent_meta.identity.description,
                         },
-                    ),
-                    supervisor_metadata=meta,
-                    _reason="Agent produced conversational response via Runtime route",
-                    _details={
-                        "confidence": route.confidence,
-                        "route_destination": route.destination,
                     },
-                ))
+                    "backend": "conversational",
+                    "memory": {},
+                    "plan_context": {},
+                    "tool_context": [],
+                },
+            )
+            result = self._strategy_router.route(outcome)
 
-            # S1Error — fall back to mock backend
-            fallback = call_runtime_backend(runtime_request, backend="mock")
-            fallback_reply = "I'm not sure how to respond."
-            if isinstance(fallback, PromptResponse):
-                fallback_reply = fallback.output.get("message", fallback_reply)
+            reply: str = "I'm not sure how to respond."
+            metadata: Dict[str, Any] = {
+                "correlation_id": state.correlation_id,
+                "trace_id": state.trace_id,
+                "agent_id": state.agent_id,
+                "confidence": route.confidence,
+                "route_destination": route.destination,
+            }
+            _reason = "Agent produced conversational response via Runtime route"
+            if result.get("error") is None:
+                reply = result["output"].get("message", reply)
+                if result.get("runtime_fallback"):
+                    metadata["runtime_fallback"] = True
+                    metadata["runtime_error"] = result["runtime_error"]
+                    _reason = "Agent produced conversational response via mock fallback"
             else:
-                fallback_reply = (
-                    f"[Runtime unavailable: {runtime_response.message}]"
-                )
+                reply = f"[Runtime unavailable: {result['error']}]"
+                metadata["runtime_error"] = result["error"]
 
             return self._persist(state.with_(
                 lifecycle_state=LifecycleState.COMPLETED,
                 route_result=route,
-                final_response=AgentResponse(
-                    reply=fallback_reply,
-                    metadata={
-                        "correlation_id": state.correlation_id,
-                        "trace_id": state.trace_id,
-                        "agent_id": state.agent_id,
-                        "confidence": route.confidence,
-                        "route_destination": route.destination,
-                        "runtime_fallback": True,
-                        "runtime_error": runtime_response.message,
-                    },
-                ),
+                final_response=AgentResponse(reply=reply, metadata=metadata),
                 supervisor_metadata=meta,
-                _reason="Agent produced conversational response via mock fallback",
+                _reason=_reason,
                 _details={
                     "confidence": route.confidence,
                     "route_destination": route.destination,
-                    "runtime_fallback": True,
                 },
             ))
 
@@ -770,24 +740,27 @@ class Supervisor:
                     },
                 ))
 
-            # ── LLM call → call Runtime → resume → loop ────────────
+            # ── LLM call → route via StrategyRouter → resume / fail ──
             if outcome.type == "llm_call":
-                runtime_request = PromptRequest(
-                    prompt=outcome.config,
-                    memory={},
-                    plan_context={},
-                    tool_context=[],
+                router_outcome = RouterOutcome(
+                    type="llm_call",
+                    payload={
+                        "prompt": outcome.config,
+                        "backend": "conversational",
+                        "memory": {},
+                        "plan_context": {},
+                        "tool_context": [],
+                    },
+                    step_id=outcome.step_id,
                 )
-                runtime_response = call_runtime_backend(
-                    runtime_request, backend="conversational",
-                )
-                if isinstance(runtime_response, PromptResponse):
+                result = self._strategy_router.route(router_outcome)
+                if result.get("error") is None:
                     wf_state, _ = engine.resume_with_result(
-                        wf_state, outcome.step_id, runtime_response.output,
+                        wf_state, outcome.step_id, result["output"],
                     )
                 else:
                     wf_state, _ = engine.fail_step(
-                        wf_state, outcome.step_id, str(runtime_response),
+                        wf_state, outcome.step_id, result["error"],
                     )
                 continue
 

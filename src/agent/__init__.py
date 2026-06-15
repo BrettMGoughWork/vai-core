@@ -49,12 +49,18 @@ from src.agent.contracts import (
     AgentResponse,  
 )  
 from src.agent.router import (  
-    DEST_RUNTIME,  
-    DEST_S4B,  
+    DEST_CAPABILITY,
+    DEST_PLANNER,
+    DEST_RUNTIME,
+    DEST_S4B,
     DEST_WORKFLOW,
-    Route,  
-    route_message,  
-)  
+    Route,
+    route_message,
+)
+from src.agent.strategy_router import (
+    RouterOutcome,
+    StrategyRouter,
+)
 from src.agent.interfaces.agent_state import (
     AgentState,
     LifecycleEvent,
@@ -154,11 +160,16 @@ __all__ = [
     "activate_agent",
     "resolve_capabilities",
     # ── Router (S5.2) ─────────────────────────────────────────────────
+    "DEST_CAPABILITY",
+    "DEST_PLANNER",
     "DEST_RUNTIME",
     "DEST_S4B",
     "DEST_WORKFLOW",
     "Route",
     "route_message",
+    # ── Strategy Router (S5.3) ────────────────────────────────────────
+    "RouterOutcome",
+    "StrategyRouter",
     # ── Supervisor (S5.5) ──────────────────────────────────────────────
     "AgentInTerminalStateError",
     "AgentNotActiveError",
