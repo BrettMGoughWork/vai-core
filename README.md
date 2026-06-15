@@ -10,31 +10,43 @@ The core idea is simple: give LLMs structured jobs, not free rein. The runtime f
 
 ## 🏗️ Architecture
 
-vai-core is organised into six strata with strict dependency rules:
+vai-core is organised into six strata (S1–S6) plus a Gateway layer with strict dependency rules:
 
 ```
-  External world (CLI, HTTP, WebSocket, webhook, cron)
+  External world (CLI, HTTP, WebSocket, webhook, cron, timer)
          │
          ▼
-  S4 ── Platform (channels, queue, worker pool, supervision, config, security, observability)
+  Gateway ── (ingress/egress, channels, FastAPI, transport, S5 interface)
          │
          ▼
-  S3 ── Capabilities (primitives, skills, registry, quarantine)
+  S4 ── Platform (job system, queue, worker pool, supervision, event substrate,
+  │               durability, config, security, observability)
+  │
+  ├──────────────────┐
+  ▼                  ▼
+  S5 Agents        S6 Workflow Engine (future)
+  (agent registry,  (trigger router, workflow state machine,
+   activation,       agent selection, user interaction)
+   routing,
+   strategy skills,
+   cognitive loop)
+  │                  │
+  └──────┬───────────┘
+         ▼
+  S3 ── Capabilities (primitives, skills, registry, quarantine, safety)
          │
          ▼
   S2 ── Strategy (planning, cognition — pure function, no I/O)
          │
          ▼
   S1 ── Runtime (execution engine, retry, panic guard, degraded mode)
-
-  S5 ── Agents (planned)
-  S6 ── Workflow Engine (planned)
 ```
 
 **Key invariants:**
-- **S4 is the universal ingress**. Channels normalize external events and push them to the S4 event substrate. S5/S6 subscribe to S4 — they never own transport.
+- **Gateway is the single entry point**. Channels live in the gateway — they normalise inbound events into ChannelMessages and forward them to S4. Gateway interfaces with S5 for dispatch. No knowledge of workflows or S6.
+- **S4 is the universal job system**. It wraps everything in jobs for reliable execution, durability, and future fan-in/fan-out. S4 never owns cognition or workflow logic.
 - **S2 is pure**. No I/O, no tool calls, no side effects. Identical inputs → identical outputs.
-- **S4 must not depend on S2 or S5/S6**. Platform is infrastructure — it cannot import cognition or agent layers.
+- **S4 must not depend on S2, S5, or S6**. Platform is infrastructure — it cannot import cognition or agent layers.
 - **Config is immutable after load**. Frozen at startup, never mutated at runtime.
 - **No silent fallback**. Every code path either succeeds or fails explicitly.
 
@@ -373,14 +385,15 @@ When an LLM agent authors a new skill at runtime, the skill passes through a mul
 
 ```
 src/
-├── runtime/        (S1) Execution engine, pipeline, retry, panic guard, degraded mode
-├── strategy/       (S2) Planning, cognition, memory — pure function, no I/O
-├── capabilities/   (S3) Primitives, skills, registry, safety validators, quarantine
-├── platform/       (S4) Channels, queue, worker pool, supervision, config, security,
+├── gateway/         (Gateway) Ingress/egress, channels, FastAPI, transport, S5 interface
+├── runtime/         (S1) Execution engine, pipeline, retry, panic guard, degraded mode
+├── strategy/        (S2) Planning, cognition, memory — pure function, no I/O
+├── capabilities/    (S3) Primitives, skills, registry, safety validators, quarantine
+├── platform/        (S4) Job system, queue, worker pool, supervision, config, security,
 │                         observability, deployment, daemon
-├── agents/         (S5) Agent layer (placeholder)
-├── workflow/       (S6) Workflow engine (placeholder)
-└── release/            Release checklist and gating
+├── agent/           (S5) Agent registry, activation, routing, strategy integration, skills
+├── workflow/        (S6) Workflow engine (placeholder)
+└── release/             Release checklist and gating
 docs/
 ├── architecture/   ARCHITECTURE.md, BOUNDARIES.md, ROADMAP.md, control plane, worker pool, ...
 ├── api/            API documentation per component
@@ -396,6 +409,7 @@ tests/
 
 | Path | Responsibility |
 |---|---|
+| `src/gateway/` | Gateway — ingress/egress, channels, FastAPI, transport, S5 interface |
 | `src/runtime/` | S1 — execution substrate, pipeline, retry/recovery, panic guard |
 | `src/strategy/` | S2 — cognitive planning (pure, no I/O) |
 | `src/capabilities/primitives/` | S3 — reusable building blocks (Python, CLI, MCP) |

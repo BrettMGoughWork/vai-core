@@ -1,35 +1,106 @@
 # Architecture Overview
 
-Vai-core is organised into five strata (S1–S5), each with a single, bounded responsibility.
+Vai-core is organised into six strata (S1–S6) plus a Gateway layer, each with a single, bounded responsibility.
 Data flows cleanly between layers through well-defined interfaces.
 
 ```
-External world
+External world (CLI, HTTP, WebSocket, webhook, cron, timer)
      │
      ▼
-Channels (S4) ───→ Event Substrate (S4) ───→ S5 Trigger Router ───→ S5 Workflow Engine
-                                                                             │
-                                                                        Supervisor
-                                                                        Dispatch
-                                                                             │
-                                                                        ┌────┴────┐
-                                                                        ▼         ▼
-                                                                   S4 Jobs   Runtime (S1)
-
-Cron/Timer (S4) ───→ Event Substrate (S4) ───→ S5 Trigger Router
+┌──────────────────────────────────────────────────────┐
+│  Gateway  (ingress/egress, channels, transport,      │
+│            FastAPI, S5 interface)                    │
+│                                                      │
+│  Channel adapters normalise inbound events into      │
+│  ChannelMessages and forward them to S4.             │
+│  No knowledge of workflows, agents, or S6.           │
+└──────────────────────────────────────────────────────┘
+     │
+     ▼
+┌──────────────────────────────────────────────────────┐
+│  S4 — Platform (universal ingress)                   │
+│                                                      │
+│  Job system, event substrate, worker pool,           │
+│  supervision, durability, observability              │
+│                                                      │
+│  S4 wraps everything in jobs → queue → worker        │
+│  execution. It provides durability, fan-in/fan-out,  │
+│  and backpressure.                                   │
+└──────────────────────────────────────────────────────┘
+     │
+     ├────────────────────────────────────┐
+     ▼                                    ▼
+┌──────────────────┐          ┌──────────────────────┐
+│ S5 — Agents      │          │  S6 — Workflow Engine │
+│                   │          │                       │
+│ Agent registry,   │          │ Trigger router        │
+│ activation,       │          │ subscribes to S4      │
+│ routing,          │          │ events, identifies    │
+│ strategy,         │          │ workflow triggers,    │
+│ capabilities      │          │ starts/resumes        │
+│                   │          │ workflows.            │
+│ S5 handles the    │          │                       │
+│ cognitive loop —  │          │ Workflow definition   │
+│ plan → execute    │          │ model, state machine, │
+│ → observe.        │          │ agent selection,      │
+│                   │          │ user interaction.     │
+│ Interfaces with   │          │                       │
+│ S3 capabilities   │          │ S6 is pure            │
+│ for tool calls.   │          │ orchestration —       │
+│                   │          │ no transport,          │
+│                   │          │ no channels.          │
+└──────────────────┘          └──────────────────────┘
+     │                                    │
+     └──────────────┬─────────────────────┘
+                    ▼
+          ┌──────────────────────┐
+          │  S3 — Capabilities   │
+          │                       │
+          │  Primitives, skills,  │
+          │  discovery, ranking,  │
+          │  quarantine           │
+          └──────────────────────┘
+                    │
+                    ▼
+          ┌──────────────────────┐
+          │  S2 — Strategy       │
+          │                       │
+          │  Pure cognitive       │
+          │  function: planning,  │
+          │  task decomposition,  │
+          │  state management.   │
+          │  No I/O, no side     │
+          │  effects.            │
+          └──────────────────────┘
+                    │
+                    ▼
+          ┌──────────────────────┐
+          │  S1 — Runtime        │
+          │                       │
+          │  Execution engine,    │
+          │  retry, panic guard,  │
+          │  degraded mode,       │
+          │  recovery             │
+          └──────────────────────┘
 ```
 
 **Strata summary:**
+- **Gateway** — Ingress/egress: FastAPI, channel adapters (CLI, HTTP, WebSocket, webhook), transport layer, normalisation. Connects to S5 for dispatch. No knowledge of workflows or agents internally.
 - **S1** — Foundation: config, LLM transport, types, execution engine, governance, observability, policy, telemetry
-- **S2** — Strategy: planning, task decomposition, continuity, state management
-- **S3** — Capabilities: primitives, skills, discovery, filtering, ranking
-- **S4** — Platform: channels (universal ingress), job system, event substrate, supervision, durability, worker pool
-- **S5** — Agents: agent registry, activation, routing, workflow engine, supervisor dispatch, job interface, state persistence
+- **S2** — Strategy: planning, task decomposition, continuity, state management (pure function, no I/O)
+- **S3** — Capabilities: primitives, skills, discovery, filtering, ranking, quarantine
+- **S4** — Platform: job system, event substrate, worker pool, supervision, durability, observability. Universal ingress — wraps everything in jobs for reliable execution.
+- **S5** — Agents: agent registry, activation, routing, strategy+capabilities integration, cognitive loop (plan → execute → observe).
+- **S6** — Workflow Engine (future): trigger router subscribes to S4 events, workflow definition model, state machine, agent selection, user interaction.
 
-S4 is the universal ingress for all external stimuli. S5 contains both the agent/routing layer and the
-workflow layer (multi-step orchestration). S5 subscribes to S4 events but owns no transport. The engine is
-deterministic — it returns StepOutcomes and the Supervisor dispatches to S1 (Runtime) or S4 (Jobs.
-Each stratum delegates down and notifies up through S4.
+**Key architectural properties:**
+- **Gateway is the single entry point** for all external stimuli. Channels live in the gateway — they normalise inbound events into ChannelMessages and forward them to S4.
+- **S4 is the universal job system** — it wraps everything in jobs, provides durability, and is the substrate for future fan-in/fan-out for multi-step workflows.
+- **S4 must not depend on S2, S5, or S6**. Platform is infrastructure — it cannot import cognition or agent layers.
+- **S5 is the cognitive loop** (plan → execute → observe). Gateway interfaces with S5 for dispatch.
+- **S2 is pure**. No I/O, no tool calls, no side effects. Identical inputs → identical outputs.
+- **Config is immutable after load**. Frozen at startup, never mutated at runtime.
+- **No silent fallback**. Every code path either succeeds or fails explicitly.
 
 ---
 
@@ -41,6 +112,10 @@ main.py              # S1 - CLI entrypoint (bootstraps config → agent → exec
 
 src/
   __init__.py
+
+  gateway/           # Gateway - Ingress/egress, channels, transport, FastAPI
+    channels/        # Channel adapters (CLI, HTTP, WebSocket, webhook)
+    entrypoint.py    # Gateway entrypoint — normalises → dispatches to S5 via S4
 
   runtime/           # S1 - Execution engine, retry, recovery, tool wrapper
     pipeline/        # S1 - Pipeline-based execution flow

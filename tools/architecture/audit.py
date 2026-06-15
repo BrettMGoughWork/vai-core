@@ -40,6 +40,16 @@ OUT_PATH  = REPO_ROOT / "docs" / "architecture_audit.md"
 #   utility     → may use domain; ideally thin
 #   test        → unrestricted
 
+# ── Exempted duplicates ────────────────────────────────────────────────────────
+# Classes with the same name but different semantic meaning across strata.
+# These are intentional — not refactoring targets.
+EXEMPTED_DUPLICATES: set[str] = {
+    "Config",                 # S2 config loader vs S1/S4 config system
+    "StepOutcome",            # S2 step-outcome enum vs S5 workflow step outcome
+    "UnknownCapabilityError", # S2 planning error vs S5 agent registry error
+    "ValidationError",        # S2 strategy validation vs S4 config validation
+}
+
 ALLOWED_IMPORTS: dict[str, set[str]] = {
     "domain":         {"domain"},
     "infrastructure": {"domain", "infrastructure", "utility", "adapter"},
@@ -89,6 +99,9 @@ def find_duplicates(classes: list[dict]) -> list[dict]:
 
     for name, group in sorted(name_map.items()):
         if len(group) > 1:
+            # Skip exempted duplicates — intentional same-name classes in different strata
+            if name in EXEMPTED_DUPLICATES:
+                continue
             files = [c["file"] for c in group]
             strata = {c["inferred_stratum"] for c in group}
             # Test-only duplicates (e.g. shared Fake helpers) are expected — low priority

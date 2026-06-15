@@ -1675,6 +1675,8 @@ def _test_degraded_mode_in_worker() -> dict[str, Any]:
                                "passed": result.result.get("reason") is not None})
             notes.append(f"Result state: {result.state.value}")
             notes.append(f"Result: {result.result}")
+    except Exception as exc:
+        notes.append(f"Exception during degraded mode test: {exc}")
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
