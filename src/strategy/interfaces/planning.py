@@ -35,6 +35,9 @@ class PlanRequest:
     max_steps: int = 10
     """Upper bound on plan steps S2 may generate."""
 
+    skill_refs: List[str] | None = None
+    """Symbolic skill names pre-resolved by S5 (no S3 coupling)."""
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # S2 → S5: plan result (one step in the hierarchy)

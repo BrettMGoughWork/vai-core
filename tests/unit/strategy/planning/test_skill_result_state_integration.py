@@ -1,29 +1,21 @@
-﻿"""Integration tests for Phase 3.8.8 — wiring S3 skill results into S2 state.
+"""Integration tests for PlanExecutor execute() — decoupled from S3.
 
-Tests A–E verify that:
-  A. Successful skill result updates segment memory.
-  B. Failed skill result updates segment memory with error.
-  C. Behavioural delta computed correctly on consecutive calls.
-  D. Previous output preserved in new record.
-  E. Cycle halts on failure (execute returns error metrics).
+Validates that execute() correctly:
+  - Returns success when the dispatcher succeeds.
+  - Returns failure when the dispatcher returns a non-success outcome.
+  - Returns terminal metrics in both cases.
 """
 
 from __future__ import annotations
 
-import time
 from unittest.mock import Mock
 
-import pytest
-
-from src.strategy.memory.segment_memory import SegmentMemory
-from src.strategy.memory.segment_memory_types import SegmentMemoryRecord
 from src.strategy.planning.dispatch.plan_executor import PlanExecutor, PlanExecutorMetrics
 from src.strategy.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
 from src.strategy.planning.models.plan import Plan
+from src.strategy.planning.models.step_state import StepState, StepStatus
 from src.strategy.types.step_result import StepResult
 from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
-from src.strategy.planning.behavioural_delta import compute_behavioural_delta
-from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2SkillCallRequest, S2SkillResult
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -51,209 +43,68 @@ def make_success_result() -> StepResult:
     )
 
 
-def make_mock_s3_adapter(
-    *,
-    success: bool = True,
-    output: dict | None = None,
-    error: str | None = None,
-) -> Mock:
-    adapter = Mock(spec=S3Adapter)
-    adapter.call_skill.return_value = S2SkillResult(
-        request_id="json.parse",
-        success=success,
-        output=output,
-        error=error,
+def make_failure_result() -> StepResult:
+    return StepResult(
+        outcome=CognitiveStepOutcome.FAILURE,
+        reason="fatal error in skill",
+        payload={},
+        trace=[],
     )
-    return adapter
+
+
+def _sample_state() -> StepState:
+    """A minimal valid StepState (dispatcher contract requires non-None state)."""
+    return StepState(
+        step_id="test-step",
+        parent_id=None,
+        cognitive_input={},
+        last_result=None,
+        status=StepStatus.PENDING,
+        created_at=0,
+        attempt=0,
+        trace=[],
+        canonical_hash="test",
+    )
 
 
 def make_mock_dispatcher() -> Mock:
     dispatcher = Mock(spec=SafeStepDispatcher)
     dispatcher.dispatch.return_value = (
-        None,  # state
+        _sample_state(),
         make_success_result(),
     )
     return dispatcher
 
 
-# ── A. Successful skill result updates state ──────────────────────────
-
-def test_successful_result_writes_record():
-    """A: Successful S3 result → SegmentMemoryRecord with state='success'."""
-    segment_memory = SegmentMemory()
-    s3_adapter = make_mock_s3_adapter(success=True, output={"x": 1})
-
-    executor = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter,
-        segment_memory=segment_memory,
+def make_fail_dispatcher() -> Mock:
+    dispatcher = Mock(spec=SafeStepDispatcher)
+    dispatcher.dispatch.return_value = (
+        _sample_state(),
+        make_failure_result(),
     )
-    plan = make_plan(skill="json.parse", arguments={"value": "hello"})
-
-    record = executor._write_skill_result_to_state(plan, make_success_result())
-
-    assert record is not None
-    assert record.segment_id == "json.parse"
-    assert record.state == "success"
-    assert record.last_output == {"x": 1}
-    assert record.error is None
-    assert record.skills == ["json.parse"]
-
-    # Verify stored in memory
-    stored = segment_memory.get_record("json.parse")
-    assert stored is not None
-    assert stored.state == "success"
-    assert stored.last_output == {"x": 1}
+    return dispatcher
 
 
-# ── B. Failed skill result updates state ──────────────────────────────
+# ── Tests ─────────────────────────────────────────────────────────────
 
-def test_failed_result_writes_error_record():
-    """B: Failed S3 result → SegmentMemoryRecord with state='error'."""
-    segment_memory = SegmentMemory()
-    s3_adapter = make_mock_s3_adapter(success=False, output=None, error="boom")
-
-    executor = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter,
-        segment_memory=segment_memory,
-    )
-    plan = make_plan(skill="fail.skill")
-
-    record = executor._write_skill_result_to_state(plan, make_success_result())
-
-    assert record is not None
-    assert record.state == "error"
-    assert record.last_output is None
-    assert record.error == "boom"
-
-    # Verify stored
-    stored = segment_memory.get_record("fail.skill")
-    assert stored is not None
-    assert stored.state == "error"
-    assert stored.error == "boom"
-
-
-# ── C. Behavioural delta computed correctly ───────────────────────────
-
-def test_behavioural_delta_computed_on_consecutive_calls():
-    """C: Consecutive calls with different output → delta reflects changes."""
-    segment_memory = SegmentMemory()
-
-    # First call with output={"a": 1}
-    s3_adapter1 = make_mock_s3_adapter(success=True, output={"a": 1})
-    executor1 = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter1,
-        segment_memory=segment_memory,
-    )
-    plan = make_plan(skill="test.delta")
-    executor1._write_skill_result_to_state(plan, make_success_result())
-
-    # Second call with output={"a": 2}
-    s3_adapter2 = make_mock_s3_adapter(success=True, output={"a": 2})
-    executor2 = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter2,
-        segment_memory=segment_memory,
-    )
-    record = executor2._write_skill_result_to_state(plan, make_success_result())
-
-    assert record is not None
-    assert record.behavioural_delta is not None
-    # The delta should contain information about the changed field
-    assert "changed_fields" in record.behavioural_delta or record.behavioural_delta
-
-
-# ── D. Previous output preserved ──────────────────────────────────────
-
-def test_previous_output_preserved():
-    """D: Second call preserves first call's last_output as previous_output."""
-    segment_memory = SegmentMemory()
-
-    # First call
-    s3_adapter1 = make_mock_s3_adapter(success=True, output={"first": "output"})
-    executor1 = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter1,
-        segment_memory=segment_memory,
-    )
-    plan = make_plan(skill="test.prev")
-    executor1._write_skill_result_to_state(plan, make_success_result())
-
-    # Second call
-    s3_adapter2 = make_mock_s3_adapter(success=True, output={"second": "output"})
-    executor2 = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter2,
-        segment_memory=segment_memory,
-    )
-    record = executor2._write_skill_result_to_state(plan, make_success_result())
-
-    assert record is not None
-    assert record.previous_output == {"first": "output"}
-    assert record.last_output == {"second": "output"}
-
-
-# ── E. Cycle halts on failure ─────────────────────────────────────────
-
-def test_cycle_halts_on_failure():
-    """E: execute() returns failure metrics when skill result is error."""
-    segment_memory = SegmentMemory()
-    s3_adapter = make_mock_s3_adapter(success=False, output=None, error="fatal")
-
-    executor = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter,
-        segment_memory=segment_memory,
-    )
-    plan = make_plan(skill="fail.skill")
-    plan_state = None
-
-    state, result, metrics = executor.execute(plan, plan_state=plan_state)
-
-    # Should halt with failure
-    assert metrics.termination_reason == "failure"
-    assert "fatal" in result.reason
-    assert result.outcome != CognitiveStepOutcome.SUCCESS
-
-
-# ── Edge cases ────────────────────────────────────────────────────────
-
-def test_returns_none_when_s3_adapter_is_none():
-    """_write_skill_result_to_state returns None without S3 adapter."""
+def test_execute_returns_success():
+    """execute() returns success metrics when the dispatcher succeeds."""
     executor = PlanExecutor(dispatcher=make_mock_dispatcher())
-    plan = make_plan()
-    record = executor._write_skill_result_to_state(plan, make_success_result())
-    assert record is None
+    plan = make_plan(skill="json.parse")
+
+    state, result, metrics = executor.execute(plan)
+
+    assert metrics.termination_reason == "success"
+    assert result.outcome == CognitiveStepOutcome.SUCCESS
 
 
-def test_returns_none_when_segment_memory_is_none():
-    """_write_skill_result_to_state returns None without SegmentMemory."""
-    s3_adapter = make_mock_s3_adapter()
-    executor = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter,
-    )
-    plan = make_plan()
-    record = executor._write_skill_result_to_state(plan, make_success_result())
-    assert record is None
+def test_execute_returns_failure():
+    """execute() returns failure metrics when the dispatcher fails."""
+    executor = PlanExecutor(dispatcher=make_fail_dispatcher())
+    plan = make_plan(skill="fail.skill")
 
+    state, result, metrics = executor.execute(plan)
 
-def test_delta_is_none_on_first_call():
-    """First call with no previous record → behavioural_delta is None."""
-    segment_memory = SegmentMemory()
-    s3_adapter = make_mock_s3_adapter(success=True, output={"x": 1})
-
-    executor = PlanExecutor(
-        dispatcher=make_mock_dispatcher(),
-        s3_adapter=s3_adapter,
-        segment_memory=segment_memory,
-    )
-    plan = make_plan(skill="first.call")
-
-    record = executor._write_skill_result_to_state(plan, make_success_result())
-
-    assert record is not None
-    assert record.behavioural_delta is None
-    assert record.previous_output is None
+    assert metrics.termination_reason == "failure"
+    assert result.outcome != CognitiveStepOutcome.SUCCESS
+    assert "fatal" in result.reason

@@ -12,12 +12,9 @@ from src.strategy.types.step_result import StepResult
 from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.strategy.planning.models.plan import Plan
 from src.strategy.planning.safety.purity_enforcer import enforce_cognitive_purity
-from src.strategy.planning.behavioural_delta import compute_behavioural_delta
-from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2SkillCallRequest
 
 if TYPE_CHECKING:
     from src.strategy.memory.segment_memory import SegmentMemory
-    from src.strategy.memory.segment_memory_types import SegmentMemoryRecord
 
 @dataclass(frozen=True)
 class PlanExecutorMetrics:
@@ -30,20 +27,14 @@ class PlanExecutor:
     - final StepState
     - final StepResult
     - PlanExecutorMetrics
-
-    Phase 3.8.8: Integrates S3 skill results into S2 state via segment memory.
     """
 
     def __init__(
         self,
         dispatcher: SafeStepDispatcher,
-        s3_adapter: Optional[S3Adapter] = None,
-        segment_memory: Optional[SegmentMemory] = None,
         runtime_context: dict | None = None,
     ):
         self.dispatcher = dispatcher
-        self._s3_adapter = s3_adapter
-        self._segment_memory = segment_memory
         self._runtime_context = runtime_context or {}
 
     def execute(
@@ -79,25 +70,6 @@ class PlanExecutor:
             )
             return state, result, metrics
 
-        # --- 3.8.8: Write skill result into S2 state via S3 adapter ---
-        record = self._write_skill_result_to_state(plan, result)
-
-        # --- 3.8.8: Halt on failure ---
-        if record is not None and record.state == "error":
-            error = PlanExecutionError(
-                f"Skill execution failed: {record.error}"
-            )
-            failure_result = StepResult.failure(
-                reason=str(error),
-                payload={"error_type": type(error).__name__},
-                trace=result.trace,
-            )
-            metrics = PlanExecutorMetrics(
-                duration=int(time() * 1000) - start,
-                termination_reason="failure",
-            )
-            return state, failure_result, metrics
-
         # Map unexpected outcomes to plan-level errors
         if result.outcome != CognitiveStepOutcome.SUCCESS:
             error = self._map_step_error(result)
@@ -120,84 +92,7 @@ class PlanExecutor:
             duration=state.created_at,
             termination_reason="success",
         )
-        # Mark plan as complete
-        from src.strategy.planning.models.plan_state import PlanStatus
-        completed_state = state.__class__(
-            plan_id=state.plan_id,
-            steps=state.steps,
-            current_step_index=state.current_step_index,
-            status=PlanStatus.COMPLETED,
-            last_result=state.last_result,
-            trace=state.trace,
-            created_at=state.created_at,
-            updated_at=state.updated_at,
-        )
-        return completed_state, result, metrics
-
-    # ── 3.8.8: Skill result → S2 state integration ─────────────────────
-
-    def _write_skill_result_to_state(
-        self,
-        plan: Plan,
-        result: StepResult,
-    ) -> Optional["SegmentMemoryRecord"]:
-        """Write the S3 skill execution result into S2 segment memory.
-
-        Performs:
-        1. Calls S3Adapter.call_skill() with the plan's target skill
-        2. Retrieves the previous segment memory record (if any)
-        3. Computes a behavioural delta between previous and new output
-        4. Creates a new SegmentMemoryRecord and writes it into segment_memory
-
-        Returns:
-            The new SegmentMemoryRecord, or None if segment_memory is unavailable.
-        """
-        if self._s3_adapter is None or self._segment_memory is None:
-            return None
-
-        # Lazy import to avoid circular dependency (memory ↔ planning)
-        from src.strategy.memory.segment_memory_types import SegmentMemoryRecord
-
-        # 1. Call the skill through S3 adapter
-        request = S2SkillCallRequest(
-            skill_name=plan.targetskillid,
-            arguments=dict(plan.arguments),
-            request_id=getattr(plan, "plan_id", plan.targetskillid),
-            context=dict(self._runtime_context),
-        )
-        s2_result = self._s3_adapter.call_skill(request)
-
-        # 2. Retrieve previous memory record
-        segment_id = plan.targetskillid
-        prev_record = self._segment_memory.get_record(segment_id)
-
-        # 3. Compute behavioural delta
-        if prev_record is not None:
-            prev_output = prev_record.last_output
-            delta = compute_behavioural_delta(prev_output, s2_result.output)
-        else:
-            delta = None
-
-        # 4. Create SegmentMemoryRecord
-        record = SegmentMemoryRecord(
-            segment_id=segment_id,
-            parent_id=None,
-            subgoal_id=getattr(plan, "intent", ""),
-            state="success" if s2_result.success else "error",
-            content=list(plan.arguments.keys()),
-            created_at=str(int(time())),
-            context=dict(plan.arguments),
-            metadata={},
-            skills=[plan.targetskillid],
-            last_output=s2_result.output,
-            previous_output=prev_record.last_output if prev_record else None,
-            behavioural_delta=delta,
-            error=s2_result.error,
-        )
-
-        # 5. Write into segment memory
-        self._segment_memory.put_record(record)
-        return record
+        return state, result, metrics
 
     def _map_step_error(self, result: StepResult) -> PlanValidationError:
         if result.outcome == CognitiveStepOutcome.FAILURE:
