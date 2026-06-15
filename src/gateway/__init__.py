@@ -6,28 +6,16 @@ Gateway owns:
 - External API surface (POST /run, GET /jobs/{job_id})
 - Provider webhook adapters (WhatsApp, Slack, GitHub, Jira)
 
-Gateway interfaces with Platform through the ``GatewayPlatformAdapter`` protocol.
-It never imports Platform internals directly.
+Gateway interfaces with S5 through the ``GatewayAgentAdapter`` protocol.
+It never imports Supervisor internals directly.
 """
 
-from src.gateway.adapters.platform_adapter import (
-    GatewayPlatformAdapter as GatewayPlatformAdapter,
-    JobRequest as JobRequest,
-    JobResult as JobResult,
-    JobStatus as JobStatus,
-)
-from src.gateway.normalization import (
-    ChannelMessage as ChannelMessage,
-    cli_to_channel_message as cli_to_channel_message,
-    gateway_to_channel_message as gateway_to_channel_message,
+from src.gateway.adapters.agent_adapter import (
+    AgentRequest as AgentRequest,
+    GatewayAgentAdapter as GatewayAgentAdapter,
 )
 
 __all__ = [
-    "ChannelMessage",
-    "GatewayPlatformAdapter",
-    "JobRequest",
-    "JobResult",
-    "JobStatus",
-    "cli_to_channel_message",
-    "gateway_to_channel_message",
+    "AgentRequest",
+    "GatewayAgentAdapter",
 ]

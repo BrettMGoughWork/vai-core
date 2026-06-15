@@ -1,10 +1,9 @@
 """
-Web Channel Application — FastAPI with end-to-end job processing.
+Web Channel Application — FastAPI with Gateway → S5 handoff.
 
-Demonstrates the full WebChannel pipeline::
+Demonstrates the correct architectural flow::
 
-    HTTP JSON body → receive() → InboundChannelMessage → normalize() → ChannelMessage
-    → create_job() → queue.push() → worker.process_next() → result
+    HTTP JSON body → Channel.normalize() → submit_channel_input() → S5 Supervisor
 
 Usage::
 
@@ -12,12 +11,10 @@ Usage::
 
 Then::
 
-    curl -X POST http://localhost:8000/api/ingress \\
-        -H "Content-Type: application/json" \\
-        -H "Authorization: Bearer demo-key-001" \\
+    curl -X POST http://localhost:8000/api/ingress \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer demo-key-001" \
         -d '{"input": "deploy the app", "sender": "alice", "metadata": {"env": "staging"}}'
-
-    curl http://localhost:8000/api/jobs/<job_id>
 
     curl http://localhost:8000/health
 """
@@ -25,23 +22,37 @@ Then::
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from src.platform.queue.queue import InMemoryQueue
-from src.platform.runtime.channels.registry import ChannelRegistry
-from src.platform.runtime.channels.web import (
-    WebChannel,
-    WebRequest,
-    register_web_channel,
-)
-from src.platform.runtime.control_plane import ControlPlane
-from src.platform.runtime.gateway_entrypoint import submit_channel_input
-from src.platform.runtime.worker import Worker
+from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
+from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
+from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
+from src.agent.supervisor import Supervisor
+from src.gateway.channels.registry import ChannelRegistry
+from src.gateway.channels.web import WebChannel, WebRequest, register_web_channel
+from src.gateway.entrypoint import submit_channel_input
+
+# ---------------------------------------------------------------------------
+# S5 Supervisor wiring
+# ---------------------------------------------------------------------------
+
+_agent_registry = AgentRegistry()
+_agent_registry.register_agent(AgentMetadata(
+    identity=AgentIdentity(
+        agent_id="default-agent",
+        name="Default Agent",
+        description="Default conversational agent",
+    ),
+    capabilities=["conversation"],
+))
+
+_agent_store = MemoryAgentStateStore()
+_supervisor = Supervisor(registry=_agent_registry, store=_agent_store)
+_s5_adapter = AgentGatewayAdapter(_supervisor)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -61,38 +72,13 @@ logger = logging.getLogger("web_channel")
 registry = ChannelRegistry()
 register_web_channel(registry)
 
-# Shared runtime — one queue, one control plane, one background worker
-job_queue: InMemoryQueue = InMemoryQueue()
-control_plane: ControlPlane = ControlPlane()
-
-
-def _worker_loop() -> None:
-    """Background worker: process one job at a time, forever."""
-    worker = Worker(
-        queue=job_queue,
-        control_plane=control_plane,
-        channel_registry=registry,
-    )
-    while True:
-        try:
-            worker.process_next()
-        except Exception:
-            logger.exception("Worker error, continuing...")
-        import time
-        time.sleep(0.1)
-
-
-_worker_thread = threading.Thread(target=_worker_loop, daemon=True)
-_worker_thread.start()
-
 app = FastAPI(
-    title="VAI — Stratum-4 Web Channel",
-    version="0.1.0",
+    title="VAI — Web Channel (Gateway → S5)",
+    version="0.2.0",
     description=(
-        "Demonstrates the Stratum-4 WebChannel adapter. "
-        "Receives structured HTTP JSON bodies, converts them into "
-        "canonical InboundChannelMessages via the Channel protocol, "
-        "and converts outbound S4 payloads back into HTTP-friendly responses."
+        "Demonstrates the Gateway → S5 Supervisor handoff. "
+        "Receives structured HTTP JSON bodies, normalises them via the "
+        "WebChannel, and hands off to the S5 Supervisor for processing."
     ),
 )
 
@@ -120,39 +106,36 @@ async def api_ingress(
     authorization: str | None = Header(None),
 ) -> dict[str, Any]:
     """
-    Convert an HTTP JSON body into a Job and enqueue it.
+    Normalise incoming HTTP JSON and hand off to the S5 Supervisor.
 
-    This is the **ingress** path: raw HTTP input → ChannelMessage → Job
-    → queue → worker → result.  The worker runs in a background thread.
+    This is the **ingress** path: raw HTTP input → ChannelMessage
+    → S5 adapter → S5 Supervisor for processing.
     """
     sender = body.sender or _resolve_sender(authorization)
     raw: dict[str, Any] = {"input": body.input, "sender": sender}
     if body.metadata:
         raw["metadata"] = body.metadata
 
-    result = submit_channel_input(
-        registry, "web", raw, queue=job_queue, control_plane=control_plane,
-    )
+    result = submit_channel_input(registry, "web", raw, adapter=_s5_adapter)
 
     if "error" in result:
         raise HTTPException(status_code=503, detail=result["error"])
 
-    logger.info("Ingress  | sender=%s  input=%s  job=%s",
-                sender, _truncate(body.input), result["job_id"])
+    logger.info("Ingress  | sender=%s  input=%s",
+                sender, _truncate(body.input))
     return {
         "status": "accepted",
         "channel": "web",
-        "job_id": result["job_id"],
-        "state": result["state"],
+        "result": result,
     }
 
 
 @app.post("/api/egress")
 async def api_egress(body: dict[str, Any]) -> dict[str, Any]:
     """
-    Convert an S4 outbound payload into an HTTP-friendly response.
+    Convert an outbound payload into an HTTP-friendly response.
 
-    This is the **egress** path: outbound S4 dict → transport-agnostic
+    This is the **egress** path: outbound dict → transport-agnostic
     HTTP response body via the WebChannel's send().
     """
     channel = WebChannel()
@@ -162,23 +145,6 @@ async def api_egress(body: dict[str, Any]) -> dict[str, Any]:
         "status": "ok",
         "channel": "web",
         "response": response,
-    }
-
-
-@app.get("/api/jobs/{job_id}")
-async def api_get_job(job_id: str) -> dict[str, Any]:
-    """Retrieve a job's state and result by its ``job_id``."""
-    from src.platform.runtime.job_store import job_store
-
-    job = job_store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="job not found")
-    return {
-        "job_id": job.job_id,
-        "state": job.state.value,
-        "channel": job.payload.channel,
-        "result": job.result,
-        "trace": job.trace,
     }
 
 
@@ -195,7 +161,7 @@ async def api_inspect() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Health "check" style response for curl convenience
+# Root page — professional demo UI
 # ---------------------------------------------------------------------------
 
 
@@ -207,17 +173,13 @@ async def root() -> HTMLResponse:
     )
 
 
-# ---------------------------------------------------------------------------
-# Root page — professional demo UI
-# ---------------------------------------------------------------------------
-
 _ROOT_PAGE = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VAI — Stratum-4 Web Channel</title>
+<title>VAI — Web Channel (Gateway → S5)</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -303,8 +265,8 @@ _ROOT_PAGE = r"""
 <div class="container">
 
   <header>
-    <h1>VAI · Stratum-4 Web Channel</h1>
-    <p>Interact with the WebChannel ingress/egress pipeline &nbsp;<span class="badge">demo</span></p>
+    <h1>VAI · Web Channel (Gateway → S5)</h1>
+    <p>Interact with the Gateway → S5 Supervisor handoff &nbsp;<span class="badge">demo</span></p>
   </header>
 
   <!-- Status bar -->
@@ -318,9 +280,9 @@ _ROOT_PAGE = r"""
 
     <!-- Ingress card -->
     <div class="card">
-        <h2>⬇  Ingress — Submit Job</h2>
+        <h2>⬇  Ingress — Submit to S5</h2>
       <p style="font-size:0.8rem;color:#8b949e;margin-bottom:1rem;">
-          HTTP JSON → <code>ChannelMessage</code> → Job → queue → worker
+          HTTP JSON → ChannelMessage → S5 Supervisor
       </p>
       <label for="ingressInput">Input text</label>
       <input type="text" id="ingressInput" placeholder="e.g. deploy the app" value="deploy the app">
@@ -334,35 +296,9 @@ _ROOT_PAGE = r"""
           <input type="text" id="ingressAuth" placeholder="Bearer …" value="Bearer demo-key-001">
         </div>
       </div>
-        <button id="ingressBtn">Submit Job</button>
+        <button id="ingressBtn">Submit to S5</button>
       <div class="output" id="ingressOutput"></div>
     </div>
-
-      <!-- Job status card -->
-    <div class="card">
-        <h2>🔍  Job Status</h2>
-      <p style="font-size:0.8rem;color:#8b949e;margin-bottom:1rem;">
-          Poll <code>GET /api/jobs/{job_id}</code> for state and result.
-      </p>
-        <label for="jobIdInput">Job ID</label>
-        <input type="text" id="jobIdInput" placeholder="e.g. 550e8400-e29b-…">
-        <button id="jobStatusBtn">Fetch Job</button>
-        <div class="output" id="jobStatusOutput"></div>
-      </div>
-
-      <!-- Egress card -->
-      <div class="card">
-        <h2>⬆  Egress Pipeline</h2>
-        <p style="font-size:0.8rem;color:#8b949e;margin-bottom:1rem;">
-          Convert S4 payload → HTTP-friendly response via <code>send()</code>
-        </p>
-        <label for="egressOutput">Output text</label>
-        <input type="text" id="egressOutput" placeholder="e.g. Deployment started" value="Deployment started">
-        <label for="egressMeta">Metadata (JSON, optional)</label>
-        <textarea id="egressMeta" rows="2">{&quot;job_id&quot;: &quot;j-001&quot;, &quot;env&quot;: &quot;staging&quot;}</textarea>
-        <button id="egressBtn">Send to Egress</button>
-        <div class="output" id="egressOutputBox"></div>
-      </div>
 
       <!-- Inspect card -->
       <div class="card full">
@@ -413,37 +349,6 @@ document.getElementById('ingressBtn').addEventListener('click', async () => {
     if (sender) body.sender = sender;
     const { ok, data } = await api('/api/ingress', 'POST', body, auth);
     show(document.getElementById('ingressOutput'), data, ok);
-    if (ok && data.job_id) {
-      document.getElementById('jobIdInput').value = data.job_id;
-      setTimeout(() => document.getElementById('jobStatusBtn').click(), 600);
-    }
-  } finally { btn.disabled = false; }
-});
-
-// --- Job Status ---
-document.getElementById('jobStatusBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('jobStatusBtn'); btn.disabled = true;
-  try {
-    const jobId = document.getElementById('jobIdInput').value.trim();
-    if (!jobId) {
-      show(document.getElementById('jobStatusOutput'), { error: 'Enter a Job ID first.' }, false);
-      return;
-    }
-    const { ok, data } = await api('/api/jobs/' + encodeURIComponent(jobId), 'GET');
-    show(document.getElementById('jobStatusOutput'), data, ok);
-  } finally { btn.disabled = false; }
-});
-
-// --- Egress ---
-document.getElementById('egressBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('egressBtn'); btn.disabled = true;
-  try {
-    const output = document.getElementById('egressOutput').value;
-    let meta = {};
-    try { meta = JSON.parse(document.getElementById('egressMeta').value || '{}'); } catch {}
-    const body = { output, metadata: meta };
-    const { ok, data } = await api('/api/egress', 'POST', body);
-    show(document.getElementById('egressOutputBox'), data, ok);
   } finally { btn.disabled = false; }
 });
 
@@ -510,13 +415,13 @@ PORT = 8000
 
 
 def main() -> None:
-    print(f"  VAI — Stratum-4 Web Channel  v0.1.0")
-    print(f"  ───────────────────────────────────")
+    print(f"  VAI — Web Channel (Gateway → S5)  v0.2.0")
+    print(f"  ──────────────────────────────────────────")
     print(f"  Listening on http://{HOST}:{PORT}")
     print(f"  API docs   http://{HOST}:{PORT}/docs")
     print(f"  Health     http://{HOST}:{PORT}/health")
     print(f"  Ingress    POST /api/ingress  (WebRequest JSON body)")
-    print(f"  Egress     POST /api/egress   (S4 payload JSON body)")
+    print(f"  Egress     POST /api/egress   (outbound payload)")
     print(f"  Inspect    GET  /api/inspect")
     print(f"\n  Channels: {registry.names}")
     print()

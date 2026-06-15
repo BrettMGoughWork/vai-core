@@ -1,12 +1,12 @@
-"""Gateway entrypoint — converts external input to S4 Jobs and enqueues them.
+"""Gateway entrypoint — normalises channel input and hands off to S5.
 
 This module provides the channel abstraction pipeline::
 
     # Pure channel logic (returns a dict — use for testing/validation)
     payload = process_channel_input(registry, channel_name, raw_input)
 
-    # Wired through to a real Job (creates Job, pushes to queue — use in apps)
-    result = submit_channel_input(registry, channel_name, raw_input, queue)
+    # Wired through to S5 via a GatewayAgentAdapter (use in apps)
+    result = submit_channel_input(registry, channel_name, raw_input, adapter)
 
 It also provides convenience wrappers for each transport channel (web,
 WebSocket, webhook) and a :func:`handle_provider_webhook` function that
@@ -19,6 +19,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.gateway.adapters.agent_adapter import (
+    AgentRequest,
+    GatewayAgentAdapter,
+)
 from src.gateway.channels.base import InboundChannelMessage
 from src.gateway.channels.registry import ChannelRegistry
 from src.gateway.channels.webhook import WebhookEvent
@@ -34,7 +38,6 @@ from src.gateway.providers.github.adapter import (
 from src.gateway.providers.jira.adapter import (
     normalize_webhook as jira_norm,
 )
-from src.platform.queue.queue import Queue
 
 
 # ------------------------------------------------------------------
@@ -234,56 +237,63 @@ def submit_channel_input(
     registry: ChannelRegistry,
     channel_name: str,
     raw_input: Any,
-    queue: Queue,
-    control_plane: Any | None = None,
+    adapter: GatewayAgentAdapter | None = None,
+    *,
+    queue: Any = None,
+    control_plane: Any = None,
 ) -> dict[str, Any]:
-    """Channel input → create Job → push to queue → return job info.
+    """Channel input → normalise → hand off to S5 → return result.
 
     This is the **wired** version of :func:`process_channel_input`.  Instead
-    of returning a plain dict, it creates an S4 ``Job``, registers it with
-    the control plane, and pushes it onto the queue so a worker can pick it
-    up.  Use this in application entry points (CLI, Web, WebSocket, …)::
+    of returning a plain dict, it normalises the input and hands off to S5
+    via the provided ``GatewayAgentAdapter``.  Use this in application entry
+    points (CLI, Web, WebSocket, …)::
 
-        result = submit_channel_input(registry, "cli", {"text": "hello"}, queue)
-        # result == {"job_id": "…", "state": "pending", "channel": "cli"}
+        result = submit_channel_input(registry, "cli", {"text": "hello"}, adapter)
+        # result == {"reply": "…", "metadata": {…}}
 
     Args:
         registry:      The :class:`ChannelRegistry` with registered adapters.
         channel_name:  Channel identifier (e.g. ``"cli"``, ``"web"``).
         raw_input:     Raw input from the transport layer.
-        queue:         Queue backend to push the job onto.
-        control_plane: Optional :class:`ControlPlane`.  Uses the module-level
-                       singleton if not given.
+        adapter:       The :class:`GatewayAgentAdapter` to hand off to S5.
+                       If ``None``, returns the normalised payload dict only
+                       (useful for testing/validation).
+        queue:         **Deprecated** — kept for backward compatibility.
+        control_plane: **Deprecated** — kept for backward compatibility.
 
     Returns:
-        A dict with ``job_id``, ``state``, and ``channel`` on success, or
-        an error dict if the channel is not registered.
-
-    Raises:
-        ValueError: If the normalized payload cannot be converted to a
-                    ``ChannelMessage``.
+        A dict with the S5 response (``reply``, ``metadata``) on success, or
+        an error dict if the channel is not registered or the handoff fails.
     """
-    from src.platform.observability.logging import log_job_created
-    from src.platform.runtime import create_job
-    from src.platform.runtime.control_plane import (
-        control_plane as _default_cp,
-    )
-    from src.platform.transport.normalization import ChannelMessage
-
-    cp = control_plane or _default_cp
-
     payload = process_channel_input(registry, channel_name, raw_input)
     if payload is None:
         return {"error": f"Channel '{channel_name}' not available"}
 
-    msg = ChannelMessage(input=payload, metadata={}, channel=channel_name)
-    job = create_job(msg)
-    cp.register_job(job)
-    log_job_created(job)
-    queue.push(job)
+    if adapter is None:
+        return {"payload": payload, "channel": channel_name}
 
-    return {
-        "job_id": job.job_id,
-        "state": job.state.value,
-        "channel": channel_name,
-    }
+    # Build an AgentRequest from the normalised payload
+    text = ""
+    if isinstance(payload, dict):
+        # Try common payload text keys
+        text = str(
+            payload.get("text")
+            or payload.get("input")
+            or payload.get("message")
+            or payload.get("content", str(payload))
+        )
+
+    msg_metadata: dict[str, Any] = (
+        payload.get("metadata", {}) if isinstance(payload, dict) else {}
+    )
+
+    request = AgentRequest(
+        channel=channel_name,
+        message_text=text,
+        user_id=msg_metadata.pop("user_id", None)
+        or (payload.get("sender") if isinstance(payload, dict) else None),
+        metadata=msg_metadata,
+    )
+
+    return adapter.ingest(request)

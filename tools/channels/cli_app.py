@@ -1,10 +1,9 @@
 """
-CLI Channel Application -- runnable entry point for the Stratum-4 CLI channel.
+CLI Channel Application — runnable entry point demonstrating Gateway → S5.
 
-Demonstrates end-to-end job processing through the CLI channel::
+Demonstrates the correct architectural flow::
 
-    raw_input -> receive() -> InboundChannelMessage -> normalize() -> ChannelMessage
-    -> create_job() -> queue.push() -> worker.process_next() -> result
+    raw_input -> Channel.normalize() -> submit_channel_input() -> S5 Supervisor
 
 Usage:
     # Single command
@@ -15,24 +14,38 @@ Usage:
 
     # Pipe mode
     echo "list jobs" | python -m tools.channels.cli_app
-
-When a job is submitted, the app runs a single worker cycle to process it
-and displays the result.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-import time
-import threading
 
-from src.platform.queue.queue import InMemoryQueue
-from src.platform.runtime.channels.cli import register_cli_channel
-from src.platform.runtime.channels.registry import ChannelRegistry
-from src.platform.runtime.control_plane import ControlPlane
-from src.platform.runtime.gateway_entrypoint import submit_channel_input
-from src.platform.runtime.worker import Worker
+from src.gateway.channels.cli import register_cli_channel
+from src.gateway.channels.registry import ChannelRegistry
+from src.gateway.entrypoint import submit_channel_input
+
+# ---------------------------------------------------------------------------
+# S5 Supervisor wiring
+# ---------------------------------------------------------------------------
+from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
+from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
+from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
+from src.agent.supervisor import Supervisor
+
+_agent_registry = AgentRegistry()
+_agent_registry.register_agent(AgentMetadata(
+    identity=AgentIdentity(
+        agent_id="default-agent",
+        name="Default Agent",
+        description="Default conversational agent",
+    ),
+    capabilities=["conversation"],
+))
+
+_agent_store = MemoryAgentStateStore()
+_supervisor = Supervisor(registry=_agent_registry, store=_agent_store)
+_s5_adapter = AgentGatewayAdapter(_supervisor)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -40,34 +53,13 @@ from src.platform.runtime.worker import Worker
 
 HEADER = r"""
 +--------------------------------------------------------------------+
-|  VAI -- CLI Channel  (Stratum-4)                                    |
+|  VAI -- CLI Channel  (Stratum-5)                                    |
 |  Type a command or Ctrl+C to exit                                   |
-|  Job: submit -> worker -> result                                    |
+|  Gateway -> S5 Supervisor -> response                               |
 +--------------------------------------------------------------------+
 """
 
 PROMPT = "vai> "
-
-# ---------------------------------------------------------------------------
-# Shared runtime — one queue, one control plane, shared worker
-# ---------------------------------------------------------------------------
-
-_queue: InMemoryQueue = InMemoryQueue()
-_cp: ControlPlane = ControlPlane()
-
-
-def _process_one(registry: ChannelRegistry | None = None) -> None:
-    """Run one worker cycle if there is a pending job."""
-    worker = Worker(
-        queue=_queue,
-        control_plane=_cp,
-        channel_registry=registry,
-    )
-    job = worker.process_next()
-    if job is not None:
-        print(f"\n  [worker] {job.job_id:<8} -> {job.state.value}")
-        if job.result:
-            print(f"  [result] {job.result}")
 
 
 # ---------------------------------------------------------------------------
@@ -76,43 +68,25 @@ def _process_one(registry: ChannelRegistry | None = None) -> None:
 
 
 def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None:
-    """Submit a command as a Job and process it with one worker cycle."""
+    """Submit a command through the Gateway → S5 pipeline."""
     result = submit_channel_input(
         registry, "cli", {"text": text, "sender": sender},
-        queue=_queue, control_plane=_cp,
+        adapter=_s5_adapter,
     )
 
     if "error" in result:
         print(f"[!] {result['error']}")
         return
 
-    print(f"\n-- Job submitted -----------------------------------------")
-    print(f"  job_id:   {result['job_id']}")
-    print(f"  state:    {result['state']}")
-    print(f"  channel:  {result['channel']}")
-
-    # Run one worker cycle to process the new job
-    _process_one(registry)
-
-    # Re-fetch the completed job for the result
-    from src.platform.runtime.job_store import job_store
-
-    stored = job_store.get(result["job_id"])
-    if stored and stored.result:
-        print(f"\n-- Result -------------------------------------------------")
-        print(f"  output:   {stored.result}")
-
-    # Show the send() output
-    from src.platform.runtime.channels.cli import CLIChannel
-
-    channel = CLIChannel()
-    outbound = channel.send({
-        "output": stored.result if stored and stored.result else f"Processed: {text}",
-        "metadata": {"job_id": result["job_id"], "status": stored.state.value if stored else "unknown"},
-    })
-    print(f"\n-- Egress (send() result) -------------------------------")
-    print(f"  text:     {outbound['text']}")
-    print(f"  metadata: {outbound['metadata']}")
+    if "reply" in result:
+        print(f"\n-- S5 Response -------------------------------------------")
+        print(f"  reply:    {result['reply']}")
+        if result.get("metadata"):
+            print(f"  metadata: {result['metadata']}")
+    else:
+        print(f"\n-- S5 Pending --------------------------------------------")
+        print(f"  state:    {result.get('state', 'unknown')}")
+        print(f"  agent_id: {result.get('agent_id', 'unknown')}")
     print()
 
 
