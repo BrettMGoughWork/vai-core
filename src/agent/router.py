@@ -11,6 +11,8 @@ Destinations
 - ``runtime`` — conversational / chat (→ Runtime stratum)
 - ``workflow`` — multi-step workflow (→ Workflow Engine)
 - ``s4b``     — direct platform job execution (→ Platform stratum)
+- ``planner`` — plan generation (→ S2 Planner)  *(reserved)*
+- ``capability`` — skill / tool execution (→ S3 via S4)  *(reserved)*
 """
 
 from __future__ import annotations
@@ -28,9 +30,11 @@ ROUTER_VERSION = "1.0"
 """Current version of the router schema."""
 
 # Route destinations
-DEST_RUNTIME = "runtime"  # → conversational LLM (chat / assistant)
-DEST_WORKFLOW = "workflow"  # → workflow engine (multi-step / orchestration)
-DEST_S4B = "s4b"          # → platform job (direct tool execution)
+DEST_RUNTIME = "runtime"      # → conversational LLM (chat / assistant)
+DEST_WORKFLOW = "workflow"    # → workflow engine (multi-step / orchestration)
+DEST_S4B = "s4b"              # → platform job (direct tool execution)
+DEST_PLANNER = "planner"      # → S2 planner (plan generation)  *(reserved)*
+DEST_CAPABILITY = "capability"  # → S3 via S4 (skill / tool)  *(reserved)*
 
 # Keywords that hint at workflow intent
 _WORKFLOW_KEYWORDS = frozenset({
@@ -72,7 +76,7 @@ class Route:
     confidence: float = 1.0
 
     def __post_init__(self) -> None:
-        valid = {DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B}
+        valid = {DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B, DEST_PLANNER, DEST_CAPABILITY}
         if self.destination not in valid:
             raise ValueError(
                 f"destination must be one of {sorted(valid)}, "
