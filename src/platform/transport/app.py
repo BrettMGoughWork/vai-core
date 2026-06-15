@@ -1,8 +1,11 @@
-"""FastAPI Gateway — Stratum-4 transport boundary.
+"""FastAPI Gateway — Stratum-4 transport boundary with adapter pattern.
 
-Single ``POST /run`` endpoint that accepts arbitrary JSON, normalizes it into
-a ``ChannelMessage`` v1 via ``gateway_to_channel_message``, creates a ``Job``,
-pushes it onto the in-memory queue, and returns the ``job_id``.
+Single ``POST /run`` endpoint that accepts arbitrary JSON, submits it as a job
+via the :class:`~src.platform.transport.adapter.PlatformGatewayAdapter`, and
+returns the ``job_id``.
+
+The Gateway **never** imports Platform internals directly — it goes through the
+adapter interface.
 """
 
 from __future__ import annotations
@@ -11,11 +14,11 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
-from src.platform.queue.queue import InMemoryQueue
-from src.platform.transport.normalization import gateway_to_channel_message
+from src.gateway.adapters.platform_adapter import JobRequest
+from src.platform.transport.adapter import PlatformGatewayAdapter
 
-# Module-level singleton so gateway and worker share one queue instance
-job_queue = InMemoryQueue()
+# Module-level adapter so gateway and worker share one queue instance
+_adapter = PlatformGatewayAdapter()
 
 app = FastAPI(title="Stratum-4 Gateway", version="0.1.0")
 
@@ -24,27 +27,25 @@ app = FastAPI(title="Stratum-4 Gateway", version="0.1.0")
 def run(payload: dict[str, Any]) -> dict[str, str]:
     """Accept a job request and return a ``job_id``.
 
-    The payload must be a JSON object (dict).  It is normalized via
-    ``gateway_to_channel_message``, wrapped in a ``Job``, registered via the
-    ``ControlPlane``, and pushed onto the in-memory queue.
+    The payload must be a JSON object (dict).  It is converted into a
+    :class:`JobRequest`, submitted through the
+    :class:`~src.platform.transport.adapter.PlatformGatewayAdapter`, which
+    wraps it in a ``ChannelMessage``, creates a ``Job``, registers it via
+    the ``ControlPlane``, and pushes it onto the in-memory queue.
     """
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Payload must be a JSON object")
 
-    channel_msg = gateway_to_channel_message(payload)
+    result = _adapter.submit_job(
+        JobRequest(
+            channel_type="cli",
+            message_text=str(payload.get("input", payload)),
+            user_id=payload.get("sender"),
+            metadata=payload.get("metadata", {}),
+        )
+    )
 
-    # Lazy imports to break the circular dependency chain
-    from src.platform.observability.logging import log_job_created
-    from src.platform.runtime import create_job
-    from src.platform.runtime.control_plane import control_plane
-
-    job = create_job(channel_msg)
-    control_plane.register_job(job)
-    log_job_created(job)
-
-    job_queue.push(job)
-
-    return {"job_id": job.job_id}
+    return {"job_id": result.job_id}
 
 
 @app.get("/jobs/{job_id}")
@@ -53,14 +54,12 @@ def get_job(job_id: str) -> dict[str, object]:
 
     Returns ``404`` with a JSON error body if the job is not found.
     """
-    from src.platform.runtime.job_store import job_store  # lazy: break circular import
-
-    job = job_store.get(job_id)
-    if job is None:
+    status = _adapter.get_job_status(job_id)
+    if status is None:
         raise HTTPException(status_code=404, detail="job not found")
 
     return {
-        "job_id": job.job_id,
-        "state": job.state,
-        "result": job.result,
+        "job_id": status.job_id,
+        "state": status.state,
+        "result": status.output,
     }
