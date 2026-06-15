@@ -21,8 +21,8 @@ from src.runtime.interfaces import (
     PromptRequest,
     PromptResponse,
     S1Error,
-    call_runtime_backend,
 )
+from src.strategy.planning.s1_contract.s1_client import call_runtime_backend
 
 
 @dataclass(frozen=True)

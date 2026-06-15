@@ -101,6 +101,49 @@ def _run_container(config: Optional[S4Config] = None) -> None:
 # ---------------------------------------------------------------------------
 
 
+def create_application() -> dict:
+    """Create the wired application composition root.
+
+    Instantiates and wires all strata layers, returning a dict of
+    components ready for use.  This is the single entrypoint for
+    programmatic embedding (tests, CLI, FastAPI).
+
+    Returns:
+        A dict with keys ``queue``, ``job_store``, ``strategy_router``,
+        ``supervisor``, ``registry``, ``state_store``.
+    """
+    from src.platform.queue import InMemoryQueue
+    from src.platform.runtime.job_store import InMemoryJobStore
+
+    from src.agent.registry import AgentRegistry
+    from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
+    from src.agent.strategy_router import StrategyRouter
+    from src.agent.supervisor import Supervisor
+
+    # S4: generic durable execution
+    queue = InMemoryQueue()
+    job_store = InMemoryJobStore()
+
+    # S5: agent orchestration
+    registry = AgentRegistry()
+    state_store = MemoryAgentStateStore()
+    strategy_router = StrategyRouter()
+    supervisor = Supervisor(
+        registry=registry,
+        store=state_store,
+        strategy_router=strategy_router,
+    )
+
+    return {
+        "queue": queue,
+        "job_store": job_store,
+        "strategy_router": strategy_router,
+        "supervisor": supervisor,
+        "registry": registry,
+        "state_store": state_store,
+    }
+
+
 def run_target(mode: str = "local") -> None:
     """Run S4 in the given deployment mode.
 
