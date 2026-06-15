@@ -21,7 +21,6 @@ from src.capabilities.primitives.stdlib.echo import EchoPrimitive
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 from src.capabilities.discovery.providers.mock_provider import _simple_embedding_fn
 from src.strategy.llm.llm_factory import factory
-from src.strategy.planning.adapters.s3_adapter import S3Adapter
 from src.strategy.memory.segment_memory import SegmentMemory
 from src.strategy.memory.subgoal_memory import SubgoalMemory
 from src.strategy.memory.plan_memory import PlanMemory
@@ -63,7 +62,6 @@ def main():
     skill_registry.set_embedder(_TestEmbedder())
     skill_registry.register(make_json_parse_skill())
     runner = SkillRunner(registry=skill_registry, embedder=_TestEmbedder())
-    s3_adapter = S3Adapter(runner)
 
     llm = factory.create("deepseek", "deepseek-chat")
 
@@ -91,7 +89,7 @@ def main():
             ])
             return raw["choices"][0]["message"]["content"]
 
-        planner = SubgoalPlanner(llm_complete=_llm_complete, s3_adapter=s3_adapter)
+        planner = SubgoalPlanner(llm_complete=_llm_complete)
 
         subgoal_id = f"json-parse-{rep}"
         subgoal_memory.put(Subgoal(
@@ -103,6 +101,7 @@ def main():
         plan_id = planner.plan_for_subgoal(
             subgoal_id=subgoal_id, goal=goal,
             governance=governance, timestamp="2025-01-01T00:00:00Z",
+            skill_refs=["stdlib.json.parse"],
         )
 
         # Check what skill the LLM named in the plan

@@ -10,7 +10,7 @@ llm:
 
 # ── Phase 2.14.7 — Kill‑switch for real LLM backend ──────────────────────
 # Set to true only after passing the readiness checklist (Phase 2.14.6).
-enable_real_llm: true
+enable_real_llm: false
 
 agent:
   loop_policy:

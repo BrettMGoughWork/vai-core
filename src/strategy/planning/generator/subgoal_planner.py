@@ -30,26 +30,19 @@ from src.strategy.planning.models.plan import Plan
 from src.strategy.planning.segments.manager import PlanSegmentManager
 from src.strategy.types.hashing import stable_hash
 from src.strategy.types.plan_segment import PlanSegment
-from src.strategy.planning.adapters.s3_adapter import S3Adapter, S2DiscoveryQuery, S2DiscoveredSkill
 
-def _build_system_prompt(skills: list[S2DiscoveredSkill] | None = None) -> str:
-    """Build a dynamic system prompt, optionally listing available skills and their input/output schemas.
 
-    When *skills* are provided (Phase 3.18.3 schema‑aware planning), each skill's name,
-    description, required inputs, and output keys are injected so the LLM can produce valid
-    per‑step ``inputs`` dictionaries and reference prior‑step outputs accurately (3.18.3b).
+def _build_system_prompt(skill_refs: list[str] | None = None) -> str:
+    """Build a dynamic system prompt, optionally listing available skill names.
+
+    When *skill_refs* are provided, each skill name is injected so the LLM can
+    reference real capability names in its plan steps.
     """
     skill_block = ""
-    if skills:
+    if skill_refs:
         lines: list[str] = ["AVAILABLE CAPABILITIES:"]
-        for sk in skills:
-            input_desc = _describe_schema(sk.input_schema)
-            output_desc = _describe_schema(sk.output_schema)
-            lines.append(
-                f"- {sk.name}: {sk.description}. "
-                f"Inputs: {input_desc}. "
-                f"Outputs: {output_desc}"
-            )
+        for name in skill_refs:
+            lines.append(f"- {name}")
         skill_block = "\n".join(lines) + "\n\n"
 
     return (
@@ -90,37 +83,6 @@ def _build_system_prompt(skills: list[S2DiscoveredSkill] | None = None) -> str:
     )
 
 
-def _describe_schema(input_schema: dict[str, Any] | None) -> str:
-    """Convert a skill input schema to a compact human-readable description.
-
-    Handles both formats:
-    1. JSON Schema format: {"required": [...], "properties": {...}}
-    2. Flat format (from skill manifests): {"param": {"type": "str", "required": True}, ...}
-    """
-    if not input_schema:
-        return "{}"
-    # ── Format 1: JSON Schema ──
-    if "properties" in input_schema:
-        required: set[str] = set(input_schema.get("required", []))
-        properties: dict[str, Any] = input_schema["properties"]
-        if not properties:
-            return "{}"
-        parts: list[str] = []
-        for prop_name, prop_def in properties.items():
-            prop_type = prop_def.get("type", "string") if isinstance(prop_def, dict) else "string"
-            req = " (required)" if prop_name in required else " (optional)"
-            parts.append(f'"{prop_name}": {prop_type}{req}')
-        return "{" + ", ".join(parts) + "}"
-    # ── Format 2: Flat (skill manifest) ──
-    parts: list[str] = []
-    for prop_name, prop_def in input_schema.items():
-        if not isinstance(prop_def, dict):
-            parts.append(f'"{prop_name}": any')
-            continue
-        prop_type = prop_def.get("type", "string")
-        req = " (required)" if prop_def.get("required") else " (optional)"
-        parts.append(f'"{prop_name}": {prop_type}{req}')
-    return "{" + ", ".join(parts) + "}"
 
 
 class SubgoalPlanner:
@@ -141,11 +103,9 @@ class SubgoalPlanner:
     def __init__(
         self,
         llm_complete: Callable[[str, str], str] | None = None,
-        s3_adapter: S3Adapter | None = None,
         segment_manager: PlanSegmentManager | None = None,
     ) -> None:
         self._llm_complete = llm_complete
-        self._s3_adapter = s3_adapter
         self._segment_manager = segment_manager
 
     def plan_for_subgoal(
@@ -154,29 +114,28 @@ class SubgoalPlanner:
         goal: str,
         governance: MemoryGovernance,
         timestamp: str,
+        skill_refs: list[str] | None = None,
     ) -> str:
         """
         Generate and hydrate a plan for the given subgoal.
 
-        1. Run skill discovery against the goal text (Phase 3.19.3).
-        2. Build a dynamic system prompt listing discovered skills and their input schemas.
-        3. Call the LLM with the schema‑aware prompt.
-        4. Parse the JSON plan response, extracting per‑step ``inputs``.
-        5. Write PlanSegments (with per‑step inputs in context) and Plan.
+        1. Build a system prompt listing available skill names (if provided).
+        2. Call the LLM with the prompt.
+        3. Parse the JSON plan response, extracting per‑step ``inputs``.
+        4. Write PlanSegments (with per‑step inputs in context) and Plan.
+
+        Args:
+            subgoal_id: ID of the subgoal to plan for.
+            goal: The goal text to plan against.
+            governance: MemoryGovernance for persisting plan artifacts.
+            timestamp: ISO timestamp for deterministic IDs.
+            skill_refs: Symbolic skill names pre-resolved by S5 (no S3 coupling).
 
         Returns the plan_id of the hydrated plan.
         Raises on LLM failure, JSON parse error, or governance rejection.
         """
-        # ── 1. Skill discovery (BEFORE the LLM call — Phase 3.18.3) ──
-        discovered_skills: list[S2DiscoveredSkill] = []
-        if self._s3_adapter is not None:
-            discovery = self._s3_adapter.discover_skills(
-                S2DiscoveryQuery(query=goal, limit=10)
-            )
-            discovered_skills = list(discovery.skills)
-
-        # ── 2. Build schema‑aware system prompt ──
-        system_prompt = _build_system_prompt(discovered_skills if discovered_skills else None)
+        # ── 1. Build system prompt with available skill names ──
+        system_prompt = _build_system_prompt(skill_refs)
 
         # ── 3. Call the LLM via injected callback ──
         if self._llm_complete is None:
@@ -207,8 +166,6 @@ class SubgoalPlanner:
             for s in steps_list
         ]
 
-        discovered_skill_names = [sk.name for sk in discovered_skills]
-
         # ── 5. Write segment (with per‑step inputs in context) ──
         segment_context = {
             "capabilities": step_capabilities,
@@ -221,7 +178,7 @@ class SubgoalPlanner:
                 steps=step_descriptions,
                 context=segment_context,
                 metadata={},
-                skills=discovered_skill_names,
+                skills=skill_refs or [],
                 created_at=timestamp,
             )
         else:
@@ -230,7 +187,7 @@ class SubgoalPlanner:
                 steps=step_descriptions,
                 context=segment_context,
                 metadata={},
-                skills=discovered_skill_names,
+                skills=skill_refs or [],
                 created_at=timestamp,
             )
         governance.put_segment(segment)
@@ -238,7 +195,7 @@ class SubgoalPlanner:
 
         # ── 6. Write the plan ──
         targetskillid = step_capabilities[0] if step_capabilities else (
-            discovered_skill_names[0] if discovered_skill_names else "unknown"
+            skill_refs[0] if skill_refs else "unknown"
         )
         plan = Plan(
             intent=subgoal_text,

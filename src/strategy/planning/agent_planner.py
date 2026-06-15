@@ -16,7 +16,6 @@ from src.strategy.planning.contracts.agent_plan import AgentPlan
 from src.strategy.planning.generator.subgoal_planner import SubgoalPlanner
 from src.strategy.planning.segments.manager import PlanSegmentManager
 from src.strategy.planning.subgoals.manager import SubgoalManager
-from src.strategy.planning.adapters.s3_adapter import S3Adapter
 
 
 class AgentPlanner:
@@ -38,13 +37,13 @@ class AgentPlanner:
         planner = AgentPlanner(
             llm_complete=llm_complete,
             plan_memory=plan_memory,
-            s3_adapter=s3_adapter,
         )
         agent_plan: AgentPlan = planner.plan(
             subgoal_id="sg-1",
             goal="Find and summarise the top 5 AI stories from Hacker News",
             governance=governance,
             timestamp="2025-01-01T00:00:00Z",
+            skill_refs=["web_search", "llm_complete"],
         )
     """
 
@@ -52,13 +51,11 @@ class AgentPlanner:
         self,
         llm_complete: Callable[[str, str], str] | None = None,
         plan_memory: PlanMemory | None = None,
-        s3_adapter: S3Adapter | None = None,
         segment_manager: PlanSegmentManager | None = None,
         subgoal_manager: SubgoalManager | None = None,
     ) -> None:
         self._subgoal_planner = SubgoalPlanner(
             llm_complete=llm_complete,
-            s3_adapter=s3_adapter,
             segment_manager=segment_manager,
         )
         self._subgoal_manager = subgoal_manager
@@ -75,12 +72,20 @@ class AgentPlanner:
         goal: str,
         governance: MemoryGovernance,
         timestamp: str,
+        skill_refs: list[str] | None = None,
     ) -> AgentPlan:
         """Generate and hydrate a plan, returning the full AgentPlan contract.
 
         Delegates to SubgoalPlanner for LLM-based plan generation,
         then reads back the stored Plan + PlanMemoryRecord to
         construct a versioned AgentPlan.
+
+        Args:
+            subgoal_id: ID of the subgoal to plan for.
+            goal: The goal text to plan against.
+            governance: MemoryGovernance for persisting plan artifacts.
+            timestamp: ISO timestamp for deterministic IDs.
+            skill_refs: Symbolic skill names pre-resolved by S5 (no S3 coupling).
 
         Returns:
             AgentPlan with full identity, content, and version fields.
@@ -94,6 +99,7 @@ class AgentPlanner:
             goal=goal,
             governance=governance,
             timestamp=timestamp,
+            skill_refs=skill_refs,
         )
 
         # ── 2. Read back the stored Plan + record ──

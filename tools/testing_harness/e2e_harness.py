@@ -146,9 +146,8 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         skill_count = load_all_skills(skill_registry, prim_registry, embedder=embedder)
         _out(f"  Loaded: {skill_count} skills")
 
-        # ── 3. Wire up SkillRunner → S3Adapter ───────────────────────────
+        # ── 3. Wire up SkillRunner ───────────────────────────────────────
         from src.capabilities.runtime.skill_runner import SkillRunner
-        from src.strategy.planning.adapters.s3_adapter import S3Adapter
 
         # ── Wire up SkillAuthor pipeline (3.17.5 capability discovery) ──
         from src.capabilities.registry.skill_safety import SkillSafetyValidator
@@ -167,7 +166,6 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         set_author_pipeline(author)
 
         runner = SkillRunner(registry=skill_registry, embedder=embedder)
-        s3_adapter = S3Adapter(runner)
 
         # ── 4. Wire up MemoryGovernance ──────────────────────────────────
         from src.strategy.memory.segment_memory import SegmentMemory
@@ -205,7 +203,7 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
             ])
             return raw["choices"][0]["message"]["content"]
 
-        planner = SubgoalPlanner(llm_complete=_llm_complete, s3_adapter=s3_adapter)
+        planner = SubgoalPlanner(llm_complete=_llm_complete)
 
         # ── 7. Register subgoal + generate plan ──────────────────────────
         from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
@@ -224,6 +222,13 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
             created_at=1704067200000,
         ))
 
+        # ── 7a. Discover relevant skills via SkillRunner ─────────────────
+        from src.capabilities.contracts import DiscoveryQuery
+        discovered = runner.discover(DiscoveryQuery(query=prompt, limit=5))
+        skill_refs = [sk.name for sk in discovered.skills]
+        if skill_refs:
+            _out(f"  Discovered {len(skill_refs)} relevant skills: {skill_refs[:3]}{'...' if len(skill_refs) > 3 else ''}")
+
         _out(f"\n{MINOR} LLM PLANNING {MINOR}")
         _out(f"  Prompt: {prompt}")
         _out(f"  Calling LLM ({backend}:{model}) ...")
@@ -233,6 +238,7 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
             goal=prompt,
             governance=governance,
             timestamp=timestamp,
+            skill_refs=skill_refs,
         )
         result.plan_id = plan_id
 
@@ -269,113 +275,44 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         _out(f"  Discovered:  {result.discovered_skills}")
         _out(f"  Steps:       {len(result.plan_steps)}")
 
-        # ── 9. Execute plan steps via S3Adapter ──────────────────────────
+        # ── 9. Execute plan steps via SkillRunner ────────────────────────
         _out(f"\n{MINOR} SKILL EXECUTION {MINOR}")
 
-        from src.strategy.planning.adapters.s3_adapter import S2SkillCallRequest
-
-        # Build runtime context with search config for primitives (PHASE 3.13.2)
-        runtime_context: dict = {}
-        try:
-            from src.strategy.config.loader import Config
-            cfg = Config("config/config.yaml")
-            search_cfg = cfg.get("search")
-            if search_cfg is not None and search_cfg.enabled:
-                runtime_context["search_config"] = search_cfg
-        except Exception:
-            pass  # config not available — primitives use their defaults
+        from src.capabilities.contracts import SkillCallRequest
 
         accumulated_outputs: dict[str, Any] = {}
-
-        # Simple template resolver for forward-reference resolution
-        _STEP_REF_RE = re.compile(r"^step-\d+$")
-
-        def _resolve_templates(value: Any, sources: dict[str, Any], parent_key: str = "") -> Any:
-            """Resolve '{{key}}' tokens, fallback '{{step-N}}' references, and
-            legacy '$ref' / JSONPath-like strings against *sources* (accumulated
-            outputs from previous steps)."""
-            if isinstance(value, str):
-                # 1. Bare {{key}} token → return raw source value
-                m = re.match(r"^\{\{\s*([\w-]+)\s*\}\}$", value)
-                if m:
-                    key = m.group(1)
-                    if key in sources:
-                        return sources[key]
-                    # Fallback: {{step-N}} → stringified accumulated outputs
-                    if _STEP_REF_RE.match(key):
-                        return json.dumps(sources, default=str)
-                    return value
-                # 2. Embedded {{key}} tokens → stringify
-                def _replacer(m: re.Match[str]) -> str:
-                    key = m.group(1)
-                    if key in sources:
-                        return str(sources[key])
-                    if _STEP_REF_RE.match(key):
-                        return json.dumps(sources, default=str)
-                    return m.group(0)
-                value = re.sub(
-                    r"\{\{\s*([\w-]+)\s*\}\}",
-                    _replacer,
-                    value,
-                )
-                # 3. JSONPath-like reference (e.g., "$.steps[0].result", "$.steps[0].output")
-                #    If the parent_key exists in sources, return its value
-                if value.startswith("$.") and parent_key and parent_key in sources:
-                    return sources[parent_key]
-                return value
-            if isinstance(value, dict):
-                # Handle $ref references to previous step outputs
-                ref = value.get("$ref")
-                if ref is not None and isinstance(ref, str) and len(value) == 1:
-                    if parent_key and parent_key in sources:
-                        return sources[parent_key]
-                    return sources
-                return {k: _resolve_templates(v, sources, parent_key=k) for k, v in value.items()}
-            if isinstance(value, list):
-                return [_resolve_templates(v, sources) for v in value]
-            return value
 
         for i, step in enumerate(result.plan_steps):
             skill_name = result.target_skill if i == 0 else step.get("capability", result.target_skill)
             description = step.get("description", f"step-{i}")
-            # Per-step inputs take precedence; fall back to plan-level arguments
             raw_inputs = step.get("inputs") or plan_record.arguments or {}
-            # Resolve forward-references to previous step outputs
-            if i > 0 and accumulated_outputs:
-                raw_inputs = _resolve_templates(raw_inputs, accumulated_outputs)
-            # Merge previous outputs as defaults (step inputs override via template resolution)
-            step_inputs = {**accumulated_outputs, **raw_inputs}
 
             _out(f"\n  [{i+1}/{len(result.plan_steps)}] {description}")
             _out(f"       skill: {skill_name}")
 
-            s2_request = S2SkillCallRequest(
+            call_request = SkillCallRequest(
                 skill_name=skill_name,
-                arguments=step_inputs,
-                request_id=f"e2e-{plan_id[:8]}-step-{i}",
-                context=runtime_context,
+                arguments=raw_inputs,
             )
 
             try:
-                s2_result = s3_adapter.call_skill(s2_request)
+                s_result = runner.execute(call_request)
                 exec_entry = {
                     "step_index": i,
                     "description": description,
                     "skill_name": skill_name,
-                    "success": s2_result.success,
-                    "output": s2_result.output,
-                    "error": s2_result.error,
+                    "success": s_result.success,
+                    "output": s_result.output,
+                    "error": s_result.error,
                 }
                 result.execution_results.append(exec_entry)
 
-                if s2_result.success:
-                    _out(f"       [OK] success  output={json.dumps(s2_result.output, default=str)[:120]}")
-                    if s2_result.output and isinstance(s2_result.output, dict):
-                        accumulated_outputs.update(s2_result.output)
-                        # Store per-step output for {{step-N}} fallback references
-                        accumulated_outputs[f"step-{i+1}"] = json.dumps(s2_result.output, default=str)
+                if s_result.success:
+                    _out(f"       [OK] success  output={json.dumps(s_result.output, default=str)[:120]}")
+                    if s_result.output and isinstance(s_result.output, dict):
+                        accumulated_outputs.update(s_result.output)
                 else:
-                    _out(f"       [FAIL] error={s2_result.error}")
+                    _out(f"       [FAIL] error={s_result.error}")
             except Exception as exc:
                 exec_entry = {
                     "step_index": i,
