@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 
-from src.platform.runtime.channels import (
+from src.gateway.channels import (
     Channel,
     CLIChannel,
     CLITUI,
@@ -51,7 +51,7 @@ from src.platform.runtime.channels import (
     register_websocket_channel,
     register_webhook_channel,
 )
-from src.platform.runtime.gateway_entrypoint import (
+from src.gateway.entrypoint import (
     process_channel_input,
     handle_web_request,
     handle_ws_message,

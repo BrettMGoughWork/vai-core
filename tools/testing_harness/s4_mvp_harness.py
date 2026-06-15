@@ -87,7 +87,7 @@ from src.platform.runtime.safety.degraded_mode import (
     WorkerRecoveredEvent,
     default_degraded_mode,
 )
-from src.platform.runtime.channels import (
+from src.gateway.channels import (
     CLIChannel,
     CLITUI,
     InboundChannelMessage,
@@ -103,7 +103,7 @@ from src.platform.runtime.channels import (
     register_webhook_channel,
     register_websocket_channel,
 )
-from src.platform.runtime.gateway_entrypoint import (
+from src.gateway.entrypoint import (
     process_channel_input,
     handle_slack_event,
     handle_mail_message,
@@ -135,6 +135,44 @@ from src.platform.supervisor.control_plane_supervisor import (
     InconsistencyEvent,
     JobStateSnapshot,
 )
+
+# ---- Test executors ---------------------------------------------------------
+# These are injected as Worker's ``executor`` param to decouple S4 from
+# any concrete runtime (S1/S2, strategy router, capabilities, etc.).
+
+# When we are in a real integration test we have the full stack already
+# initialised (see test__* fixtures) — here we only need a thin wrapper
+# that returns the expected shape so the worker loop can progress.
+#
+# Expected executor return shape::
+#
+#     {"output": <response_text>,
+#      "done": True,
+#      "cognitive_state": {...},
+#      "memory": {...},
+#      "result": <raw_s2_result>}
+
+EXECUTOR_SUCCESS_SHAPE = {
+    "done": True,
+    "cognitive_state": {},
+    "memory": {},
+    "result": {},
+}
+
+
+def _echo_executor(*, payload: dict, **_: Any) -> dict[str, Any]:
+    """Return the payload text wrapped in the shape the worker loop expects."""
+    return {
+        "output": payload.get("input", payload.get("text", "")),
+        **EXECUTOR_SUCCESS_SHAPE,
+    }
+
+
+def _failing_executor(*, payload: dict, **_: Any) -> dict[str, Any]:
+    """Raise so the worker's error path can be exercised."""
+    msg = payload.get("input", payload.get("text", "injected failure"))
+    raise RuntimeError(f"Failing executor: {msg}")
+
 
 # ---- Helpers ---------------------------------------------------------------
 
@@ -374,7 +412,7 @@ def _test_worker_failure() -> dict[str, Any]:
 
     # Patch the pipeline's run() to raise — simulating an unhandled crash
     with patch.object(EvaluatorPipeline, "run", side_effect=RuntimeError("boom")):
-        w = Worker(queue=q, control_plane=cp)
+        w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
         result = w.process_next()
 
     checks.append({"check": "worker returns job after failure", "passed": result is job})
@@ -459,7 +497,7 @@ def _test_worker_empty() -> dict[str, Any]:
 
     q = InMemoryQueue()
     cp = ControlPlane()
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
 
     result = w.process_next()
     checks.append({"check": "process_next on empty queue returns None", "passed": result is None})
@@ -476,7 +514,7 @@ def _test_worker_execute() -> dict[str, Any]:
 
     q = InMemoryQueue()
     cp = ControlPlane()
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
     ch = ChannelMessage(input={"ping": "pong"})
     job = create_job(ch)
     q.push(job)
@@ -588,7 +626,7 @@ def _test_end_to_end() -> dict[str, Any]:
     from src.platform.runtime.control_plane import ControlPlane
 
     cp = ControlPlane()
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
     processed = w.process_next()
     checks.append({"check": "worker returns job", "passed": processed is job})
     checks.append({"check": "result is populated", "passed": processed is not None and processed.result is not None})
@@ -668,7 +706,7 @@ def _test_gateway_get() -> dict[str, Any]:
     # Process the job
     from src.platform.runtime.control_plane import control_plane
     from src.platform.runtime.worker import Worker
-    w = Worker(queue=job_queue, control_plane=control_plane)
+    w = Worker(queue=job_queue, control_plane=control_plane, executor=_echo_executor)
     w.process_next()
 
     # Retrieve updated state
@@ -903,7 +941,7 @@ def _test_multi_cycle() -> dict[str, Any]:
     store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
     q = InMemoryQueue()
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
 
     ch = ChannelMessage(input={"multi": "cycle"})
     job = create_job(ch)
@@ -1108,7 +1146,7 @@ def _test_worker_retry() -> dict[str, Any]:
     q = InMemoryQueue()
     store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
 
     job = create_job(cli_to_channel_message({"cmd": "deploy"}))
     cp.register_job(job)
@@ -1200,7 +1238,7 @@ def _test_worker_poison() -> dict[str, Any]:
     q = InMemoryQueue()
     store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
 
     # Replace the retry wrapper's function with one that always fails
     def _always_fail_fn(*args, **kwargs):
@@ -1231,7 +1269,8 @@ def _test_worker_poison() -> dict[str, Any]:
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
 
-
+
+
 @_scenario("crash_recovery_logic", "Pure logic tests for CrashRecovery.evaluate()")
 def _test_crash_recovery_logic() -> dict[str, Any]:
     """Verify CrashRecovery decisions: no checkpoint, not running, RUNNING+checkpoint, token match/mismatch."""
@@ -1303,7 +1342,7 @@ def _test_worker_crash_recovery() -> dict[str, Any]:
     q = InMemoryQueue()
     store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
 
     job = create_job(cli_to_channel_message({"cmd": "analyze"}))
     cp.register_job(job)
@@ -1406,7 +1445,7 @@ def _test_poison_skip_recovery() -> dict[str, Any]:
     q = InMemoryQueue()
     store = InMemoryJobStore()
     cp = ControlPlane(job_store=store)
-    w = Worker(queue=q, control_plane=cp)
+    w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
 
     job = create_job(cli_to_channel_message({"cmd": "tainted"}))
     cp.register_job(job)
@@ -1609,22 +1648,11 @@ def _test_degraded_mode_in_worker() -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     notes: list[str] = []
 
-    from src.platform.runtime.worker import execute_job_payload
-
-    # Save original to restore later
-    _original = execute_job_payload
-
-    def _always_fail(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        raise RuntimeError("persistent failure")
-
-    import src.platform.runtime.worker as worker_mod
-    worker_mod.execute_job_payload = _always_fail  # type: ignore[assignment]
-
     try:
         q = InMemoryQueue()
         store = InMemoryJobStore()
         cp = ControlPlane(job_store=store)
-        w = Worker(queue=q, control_plane=cp)
+        w = Worker(queue=q, control_plane=cp, executor=_failing_executor)
 
         # Create a job with consecutive_failures already at the degraded threshold (3)
         job = create_job(cli_to_channel_message({"cmd": "degrade-me"}))
@@ -1647,8 +1675,6 @@ def _test_degraded_mode_in_worker() -> dict[str, Any]:
                                "passed": result.result.get("reason") is not None})
             notes.append(f"Result state: {result.state.value}")
             notes.append(f"Result: {result.result}")
-    finally:
-        worker_mod.execute_job_payload = _original
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
@@ -1932,22 +1958,11 @@ def _test_panic_guard_in_worker() -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     notes: list[str] = []
 
-    from src.platform.runtime.worker import execute_job_payload
-
-    # Save original to restore later
-    _original = execute_job_payload
-
-    def _broken_execute(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        raise RuntimeError("catastrophic failure")
-
-    import src.platform.runtime.worker as worker_mod
-    worker_mod.execute_job_payload = _broken_execute  # type: ignore[assignment]
-
     try:
         q = InMemoryQueue()
         store = InMemoryJobStore()
         cp = ControlPlane(job_store=store)
-        w = Worker(queue=q, control_plane=cp)
+        w = Worker(queue=q, control_plane=cp, executor=_failing_executor)
 
         job = create_job(cli_to_channel_message({"cmd": "boom"}))
         cp.register_job(job)
@@ -1965,8 +1980,6 @@ def _test_panic_guard_in_worker() -> dict[str, Any]:
             )
             checks.append({"check": "hydrate event in trace", "passed": has_hydrate})
             notes.append(f"Result state: {result.state.value}")
-    finally:
-        worker_mod.execute_job_payload = _original
 
     passed = all(c["passed"] for c in checks)
     return {"passed": passed, "checks": checks, "notes": notes}
@@ -4181,7 +4194,7 @@ def _test_metrics_integration() -> dict[str, Any]:
         cp.register_job(job)
 
         # --- Worker processing ---
-        w = Worker(queue=q, control_plane=cp)
+        w = Worker(queue=q, control_plane=cp, executor=_echo_executor)
         processed = w.process_next()
 
         # Collect emitted metrics
@@ -4574,6 +4587,7 @@ def _test_logging_integration() -> dict[str, Any]:
         worker = Worker(
             queue=queue,
             control_plane=cp,
+            executor=_echo_executor,
         )
 
         # Create, register, and queue a job
@@ -4744,6 +4758,7 @@ def _test_tracing_integration() -> dict[str, Any]:
         worker = Worker(
             queue=queue,
             control_plane=cp,
+            executor=_echo_executor,
         )
 
         # Create, register, and queue a job

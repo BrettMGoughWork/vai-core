@@ -14,9 +14,9 @@ from typing import Any
 
 import pytest
 
-from src.platform.runtime.channels.registry import ChannelRegistry
-from src.platform.runtime.channels.webhook import WebhookEvent, register_webhook_channel
-from src.platform.runtime.gateway_entrypoint import (
+from src.gateway.channels.registry import ChannelRegistry
+from src.gateway.channels.webhook import WebhookEvent, register_webhook_channel
+from src.gateway.entrypoint import (
     PROVIDER_MAP,
     handle_provider_webhook,
 )
