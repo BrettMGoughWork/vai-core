@@ -2,7 +2,7 @@
 
 Each provider sub-package exports a ``normalize_webhook`` pure function
 that transforms a raw provider POST payload into a
-:class:`~src.platform.runtime.channels.webhook.WebhookEvent`.
+:class:`~src.gateway.channels.webhook.WebhookEvent`.
 
 These adapters sit **outside** the generic Webhook Channel and are
 responsible for isolating provider-specific quirks (field names, nesting,

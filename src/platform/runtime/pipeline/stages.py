@@ -409,7 +409,12 @@ class ExecutionStage(PipelineStage):
             cp.issue_resume_token(job)
 
         # ---- Loop complete ----
-        cp.mark_succeeded(job, job.execution_context.last_result if job.execution_context else None)  # type: ignore[arg-type]
+        # Store the full executor output as job.result so that
+        # Worker._route_response can extract the top-level ``output`` key
+        # without knowing about S1/S2 internals. The execution-context
+        # fields (cognitive_state, memory, last_result) are already set
+        # above from the same output dict.
+        cp.mark_succeeded(job, output)
         cp.save_checkpoint(job)
         log_job_finished(job)
         return job

@@ -1,7 +1,7 @@
 """Slack webhook adapter — pure-logic payload normaliser.
 
 Transforms a raw Slack Events API payload into a canonical
-:class:`~src.platform.runtime.channels.webhook.WebhookEvent`.
+:class:`~src.gateway.channels.webhook.WebhookEvent`.
 
 Expected raw structure (Events API)::
 
@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.platform.runtime.channels.webhook import WebhookEvent
+from src.gateway.channels.webhook import WebhookEvent
 
 
 def normalize_webhook(raw_input: dict[str, Any]) -> WebhookEvent:

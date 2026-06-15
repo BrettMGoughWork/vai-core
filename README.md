@@ -119,9 +119,9 @@ Key features:
 
 Entry point (programmatic):
 ```python
-from src.platform.runtime.channels.registry import ChannelRegistry
-from src.platform.runtime.channels.ws import register_websocket_channel
-from src.platform.runtime.gateway_entrypoint import process_channel_input
+from src.gateway.channels.registry import ChannelRegistry
+from src.gateway.channels.ws import register_websocket_channel
+from src.gateway.entrypoint import process_channel_input
 
 # Register
 registry = ChannelRegistry()
@@ -132,7 +132,7 @@ payload = process_channel_input(registry, "ws", {"text": "hello", "sender": "nod
 # {"input": "hello", "metadata": {"channel": "ws", "sender": "node1", "message_type": "text"}}
 
 # Egress
-from src.platform.runtime.channels.ws import WebSocketChannel
+from src.gateway.channels.ws import WebSocketChannel
 channel = WebSocketChannel()
 output = channel.send({"output": "Ack", "metadata": {"job_id": "j-1"}})
 # {"text": "Ack", "message_type": "text", "metadata": {"job_id": "j-1"}}
@@ -155,9 +155,9 @@ Key features:
 
 Entry point (programmatic):
 ```python
-from src.platform.runtime.channels.registry import ChannelRegistry
-from src.platform.runtime.channels.webhook import register_webhook_channel
-from src.platform.runtime.gateway_entrypoint import process_channel_input
+from src.gateway.channels.registry import ChannelRegistry
+from src.gateway.channels.webhook import register_webhook_channel
+from src.gateway.entrypoint import process_channel_input
 
 # Register
 registry = ChannelRegistry()
@@ -181,7 +181,7 @@ payload = process_channel_input(registry, "webhook", {
 #  "metadata": {"channel": "webhook", "source": "whatsapp", "sender": None}}
 
 # Egress
-from src.platform.runtime.channels.webhook import WebhookChannel
+from src.gateway.channels.webhook import WebhookChannel
 channel = WebhookChannel()
 output = channel.send({"output": "Processed", "metadata": {"job_id": "j-1"}})
 # {"status": "ok", "response": "Processed", "metadata": {"job_id": "j-1"}}
@@ -211,9 +211,9 @@ echo "list jobs" | python -m tools.channels.cli_app
 **Programmatic usage:**
 
 ```python
-from src.platform.runtime.channels.registry import ChannelRegistry
-from src.platform.runtime.channels.cli import register_cli_channel
-from src.platform.runtime.gateway_entrypoint import process_channel_input
+from src.gateway.channels.registry import ChannelRegistry
+from src.gateway.channels.cli import register_cli_channel
+from src.gateway.entrypoint import process_channel_input
 
 # Register
 registry = ChannelRegistry()
@@ -224,7 +224,7 @@ payload = process_channel_input(registry, "cli", {"text": "deploy the app", "sen
 # {"input": "deploy the app", "metadata": {"channel": "cli", "sender": "alice", "received_at": ...}}
 
 # Egress
-from src.platform.runtime.channels.cli import CLIChannel
+from src.gateway.channels.cli import CLIChannel
 channel = CLIChannel()
 output = channel.send({"output": "Done!", "metadata": {"job_id": "j-1"}})
 # {"text": "Done!", "metadata": {"job_id": "j-1"}}
@@ -258,9 +258,9 @@ curl http://localhost:8000/health
 **Programmatic usage:**
 
 ```python
-from src.platform.runtime.channels.registry import ChannelRegistry
-from src.platform.runtime.channels.web import register_web_channel
-from src.platform.runtime.gateway_entrypoint import handle_web_request
+from src.gateway.channels.registry import ChannelRegistry
+from src.gateway.channels.web import register_web_channel
+from src.gateway.entrypoint import handle_web_request
 
 # Register
 registry = ChannelRegistry()
@@ -271,13 +271,13 @@ payload = handle_web_request(registry, {"input": "deploy", "sender": "api-key-12
 # {"input": "deploy", "metadata": {"channel": "web", "sender": "api-key-123"}}
 
 # Egress
-from src.platform.runtime.channels.web import WebChannel
+from src.gateway.channels.web import WebChannel
 channel = WebChannel()
 response = channel.send({"output": "Deploying...", "metadata": {"job_id": "j-1"}})
 # {"output": "Deploying...", "metadata": {"job_id": "j-1"}}
 
 # Validate with Pydantic models
-from src.platform.runtime.channels.web import WebRequest, WebResponse
+from src.gateway.channels.web import WebRequest, WebResponse
 req = WebRequest(input="deploy", sender="alice")
 resp = WebResponse(output="ok", metadata={"job_id": "j-1"})
 ```

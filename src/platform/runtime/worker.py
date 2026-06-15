@@ -9,9 +9,9 @@ added by S4.5–S4.8.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from typing import Any
 
-from src.platform.adapter.adapter import s1_to_s2_adapter, s2_to_s1_adapter
 from src.platform.observability.logging import log_execution, log_supervisor_action as _log_supervisor_action
 from src.platform.observability.metrics import emit_metric
 from src.platform.observability.tracing import (
@@ -19,7 +19,7 @@ from src.platform.observability.tracing import (
     emit_segment_trace as _emit_segment_trace,
 )
 from src.platform.queue.queue import Queue
-from src.platform.runtime.channels.registry import ChannelRegistry
+from src.gateway.channels.registry import ChannelRegistry
 from src.platform.runtime.control_plane import ControlPlane
 from src.platform.runtime.execution_context import ExecutionContext
 from src.platform.runtime.job import Job
@@ -46,118 +46,27 @@ from src.platform.runtime.safety.degraded_mode import (
     DegradedMode,
     default_degraded_mode,
 )
-from src.platform.transport.normalization import ChannelMessage
-from src.strategy.planning.s1_contract.s1_client import call_s1_backend
-from src.strategy.planning.s1_contract.s1_real_client import ENABLE_REAL_LLM
-from src.strategy.planning.s1_contract.types import (
-    PromptRequest,
-    PromptResponse,
-    S1Error,
-)
 
+WorkExecutor = Callable[..., dict[str, Any]]
+"""Signature: ``(payload, execution_context=None, resume_token=None, **kwargs) -> dict``.
 
-def _dispatch_to_s1(
-    payload: ChannelMessage,
-    s1_request: dict[str, Any],
-    enable_real_llm: bool = False,
-) -> dict[str, Any]:
-    """Dispatch a job payload to the S1 cognitive stratum.
-
-    Builds a :class:`PromptRequest` from the channel message and sends it
-    through ``call_s1_backend()`` (simulation or real_llm backend).
-
-    Args:
-        payload:         The original ``ChannelMessage`` from the channel.
-        s1_request:      The S1 request dict from ``s2_to_s1_adapter``.
-        enable_real_llm: If ``True``, request the real LLM backend (subject
-                         to the upstream kill-switch in ``s1_real_client``).
-
-    Returns:
-        A raw output dict compatible with ``s1_to_s2_adapter``.
-    """
-    # Extract the user's input text from the normalized payload structure.
-    # ChannelMessage.input is a dict with fields like
-    # {"input": "<user text>", "metadata": {...}}.
-    raw_input: dict[str, Any] = payload.input
-    user_text: str = ""
-    if isinstance(raw_input, dict):
-        user_text = raw_input.get("input", "")
-        if not isinstance(user_text, str):
-            user_text = str(user_text)
-
-    request = PromptRequest(
-        prompt={"instruction": user_text},
-        memory={},
-        plan_context={},
-        tool_context=[
-            {
-                "name": "chat",
-                "description": "Respond to the user's message",
-                "schema": {
-                    "type": "object",
-                    "properties": {"response": {"type": "string"}},
-                },
-            },
-        ],
-    )
-
-    backend = "real_llm" if enable_real_llm else "simulation"
-    result = call_s1_backend(request, backend=backend)
-
-    if isinstance(result, S1Error):
-        return {
-            "error": result.message,
-            "error_type": result.type,
-            "s1_request": s1_request.get("input", {}),
-        }
-
-    # PromptResponse — extract the structured output
-    return {
-        "s1_output": result.output,
-        "s1_request": s1_request.get("input", {}),
-    }
-
-
-def execute_job_payload(
-    payload: ChannelMessage,
-    execution_context: dict | None = None,
-    resume_token: str | None = None,
-) -> dict[str, Any]:
-    """Execute one cognitive cycle through the adapter pipeline.
-
-    Converts the S4 payload to an S1 request via the S2→S1 adapter,
-    executes against the cognitive strata via S1 dispatch (simulation
-    or real LLM), normalises the raw output via the S1→S2 adapter,
-    and wraps the result in a multi-cycle envelope
-    ``{done, cognitive_state, memory, result}``.
-
-    Args:
-        payload:          The job payload (a ``ChannelMessage``).
-        execution_context: Opaque cognitive context (unused in stub).
-        resume_token:     Opaque cycle identifier (passthrough).
-
-    Returns:
-        A dict with keys ``done``, ``cognitive_state``, ``memory``,
-        and ``result``.
-    """
-    s1_request = s2_to_s1_adapter(payload, resume_token=resume_token)
-    raw_output = _dispatch_to_s1(
-        payload, s1_request, enable_real_llm=ENABLE_REAL_LLM
-    )
-    s2_result = s1_to_s2_adapter(raw_output)
-
-    return {
-        "done": True,
-        "cognitive_state": {},
-        "memory": {},
-        "result": s2_result,
-    }
+Implementations process a job payload and return a result dict containing
+at minimum an ``output`` key (for channel response routing).
+"""
 
 
 class Worker:
     """Processes one job per ``process_next()`` call.
 
+    The worker is a generic durable execution engine.  It does **not** know
+    about S1 (LLM), S2 (planner), or S3 (capabilities).  Work is delegated
+    to the injected ``executor`` callable, which the caller provides.
+
     Args:
+        executor:          Callable that processes job payloads.  Receives
+                           ``(payload, execution_context=None, resume_token=None,
+                           **kwargs)`` and must return a ``dict`` with at
+                           least an ``output`` key (for channel routing).
         queue:             The queue to poll for pending jobs.
         control_plane:     The ``ControlPlane`` that owns job state transitions.
         timeout_seconds:   Timeout (seconds) for a single execution attempt.
@@ -168,18 +77,20 @@ class Worker:
 
     def __init__(
         self,
+        executor: WorkExecutor,
         queue: Queue,
         control_plane: ControlPlane,
         timeout_seconds: int = 5,
         crash_recovery: CrashRecovery | None = None,
         channel_registry: ChannelRegistry | None = None,
     ) -> None:
+        self._executor = executor
         self._queue = queue
         self._cp = control_plane
         self.timeout_seconds = timeout_seconds
         self._channel_registry = channel_registry
         self._retry_wrapper = ToolRetryWrapper(
-            execute_job_payload,
+            self._executor,
             poison_detector=default_poison_detector(),
         )
         self._crash_recovery = (
@@ -221,30 +132,10 @@ class Worker:
         if channel is None:
             return
 
-        # Extract the S1 output text from the result envelope.
-        # The result structure is:
-        #   {..., "result": {"type": "s2_result", "output": {"s1_output": {...}}}}
+        # Extract the output text from the executor result dict.
+        # The executor contract requires an ``output`` key for channel routing.
         result: dict[str, Any] = job.result
-        s2_result = result.get("result", {})
-        if not isinstance(s2_result, dict):
-            return
-        s1_output: dict[str, Any] = s2_result.get("output", {}).get("s1_output", {})
-
-        # PromptResponse.output is a dict with keys like drift, reflection, etc.
-        # Try to extract a human-readable summary; fall back to the first string
-        # value found.
-        response_text: str = ""
-        if isinstance(s1_output, dict):
-            # Prefer 'reflection' as it contains the simulator's main response
-            response_text = s1_output.get("reflection", "")
-            if not response_text:
-                # Fall back to any non-empty string value
-                for val in s1_output.values():
-                    if isinstance(val, str) and val.strip():
-                        response_text = val
-                        break
-        elif isinstance(s1_output, str):
-            response_text = s1_output
+        response_text = result.get("output", "")
 
         if response_text:
             channel.send({"output": response_text, "metadata": {}})
