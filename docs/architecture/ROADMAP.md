@@ -2595,6 +2595,718 @@ class WorkflowSupervisor:
 
 ---
 
+## Refactor — Renewed Responsibility Split
+
+**Context:** After completing S5 (Agent Workflow Layer), an architectural review revealed that stratum boundaries had drifted. S2 (Planner) was coupled to S1 (Runtime) and S3 (Capabilities). S4 (Platform) contained Gateway concerns (FastAPI, transport) and routing logic it shouldn't own. The Gateway itself was embedded inside S4 with no clear boundary.
+
+**Mission:** Refactor stratum boundaries so each layer has a single, pure responsibility. S2 becomes a pure planner (call it, get a plan back). S4 becomes a generic durable execution engine (queue + worker, no routing knowledge). S5 becomes the orchestrator with a Strategy Router dispatching to S1 (direct LLM), S2 (planner), and S3 (capabilities via S4 jobs). Gateway is extracted as a standalone package with a defined boundary interface.
+
+**New architecture flow:**
+
+```
+Gateway (src/gateway/)
+  FastAPI, webhooks, WS, ChannelMessage normalization
+  Calls Platform via GatewayPlatformAdapter
+  │
+  ▼
+S4 — Platform (src/platform/)
+  Generic durable execution engine (queue + worker only)
+  Executes injected work units: tool calls, plan steps
+  No routing knowledge, no channel awareness
+  │
+  ▼
+S5 — Agent Workflow (src/agent/)
+  StrategyRouter routes:
+    llm_call → S1 Runtime (direct, sync)
+    planner_call → S2 Planner (direct, sync) → execute plan steps via S4
+    tool_call → S3 Capabilities (via S4 job)
+  │  │  │
+  ▼  ▼  ▼
+S1       S2        S3
+Runtime  Planner   Capabilities
+(LLM)    (pure)    (skills, primitives)
+```
+
+**Key principle:** S4 is a generic work-unit executor. It accepts `Job` objects, executes them via an injected `WorkExecutor` callable, handles retry/durability/dead-letter, and returns results. S4 does not interpret, route, or dispatch based on job content — that's S5's job.
+
+**Execution plan:** 7 phases, each delivered as a separate PR.
+
+---
+
+### PHASE R.1 — Gateway Extraction
+
+**Goal:** Extract Gateway from S4 into `src/gateway/` with a clean boundary interface. Gateway owns transport, ingress normalization, and external API surface. Platform no longer has any transport concern.
+
+**R.1.1 — Create Gateway Package Structure**
+
+Create `src/gateway/` as a standalone package:
+
+```
+src/gateway/
+├── __init__.py            # Exports: GatewayApp, GatewayPlatformAdapter, create_app
+├── app.py                 # FastAPI application (moved from src/platform/transport/app.py)
+│   ├── POST /run          # Accept inbound message, normalize, submit to Platform
+│   ├── GET /jobs/{job_id} # Poll job status
+│   └── health check endpoint
+├── normalization.py       # ChannelMessage normalization (moved from transport/)
+│   └── to_platform_job(message: InboundChannelMessage) -> JobRequest
+├── adapters/
+│   ├── __init__.py
+│   └── platform_adapter.py   # GatewayPlatformAdapter interface + impl
+│       class GatewayPlatformAdapter(Protocol):
+│           def submit_job(self, job: JobRequest) -> JobResult: ...
+│           def get_job_status(self, job_id: str) -> JobStatus: ...
+├── channels/              # Channel normalizers (move from src/platform/runtime/channels/)
+│   ├── __init__.py
+│   ├── discord.py
+│   ├── slack.py
+│   ├── cli.py
+│   └── webhook.py
+└── config.py              # Gateway-specific config (port, cors, etc.)
+```
+
+**R.1.2 — Define GatewayPlatformAdapter**
+
+The single boundary interface between Gateway and Platform:
+
+```python
+# src/gateway/adapters/platform_adapter.py
+from dataclasses import dataclass
+from typing import Protocol
+
+@dataclass(frozen=True)
+class JobRequest:
+    channel_type: str        # "cli" | "discord" | "slack" | "webhook"
+    message_text: str
+    user_id: str
+    metadata: dict
+
+@dataclass(frozen=True)
+class JobResult:
+    job_id: str
+    status: str              # "queued" | "running" | "completed" | "failed"
+    output: str | None = None
+    error: str | None = None
+
+class GatewayPlatformAdapter(Protocol):
+    def submit_job(self, request: JobRequest) -> JobResult: ...
+    def get_job_status(self, job_id: str) -> JobStatus: ...
+```
+
+Platform implements this adapter — Gateway never imports Platform internals.
+
+**R.1.3 — Move Files from Platform to Gateway**
+
+- `src/platform/transport/app.py` → `src/gateway/app.py`
+- `src/platform/transport/normalization.py` → `src/gateway/normalization.py`
+- `src/platform/runtime/channels/` → `src/gateway/channels/`
+- `src/platform/runtime/gateway_entrypoint.py` → `src/gateway/` (moved, not rewritten; the routing logic will be simplified in R.4)
+
+**R.1.4 — Wire Gateway via Adapter**
+
+- Gateway `app.py` imports `GatewayPlatformAdapter` (not Platform internals)
+- Platform provides the implementation during composition root setup
+- `src/platform/deployment/__main__.py` creates both and wires them
+
+**R.1.5 — Remove Old Transport from Platform**
+
+- Delete `src/platform/transport/` (all files moved, no code left)
+- Remove any now-unused imports in `src/platform/`
+- Ensure Platform has zero web/transport dependencies
+
+**R.1.6 — Update Tests**
+
+- Move transport tests from `tests/unit/platform/transport/` to `tests/unit/gateway/`
+- Adapter tests test against a mock Platform adapter
+- Verify gateway integration: `POST /run` → normalizes → calls adapter → returns result
+
+**Tests:**
+1. Gateway creates FastAPI app with correct routes
+2. `POST /run` normalizes message and calls adapter
+3. `GET /jobs/{job_id}` returns adapter result
+4. Adapter interface accepts all valid channel types
+5. Gateway does NOT import any `src.platform` internals (import lint test)
+6. CLI channel normalizer produces correct JobRequest
+7. Webhook channel normalizer produces correct JobRequest
+8. Platform implements adapter correctly
+9. Empty message returns error (validation)
+10. Malformed channel type returns error
+
+✅ Outcome: Gateway is a standalone package with a defined boundary interface. Platform has zero transport concerns.
+
+---
+
+### PHASE R.2 — S2 Purification: Remove S1 Coupling
+
+**Goal:** S2 must not call or import S1 (Runtime). S2 becomes a pure planner called on-demand via a `PlanRequest` → `PlanResult` interface. Any LLM calls needed for plan generation are injected as a callable, not owned by S2.
+
+**R.2.1 — Extract s1_contract Types to Runtime**
+
+The `src/strategy/planning/s1_contract/` directory contains S1 types (contract classes, prompts, config) that currently live in S2. Move them to Runtime:
+
+- Move `src/strategy/planning/s1_contract/s1_contract.py` → `src/runtime/interfaces/contract.py`
+- Move `src/strategy/planning/s1_contract/prompts.py` → `src/runtime/interfaces/prompts.py`
+- Leave implementation files in place with backward-compat re-exports (they'll be fixed in R.6)
+- Update any S2 imports of S1 contract types to point to `src.runtime.interfaces`
+- Update `src/runtime/interfaces/__init__.py` to re-export the moved symbols
+
+Leave a backward-compat re-export in the old location (removed in R.6):
+```python
+# src/strategy/planning/s1_contract/s1_contract.py  (temporary)
+from src.runtime.interfaces.contract import *  # re-export for backward compat
+```
+
+**R.2.2 — Extract ChatProvider as Injected Callable**
+
+`SubgoalPlanner` (and any other S2 planner) currently owns its LLM via `ChatProvider(transport=DeepSeekTransport(...))`. Change this to accept a generic `llm_complete` callable:
+
+```python
+# Before (in S2)
+class SubgoalPlanner:
+    def __init__(self):
+        self._llm = ChatProvider(transport=DeepSeekTransport())
+
+    def decompose(self, goal: str) -> list[Subgoal]:
+        prompt = self._build_decomposition_prompt(goal)
+        response = self._llm.chat(prompt)  # S2 owns LLM
+        return self._parse_subgoals(response)
+
+# After
+@dataclass
+class PlannerConfig:
+    llm_complete: Callable[[str, dict | None], str]  # injected from outside
+    max_depth: int = 3
+    max_breadth: int = 5
+
+class SubgoalPlanner:
+    def __init__(self, config: PlannerConfig):
+        self._config = config
+
+    def plan(self, request: PlanRequest) -> PlanResult:
+        prompt = self._build_decomposition_prompt(request)
+        response = self._config.llm_complete(prompt, {"type": "planning"})
+        plan = self._parse_subgoals(response)
+        return PlanResult(plan=plan, steps=plan.steps)
+```
+
+**R.2.3 — Define S2's Public Interface**
+
+S2's entire public API becomes:
+
+```python
+# src/strategy/__init__.py
+@dataclass(frozen=True)
+class PlanRequest:
+    goal: str                      # What to achieve
+    context: dict | None = None    # Available skills, constraints, history
+    skill_refs: list[str] | None = None  # Pre-resolved skill names (from S5)
+
+@dataclass(frozen=True)
+class StepNode:
+    id: str
+    description: str
+    depends_on: list[str] | None = None
+    skill_ref: str | None = None   # Symbolic reference, not a callable
+
+@dataclass(frozen=True)
+class PlanResult:
+    plan_id: str
+    goal: str
+    steps: list[StepNode]
+    reasoning: str | None = None
+
+class Planner(Protocol):
+    def plan(self, request: PlanRequest) -> PlanResult: ...
+```
+
+**R.2.4 — Update All S2 Callers**
+
+- S5's Strategy Router calls `planner.plan(request)` instead of creating SubgoalPlanner directly
+- The composition root provides `llm_complete` — extracted from S1 Runtime's `Runtime.complete()`
+- Remove all `from src.strategy.llm.*` imports from non-LLM files in S2
+- Tests use a mock `llm_complete` that returns canned plans
+
+**Tests:**
+1. SubgoalPlanner.plan() returns PlanResult with correct structure
+2. SubgoalPlanner uses injected llm_complete (verify via mock)
+3. PlanRequest with empty goal returns empty plan (no crash)
+4. PlanRequest with context passes context to llm_complete
+5. PlanRequest with skill_refs produces steps referencing those skills
+6. Depth limit enforced (SubgoalPlanner respects max_depth)
+7. Breadth limit enforced (SubgoalPlanner respects max_breadth)
+8. Planner protocol accepts both SubgoalPlanner and mock
+9. S2 no longer imports any `src.runtime` or `src.strategy.llm` (import lint test)
+10. PlanResult is frozen (immutable)
+
+✅ Outcome: S2 is a pure planner. It receives requests, returns plans. No S1 coupling. No LLM ownership.
+
+---
+
+### PHASE R.3 — S2 Purification: Remove S3 Coupling
+
+**Goal:** S2 must not call or import S3 (Capabilities). The `S3Adapter` that lets S2 discover and execute skills is removed. S2 plans use symbolic skill references only. S5 resolves those references when executing plan steps.
+
+**R.3.1 — Remove S3Adapter from SubgoalPlanner**
+
+`SubgoalPlanner` currently calls `S3Adapter.discover()` to find available skills during planning. This creates an implicit dependency on S3 being running and accessible. Instead:
+
+- SubgoalPlanner receives skill info *already resolved* via `PlanRequest.skill_refs`
+- S5 discovers skills from S3 *before* calling S2 to plan
+- SubgoalPlanner can reference skills by name in plan steps, but it doesn't call S3
+
+```python
+# Before (in SubgoalPlanner)
+def decompose(self, goal: str) -> list[Subgoal]:
+    available = self._s3_adapter.discover()  # calls S3
+    for skill in available:
+        ...
+
+# After
+def plan(self, request: PlanRequest) -> PlanResult:
+    # request.skill_refs already has the available skill names
+    for skill_name in (request.skill_refs or []):
+        ...
+```
+
+Delete `src/strategy/planning/adapters/s3_adapter.py` and the `adapters/` directory if empty.
+
+**R.3.2 — Remove S3Adapter from PlanExecutor**
+
+The `PlanExecutor` (in S2) currently calls `S3Adapter.call_skill()` to execute plan steps. This moves to S5:
+
+- S5's Strategy Router receives a plan from S2
+- For each plan step that has a `skill_ref`, S5 routes it via `route_to_capabilities(step) → S3 execution → submit as S4 job`
+- PlanExecutor in S2 becomes unnecessary — mark for removal in R.5
+
+```python
+# src/strategy/planning/executor.py — before
+class PlanExecutor:
+    def __init__(self, s3_adapter: S3Adapter):
+        self._s3 = s3_adapter
+    
+    def execute_step(self, step: StepNode) -> StepResult:
+        return self._s3.call_skill(step.skill_ref, step.params)
+
+# After — REMOVED
+# Skill execution responsibility moved to S5 Strategy Router → S3 via S4 jobs
+```
+
+**R.3.3 — Update S2 Types to Use Symbolic References Only**
+
+- `StepNode.skill_ref` is a `str` (skill name), not a callable or adapter reference
+- S2 has zero import of `src.capabilities.*`
+- Config types in S2 that reference S3 config are cleaned up
+
+**Tests:**
+1. S2 can produce a plan with valid skill references without calling S3
+2. PlanRequest with skill_refs=["fetch", "search"] produces steps referencing those skills
+3. PlanRequest with empty skill_refs produces plan with no skill references
+4. S2 does not import `src.capabilities.*` anywhere (import lint test)
+5. SubgoalPlanner works without S3Adapter entirely
+6. Plans with symbolic skill refs round-trip through serialization
+
+✅ Outcome: S2 has zero S3 coupling. Plans use symbolic skill references resolved by S5.
+
+---
+
+### PHASE R.4 — S4 Slimming
+
+**Goal:** S4 becomes a generic durable execution engine. It accepts `Job` submissions, executes them, and returns results — it does not interpret, route, or dispatch based on job content. The worker is a generic executor with no knowledge of S1, S2, S3, or S5.
+
+**R.4.1 — Remove S1 Dispatch from Worker**
+
+`src/platform/runtime/worker.py` currently imports `call_s1_backend` and dispatches to S1. This routing knowledge does not belong in S4.
+
+```python
+# Before — worker.py
+from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+
+def _dispatch_to_s1(job: Job) -> JobResult:
+    response = call_s1_backend(job.payload)
+    return JobResult(job_id=job.id, status="completed", output=response)
+
+def execute_job(self, job: Job) -> JobResult:
+    if job.type == "llm_call":
+        return self._dispatch_to_s1(job)
+    elif job.type == "capability_call":
+        return self._dispatch_to_capability(job)
+    ...
+```
+
+Replace with a generic executor interface:
+
+```python
+# After — worker.py
+from typing import Callable, Any
+
+WorkExecutor = Callable[[dict[str, Any]], dict[str, Any]]
+
+class Worker:
+    """Generic durable execution worker. Does not know about S1, S3, or routing."""
+    
+    def __init__(self, job_store: JobStore, queue: Queue, executor: WorkExecutor):
+        self._job_store = job_store
+        self._queue = queue
+        self._executor = executor  # Injected, not owned
+    
+    def run(self) -> None:
+        while True:
+            job = self._queue.dequeue()
+            if job is None:
+                break
+            try:
+                result = self._executor(job.payload)  # Pure execution
+                self._job_store.complete(job.id, result)
+            except Exception as e:
+                self._job_store.fail(job.id, str(e))
+```
+
+The `WorkExecutor` callable is provided by the composition root (in S5 or Gateway) — S4 never knows what it executes.
+
+**R.4.2 — Move gateway_entrypoint.py Routing to Gateway**
+
+`src/platform/runtime/gateway_entrypoint.py` is pure gateway logic (it routes inbound messages to channels). Move it to `src/gateway/`:
+
+- `src/platform/runtime/gateway_entrypoint.py` → `src/gateway/entrypoint.py`
+- Remove any `src.platform.runtime` imports from the moved file
+- The Gateway now calls `GatewayPlatformAdapter.submit_job()` instead of routing internally
+
+**R.4.3 — Clean Up Platform**
+
+- Remove `src/platform/runtime/channels/` (moved to Gateway in R.1)
+- Remove `src/platform/transport/` (already moved in R.1)
+- Remove `src/platform/runtime/gateway_entrypoint.py` (moved)
+- Verify Platform has: `queue/`, `worker.py`, `job_store/`, `supervisor/`, `retry/` — nothing else
+- Platform's `__init__.py` exports only `Job`, `JobResult`, `JobStore`, `Queue`, `Worker`
+
+**Tests:**
+1. Worker calls injected executor with job payload
+2. Worker completes job on success
+3. Worker fails job on exception
+4. Worker handles empty queue gracefully
+5. Worker respects retry config
+6. WorkExecutor callable can be mocked
+7. Platform does not import `src.agent.*`, `src.strategy.*`, `src.capabilities.*`, `src.runtime.*` (import lint test)
+8. Platform's public API contains only: Job, JobResult, JobStore, Queue, Worker
+9. Job submission returns immediately (fire-and-forget with status tracking)
+10. JobStatus polling returns correct state
+
+✅ Outcome: S4 is a generic durable execution engine. No routing, no dispatch, no stratum awareness. The composition root wires the executor.
+
+---
+
+### PHASE R.5 — S5 Strategy Router
+
+**Goal:** S5 owns a `StrategyRouter` that dispatches workflow outcomes to the correct layer. Three routes: `llm_call → S1 Runtime`, `planner_call → S2 Planner`, `tool_call → S3 via S4 job`. The Supervisor no longer calls S1 directly.
+
+**R.5.1 — Create StrategyRouter**
+
+```python
+# src/agent/strategy_router.py
+
+from dataclasses import dataclass
+from typing import Callable, Any
+
+@dataclass(frozen=True)
+class RouterOutcome:
+    type: str           # "llm_call" | "planner_call" | "tool_call"
+    payload: dict
+
+class StrategyRouter:
+    """Routes workflow outcomes to the correct execution layer."""
+    
+    def __init__(
+        self,
+        runtime: Runtime,                    # S1 — direct LLM calls
+        planner: Planner,                    # S2 — plan generation
+        capabilities: CapabilityManager,     # S3 — skill discovery/execution
+        submit_s4_job: Callable,             # S4 — durable execution
+    ):
+        self._runtime = runtime
+        self._planner = planner
+        self._capabilities = capabilities
+        self._submit_s4_job = submit_s4_job
+    
+    def route(self, outcome: RouterOutcome) -> StepResult:
+        match outcome.type:
+            case "llm_call":
+                return self._route_to_llm(outcome)
+            case "planner_call":
+                return self._route_to_planner(outcome)
+            case "tool_call":
+                return self._route_to_capabilities(outcome)
+            case unknown:
+                raise ValueError(f"Unknown route: {unknown}")
+```
+
+**R.5.2 — Implement `route_to_llm()`**
+
+```python
+def _route_to_llm(self, outcome: RouterOutcome) -> StepResult:
+    """Direct, synchronous LLM call via S1 Runtime."""
+    response = self._runtime.complete(
+        prompt=outcome.payload["prompt"],
+        context=outcome.payload.get("context"),
+        config=outcome.payload.get("config"),
+    )
+    return StepResult(
+        step_id=outcome.payload["step_id"],
+        output=response.text,
+        tool_calls=response.tool_calls,
+    )
+```
+
+This is direct — no queue, no durability. LLM calls are fast and synchronous.
+
+**R.5.3 — Implement `route_to_planner()`**
+
+```python
+def _route_to_planner(self, outcome: RouterOutcome) -> StepResult:
+    """Generate a plan via S2, then submit plan steps as S4 jobs."""
+    # 1. Discover available skills first
+    available = self._capabilities.discover()
+    
+    # 2. Call S2 planner
+    plan = self._planner.plan(PlanRequest(
+        goal=outcome.payload["goal"],
+        context=outcome.payload.get("context"),
+        skill_refs=[s.name for s in available],
+    ))
+    
+    # 3. Submit each plan step as an S4 job for durable execution
+    job_ids = []
+    for step in plan.steps:
+        job = self._submit_s4_job({
+            "type": "plan_step",
+            "plan_id": plan.plan_id,
+            "step_id": step.id,
+            "skill_ref": step.skill_ref,
+            "params": outcome.payload.get("params", {}),
+        })
+        job_ids.append(job.job_id)
+    
+    return StepResult(
+        step_id=outcome.payload["step_id"],
+        output=f"Plan created: {len(plan.steps)} steps, {len(job_ids)} jobs submitted",
+        metadata={"plan_id": plan.plan_id, "job_ids": job_ids},
+    )
+```
+
+**R.5.4 — Implement `route_to_capabilities()`**
+
+```python
+def _route_to_capabilities(self, outcome: RouterOutcome) -> StepResult:
+    """Execute a tool/skill call via S3, submitted as an S4 job for durability."""
+    job = self._submit_s4_job({
+        "type": "tool_call",
+        "skill_name": outcome.payload["skill_name"],
+        "arguments": outcome.payload["arguments"],
+    })
+    return StepResult(
+        step_id=outcome.payload["step_id"],
+        output=f"Tool call submitted as job {job.job_id}",
+        metadata={"job_id": job.job_id},
+    )
+```
+
+**R.5.5 — Wire StrategyRouter into Supervisor**
+
+- Replace two direct `call_runtime_backend()` call sites in `supervisor.py` (lines ~312 and ~774) with `self._strategy_router.route(outcome)`
+- The `StepOutcome` type in supervisor maps to `RouterOutcome`:
+  - `DEST_RUNTIME` → `RouterOutcome("llm_call", ...)`
+  - New `DEST_PLANNER` → `RouterOutcome("planner_call", ...)`
+  - New `DEST_CAPABILITY` → `RouterOutcome("tool_call", ...)`
+- Remove old `call_runtime_backend` import from supervisor
+- Update `src/agent/router.py` to include the two new destination types
+
+```python
+# src/agent/router.py
+DEST_RUNTIME = "runtime"        # LLM call (S1)
+DEST_PLANNER = "planner"        # Plan generation (S2) — NEW
+DEST_CAPABILITY = "capability"  # Skill execution (S3) — NEW
+```
+
+**R.5.6 — Remove Old Direct Dispatch**
+
+- Remove the old `_call_s1_backend` / `call_runtime_backend` code from supervisor
+- The Strategy Router is now the single dispatch point for all three action types
+- Update supervisor's `_handle_step_completion` to use the router
+
+**Tests:**
+1. StrategyRouter routes `llm_call` to Runtime.complete()
+2. StrategyRouter routes `planner_call` to Planner.plan()
+3. StrategyRouter routes `tool_call` to submit_s4_job()
+4. Unknown outcome type raises ValueError
+5. route_to_llm passes prompt and context correctly
+6. route_to_planner discovers skills before calling planner
+7. route_to_planner submits correct number of S4 jobs
+8. route_to_capabilities submits correct job payload
+9. Supervisor no longer imports `call_runtime_backend` (import lint test)
+10. Supervisor produces correct RouterOutcome from StepOutcome
+11. Full cycle: supervisor → StrategyRouter → S1 → response
+12. Full cycle: supervisor → StrategyRouter → S2 → plan → S4 jobs
+
+✅ Outcome: S5 has a single dispatch point for LLM calls, planning, and capability execution. Supervisor is clean.
+
+---
+
+### PHASE R.6 — Wiring + Tests
+
+**Goal:** Update the composition root, fix all imports across the project, run all test suites, and fix any regressions.
+
+**R.6.1 — Update Composition Root**
+
+`src/platform/deployment/__main__.py` creates and wires all strata. Update it:
+
+```python
+# src/platform/deployment/__main__.py
+
+def create_application() -> Application:
+    # 1. Create S1 Runtime
+    runtime = TransportRuntime(config=runtime_config)
+    
+    # 2. Create S2 Planner with injected llm_complete
+    planner = SubgoalPlanner(PlannerConfig(
+        llm_complete=runtime.complete,  # S1 injected into S2
+        max_depth=3,
+        max_breadth=5,
+    ))
+    
+    # 3. Create S3 Capabilities
+    capabilities = CapabilityManager()
+    
+    # 4. Create S4 Platform (generic durable execution)
+    job_store = InMemoryJobStore()
+    queue = InMemoryQueue()
+    
+    # The S4 executor wraps capability calls + plan steps
+    def s4_executor(payload: dict) -> dict:
+        match payload.get("type"):
+            case "tool_call":
+                return capabilities.execute(payload["skill_name"], payload["arguments"])
+            case "plan_step":
+                return capabilities.execute(payload["skill_ref"], payload["params"])
+            case _:
+                return capabilities.execute_raw(payload)
+    
+    worker = Worker(job_store=job_store, queue=queue, executor=s4_executor)
+    
+    # 5. Create S5 Strategy Router
+    router = StrategyRouter(
+        runtime=runtime,
+        planner=planner,
+        capabilities=capabilities,
+        submit_s4_job=lambda payload: PlatformAdapter.submit_job(queue, payload),
+    )
+    
+    # 6. Create S5 Supervisor
+    supervisor = WorkflowSupervisor(strategy_router=router)
+    
+    # 7. Create Gateway
+    gateway = create_gateway_app(
+        platform_adapter=PlatformAdapter(queue=queue, job_store=job_store)
+    )
+    
+    return Application(gateway=gateway, worker=worker, supervisor=supervisor)
+```
+
+**R.6.2 — Fix All Imports**
+
+Audit and fix every file that imports from the old locations:
+- Files importing from `src.strategy.planning.s1_contract.*` → `src.runtime.interfaces.*`
+- Files importing from `src.platform.transport.*` → `src.gateway.*`
+- Files importing from `src.platform.runtime.channels.*` → `src.gateway.channels.*`
+- Files importing from `src.strategy.planning.adapters.*` → remove (no longer exists)
+- Files importing `call_s1_backend` or `call_runtime_backend` → `StrategyRouter` or `Runtime.complete()`
+- Files importing old worker dispatch functions → update to new generic worker
+
+```bash
+grep -r "s1_contract\|s1_client\|s1_real_client\|call_s1_backend\|call_runtime_backend" src/ tests/
+# Fix all matches
+```
+
+**R.6.3 — Run Test Suites**
+
+```bash
+cd C:\Users\mikut\Code\vai-core
+python -m pytest tests/ -x --tb=short 2>&1
+```
+
+Fix regressions iteratively:
+1. Gateway tests pass
+2. S2 planner tests pass (with mock llm_complete)
+3. S4 worker tests pass (with mock executor)
+4. S5 supervisor+tests pass (with mock StrategyRouter)
+5. S3 capability tests pass (no changes expected)
+6. Integration tests pass
+7. CLI smoke test: `python -m tools.agent.cli_app`
+
+**R.6.4 — Clean Up Backward-Compat Re-exports**
+
+Remove the temporary re-exports added in R.2.1:
+- Delete `src/strategy/planning/s1_contract/` directory (now empty)
+- Delete `src/strategy/planning/adapters/` directory (now empty)
+- Update `src/strategy/__init__.py` to remove old exports
+
+**Tests:**
+1. Composition root creates all components without error
+2. Full end-to-end: Gateway → Platform → S5 → StrategyRouter → S1/S2/S3
+3. Import audit: zero imports from old locations
+4. All stratum boundary tests pass (import lint tests)
+
+✅ Outcome: Everything is wired correctly. All tests pass. No dead backward-compat code.
+
+---
+
+### PHASE R.7 — Documentation
+
+**Goal:** Update ARCHITECTURE.md to reflect the refactored stratum boundaries. Clean up any remaining dead code.
+
+**R.7.1 — Update ARCHITECTURE.md**
+
+- Update stratum descriptions:
+  - S4: "Generic Durable Execution Engine" (was "Platform Runtime")
+  - S5: "Agent Workflow Orchestrator" with Strategy Router description
+  - Gateway: New standalone package description
+  - S2: "Pure Planner" — no longer owns LLM or capabilities
+  - S1: "Runtime — Cross-Cutting LLM Service"
+- Update the flow diagram at the top to show the new architecture
+- Update the Responsibility Table
+- Add Gateway/Platform adapter interface documentation
+- Add StrategyRouter to the S5 interface documentation
+
+**R.7.2 — Remove Dead Code**
+
+- `src/strategy/planning/adapters/` — empty or deleted
+- `src/strategy/planning/s1_contract/` — empty or deleted  
+- `src/platform/transport/` — moved to Gateway
+- `src/platform/runtime/channels/` — moved to Gateway
+- `src/platform/runtime/gateway_entrypoint.py` — moved to Gateway
+- Any backward-compat stubs left over from R.6.4
+
+**R.7.3 — Final Verification**
+
+```bash
+# Full test suite
+python -m pytest tests/ -x --tb=short
+
+# Lint / type check
+python -m mypy src/ 2>&1 | head -20
+
+# Import audit — verify clean boundaries
+grep -r "from src.platform" src/gateway/  # Should be zero matches (except adapter)
+grep -r "from src.capabilities" src/strategy/  # Should be zero matches
+grep -r "from src.strategy.llm" src/strategy/  # Should be zero matches
+grep -r "call_s1_backend" src/  # Should be zero matches
+
+# CLI smoke test
+python -m tools.agent.cli_app --help
+```
+
+✅ Outcome: Documentation reflects the refactored architecture. Dead code is removed. All tests and checks pass.
+
+---
+
 ## Runtime — Cross-Cutting LLM Service
 
 Runtime is not a stratum — it is a service used by S5 and S2.
