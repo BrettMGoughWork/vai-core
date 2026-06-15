@@ -9,95 +9,61 @@ External world (CLI, HTTP, WebSocket, webhook, cron, timer)
      ▼
 ┌──────────────────────────────────────────────────────┐
 │  Gateway  (ingress/egress, channels, transport,      │
-│            FastAPI, S5 interface)                    │
+│            FastAPI, S5 adapter interface)            │
 │                                                      │
-│  Channel adapters normalise inbound events into      │
-│  ChannelMessages and forward them to S4.             │
+│  Channels normalise inbound events and hand off      │
+│  to S5 via AgentGatewayAdapter.                      │
 │  No knowledge of workflows, agents, or S6.           │
-└──────────────────────────────────────────────────────┘
-     │
-     ▼
+│  Channels stay in Gateway — they are plumbing.       │
+└──────────────────────┬───────────────────────────────┘
+                       │  AgentGatewayAdapter.ingest()
+                       ▼
 ┌──────────────────────────────────────────────────────┐
-│  S4 — Platform (universal ingress)                   │
+│  S5 — Agents  (cognitive loop)                       │
 │                                                      │
-│  Job system, event substrate, worker pool,           │
-│  supervision, durability, observability              │
+│  Agent registry, activation, routing, strategy,      │
+│  capabilities.                                       │
+│  Plan → execute → observe.                           │
 │                                                      │
-│  S4 wraps everything in jobs → queue → worker        │
-│  execution. It provides durability, fan-in/fan-out,  │
-│  and backpressure.                                   │
-└──────────────────────────────────────────────────────┘
-     │
-     ├────────────────────────────────────┐
-     ▼                                    ▼
-┌──────────────────┐          ┌──────────────────────┐
-│ S5 — Agents      │          │  S6 — Workflow Engine │
-│                   │          │                       │
-│ Agent registry,   │          │ Trigger router        │
-│ activation,       │          │ subscribes to S4      │
-│ routing,          │          │ events, identifies    │
-│ strategy,         │          │ workflow triggers,    │
-│ capabilities      │          │ starts/resumes        │
-│                   │          │ workflows.            │
-│ S5 handles the    │          │                       │
-│ cognitive loop —  │          │ Workflow definition   │
-│ plan → execute    │          │ model, state machine, │
-│ → observe.        │          │ agent selection,      │
-│                   │          │ user interaction.     │
-│ Interfaces with   │          │                       │
-│ S3 capabilities   │          │ S6 is pure            │
-│ for tool calls.   │          │ orchestration —       │
-│                   │          │ no transport,          │
-│                   │          │ no channels.          │
-└──────────────────┘          └──────────────────────┘
-     │                                    │
-     └──────────────┬─────────────────────┘
-                    ▼
-          ┌──────────────────────┐
-          │  S3 — Capabilities   │
-          │                       │
-          │  Primitives, skills,  │
-          │  discovery, ranking,  │
-          │  quarantine           │
-          └──────────────────────┘
-                    │
-                    ▼
-          ┌──────────────────────┐
-          │  S2 — Strategy       │
-          │                       │
-          │  Pure cognitive       │
-          │  function: planning,  │
-          │  task decomposition,  │
-          │  state management.   │
-          │  No I/O, no side     │
-          │  effects.            │
-          └──────────────────────┘
-                    │
-                    ▼
-          ┌──────────────────────┐
-          │  S1 — Runtime        │
-          │                       │
-          │  Execution engine,    │
-          │  retry, panic guard,  │
-          │  degraded mode,       │
-          │  recovery             │
-          └──────────────────────┘
+│  ┌────────────────────────────────────────────────┐  │
+│  │  Workflow Engine                               │  │
+│  │                                                │  │
+│  │  Trigger router, definition model, state       │  │
+│  │  machine, agent selection, user interaction.   │  │
+│  │  Pure orchestration — no transport/channels.   │  │
+│  └────────────────────────────────────────────────┘  │
+└──────┬──────────┬──────────┬──────────┬──────────────┘
+       │          │          │          │
+       │ llm_call │ plan     │ tool     │ durable job
+       ▼          ▼          ▼          ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐
+│ S1 — LLM │ │ S2 —     │ │ S3 —     │ │ S4 — Platform  │
+│ Runtime  │ │ Strategy │ │ Capab.   │ │                │
+│          │ │          │ │          │ │ Job system,    │
+│ LLM      │ │ Planning,│ │ Skills,  │ │ event substrate│
+│ transport│ │ task     │ │ prim.,   │ │ worker pool,   │
+│ exec     │ │ decompos │ │ discov., │ │ durability,    │
+│ engine,  │ │ state    │ │ ranking  │ │ supervision,   │
+│ config   │ │ (pure    │ │          │ │ observability  │
+│          │ │ function)│ │          │ │                │
+└──────────┘ └──────────┘ └──────────┘ └────────────────┘
 ```
 
 **Strata summary:**
-- **Gateway** — Ingress/egress: FastAPI, channel adapters (CLI, HTTP, WebSocket, webhook), transport layer, normalisation. Connects to S5 for dispatch. No knowledge of workflows or agents internally.
-- **S1** — Foundation: config, LLM transport, types, execution engine, governance, observability, policy, telemetry
-- **S2** — Strategy: planning, task decomposition, continuity, state management (pure function, no I/O)
-- **S3** — Capabilities: primitives, skills, discovery, filtering, ranking, quarantine
-- **S4** — Platform: job system, event substrate, worker pool, supervision, durability, observability. Universal ingress — wraps everything in jobs for reliable execution.
-- **S5** — Agents: agent registry, activation, routing, strategy+capabilities integration, cognitive loop (plan → execute → observe).
-- **S6** — Workflow Engine (future): trigger router subscribes to S4 events, workflow definition model, state machine, agent selection, user interaction.
+- **Gateway** — Ingress/egress: FastAPI, channel adapters (CLI, HTTP, WebSocket, webhook), transport layer, normalisation. Hands off to S5 via `AgentGatewayAdapter`. Channels stay in Gateway — they are pure plumbing with no knowledge of workflows or agents.
+- **S1** — Foundation: config, LLM transport, types, execution engine, governance, observability, policy, telemetry. Called by S5 for LLM invocations.
+- **S2** — Strategy: planning, task decomposition, continuity, state management (pure function, no I/O). Called by S5 for cognitive planning.
+- **S3** — Capabilities: primitives, skills, discovery, filtering, ranking, quarantine. Called by S5 for tool execution.
+- **S4** — Platform: job system, event substrate, worker pool, supervision, durability, observability. Receives durable job submissions from S5 when work needs async/reliable execution.
+- **S5** — Agents: agent registry, activation, routing, strategy+capabilities integration, cognitive loop (plan → execute → observe). Directly calls S1, S2, S3, and submits durable work to S4.
+- **S6** — Workflow Engine (within S5): trigger router, workflow definition model, state machine, agent selection, user interaction. Pure orchestration layer embedded inside S5 — no transport, no channels.
 
 **Key architectural properties:**
-- **Gateway is the single entry point** for all external stimuli. Channels live in the gateway — they normalise inbound events into ChannelMessages and forward them to S4.
-- **S4 is the universal job system** — it wraps everything in jobs, provides durability, and is the substrate for future fan-in/fan-out for multi-step workflows.
+- **Gateway is the single entry point** for all external stimuli. Channels live in the gateway — they normalise inbound events and hand off to S5 via `AgentGatewayAdapter`.
+- **S5 is the cognitive loop** (plan → execute → observe). It directly calls S1 (LLM), S2 (planning), S3 (capabilities), and submits durable work to S4.
+- **S6 is embedded within S5** — the workflow engine is S5's internal orchestration layer for multi-step workflows.
+- **S4 is the durable job system** — S5 submits work to S4 when it needs reliability, fan-in/fan-out, or async processing. S4 does not mediate interactive request/response.
 - **S4 must not depend on S2, S5, or S6**. Platform is infrastructure — it cannot import cognition or agent layers.
-- **S5 is the cognitive loop** (plan → execute → observe). Gateway interfaces with S5 for dispatch.
 - **S2 is pure**. No I/O, no tool calls, no side effects. Identical inputs → identical outputs.
 - **Config is immutable after load**. Frozen at startup, never mutated at runtime.
 - **No silent fallback**. Every code path either succeeds or fails explicitly.

@@ -67,6 +67,9 @@ STRATUM_RULES: list[tuple[str, str]] = [
     ("platform\\telemetry", "infrastructure"),
     ("platform/observability", "infrastructure"),
     ("platform\\observability", "infrastructure"),
+    # Gateway (S4 transport entry-point)
+    ("gateway/", "infrastructure"),
+    ("gateway\\", "infrastructure"),
     # ── S2 — domain ──
     ("strategy/types", "domain"),
     ("strategy\\types", "domain"),
