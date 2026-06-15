@@ -52,7 +52,7 @@ from src.agent.interfaces.agent_state_store import AgentStateStore
 from src.agent.job_interface import JobDispatchResult, dispatch_route
 from src.agent.registry import AgentRegistry, AgentNotFoundError
 from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
-from src.agent.workflow import WorkflowEngine, WorkflowRegistry
+from src.agent.workflow import WorkflowEngine, WorkflowInstanceStore, WorkflowRegistry
 from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.agent.workflow.user_interaction import UserInteractionManager
 from src.agent.strategy_router import RouterOutcome, StrategyRouter
@@ -100,6 +100,7 @@ class Supervisor:
         *,
         submit_job_callable: Optional[Callable[[Any], str]] = None,
         workflow_registry: Optional[WorkflowRegistry] = None,
+        workflow_instance_store: Optional[WorkflowInstanceStore] = None,
         interaction_manager: Optional[UserInteractionManager] = None,
         strategy_router: Optional[StrategyRouter] = None,
         auto_persist: bool = True,
@@ -108,6 +109,7 @@ class Supervisor:
         self._store = store
         self._submit_job = submit_job_callable
         self._workflow_registry = workflow_registry
+        self._workflow_store = workflow_instance_store or WorkflowInstanceStore()
         self._interaction_manager = interaction_manager
         self._strategy_router = strategy_router or StrategyRouter()
         self._auto_persist = auto_persist
@@ -684,9 +686,12 @@ class Supervisor:
         """
         iteration = 0
 
+        wf_store = self._workflow_store
+
         while iteration < self._WF_MAX_ITERATIONS:
             iteration += 1
             wf_state, outcome = engine.step(wf_state)
+            wf_store.save(wf_state)
 
             # ── Deterministic transitions ──────────────────────────
             if outcome.type == "continue":
@@ -762,6 +767,7 @@ class Supervisor:
                     wf_state, _ = engine.fail_step(
                         wf_state, outcome.step_id, result["error"],
                     )
+                wf_store.save(wf_state)
                 continue
 
             # ── Tool execute → dispatch to S4B → WAITING ──────────
@@ -809,6 +815,7 @@ class Supervisor:
                     wf_state, outcome.step_id,
                     "tool_execute dispatched zero jobs",
                 )
+                wf_store.save(wf_state)
                 continue
 
             # ── User input → WAITING ───────────────────────────────
@@ -855,6 +862,7 @@ class Supervisor:
                         wf_state, outcome.step_id,
                         f"sub-workflow {sub_id!r}: {exc}",
                     )
+                wf_store.save(wf_state)
                 continue
 
             # ── Unreachable guard ───────────────────────────────────

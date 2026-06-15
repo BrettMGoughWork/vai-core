@@ -3344,6 +3344,119 @@ S5 Supervisor (src/agent/)
 
 ---
 
+### 📋 PHASE R.9 — WorkflowOps: Operational Workflow Management
+
+**Goal:** Add centralized operational visibility and management for all running workflow instances. Currently, workflow state is embedded inside each `AgentState.supervisor_metadata` — there is no way to list, inspect, cancel, or retry workflows across agents. This phase adds a `WorkflowInstanceStore` for persistence, and a `WorkflowOps` API for operations teams.
+
+**Rationale:** This replaces the old S5.11 (Workflow Supervisor) with a design matching the refactored architecture. The Agent Runtime Supervisor already manages workflow execution within an agent; `WorkflowOps` provides the **cross-agent operational view** that's missing.
+
+```
+┌─────────────────────────────────────────────────┐
+│            WorkflowOps (src/agent/workflow/)    │
+│                                                 │
+│  list_instances()  ────► WorkflowInstanceStore  │
+│  get_instance()    ────► WorkflowInstanceStore  │
+│  cancel_instance() ────► WorkflowInstanceStore  │
+│                         + WorkflowEngine         │
+│  retry_instance()  ────► WorkflowInstanceStore  │
+│                         + WorkflowEngine         │
+│  dead_letter_queue()───► WorkflowInstanceStore  │
+│  metrics()         ────► WorkflowInstanceStore  │
+│                                                 │
+│  Agent Supervisor writes to store on each       │
+│  state transition (create, step, complete,      │
+│  fail, cancel)                                  │
+└─────────────────────────────────────────────────┘
+```
+
+**Steps:**
+
+| Step | What | Files |
+|------|------|-------|
+| R.9.1 | WorkflowInstanceStore — persistent store | `src/agent/workflow/instance_store.py` (new) |
+| R.9.2 | WorkflowOps — management API | `src/agent/workflow/ops.py` (new) |
+| R.9.3 | Wire store updates into Supervisor | `src/agent/supervisor.py` (updated) |
+| R.9.4 | Unit tests | `tests/unit/agent/workflow/test_instance_store.py`, `tests/unit/agent/workflow/test_ops.py` (new) |
+| R.9.5 | Architecture doc + README update | `README.md`, `docs/architecture/ARCHITECTURE.md` (updated) |
+
+**R.9.1 — WorkflowInstanceStore**
+
+```python
+class WorkflowInstanceStore:
+    """Persistent store for workflow instances — indexed by execution_id,
+    workflow_id, and status. Used by WorkflowOps for cross-agent queries."""
+
+    def save(self, instance: WorkflowExecutionState) -> None: ...
+    def get(self, execution_id: str) -> WorkflowExecutionState | None: ...
+    def list_instances(
+        self, *, workflow_id: str | None = None, status: WorkflowStatus | None = None,
+    ) -> list[WorkflowExecutionState]: ...
+    def delete(self, execution_id: str) -> bool: ...
+```
+
+Default implementation uses an in-memory dict (sufficient for single-process deployments). A SQLite implementation is a future extension.
+
+**R.9.2 — WorkflowOps**
+
+```python
+class WorkflowOps:
+    """Operational management API for workflow instances.
+    
+    Provides the cross-agent view that ops teams need — list all workflows,
+    inspect a specific run, cancel or retry failed instances, check the
+    dead-letter queue, and see aggregate metrics.
+    """
+
+    def __init__(self, store: WorkflowInstanceStore, engine: WorkflowEngine): ...
+
+    def list_instances(self, state: str | None = None) -> list[WorkflowExecutionState]:
+        # Filter by optional state; sorted by created_at desc
+
+    def get_instance(self, execution_id: str) -> WorkflowExecutionState | None:
+        # Full detail: step_history (via step_results), context, error
+
+    def cancel_instance(self, execution_id: str) -> bool:
+        # Cancel a running/paused workflow via engine.cancel(), persist
+
+    def retry_instance(self, execution_id: str) -> bool:
+        # Reset a failed workflow: status=RUNNING, error=None, persist
+        # Caller must re-invoke the supervisor loop separately
+
+    def dead_letter_queue(self) -> list[WorkflowExecutionState]:
+        # Instances with status=FAILED (in-memory store) or
+        # instances past retry limits (future: with retry_count tracking)
+
+    def metrics(self) -> dict:
+        # Counts by state, avg duration, failure rate
+        # Return: {"active": 5, "completed": 100, "failed": 3, "avg_duration_ms": 450}
+```
+
+**R.9.3 — Supervior Wiring**
+
+The Agent Runtime `Supervisor._run_workflow_loop()` already handles workflow state transitions. The wiring adds:
+
+1. Accept an optional `workflow_ops: WorkflowOps` parameter in `Supervisor.__init__`
+2. After each engine transition (start, step, resume, fail, cancel), call `store.save()` with the new state
+3. When a workflow completes or fails, the store entry is updated (not deleted — history is preserved)
+4. This is a write-through pattern — every state transition persists immediately
+
+**Write tests:**
+
+1. `WorkflowInstanceStore` — save, get, list (all / by status / by workflow_id), delete
+2. `WorkflowOps.list_instances()` — returns correct count and items
+3. `WorkflowOps.get_instance()` — returns full state including step_results and error
+4. `WorkflowOps.cancel_instance()` — cancels via engine, persists, returns True
+5. `WorkflowOps.cancel_instance()` — non-existent ID returns False
+6. `WorkflowOps.retry_instance()` — resets failed instance, persists, returns True
+7. `WorkflowOps.retry_instance()` — non-failed instance returns False
+8. `WorkflowOps.dead_letter_queue()` — returns only FAILED instances
+9. `WorkflowOps.metrics()` — correct counts for mixed-state instances
+10. Supervisor wiring — state transitions propagate to store (integration)
+
+✅ **Outcome:** Operations team can observe, manage, and debug running workflows across all agents. Each state transition is recorded in the instance store. The Agent Runtime Supervisor remains the execution orchestrator — WorkflowOps is purely an operational view.
+
+---
+
 ## Runtime — Cross-Cutting LLM Service
 
 Runtime is not a stratum — it is a service used by S5 and S2.
