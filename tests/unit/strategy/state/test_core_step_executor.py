@@ -13,7 +13,7 @@ from src.strategy.state.step_outcome import StepOutcome, classify_step
 from src.strategy.state.isdone import isdone
 from src.strategy.state.config import AgentConfig, LoopPolicyConfig
 from src.strategy.state.state import ConversationState
-from src.strategy.llm.types import CoreLLMResponse
+from src.runtime.llm.types import CoreLLMResponse
 from src.strategy.types.result import CoreResult
 from src.runtime.safe_failure import SafeFailure
 from src.runtime.retry.circuit_breaker import CircuitBreaker

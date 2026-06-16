@@ -50,7 +50,7 @@ def _make_governance(
 
 
 def _make_planner(pm: PlanMemory) -> AgentPlanner:
-    from src.strategy.llm.mock_llm import MockLLM
+    from src.runtime.llm.mock_llm import MockLLM
     return AgentPlanner(llm_complete=MockLLM().make_complete(), plan_memory=pm)
 
 

@@ -7,9 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from ._base import ChatProvider
-from src.strategy.types.validation.deadcode_markers import deadcode_ignore
 
-@deadcode_ignore(reason="Factory registration only, not directly used")
+
 class GeminiClient(ChatProvider):
     """
     Thin HTTP client for the Gemini API (Google AI for Developers).

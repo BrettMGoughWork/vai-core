@@ -4,7 +4,7 @@
 from typing import Tuple, Union
 
 from src.strategy.state.state import ConversationState
-from src.strategy.llm.types import LLMCallable
+from src.runtime.llm.types import LLMCallable
 from src.strategy.state.config import AgentConfig
 from src.strategy.types.registry import SkillRegistry
 from src.strategy.planning.safety.tool_selection import select_tool

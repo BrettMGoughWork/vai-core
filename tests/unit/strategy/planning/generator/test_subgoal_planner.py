@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.strategy.llm.mock_llm import MockLLM, MOCK_PLAN_RESPONSE
+from src.runtime.llm.mock_llm import MockLLM, MOCK_PLAN_RESPONSE
 from src.strategy.memory.drift_memory import DriftMemory
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.memory.governance.governance_errors import MemoryGovernanceError

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from typing import Protocol, runtime_checkable
 
@@ -29,3 +29,16 @@ class CoreLLMResponse:
     text: Optional[str] = None
     tool_name: Optional[str] = None
     tool_args: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class RuntimeConfig:
+    """Configuration for an LLM runtime call.
+
+    Replaces the S2-owned LLMConfig so that S1 (runtime)
+    has no dependency on S2 types.
+    """
+    provider: str
+    model: str
+    temperature: float = 0.0
+    max_tokens: int = 4096

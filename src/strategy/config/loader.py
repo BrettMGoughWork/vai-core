@@ -8,7 +8,6 @@ from src.strategy.state.config import (
     LoopPolicyConfig,
     SearchConfig,
 )
-from ..llm.builder import create_llm_transport
 
 class Config:
     def __init__(self, path="config/config.yaml"):

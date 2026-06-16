@@ -1,11 +1,11 @@
-﻿"""Tests for src.strategy.llm.mock_llm — MockLLM determinism and ChatProvider compliance."""
+﻿"""Tests for src.runtime.llm.mock_llm — MockLLM determinism and ChatProvider compliance."""
 from __future__ import annotations
 
 import json
 
 import pytest
 
-from src.strategy.llm.mock_llm import MockLLM, MOCK_PLAN_RESPONSE, _HALLUCINATION_RESPONSE
+from src.runtime.llm.mock_llm import MockLLM, MOCK_PLAN_RESPONSE, _HALLUCINATION_RESPONSE
 
 
 class TestMockLLMOutputShape:
@@ -76,7 +76,7 @@ class TestMockLLMChatProviderProtocol:
         assert "choices" in result
 
     def test_registered_in_llm_factory(self):
-        from src.strategy.llm.llm_factory import PROVIDER_CLIENTS
+        from src.runtime.llm.llm_factory import PROVIDER_CLIENTS
         assert "mock" in PROVIDER_CLIENTS
         assert PROVIDER_CLIENTS["mock"] is MockLLM
 

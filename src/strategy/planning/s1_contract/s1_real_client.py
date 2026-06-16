@@ -147,18 +147,19 @@ def _serialise_prompt(prompt_payload: dict) -> str:
 def _call_provider(prompt_text: str) -> str:
     """Send the prompt to the configured LLM provider and return raw text.
 
-    Uses the existing LLM infrastructure from ``src.strategy.llm`` so all
+    Uses the existing LLM infrastructure from ``src.runtime.llm`` so all
     providers (OpenAI, Anthropic, Gemini, DeepSeek, Qwen, Mistral) are
     supported through a single code path.
     """
-    from src.strategy.planning.s1_contract.s1_client import _get_llm_transport
+    from src.strategy.planning.s1_contract.s1_client import _llm_transport
 
-    transport = _get_llm_transport()
-    if transport is None:
+    if _llm_transport is None:
         raise S1RealLLMError(
-            message="No LLM transport configured.  Ensure llm.provider is set in config.yaml.",
+            message="No LLM transport configured.  The composition root must inject one via set_llm_transport().",
             retryable=False,
         )
+
+    transport = _llm_transport
 
     return transport.complete(prompt_text)
 

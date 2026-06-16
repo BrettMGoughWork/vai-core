@@ -3,8 +3,7 @@ import json
 from typing import List, Dict, Any
 
 from .types import CoreLLMResponse
-from src.strategy.types.toolspec import ToolSpec
-from src.strategy.llm.providers._base import ChatProvider
+from .providers._base import ChatProvider
 
 
 class LLMTransport:
@@ -22,38 +21,22 @@ class LLMTransport:
     def call(
         self,
         prompt: str,
-        tools: List[ToolSpec],
+        tools: List[Dict[str, Any]],
         model: str,
         temperature: float = 0.2,
     ) -> CoreLLMResponse:
         """
         Call the LLM with tools and parse the response.
         """
-        # Convert ToolSpecs → provider schema
-        tool_defs = [self._convert_tool_spec(t) for t in tools]
-
         # Call the provider
         raw = self.client.chat(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            tools=tool_defs,
+            tools=tools,
             temperature=temperature,
         )
 
         return self._parse_response(raw)
-
-    # ---------------------------------------------------------
-    # Convert ToolSpec → provider tool schema
-    # ---------------------------------------------------------
-    def _convert_tool_spec(self, spec: ToolSpec) -> Dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": spec.name,
-                "description": spec.description,
-                "parameters": spec.schema,
-            },
-        }
 
     # ---------------------------------------------------------
     # Parse provider response → CoreLLMResponse

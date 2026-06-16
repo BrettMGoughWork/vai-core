@@ -15,9 +15,9 @@ from urllib import error as urllib_error
 
 import pytest
 
-from src.strategy.llm.providers.anthropic import AnthropicClient, _to_claude_messages
-from src.strategy.llm.providers.openai import OpenAIClient
-from src.strategy.llm.llm_factory import create as factory_create
+from src.runtime.llm.providers.anthropic import AnthropicClient, _to_claude_messages
+from src.runtime.llm.providers.openai import OpenAIClient
+from src.runtime.llm.llm_factory import create as factory_create
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ class TestAnthropicClientChat:
         model = kwargs.pop("model", "claude-3")
         messages = kwargs.pop("messages", [{"role": "user", "content": "hello"}])
 
-        with patch("src.strategy.llm.providers.anthropic.request.urlopen", side_effect=fake_urlopen):
+        with patch("src.runtime.llm.providers.anthropic.request.urlopen", side_effect=fake_urlopen):
             result = client.chat(model=model, messages=messages, **kwargs)
         return result, captured.get("req")
 
@@ -201,19 +201,19 @@ class TestAnthropicClientChat:
 
     def test_http_error_raises_runtime_error(self, client):
         http_err = urllib_error.HTTPError(url="", code=401, msg="Unauthorized", hdrs=None, fp=BytesIO(b""))
-        with patch("src.strategy.llm.providers.anthropic.request.urlopen", side_effect=http_err):
+        with patch("src.runtime.llm.providers.anthropic.request.urlopen", side_effect=http_err):
             with pytest.raises(RuntimeError, match="401"):
                 client.chat(model="m", messages=[{"role": "user", "content": "hi"}])
 
     def test_url_error_raises_runtime_error(self, client):
         url_err = urllib_error.URLError(reason="Name or service not known")
-        with patch("src.strategy.llm.providers.anthropic.request.urlopen", side_effect=url_err):
+        with patch("src.runtime.llm.providers.anthropic.request.urlopen", side_effect=url_err):
             with pytest.raises(RuntimeError, match="Anthropic"):
                 client.chat(model="m", messages=[{"role": "user", "content": "hi"}])
 
     def test_missing_api_key_raises_value_error(self):
         with patch.dict(os.environ, {}, clear=True):
-            with patch("src.strategy.llm.providers.anthropic.load_dotenv"):
+            with patch("src.runtime.llm.providers.anthropic.load_dotenv"):
                 with pytest.raises(ValueError, match="API key"):
                     AnthropicClient(api_key=None)
 
@@ -236,7 +236,7 @@ class TestOpenAIClientChat:
         model = kwargs.pop("model", "gpt-4")
         messages = kwargs.pop("messages", [{"role": "user", "content": "hello"}])
 
-        with patch("src.strategy.llm.providers.openai.request.urlopen", side_effect=fake_urlopen):
+        with patch("src.runtime.llm.providers.openai.request.urlopen", side_effect=fake_urlopen):
             result = client.chat(model=model, messages=messages, **kwargs)
         return result, captured.get("req")
 
@@ -278,13 +278,13 @@ class TestOpenAIClientChat:
 
     def test_http_error_raises_runtime_error(self, client):
         http_err = urllib_error.HTTPError(url="", code=429, msg="Too Many Requests", hdrs=None, fp=BytesIO(b""))
-        with patch("src.strategy.llm.providers.openai.request.urlopen", side_effect=http_err):
+        with patch("src.runtime.llm.providers.openai.request.urlopen", side_effect=http_err):
             with pytest.raises(RuntimeError, match="429"):
                 client.chat(model="m", messages=[{"role": "user", "content": "hi"}])
 
     def test_missing_api_key_raises_value_error(self):
         with patch.dict(os.environ, {}, clear=True):
-            with patch("src.strategy.llm.providers.openai.load_dotenv"):
+            with patch("src.runtime.llm.providers.openai.load_dotenv"):
                 with pytest.raises(ValueError, match="API key"):
                     OpenAIClient(api_key=None)
 
@@ -296,7 +296,7 @@ class TestLLMFactory:
         class FakeClient:
             def __init__(self, model=None): self.model = model
 
-        with patch("src.strategy.llm.llm_factory.PROVIDER_CLIENTS", {"fake": FakeClient}):
+        with patch("src.runtime.llm.llm_factory.PROVIDER_CLIENTS", {"fake": FakeClient}):
             client = factory_create("fake", "fake-model")
 
         assert isinstance(client, FakeClient)
@@ -305,7 +305,7 @@ class TestLLMFactory:
         class FakeClient:
             def __init__(self, model=None): pass
 
-        with patch("src.strategy.llm.llm_factory.PROVIDER_CLIENTS", {"fakeprovider": FakeClient}):
+        with patch("src.runtime.llm.llm_factory.PROVIDER_CLIENTS", {"fakeprovider": FakeClient}):
             client = factory_create("FakeProvider", "m")
 
         assert isinstance(client, FakeClient)
@@ -319,7 +319,7 @@ class TestLLMFactory:
             def __init__(self, model=None): self.model = model
             # no 'unknown_kwarg' param
 
-        with patch("src.strategy.llm.llm_factory.PROVIDER_CLIENTS", {"strict": StrictClient}):
+        with patch("src.runtime.llm.llm_factory.PROVIDER_CLIENTS", {"strict": StrictClient}):
             # Should NOT raise — unknown_kwarg is filtered out
             client = factory_create("strict", "m", unknown_kwarg="ignored")
 
@@ -329,7 +329,7 @@ class TestLLMFactory:
         class ModelAwareClient:
             def __init__(self, model=None): self.model = model
 
-        with patch("src.strategy.llm.llm_factory.PROVIDER_CLIENTS", {"maware": ModelAwareClient}):
+        with patch("src.runtime.llm.llm_factory.PROVIDER_CLIENTS", {"maware": ModelAwareClient}):
             client = factory_create("maware", "test-model-123")
 
         assert client.model == "test-model-123"
@@ -338,7 +338,7 @@ class TestLLMFactory:
         class ConfigurableClient:
             def __init__(self, model=None, timeout=30.0): self.timeout = timeout
 
-        with patch("src.strategy.llm.llm_factory.PROVIDER_CLIENTS", {"conf": ConfigurableClient}):
+        with patch("src.runtime.llm.llm_factory.PROVIDER_CLIENTS", {"conf": ConfigurableClient}):
             client = factory_create("conf", "m", timeout=60.0)
 
         assert client.timeout == 60.0

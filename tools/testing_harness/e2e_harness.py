@@ -184,11 +184,11 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
 
         # ── 5. Wire up LLM ───────────────────────────────────────────────
         if backend == "mock":
-            from src.strategy.llm.mock_llm import MockLLM
+            from src.runtime.llm.mock_llm import MockLLM
             llm = MockLLM()
             model = "mock"
         else:
-            from src.strategy.llm.llm_factory import factory
+            from src.runtime.llm.llm_factory import factory
             provider = os.environ.get("LLM_PROVIDER", "deepseek")
             model = os.environ.get("LLM_MODEL", "deepseek-chat")
             llm = factory.create(provider, model)
