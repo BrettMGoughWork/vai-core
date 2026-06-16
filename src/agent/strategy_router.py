@@ -77,11 +77,15 @@ class StrategyRouter:
         planner: Optional[Callable[..., Any]] = None,
         capability_discoverer: Optional[Callable[[], list]] = None,
         submit_s4_job: Optional[Callable[[Any], Any]] = None,
+        skill_executor: Optional[Any] = None,
+        validation_pipeline: Optional[Any] = None,
     ) -> None:
         self._call_runtime = call_runtime
         self._planner = planner
         self._capability_discoverer = capability_discoverer
         self._submit_s4_job = submit_s4_job
+        self._skill_executor = skill_executor
+        self._validation_pipeline = validation_pipeline
 
     # ------------------------------------------------------------------
     # Public API
@@ -210,10 +214,46 @@ class StrategyRouter:
         }
 
     def _route_to_capabilities(self, outcome: RouterOutcome) -> Dict[str, Any]:
-        """Execute a tool/skill call via S3, submitted as an S4 job.
+        """Execute a tool/skill call via S3 or submit as an S4 job.
 
-        Requires ``submit_s4_job`` to be configured at construction time.
+        If ``skill_executor`` is configured, executes directly (S3).
+        Otherwise, submits as an S4 job for durable execution.
+
+        When executing directly, the optional ``validation_pipeline``
+        runs shape validation + anomaly detection + drift evaluation
+        on the result.
         """
+        skill_name = outcome.payload.get("skill_name", "")
+        arguments = outcome.payload.get("arguments", {})
+
+        # --- Direct execution path (S3) ---
+        if self._skill_executor is not None:
+            result = self._skill_executor.execute(
+                skill_name=skill_name,
+                arguments=arguments,
+            )
+            response: Dict[str, Any] = {
+                "output": result.output if result.success else None,
+                "error": result.error if not result.success else None,
+                "metadata": {"direct": True},
+            }
+
+            # Optional validation pipeline (S5)
+            if self._validation_pipeline is not None and result.success:
+                schemas = outcome.payload.get("output_schema", None)
+                diagnostics = self._validation_pipeline.apply(
+                    skill_name=skill_name,
+                    actual_output=result.output,
+                    expected_schema=schemas,
+                    subgoal_id=outcome.payload.get("subgoal_id", ""),
+                    segment_id=outcome.payload.get("segment_id", ""),
+                    step_id=outcome.step_id,
+                )
+                response["metadata"]["validation"] = diagnostics
+
+            return response
+
+        # --- S4 job submission fallback ---
         if self._submit_s4_job is None:
             raise NotImplementedError(
                 "submit_s4_job must be configured before routing tool outcomes"
@@ -221,13 +261,13 @@ class StrategyRouter:
 
         job = self._submit_s4_job({
             "type": "tool_call",
-            "skill_name": outcome.payload.get("skill_name", ""),
-            "arguments": outcome.payload.get("arguments", {}),
+            "skill_name": skill_name,
+            "arguments": arguments,
         })
         job_id = getattr(job, "job_id", str(job))
 
         return {
             "output": f"Tool call submitted as job {job_id}",
-            "metadata": {"job_id": job_id},
+            "metadata": {"direct": False, "job_id": job_id},
             "error": None,
         }

@@ -3557,8 +3557,8 @@ def test_tool_execute_dispatches_to_s4(wired_adapter, job_queue):
 | R.11.1 | ✅ | Move LLM providers `src/strategy/llm/providers/` → `src/runtime/llm/providers/` | Moved files + update imports in `strategy/llm/transport.py`, `strategy/llm/builder.py` |
 | R.11.2 | ✅ | Define S5→S1/S2/S3/S4 protocol interfaces | `src/agent/interfaces/s1_executor.py`, `s2_planner.py`, `s3_executor.py`, `s4_job_submitter.py` |
 | R.11.3 | ✅ | Wire S2 planner via DI — remove all S1/S3/S4 imports from `src/strategy/` | `src/strategy/planning/generator/`, `src/strategy/state/` |
-| R.11.4 | | Remove `PlanExecutor` from S2 — plan execution lives in S5/S6 | Remove `src/strategy/planning/dispatch/plan_executor.py`, move relevant logic to `src/agent/workflow/` |
-| R.11.5 | | Wire S5→S3 skill calls directly (not through S4B by default) | `src/agent/strategy_router.py`, `src/agent/interfaces/s3_executor.py` |
+| R.11.4 | ✅ | Remove `PlanExecutor` from S2 — plan execution lives in S5/S6 | Remove `src/strategy/planning/dispatch/plan_executor.py`, move relevant logic to `src/agent/workflow/` |
+| R.11.5 | ✅ | Wire S5→S3 skill calls directly (not through S4B by default) | `src/agent/strategy_router.py`, `src/agent/wiring/composition.py`, `src/platform/transport/app.py` |
 | R.11.6 | | Route LLM `tool_calls` from S1 back to S5 → S3 | `src/runtime/transport/`, `src/agent/strategy_router.py` |
 | R.11.7 | | Stratum isolation audit — verify no stratum imports another stratum's internals | `tools/architecture/extract_architecture.py` (update rules) |
 
@@ -3627,7 +3627,7 @@ The `AgentPlanner` currently needs an `llm_complete: Callable`. This callable sh
 - Create `src/agent/workflow/plan_step_executor.py` — iterates over plan steps, routes each to S1/S3 via protocol interfaces
 - The plan→workflow bridge: convert a `Plan` to a `WorkflowDefinition`, then let S6's workflow engine execute it step by step
 
-**R.11.5 — Direct S5→S3 skill calls**
+**R.11.5 — Direct S5→S3 skill calls ✅**
 
 Currently `StrategyRouter._route_to_capabilities()` submits tool calls as S4B jobs. Add a direct path:
 
@@ -3894,3 +3894,71 @@ X.3.10. Write architecture doc — for future contributors.
 ### PHASE Y.5 - Autonomy and Governance
 
 ---
+
+## Next Steps
+
+These are the highest-priority tasks emerging from the current project audit. They are not phases of a particular stratum — they are cross-cutting concerns that must be addressed to stabilise the project for further development.
+
+### N.1 — Fix `ci_architecture_check.py`
+
+**Problem:** `tools/architecture/ci_architecture_check.py` (or the equivalent CI gate script) is throwing an error, which means the CI architecture check is not providing reliable signal. Without it, we cannot trust CI to catch regressions in stratum boundaries, import violations, or dead code.
+
+**Goal:** Diagnose and fix the script so it runs to completion and produces correct output. Then re-establish it as a required CI gate.
+
+**Tasks:**
+- N.1.1 — Identify root cause of the CI failure (likely a changed API, missing dependency, or refactored import path)
+- N.1.2 — Fix the script
+- N.1.3 — Verify it runs cleanly on the current codebase
+- N.1.4 — Add a CI step that gates on its exit code (if not already present)
+
+### N.2 — Reduce HIGH Architecture Issues
+
+**Problem:** The last architecture check reported **279 HIGH issues**. Critical and High issues cause CI to fail, which means no PR can merge until these are addressed. Many may be false positives from the new architecture analyser, but they all block progress.
+
+**Goal:** Get to **0 Critical, 0 High** so CI passes reliably and the architecture check provides useful signal instead of noise.
+
+**Tasks:**
+- N.2.1 — Triage the 279 HIGH issues: classify as genuine vs false positive
+- N.2.2 — Fix genuine issues (duplicate classes, import violations, boundary breaks, dead code)
+- N.2.3 — Add exemptions/exclusions for false positives in the analyser config
+- N.2.4 — Re-run and verify: 0 Critical, 0 High
+
+### N.3 — Integration Testing Foundation
+
+**Problem:** The project has strong unit test coverage but lacks integration tests that exercise the full Gateway → S5 → S6 → S1/S2/S3 pipeline. Individual components work; the wiring between them has never been tested end-to-end.
+
+**Goal:** Build the infrastructure and first suite of integration tests that exercise the real (or realistically mocked) pipeline end-to-end.
+
+**Tasks:**
+- N.3.1 — Create an integration test harness with in-memory adapters (in-memory S4 queue, mock LLM, mock skill executor)
+- N.3.2 — Write a test that sends a message through Gateway → S5 → workflow → reply
+- N.3.3 — Write a test that exercises tool_execute → S4 job dispatch → status polling
+- N.3.4 — Write a test that exercises a full workflow with multiple step types
+- N.3.5 — Add CI step to run integration tests on every PR
+
+### N.4 — Gateway Analysis & Hardening
+
+**Problem:** The Gateway is currently a concept — there is no real external entry point that hits it. The FastAPI app exists but the CLI tool bypasses it, there are no webhooks, no web sockets, no real channel adapters in use. The Gateway-to-S5 handoff (`AgentGatewayAdapter`) was introduced in R.8 but has never been exercised with real traffic.
+
+**Goal:** Analyse what's needed to make Gateway a real ingress, document the gaps, and implement the minimal changes needed to support at least one real channel (CLI → Gateway → S5).
+
+**Tasks:**
+- N.4.1 — Audit the current Gateway state: what exists, what's wired, what's dead
+- N.4.2 — Map the gap between current Gateway and the architecture diagram
+- N.4.3 — Document what's needed for each channel type (CLI, HTTP, webhook)
+- N.4.4 — Wire at least one real path end-to-end (CLI → Gateway → S5 → response)
+- N.4.5 — Update ARCHITECTURE.md with accurate Gateway description
+
+### N.5 — End-to-End Pipeline Validation
+
+**Problem:** The project is 1 month old. Large pieces work in isolation but the mechanics have never been tested end-to-end. The TriggerRouter is dead code, `submit_job_callable` defaults to `None`, and the FastAPI app creates a Supervisor without workflow configuration.
+
+**Goal:** Validate the full pipeline works by wiring real (or realistically simulated) components and exercising the critical paths.
+
+**Tasks:**
+- N.5.1 — Wire the FastAPI app with a real Supervisor, WorkflowRegistry, and submit_job_callable
+- N.5.2 — Register a "hello world" workflow and verify it executes via `POST /run`
+- N.5.3 — Verify the TriggerRouter receives events and starts workflow instances
+- N.5.4 — Verify tool_execute steps dispatch to S4 and return results
+- N.5.5 — Verify paused workflows resume correctly with user input
+- N.5.6 — Document all known gaps in an "end-to-end readiness" matrix

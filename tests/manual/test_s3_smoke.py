@@ -64,7 +64,8 @@ from src.strategy.memory.plan_memory import PlanMemory
 from src.strategy.memory.drift_memory import DriftMemory
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.planning.generator.subgoal_planner import SubgoalPlanner
-from src.strategy.planning.dispatch.plan_executor import PlanExecutor
+from src.agent.workflow.plan_step_executor import PlanStepExecutor
+from src.agent.interfaces.s3_executor import S3SkillExecutor
 from src.strategy.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
 from src.strategy.planning.models.plan import Plan
 from src.strategy.planning.agent_loop.agent_loop import run_agent_loop
@@ -120,15 +121,16 @@ def _make_success_step_result() -> StepResult:
     )
 
 
-def _make_mock_dispatcher() -> Mock:
-    from src.strategy.planning.models.plan_state import PlanState, PlanStatus
-    dispatcher = Mock(spec=SafeStepDispatcher)
-
-    def _dispatch_side_effect(plan, plan_state=None):
-        return (PlanState.initial(plan), _make_success_step_result())
-
-    dispatcher.dispatch.side_effect = _dispatch_side_effect
-    return dispatcher
+def _make_mock_skill_executor() -> Mock:
+    from src.capabilities.contracts import SkillResult
+    executor = Mock(spec=S3SkillExecutor)
+    executor.execute.return_value = SkillResult(
+        request_id="smoke",
+        success=True,
+        output={},
+        error=None,
+    )
+    return executor
 
 
 def _create_real_llm() -> Any:
@@ -222,9 +224,9 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
 
     planner = SubgoalPlanner(llm_complete=_llm_complete)
 
-    # S2: plan executor (dispatcher mocked -- real dispatcher requires ConversationState)
-    executor = PlanExecutor(
-        dispatcher=_make_mock_dispatcher(),
+    # S5: plan step executor (skill executor mocked)
+    executor = PlanStepExecutor(
+        skill_executor=_make_mock_skill_executor(),
     )
 
     # -- Generate plan via SubgoalPlanner --------------------------------
@@ -282,7 +284,7 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
         print(f"  segment_steps: {seg.steps}")
         print(f"  [OK] 3.9.3: Plan segment constructed with skills={seg.skills}")
 
-    # -- 3.9.4: Verify skill execution via PlanExecutor ------------------
+    # -- 3.9.4: Verify skill execution via PlanStepExecutor --------------
 
     # Build a Plan we know will work with stdlib.echo for the execution test
     echo_plan = Plan(
@@ -292,13 +294,12 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
         reasoning_summary="smoke test execution",
     )
 
-    state, result, metrics = executor.execute(echo_plan)
-    print(f"  termination: {metrics.termination_reason}")
+    result = executor.execute(echo_plan)
     print(f"  result.outcome: {result.outcome}")
 
     # 3.9.4: Skill execution succeeded
-    assert metrics.termination_reason == "success", \
-        f"expected success, got {metrics.termination_reason}"
+    assert result.outcome == CognitiveStepOutcome.SUCCESS, \
+        f"expected SUCCESS, got {result.outcome}"
     print("  [OK] 3.9.4: Skill execution completed via S3")
 
     # -- 3.9.5: Verify state update --------------------------------------
@@ -349,7 +350,7 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
     # ══════════════════════════════════════════════════════════════════════
     # The V2 AgentLoopV2 was removed in favour of the deterministic
     # run_agent_loop() function from agent_loop.py.
-    # Direct PlanExecutor + SubgoalPlanner tests above already validate
+    # Direct PlanStepExecutor + SubgoalPlanner tests above already validate
     # the core S2→S3 dispatch chain independently.
 
     subgoal = Subgoal(

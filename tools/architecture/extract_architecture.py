@@ -31,6 +31,118 @@ OUTPUT_PATH = REPO_ROOT / "docs" / "architecture.json"
 
 EXCLUDE_DIRS = {".venv", ".git", "__pycache__", "node_modules", "tests"}
 
+# ── Stratum isolation import rules ─────────────────────────────────────
+# Each entry is (importing_package_prefix, [forbidden_import_prefixes]).
+# RUNTIME imports (not TYPE_CHECKING) matching these patterns are violations.
+IMPORT_RULES: list[tuple[list[str], list[str]]] = [
+    # Rule 1: S1 (runtime) must not import from S2 (strategy), S3 (capabilities), S5 (agent)
+    (["src", "runtime"], ["src.agent", "src.strategy", "src.capabilities"]),
+    # Rule 2: S2 (strategy) must not import from S3 (capabilities), S4 (platform), S5 (agent)
+    (["src", "strategy"], ["src.agent", "src.capabilities", "src.platform"]),
+    # Rule 3: S3 (capabilities) must not import from S2 (strategy), S4 (platform), S5 (agent)
+    (["src", "capabilities"], ["src.agent", "src.strategy", "src.platform"]),
+]
+
+# Known-broken imports that existed before R.11.7 — allowed until fixed.
+IMPORT_ALLOWLIST: set[str] = set()
+
+
+def _module_prefix(rel_path: str) -> list[str]:
+    """Convert a repo-relative path like 'src/runtime/foo.py' to ['src', 'runtime']."""
+    parts = Path(rel_path).with_suffix("").parts
+    if parts[-1] == "__init__":
+        parts = parts[:-1]
+    return list(parts)
+
+
+def _matches_rule(file_prefix: list[str], rules: list[tuple[list[str], list[str]]]) -> list[str]:
+    """Return the list of forbidden prefixes that apply to a file's package prefix."""
+    for rule_prefix, forbidden in rules:
+        if len(file_prefix) >= len(rule_prefix) and file_prefix[: len(rule_prefix)] == rule_prefix:
+            return forbidden
+    return []
+
+
+def check_stratum_isolation(root: Path) -> list[dict[str, Any]]:
+    """Walk all .py files and report stratum isolation import violations.
+
+    Returns a list of violation dicts with keys:
+        file, line, import_stmt, rule (human-readable), allowed (bool)
+    """
+    violations: list[dict[str, Any]] = []
+
+    for abs_path in collect_py_files(root):
+        rel_path = str(abs_path.relative_to(root))
+        rel_posix = rel_path.replace("\\", "/")
+
+        # Skip test files and non-src code
+        if not rel_posix.startswith("src/"):
+            continue
+
+        file_prefix = _module_prefix(rel_posix)
+        forbidden = _matches_rule(file_prefix, IMPORT_RULES)
+        if not forbidden:
+            continue  # No rules apply to this file's package
+
+        try:
+            source = abs_path.read_text(encoding="utf-8", errors="replace")
+            tree = ast.parse(source, filename=str(abs_path))
+        except SyntaxError:
+            continue
+
+        # Collect TYPE_CHECKING node ids so we skip them
+        type_checking_ids: set[int] = set()
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.If)
+                and isinstance(node.test, ast.Name)
+                and node.test.id == "TYPE_CHECKING"
+            ):
+                for child in ast.walk(node):
+                    type_checking_ids.add(id(child))
+
+        # Scan imports
+        for node in ast.walk(tree):
+            if id(node) in type_checking_ids:
+                continue
+
+            imported_module: str = ""
+
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imported_module = alias.name
+                    _check_import(
+                        imported_module, forbidden, rel_path, node.lineno, violations
+                    )
+            elif isinstance(node, ast.ImportFrom):
+                imported_module = node.module or ""
+                _check_import(
+                    imported_module, forbidden, rel_path, node.lineno, violations
+                )
+
+    return violations
+
+
+def _check_import(
+    imported_module: str,
+    forbidden: list[str],
+    rel_path: str,
+    lineno: int | None,
+    violations: list[dict[str, Any]],
+) -> None:
+    """Check a single import against forbidden prefixes."""
+    for forbid in forbidden:
+        if imported_module == forbid or imported_module.startswith(forbid + "."):
+            violation_key = f"{rel_path}:{lineno}:{imported_module}"
+            violations.append({
+                "file": rel_path.replace("\\", "/"),
+                "line": lineno or 0,
+                "import_stmt": imported_module,
+                "rule": f"Must not import from {forbid}",
+                "allowed": violation_key in IMPORT_ALLOWLIST,
+            })
+            break  # one violation per import
+
 # Map directory path fragments → inferred_stratum
 STRATUM_RULES: list[tuple[str, str]] = [
     # test first (most specific)
@@ -470,6 +582,27 @@ def main() -> None:
     print(f"  classes   : {len(classes)}")
     print(f"  references: {len(top_references)}")
     print(f"  skills    : {len(skills)}")
+
+    # ── Stratum isolation check ──────────────────────────────────────────
+    violations = check_stratum_isolation(REPO_ROOT)
+    if violations:
+        # Separate allowed vs. new violations
+        new = [v for v in violations if not v["allowed"]]
+        allowed = [v for v in violations if v["allowed"]]
+
+        if allowed:
+            print(f"\n[i] {len(allowed)} allowlisted import violation(s) (not enforced):")
+            for v in allowed:
+                print(f"   {v['file']}:{v['line']}  {v['import_stmt']}  ({v['rule']})")
+        if new:
+            print(f"\n[!!] {len(new)} stratum isolation violation(s):")
+            for v in new:
+                print(f"   {v['file']}:{v['line']}  {v['import_stmt']}  ({v['rule']})")
+            sys.exit(1)
+        else:
+            print(f"\n[OK] All {len(violations)} known violation(s) are allowlisted -- passing.")
+    else:
+        print("\n[OK] Stratum isolation rules passed -- no violations.")
 
 
 if __name__ == "__main__":
