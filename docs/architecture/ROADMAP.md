@@ -3457,6 +3457,92 @@ The Agent Runtime `Supervisor._run_workflow_loop()` already handles workflow sta
 
 ---
 
+### PHASE R.10 — End-to-End Wiring & Integration Tests
+
+Wire the full Gateway → S5 → S6 → S1/S2/S3 pipeline so that a single message can be
+tested end-to-end.  The architecture is well-designed at every layer, but the pipeline
+has never been exercised — the TriggerRouter is dead code, `submit_job_callable`
+defaults to `None`, and there are zero integration tests for the new pipeline.
+
+| Step | What | Files |
+|------|------|-------|
+| R.10.1 | In-memory S4 job queue + test workflow fixture | `tests/integration/e2e/conftest.py` (new) |
+| R.10.2 | Wire dependencies in FastAPI app | `src/platform/transport/app.py` (updated) |
+| R.10.3 | Integration test: Gateway → S5 → workflow → S1 | `tests/integration/e2e/test_gateway_to_workflow.py` (new) |
+| R.10.4 | Integration test: workflow tool_execute → S4 jobs → WAITING | `tests/integration/e2e/test_gateway_to_workflow.py` (new) |
+
+**R.10.1 — Test fixtures**
+
+```python
+class InMemoryJobQueue:
+    """Records submitted S4 jobs for later inspection."""
+
+    def __init__(self):
+        self.jobs: dict[str, dict] = {}
+        self.call_count = 0
+
+    def submit(self, payload: dict) -> str:
+        self.call_count += 1
+        job_id = f"job-{self.call_count}"
+        self.jobs[job_id] = {"payload": payload, "status": "pending"}
+        return job_id
+```
+
+A "hello world" `WorkflowDefinition` with one `llm_call` step is registered so the
+DEST_WORKFLOW route can execute without error.  The fixture module also provides
+`make_wired_supervisor()` which creates a `Supervisor` with all four dependencies:
+`workflow_registry`, `submit_job_callable`, `strategy_router`, and
+`workflow_instance_store`.
+
+**R.10.2 — Wire FastAPI app**
+
+The `POST /run` endpoint currently creates a `Supervisor` without `workflow_registry`
+or `submit_job_callable`.  This means the DEST_WORKFLOW route immediately returns
+"workflow_not_configured", and the tool_execute path errors with
+"No submit_job_callable provided".
+
+The fix:
+
+1. Register the hello_world (or equivalent) workflow in the FastAPI app's
+   `WorkflowRegistry`
+2. Provide an `InMemoryJobQueue.submit` as the `submit_job_callable`
+3. Pass both into the `Supervisor` constructor
+
+This makes the FastAPI app correctly process workflow and S4B routes.
+
+**R.10.3 — Integration test: Gateway → workflow → LLM call → complete**
+
+```python
+def test_gateway_to_workflow_completes(wired_adapter):
+    """A message with a workflow keyword triggers DEST_WORKFLOW,
+    the hello_world workflow runs through its llm_call step via
+    StrategyRouter → mock LLM, and the workflow completes."""
+    result = wired_adapter.ingest(AgentRequest(
+        message_text="run my hello world workflow",
+        channel="test",
+        user_id="test-user",
+        metadata={},
+    ))
+    assert "reply" in result
+    assert "metadata" in result
+    assert result.metadata.get("workflow_id") == "default-agent"
+```
+
+**R.10.4 — Integration test: tool_execute → S4B dispatch → WAITING**
+
+A workflow with a `tool_execute` step transitions to `WAITING` and records the
+dispatched jobs.  The test verifies the `InMemoryJobQueue` received the job and
+the agent state is correct.
+
+```python
+def test_tool_execute_dispatches_to_s4(wired_adapter, job_queue):
+    result = wired_adapter.ingest(...)
+    assert result["state"] == "waiting"
+    assert job_queue.call_count == 1
+```
+
+---
+
 ## Runtime — Cross-Cutting LLM Service
 
 Runtime is not a stratum — it is a service used by S5 and S2.

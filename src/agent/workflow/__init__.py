@@ -17,12 +17,17 @@ from src.agent.workflow.user_interaction import (
     InteractionResponse,
     UserInteractionManager,
 )
+from src.agent.workflow.workflow_definition import (
+    WorkflowDefinition,
+    WorkflowStep,
+)
 
 __all__ = [
     "InteractionRequest",
     "InteractionResponse",
     "StepOutcome",
     "UserInteractionManager",
+    "WorkflowDefinition",
     "WorkflowEngine",
     "WorkflowExecutionState",
     "WorkflowInstanceRecord",
@@ -30,5 +35,6 @@ __all__ = [
     "WorkflowOps",
     "WorkflowRegistry",
     "WorkflowStatus",
+    "WorkflowStep",
 ]
 
