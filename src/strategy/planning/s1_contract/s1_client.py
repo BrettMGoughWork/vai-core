@@ -94,46 +94,22 @@ def _resolve_model(llm_raw: dict) -> str:
     return llm_raw.get("model", "default")
 
 
-def _get_llm_transport():
-    """Lazily create an LLMTransport for the configured provider.
+# ── DI slot: LLM transport (set by the composition root) ──────────
+# S2 does NOT import S1 types to create a transport itself.
+# The S5 composition root injects the transport via set_llm_transport().
 
-    Returns None if no provider is configured or the config is missing.
-    Uses the canonical LLM builder factory.
-    """
-    try:
-        from src.strategy.llm.builder import create_llm_transport
-    except ImportError:
-        return None
+_llm_transport: object | None = None
+"""Module-level DI slot for the S1 LLM transport.
 
-    try:
-        import yaml
-        from pathlib import Path
+Set by the composition root during startup.
+S2 never imports S1 internals to create a transport.
+"""
 
-        config_path = Path("config/config.yaml")
-        if not config_path.exists():
-            return None
 
-        with open(config_path, "r") as f:
-            raw = yaml.safe_load(f)
-
-        llm_raw = raw.get("llm", {})
-        provider_name = llm_raw.get("provider", "")
-        if not provider_name:
-            return None
-
-        model = _resolve_model(llm_raw)
-
-        from src.strategy.state.config import LLMConfig
-        llm_config = LLMConfig(
-            provider=llm_raw.get("provider", ""),
-            model=model,
-            temperature=llm_raw.get("temperature", 0.0),
-            max_tokens=llm_raw.get("max_tokens", 4096),
-        )
-    except Exception:
-        return None
-
-    return create_llm_transport(llm_config)
+def set_llm_transport(transport: object | None) -> None:
+    """Inject an S1 LLM transport from the composition root (S5)."""
+    global _llm_transport
+    _llm_transport = transport
 
 
 def call_s1_backend(
@@ -178,13 +154,14 @@ def call_s1_backend(
     # Sends the user message directly to a real LLM and wraps the response
     # into the format the S5 supervisor expects.
     if backend == "conversational":
-        transport = _get_llm_transport()
-        if transport is None:
+        if _llm_transport is None:
             return S1Error(
                 type="llm_transport_unavailable",
-                message="No LLM transport configured. Ensure llm.provider is set in config.yaml.",
-                details={"hint": "Check config/config.yaml llm section"},
+                message="No LLM transport configured. The composition root must inject one via set_llm_transport().",
+                details={"hint": "Call set_llm_transport(transport) in the composition root before use."},
             )
+
+        transport = _llm_transport
 
         user_message = request.prompt.get("message", "")
         agent_id = request.prompt.get("agent_id", "assistant")

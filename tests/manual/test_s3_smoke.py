@@ -133,7 +133,7 @@ def _make_mock_dispatcher() -> Mock:
 
 def _create_real_llm() -> Any:
     """Create a ChatProvider from the LLM factory using env config."""
-    from src.strategy.llm.llm_factory import factory
+    from src.runtime.llm.llm_factory import factory
 
     provider = os.environ.get("LLM_PROVIDER", "openai")
     model = os.environ.get("LLM_MODEL", os.environ.get("OPENAI_MODEL", "gpt-4"))
@@ -206,7 +206,7 @@ def _run_single_smoke_run(backend: str, run_index: int) -> None:
 
     # S2: planner with mock or real LLM
     if backend == "mock":
-        from src.strategy.llm.mock_llm import MockLLM
+        from src.runtime.llm.mock_llm import MockLLM
         llm = MockLLM()
         model = "mock"
     else:

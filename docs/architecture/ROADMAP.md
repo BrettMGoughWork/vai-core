@@ -3542,7 +3542,134 @@ def test_tool_execute_dispatches_to_s4(wired_adapter, job_queue):
 ```
 
 ---
+### 📋 PHASE R.11 — Stratum Isolation & S5 Protocol Interfaces
 
+**Goal:** Enforce strict stratum isolation. S1 knows nothing of S2/S3/S4. S2 knows nothing of S1/S3/S4 (receives `llm_complete` via DI). S3 knows nothing of S1/S2/S4. S4 knows nothing of S1/S2/S3. S5 is the sole orchestrator with clean protocol interfaces to each stratum. S4 is optional — only used when the workflow step requires durability, restartability, or fan-in/fan-out.
+
+**Rationale:** S5 is becoming the orchestrator, but cross-stratum imports are ad-hoc. LLM providers live in `src/strategy/` (violating S2's purity). `PlanExecutor` lives in S2 but involves I/O (violating purity). Tool calls go through S4B even when durability isn't needed. This phase cleans all of that up.
+
+**Key architectural rule:** Each stratum exposes a protocol/interface. S5's composition root wires them via dependency injection. No stratum directly imports another stratum's implementation.
+
+**S4 is optional:** The workflow step definition includes a `requires_durability` flag. If `True`, S5 routes through S4. If `False`, S5 calls S3's `SkillRunner.execute()` directly. Default is `False` — assume direct unless durability is required.
+
+| Step | Status | What | Files |
+|------|--------|------|-------|
+| R.11.1 | ✅ | Move LLM providers `src/strategy/llm/providers/` → `src/runtime/llm/providers/` | Moved files + update imports in `strategy/llm/transport.py`, `strategy/llm/builder.py` |
+| R.11.2 | ✅ | Define S5→S1/S2/S3/S4 protocol interfaces | `src/agent/interfaces/s1_executor.py`, `s2_planner.py`, `s3_executor.py`, `s4_job_submitter.py` |
+| R.11.3 | ✅ | Wire S2 planner via DI — remove all S1/S3/S4 imports from `src/strategy/` | `src/strategy/planning/generator/`, `src/strategy/state/` |
+| R.11.4 | | Remove `PlanExecutor` from S2 — plan execution lives in S5/S6 | Remove `src/strategy/planning/dispatch/plan_executor.py`, move relevant logic to `src/agent/workflow/` |
+| R.11.5 | | Wire S5→S3 skill calls directly (not through S4B by default) | `src/agent/strategy_router.py`, `src/agent/interfaces/s3_executor.py` |
+| R.11.6 | | Route LLM `tool_calls` from S1 back to S5 → S3 | `src/runtime/transport/`, `src/agent/strategy_router.py` |
+| R.11.7 | | Stratum isolation audit — verify no stratum imports another stratum's internals | `tools/architecture/extract_architecture.py` (update rules) |
+
+**R.11.1 — Move LLM providers to S1**
+
+Currently LLM providers (OpenAI, Anthropic, Gemini, Mistral, Qwen, DeepSeek) live at `src/strategy/llm/providers/`. They are S1 concerns — the runtime owns LLM execution. Move them to `src/runtime/llm/providers/` and update all import paths.
+
+Files to move:
+- `src/strategy/llm/providers/` → `src/runtime/llm/providers/`
+- `src/strategy/llm/llm_factory.py` → `src/runtime/llm/llm_factory.py` (the factory belongs with the providers)
+- `src/strategy/llm/builder.py` → `src/runtime/llm/builder.py`
+- `src/strategy/llm/transport.py` → update import path for `ChatProvider`
+- `src/strategy/llm/types.py` → `src/runtime/llm/types.py` (shared types)
+- `src/strategy/llm/mock_llm.py` → `src/runtime/llm/mock_llm.py`
+
+Update all references in:
+- `src/strategy/llm/transport.py` (imports `ChatProvider` from providers)
+- `src/strategy/state/core_step_executor.py` (imports `LLMCallable`)
+- `src/strategy/planning/s1_contract/s1_client.py` (imports `create_llm_transport`)
+- Any test files referencing `src.strategy.llm`
+
+The `src/strategy/llm/` directory after the move should only contain what S2 legitimately needs — which may be nothing if all LLM usage goes through DI. If nothing remains, remove the directory entirely.
+
+**R.11.2 — Define protocol interfaces in S5**
+
+Create `src/agent/interfaces/` with protocol classes that each stratum implements:
+
+```python
+# src/agent/interfaces/s1_executor.py
+class S1Executor(Protocol):
+    """S5 → S1: Execute an LLM call."""
+    def complete(self, prompt: str, context: dict | None = None) -> LLMResponse: ...
+    def complete_with_tools(self, prompt: str, tools: list[ToolDef], context: dict | None = None) -> LLMResponse: ...
+
+# src/agent/interfaces/s2_planner.py
+class S2Planner(Protocol):
+    """S5 → S2: Generate a plan (pure)."""
+    def plan(self, goal: str, capabilities: list[CapabilityInfo]) -> Plan: ...
+
+# src/agent/interfaces/s3_executor.py
+class S3CapabilityDiscovery(Protocol):
+    """S5 → S3: Discover available capabilities."""
+    def discover(self, context: CapabilityContext) -> list[CapabilityInfo]: ...
+
+class S3SkillExecutor(Protocol):
+    """S5 → S3: Execute a skill directly (no S4)."""
+    def execute(self, skill_name: str, arguments: dict) -> SkillResult: ...
+
+# src/agent/interfaces/s4_job_submitter.py
+class S4JobSubmitter(Protocol):
+    """S5 → S4: Submit a durable job (optional path)."""
+    def submit(self, payload: dict, durable: bool = True) -> str: ...
+```
+
+These protocols live in S5's directory. Each stratum's concrete implementation is injected by the composition root (app.py).
+
+**R.11.3 — Wire S2 planner via DI**
+
+The `AgentPlanner` currently needs an `llm_complete: Callable`. This callable should be injected by S5's composition root, wired to `S1Executor.complete()`. Remove all direct imports of `src.strategy.llm` or `src.runtime.llm` from S2 code.
+
+**R.11.4 — Plan execution moves to S5/S6**
+
+`PlanExecutor` in `src/strategy/planning/dispatch/` performs I/O (executing plan steps). This violates S2's purity constraint. Move the execution loop to S5/S6:
+
+- Remove `src/strategy/planning/dispatch/plan_executor.py`
+- Create `src/agent/workflow/plan_step_executor.py` — iterates over plan steps, routes each to S1/S3 via protocol interfaces
+- The plan→workflow bridge: convert a `Plan` to a `WorkflowDefinition`, then let S6's workflow engine execute it step by step
+
+**R.11.5 — Direct S5→S3 skill calls**
+
+Currently `StrategyRouter._route_to_capabilities()` submits tool calls as S4B jobs. Add a direct path:
+
+```python
+def _route_to_capabilities(self, outcome: RouterOutcome) -> RouterResult:
+    if self._skill_executor is not None:
+        # Direct execution — no durability needed
+        result = self._skill_executor.execute(
+            skill_name=outcome.payload["skill_name"],
+            arguments=outcome.payload.get("arguments", {}),
+        )
+        return RouterResult(success=True, output=result.output)
+    elif self._submit_s4_job is not None:
+        # Durable path — through S4
+        job_id = self._submit_s4_job(outcome.payload)
+        return RouterResult(success=True, job_id=job_id, requires_durability=True)
+    else:
+        raise NotImplementedError("No skill executor or S4 job submitter configured")
+```
+
+**R.11.6 — Route LLM tool_calls to S3**
+
+The current LLM conversational path (`s1_client.py`) uses `transport.complete()` which returns text only. Switch to `transport.call()` which returns `CoreLLMResponse` with `tool_name`/`tool_args`. Return tool calls in `PromptResponse.tool_calls` so the Supervisor can route them through `StrategyRouter._route_to_capabilities()`.
+
+This requires changes in:
+- `src/strategy/planning/s1_contract/s1_client.py` — use `transport.call()` for conversational path
+- `src/agent/strategy_router.py` — add `tool_call` route handler that creates `RouterOutcome(type="tool_call")`
+- `src/agent/supervisor.py` — handle `RouterOutcome(type="tool_call")` in `run_agent_step()`
+
+**R.11.7 — Stratum isolation audit**
+
+Update `tools/architecture/extract_architecture.py` with strict rules:
+- `src/runtime/` must not import from `src/agent/`, `src/strategy/`, `src/capabilities/`
+- `src/strategy/` must not import from `src/agent/`, `src/capabilities/`, `src/platform/` (except through injected callables)
+- `src/capabilities/` must not import from `src/agent/`, `src/strategy/`, `src/platform/`
+- `src/platform/` must not import from `src/agent/`, `src/strategy/`, `src/capabilities/`
+- `src/agent/` may import protocol interfaces from `src/agent/interfaces/` only — not concrete stratum implementations
+- `src/gateway/` may only import from `src/agent/interfaces/`
+
+✅ **Outcome:** Each stratum is fully isolated. S5 is the sole orchestrator. LLM providers live in S1 where they belong. Plans are generated purely by S2 and executed by S5/S6. Skills can be called directly (no durability) or through S4 (durability needed). The architecture check enforces these rules in CI.
+
+---
 ## Runtime — Cross-Cutting LLM Service
 
 Runtime is not a stratum — it is a service used by S5 and S2.

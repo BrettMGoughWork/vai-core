@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.llm.mock_llm import MockLLM
+from src.runtime.llm.mock_llm import MockLLM
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.memory.plan_memory import PlanMemory
 from src.strategy.memory.segment_memory import SegmentMemory

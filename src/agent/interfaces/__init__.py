@@ -81,6 +81,25 @@ from src.agent.interfaces.agent_state_store import (
     StoreError as StoreError,
 )
 
+# ── Stratum Protocol Interfaces (R.11.2) ──────────────────────────────
+# S5 → S1 / S2 / S3 / S4
+# These protocols define the only interfaces through which the
+# orchestrator interacts with the lower strata.
+
+from src.agent.interfaces.s1_executor import (
+    S1Executor as S1Executor,
+)
+from src.agent.interfaces.s2_planner import (
+    S2Planner as S2Planner,
+)
+from src.agent.interfaces.s3_executor import (
+    S3CapabilityDiscovery as S3CapabilityDiscovery,
+    S3SkillExecutor as S3SkillExecutor,
+)
+from src.agent.interfaces.s4_job_submitter import (
+    S4JobSubmitter as S4JobSubmitter,
+)
+
 __all__ = [
     # Activation
     "ActivatedAgentContext",
@@ -119,4 +138,10 @@ __all__ = [
     # Agent State Store (S5.6)
     "AgentStateStore",
     "StoreError",
+    # Stratum Protocols (R.11.2)
+    "S1Executor",
+    "S2Planner",
+    "S3CapabilityDiscovery",
+    "S3SkillExecutor",
+    "S4JobSubmitter",
 ]

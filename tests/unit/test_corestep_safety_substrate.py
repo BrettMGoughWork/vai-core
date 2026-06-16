@@ -6,7 +6,7 @@ from src.strategy.state.config import AgentConfig
 from src.strategy.state.core_step_executor import CoreStepExecutor
 from src.strategy.state.step_outcome import StepOutcome
 from src.strategy.state.state import ConversationState
-from src.strategy.llm.types import CoreLLMResponse
+from src.runtime.llm.types import CoreLLMResponse
 from src.strategy.types.capabilities import SkillCategory, SideEffect
 from src.strategy.types.result import CoreResult
 from src.runtime.degraded_mode import DegradedModeController

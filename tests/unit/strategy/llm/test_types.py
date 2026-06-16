@@ -1,1 +1,1 @@
-"""Tests for src.strategy.llm.types."""
+"""Tests for src.runtime.llm.types."""

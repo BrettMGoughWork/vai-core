@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Any
 
 from .transport import LLMTransport
 from .llm_factory import factory
+from .types import RuntimeConfig
 
-from src.strategy.state.config import LLMConfig
 
-def create_llm_transport(llm_config: LLMConfig) -> LLMTransport:
+def create_llm_transport(llm_config: RuntimeConfig) -> LLMTransport:
     """
     Create an LLMTransport using the unified config.yaml structure.
 

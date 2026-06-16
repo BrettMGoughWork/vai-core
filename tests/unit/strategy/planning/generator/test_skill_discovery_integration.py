@@ -16,7 +16,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.strategy.llm.mock_llm import MockLLM
+from src.runtime.llm.mock_llm import MockLLM
 from src.strategy.memory.drift_memory import DriftMemory
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.memory.plan_memory import PlanMemory
@@ -167,7 +167,7 @@ class TestPlanTargetSkillIdPrefersLLM:
     def test_targetskillid_is_unknown_when_llm_and_skill_refs_unavailable(self):
         """Without LLM capability or skill_refs, targetskillid is 'unknown'."""
         # Simulate no capability in LLM response and no skill_refs
-        from src.strategy.llm.mock_llm import MOCK_PLAN_RESPONSE
+        from src.runtime.llm.mock_llm import MOCK_PLAN_RESPONSE
         from copy import deepcopy
 
         no_cap_response = deepcopy(MOCK_PLAN_RESPONSE)

@@ -31,7 +31,7 @@ from src.agent.workflow import (
     WorkflowStep,
 )
 from src.agent.workflow.instance_store import WorkflowInstanceStore as WfStore
-from src.runtime.contracts import PromptResponse
+from src.runtime.interfaces.contract import PromptResponse
 
 
 # ======================================================================

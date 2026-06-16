@@ -20,7 +20,7 @@ from src.capabilities.skills.manifest import SkillManifest
 from src.capabilities.primitives.stdlib.echo import EchoPrimitive
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 from src.capabilities.discovery.providers.mock_provider import _simple_embedding_fn
-from src.strategy.llm.llm_factory import factory
+from src.runtime.llm.llm_factory import factory
 from src.strategy.memory.segment_memory import SegmentMemory
 from src.strategy.memory.subgoal_memory import SubgoalMemory
 from src.strategy.memory.plan_memory import PlanMemory
