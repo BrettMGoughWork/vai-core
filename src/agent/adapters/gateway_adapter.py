@@ -98,11 +98,16 @@ class AgentGatewayAdapter:
                     "metadata": resp.metadata,
                     "agent_id": agent_id,
                 }
+            # Derive failure reason from lifecycle history or errors
+            last_event = state.lifecycle_history[-1] if state.lifecycle_history else None
+            reason = last_event.reason if last_event else ""
+            if not reason and state.errors:
+                reason = state.errors[-1].get("message", "")
             return {
                 "error": (
                     "Agent completed without producing a response"
                     if state.lifecycle_state == LifecycleState.COMPLETED
-                    else state._reason or "Agent failed"
+                    else reason or "Agent failed"
                 ),
             }
 
@@ -111,3 +116,62 @@ class AgentGatewayAdapter:
             "state": state.lifecycle_state.value,
             "agent_id": agent_id,
         }
+
+    def resume(self, agent_id: str, message_text: str) -> Dict[str, Any]:
+        """Resume a WAITING agent with new input.
+
+        Loads the agent's state from the store, runs one step with the
+        given message, and returns the result in the same shape as
+        ``ingest()``.
+
+        Args:
+            agent_id:     The WAITING agent to resume.
+            message_text: Input text to resume the workflow with.
+
+        Returns:
+            Same shape as ``ingest()`` — one of:
+
+            - Success:  ``{"reply": str, "metadata": dict, "agent_id": str}``
+            - Pending:  ``{"state": "waiting", "agent_id": str}``
+            - Error:    ``{"error": str}``
+        """
+        try:
+            state = self._supervisor.get_agent_state(agent_id)
+        except Exception as exc:
+            return {"error": f"Failed to load agent state: {exc}"}
+
+        if state.lifecycle_state.value == "waiting":
+            # Transition from WAITING — no activation needed
+            try:
+                state = self._supervisor.run_agent_step(
+                    state, message=message_text,
+                )
+            except Exception as exc:
+                return {"error": f"Resume step failed: {exc}"}
+
+            if state.lifecycle_state in (
+                LifecycleState.COMPLETED,
+                LifecycleState.FAILED,
+            ):
+                resp = self._supervisor.get_response(state)
+                if resp is not None and resp.reply is not None:
+                    return {
+                        "reply": resp.reply,
+                        "metadata": resp.metadata,
+                        "agent_id": agent_id,
+                    }
+                return {
+                    "error": (
+                        "Agent completed without producing a response"
+                        if state.lifecycle_state == LifecycleState.COMPLETED
+                        else state._reason or "Agent failed"
+                    ),
+                }
+
+            # Still waiting (multi-step resume) or running
+            return {
+                "state": state.lifecycle_state.value,
+                "agent_id": agent_id,
+            }
+
+        return {"error": f"Agent {agent_id!r} is not WAITING"}

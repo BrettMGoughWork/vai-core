@@ -171,11 +171,16 @@ def call_s1_backend(
         )
         description = request.prompt.get("agent_metadata", {}).get("description", "")
 
-        system_prompt = (
-            f"You are {agent_name}, an AI assistant in the VAI platform.\n"
-            f"{description}\n\n"
-            "Respond conversationally. Be concise, helpful, and accurate."
-        )
+        # Allow workflow YAMLs to override the system prompt
+        explicit_system_prompt = request.prompt.get("system_prompt")
+        if explicit_system_prompt:
+            system_prompt = explicit_system_prompt
+        else:
+            system_prompt = (
+                f"You are {agent_name}, an AI assistant in the VAI platform.\n"
+                f"{description}\n\n"
+                "Respond conversationally. Be concise, helpful, and accurate."
+            )
 
         try:
             raw_text = transport.complete(

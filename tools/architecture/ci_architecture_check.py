@@ -4,7 +4,7 @@ CI wrapper: runs the architecture extractor then the audit.
 Exits non-zero if any critical or high issues are found.
 
 Usage:
-    python tools/dictionary/ci_architecture_check.py
+    python tools/architecture/ci_architecture_check.py
 """
 import subprocess
 import sys

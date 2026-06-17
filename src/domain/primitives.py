@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Literal
 
-from src.runtime._markers import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 
 @deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")
@@ -48,13 +48,16 @@ class PrimitiveResult:
     """Outcome of the call."""
 
     data: Any | None = None
-    """Successful output payload (``None`` on error)."""
+    """Payload on success."""
 
     error: str | None = None
-    """Error message (``None`` on success)."""
+    """Error message on failure."""
 
-    side_effects: list[dict] = field(default_factory=list)
-    """Structured list of observed side effects."""
+    side_effects: list[dict[str, Any]] = field(default_factory=list)
+    """Any side-effects recorded during execution."""
+
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Arbitrary metadata for tooling / observability."""
 
     def __post_init__(self) -> None:
         """Enforce behavioural invariants."""
@@ -64,6 +67,10 @@ class PrimitiveResult:
             )
         if self.status == "success" and self.error is not None:
             raise ValueError("error must be None when status is 'success'")
+
+    def __bool__(self) -> bool:
+        """Convenience: truthy when status == 'success'."""
+        return self.status == "success"
 
 
 @deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")

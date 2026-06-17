@@ -24,6 +24,7 @@ from src.agent.router import (
     DEST_WORKFLOW,
     Route,
     route_message,
+    _WORKFLOW_TRIGGER,
 )
 from src.agent.registry import (
     CAP_JOB_SUBMISSION,
@@ -171,40 +172,37 @@ class TestRouteMessageDefaults:
 
 
 class TestRouteMessageS6:
-    """Workflow keywords route to DEST_WORKFLOW irrespective of capabilities."""
+    """Messages starting with /workflow route to DEST_WORKFLOW."""
 
     @pytest.mark.parametrize(
-        "msg",
+        "msg,expected_wf_id",
         [
-            "run workflow",
-            "start workflow",
-            "workflow",
-            "trigger workflow",
-            "execute workflow",
-            "please run workflow X",
-            "RUN WORKFLOW",
-            "Run Workflow",
+            ("/workflow", ""),
+            ("/workflow default-agent", "default-agent"),
+            ("/workflow tools-workflow", "tools-workflow"),
+            ("/workflow waiting-agent hello", "waiting-agent"),
+            ("/WORKFLOW default-agent", "default-agent"),
+            ("/Workflow default-agent", "default-agent"),
         ],
     )
-    def test_workflow_keywords(
-        self, msg: str, default_agent: AgentMetadata
+    def test_workflow_prefix(
+        self, msg: str, expected_wf_id: str, default_agent: AgentMetadata
     ) -> None:
         route = route_message(msg, default_agent)
         assert route.destination == DEST_WORKFLOW
-        assert route.confidence == 0.8
+        assert route.confidence == 0.9
         assert route.payload.get("trigger") == "workflow_request"
+        assert route.payload.get("workflow_id") == expected_wf_id
 
-    def test_workflow_keyword_embedded(
-        self, default_agent: AgentMetadata
-    ) -> None:
-        """Keyword can appear anywhere in the message."""
-        route = route_message("I need to start workflow daily-report", default_agent)
-        assert route.destination == DEST_WORKFLOW
+    def test_workflow_prefix_no_match(self, default_agent: AgentMetadata) -> None:
+        """Plain 'workflow' (no leading slash) should NOT trigger workflow."""
+        route = route_message("run the workflow", default_agent)
+        assert route.destination == DEST_RUNTIME
 
     def test_s6_carries_agent_id(self, default_agent: AgentMetadata) -> None:
-        route = route_message("run workflow", default_agent)
+        route = route_message("/workflow", default_agent)
         assert route.agent_id == "test-agent"
-        assert route.payload.get("message") == "run workflow"
+        assert route.payload.get("message") == "/workflow"
 
 
 class TestRouteMessageS4B:
@@ -241,12 +239,13 @@ class TestRouteMessageS4B:
         route = route_message("run backup", full_capability_agent)
         assert route.destination == DEST_S4B
 
-    def test_workflow_keyword_takes_precedence(
+    def test_workflow_prefix_takes_precedence(
         self, job_capable_agent: AgentMetadata
     ) -> None:
-        """Workflow keywords are checked first and take priority."""
-        route = route_message("run workflow", job_capable_agent)
+        """/workflow prefix is checked first and takes priority over S4B."""
+        route = route_message("/workflow tools-workflow", job_capable_agent)
         assert route.destination == DEST_WORKFLOW  # not S4B
+        assert route.payload.get("workflow_id") == "tools-workflow"
 
     def test_s4b_carries_agent_id(
         self, job_capable_agent: AgentMetadata

@@ -146,8 +146,9 @@ class TestStepLlmCall:
 
         new_state, outcome = engine.step(state)
 
-        assert outcome.type == "completed"
-        assert new_state.status == WorkflowStatus.COMPLETED
+        assert outcome.type == "llm_call"
+        assert new_state.current_step_id is None
+        assert new_state.status == WorkflowStatus.RUNNING  # engine defers completion to supervisor
 
 
 # ===================================================================
@@ -224,7 +225,9 @@ class TestStepUserInput:
         # resume — injects input and steps into "after"
         resumed, outcome = engine.resume_with_input(wf_state, "my answer")
 
-        assert outcome.type == "completed"  # "after" has on_success: __end__
+        assert outcome.type == "llm_call"  # "after" is llm_call, on_success: __end__
+        assert resumed.current_step_id is None
+        assert resumed.status == WorkflowStatus.RUNNING  # engine defers completion to supervisor
         assert resumed.context["_user_input"] == "my answer"
 
 

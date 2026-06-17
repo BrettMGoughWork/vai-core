@@ -1,0 +1,24 @@
+# Default conversational workflow
+# Single LLM call that responds to the user's message.
+workflow_id: default-agent
+name: "Conversational Workflow"
+description: "Greets the user via conversation"
+version: "1.0.0"
+trigger_on:
+  - "workflow_request"
+
+steps:
+  greet:
+    step_id: greet
+    step_type: llm_call
+    label: "Greet the user"
+    config:
+      message: "{context.input}"
+      agent_id: "default-agent"
+      agent_metadata:
+        name: "Default Agent"
+        description: "A friendly conversational agent"
+    transitions:
+      on_success: __end__
+
+start_step: greet

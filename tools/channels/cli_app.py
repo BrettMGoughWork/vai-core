@@ -14,6 +14,9 @@ Usage:
 
     # Pipe mode
     echo "list jobs" | python -m tools.channels.cli_app
+
+    # Print usage
+    python -m tools.channels.cli_app --help
 """
 
 from __future__ import annotations
@@ -21,31 +24,10 @@ from __future__ import annotations
 import argparse
 import sys
 
+from src.agent.composition_root import s5_adapter
 from src.gateway.channels.cli import register_cli_channel
 from src.gateway.channels.registry import ChannelRegistry
 from src.gateway.entrypoint import submit_channel_input
-
-# ---------------------------------------------------------------------------
-# S5 Supervisor wiring
-# ---------------------------------------------------------------------------
-from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
-from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
-from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
-from src.agent.supervisor import Supervisor
-
-_agent_registry = AgentRegistry()
-_agent_registry.register_agent(AgentMetadata(
-    identity=AgentIdentity(
-        agent_id="default-agent",
-        name="Default Agent",
-        description="Default conversational agent",
-    ),
-    capabilities=["conversation"],
-))
-
-_agent_store = MemoryAgentStateStore()
-_supervisor = Supervisor(registry=_agent_registry, store=_agent_store)
-_s5_adapter = AgentGatewayAdapter(_supervisor)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -71,7 +53,7 @@ def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None
     """Submit a command through the Gateway → S5 pipeline."""
     result = submit_channel_input(
         registry, "cli", {"text": text, "sender": sender},
-        adapter=_s5_adapter,
+        adapter=s5_adapter,
     )
 
     if "error" in result:
@@ -136,18 +118,33 @@ def _parse_args() -> argparse.Namespace:
         "text",
         nargs="?",
         default=None,
-        help="Single command text (omit for interactive/pipe mode)",
+        help="Single command text. Required unless --interactive is used.",
     )
     parser.add_argument(
         "--sender",
         default=None,
         help="Optional sender identity",
     )
+    parser.add_argument(
+        "--interactive", "-i",
+        action="store_true",
+        help="Start interactive REPL mode (reads commands from stdin)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
+
+    # Param guard: require text arg, --interactive flag, or pipe input
+    if not args.text and not args.interactive:
+        if sys.stdin.isatty():
+            # Interactive terminal with no args — show usage
+            print("Usage: python -m tools.channels.cli_app [--interactive] <text>")
+            print("       python -m tools.channels.cli_app --interactive")
+            print("       echo 'hello' | python -m tools.channels.cli_app")
+            sys.exit(1)
+        # stdin is a pipe — let run_interactive read from it
 
     # Wire up the CLI channel
     registry = ChannelRegistry()
