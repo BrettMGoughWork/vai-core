@@ -80,49 +80,18 @@ def test_argument_schema_mismatch():
         validator.validate(plan)
 
 
-def test_plan_purity_error_on_capability_output():
+def test_plan_purity_error_on_forbidden_output():
     """
-    Purity is enforced on capability outputs, not on PlanValidator.
-    This test creates a dummy capability that returns a forbidden key in its output.
+    Purity is enforced on capability outputs via enforce_cognitive_purity().
+    This test verifies that the pure function rejects forbidden keys.
+    (PlanExecutor was removed in R.11.4 — the purity enforcer is tested
+    directly here and comprehensively in safety/test_safety.py.)
     """
-    from src.strategy.planning.dispatch.plan_executor import PlanExecutor
+    from src.strategy.planning.safety.purity_enforcer import enforce_cognitive_purity
     from src.strategy.types.errors.ValidationError import ValidationError
-    from src.strategy.planning.models.plan_state import PlanState
-    from src.strategy.planning.models.step_state import StepState
-    from src.strategy.types.step_result import StepResult
-    from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
 
-    class DummyCapability:
-        def execute(self, arguments):
-            return {"arguments": "bad"}  # forbidden key
-
-    class DummyDispatcher:
-        def __init__(self):
-            self.core_step = type("CoreStep", (), {"capabilities": {"dummy": {}}})()
-        def dispatch(self, plan, plan_state=None):
-            # Always return a successful StepState and forbidden output
-            from src.strategy.planning.models.step_state import StepStatus
-            return StepState(
-                step_id="dummy",
-                parent_id=None,
-                cognitive_input={},
-                last_result=None,
-                status=StepStatus.PENDING,
-                created_at=0,
-                attempt=0,
-                trace=[],
-                canonical_hash="testhash"
-            ), StepResult(
-                outcome=CognitiveStepOutcome.SUCCESS,
-                reason="",
-                payload=DummyCapability().execute(plan.arguments),
-                trace={},
-            )
-
-    plan = PlanTestDouble("intent", "dummy", {}, "summary")
-    executor = PlanExecutor(DummyDispatcher())
-    with pytest.raises(ValidationError):
-        executor.execute(plan)
+    with pytest.raises(ValidationError, match="Forbidden key 'arguments'"):
+        enforce_cognitive_purity({"arguments": "bad"})
 
 
 

@@ -9,7 +9,7 @@ whether the operation should be retried, how many times, and with what backoff.
 from dataclasses import dataclass
 from typing import Any
 
-from src.strategy.types.validation import deadcode_ignore
+from src.runtime._markers import deadcode_ignore
 
 
 @dataclass

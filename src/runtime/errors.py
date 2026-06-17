@@ -1,4 +1,4 @@
-from src.strategy.types.validation.deadcode_markers import deadcode_ignore
+from src.runtime._markers import deadcode_ignore
 
 
 @deadcode_ignore(reason="Defined as part of error taxonomy, used via type field")

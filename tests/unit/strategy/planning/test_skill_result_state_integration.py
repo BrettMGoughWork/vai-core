@@ -1,21 +1,20 @@
-"""Integration tests for PlanExecutor execute() — decoupled from S3.
+"""Integration tests for PlanStepExecutor — decoupled from S3.
 
 Validates that execute() correctly:
-  - Returns success when the dispatcher succeeds.
-  - Returns failure when the dispatcher returns a non-success outcome.
-  - Returns terminal metrics in both cases.
+  - Returns success when the skill executor succeeds.
+  - Returns failure when the skill executor returns an error.
 """
 
 from __future__ import annotations
 
 from unittest.mock import Mock
 
-from src.strategy.planning.dispatch.plan_executor import PlanExecutor, PlanExecutorMetrics
-from src.strategy.planning.dispatch.safe_step_dispatcher import SafeStepDispatcher
+from src.agent.workflow.plan_step_executor import PlanStepExecutor
+from src.agent.interfaces.s3_executor import S3SkillExecutor
 from src.strategy.planning.models.plan import Plan
-from src.strategy.planning.models.step_state import StepState, StepStatus
-from src.strategy.types.step_result import StepResult
 from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
+from src.strategy.types.step_result import StepResult
+from src.capabilities.contracts import SkillResult
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -34,77 +33,42 @@ def make_plan(
     )
 
 
-def make_success_result() -> StepResult:
-    return StepResult(
-        outcome=CognitiveStepOutcome.SUCCESS,
-        reason="done",
-        payload={"x": 1},
-        trace=[],
+def make_mock_skill_executor(*, success: bool = True) -> Mock:
+    executor = Mock(spec=S3SkillExecutor)
+    executor.execute.return_value = SkillResult(
+        request_id="test",
+        success=success,
+        output={"x": 1} if success else None,
+        error=None if success else "fatal error in skill",
     )
-
-
-def make_failure_result() -> StepResult:
-    return StepResult(
-        outcome=CognitiveStepOutcome.FAILURE,
-        reason="fatal error in skill",
-        payload={},
-        trace=[],
-    )
-
-
-def _sample_state() -> StepState:
-    """A minimal valid StepState (dispatcher contract requires non-None state)."""
-    return StepState(
-        step_id="test-step",
-        parent_id=None,
-        cognitive_input={},
-        last_result=None,
-        status=StepStatus.PENDING,
-        created_at=0,
-        attempt=0,
-        trace=[],
-        canonical_hash="test",
-    )
-
-
-def make_mock_dispatcher() -> Mock:
-    dispatcher = Mock(spec=SafeStepDispatcher)
-    dispatcher.dispatch.return_value = (
-        _sample_state(),
-        make_success_result(),
-    )
-    return dispatcher
-
-
-def make_fail_dispatcher() -> Mock:
-    dispatcher = Mock(spec=SafeStepDispatcher)
-    dispatcher.dispatch.return_value = (
-        _sample_state(),
-        make_failure_result(),
-    )
-    return dispatcher
+    return executor
 
 
 # ── Tests ─────────────────────────────────────────────────────────────
 
 def test_execute_returns_success():
-    """execute() returns success metrics when the dispatcher succeeds."""
-    executor = PlanExecutor(dispatcher=make_mock_dispatcher())
+    """execute() returns SUCCESS StepResult when the skill succeeds."""
+    skill_executor = make_mock_skill_executor(success=True)
+    executor = PlanStepExecutor(skill_executor=skill_executor)
     plan = make_plan(skill="json.parse")
 
-    state, result, metrics = executor.execute(plan)
+    result = executor.execute(plan)
 
-    assert metrics.termination_reason == "success"
     assert result.outcome == CognitiveStepOutcome.SUCCESS
+    assert result.payload == {"x": 1}
+    skill_executor.execute.assert_called_once_with(
+        skill_name="json.parse",
+        arguments={"value": "hello"},
+    )
 
 
 def test_execute_returns_failure():
-    """execute() returns failure metrics when the dispatcher fails."""
-    executor = PlanExecutor(dispatcher=make_fail_dispatcher())
+    """execute() returns FAILURE StepResult when the skill fails."""
+    skill_executor = make_mock_skill_executor(success=False)
+    executor = PlanStepExecutor(skill_executor=skill_executor)
     plan = make_plan(skill="fail.skill")
 
-    state, result, metrics = executor.execute(plan)
+    result = executor.execute(plan)
 
-    assert metrics.termination_reason == "failure"
-    assert result.outcome != CognitiveStepOutcome.SUCCESS
+    assert result.outcome == CognitiveStepOutcome.FAILURE
     assert "fatal" in result.reason
