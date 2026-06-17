@@ -36,11 +36,8 @@ DEST_S4B = "s4b"              # → platform job (direct tool execution)
 DEST_PLANNER = "planner"      # → S2 planner (plan generation)  *(reserved)*
 DEST_CAPABILITY = "capability"  # → S3 via S4 (skill / tool)  *(reserved)*
 
-# Keywords that hint at workflow intent
-_WORKFLOW_KEYWORDS = frozenset({
-    "run workflow", "start workflow", "workflow",
-    "trigger workflow", "execute workflow",
-})
+# Trigger prefix for explicit workflow dispatch
+_WORKFLOW_TRIGGER = "/workflow"
 
 # Keywords that hint at direct execution intent
 _EXECUTION_KEYWORDS = frozenset({
@@ -121,18 +118,23 @@ def route_message(
     """
     ctx = context or {}
     _ = ctx  # reserved for future context-based routing
-    msg_lower = message.strip().lower()
+    msg = message.strip()
+    msg_lower = msg.lower()
 
-    # ── 1. Workflow keywords → DEST_WORKFLOW ─────────────────────────
-    if any(kw in msg_lower for kw in _WORKFLOW_KEYWORDS):
+    # ── 1. "/workflow" explicit prefix → DEST_WORKFLOW ────────────────
+    if msg_lower.startswith(_WORKFLOW_TRIGGER):
+        # Extract optional workflow_id after the trigger
+        rest = msg[len(_WORKFLOW_TRIGGER):].strip()
+        workflow_id = rest.split(maxsplit=1)[0] if rest else None
         return Route(
             destination=DEST_WORKFLOW,
             payload={
-                "message": message,
+                "message": msg,
                 "trigger": "workflow_request",
+                "workflow_id": workflow_id or "",
             },
             agent_id=agent.identity.agent_id,
-            confidence=0.8,
+            confidence=0.9,
         )
 
     # ── 2. Execution keywords + capability → S4b ──────────────────────

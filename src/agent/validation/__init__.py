@@ -1,5 +1,6 @@
-"""R.11.7 — Stratum isolation: S5 validation pipeline.
+"""S5 validation utilities (adapter stratum).
 
-The ValidationPipeline lives in S5 (Agent), where it orchestrates
-S2-owned validation and drift-detection functions after skill execution.
+``ValidationPipeline`` has been moved to ``src.strategy.validation.pipeline``
+(utility stratum) so it can legally import strategy-layer drift helpers.
+This module is kept as a placeholder for future S5-specific validators.
 """

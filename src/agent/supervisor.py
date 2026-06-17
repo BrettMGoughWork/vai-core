@@ -33,6 +33,7 @@ Public API
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -104,6 +105,7 @@ class Supervisor:
         interaction_manager: Optional[UserInteractionManager] = None,
         strategy_router: Optional[StrategyRouter] = None,
         auto_persist: bool = True,
+        inline_tool_executor: Optional[Callable[[dict[str, Any]], dict[str, Any] | None]] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -113,6 +115,7 @@ class Supervisor:
         self._interaction_manager = interaction_manager
         self._strategy_router = strategy_router or StrategyRouter()
         self._auto_persist = auto_persist
+        self._inline_tool_executor = inline_tool_executor
 
     # ── 1. create_agent ────────────────────────────────────────────────
 
@@ -451,7 +454,10 @@ class Supervisor:
             # ── Start path ───────────────────────────────────────────
             try:
                 wf_state = engine.start_workflow(
-                    workflow_id, context={"input": input_text},
+                    workflow_id, context={
+                        "input": input_text,
+                        "message": input_text,
+                    },
                 )
             except ValueError as exc:
                 new_errors.append({
@@ -703,6 +709,7 @@ class Supervisor:
                 meta.pop("workflow_waiting_for", None)
                 final_msg = (
                     wf_state.context.get("_workflow_result")
+                    or wf_state.context.get("result")
                     or "Workflow completed successfully."
                 )
                 return self._persist(state.with_(
@@ -747,10 +754,15 @@ class Supervisor:
 
             # ── LLM call → route via StrategyRouter → resume / fail ──
             if outcome.type == "llm_call":
+                rendered_config = _render_context_templates(
+                    outcome.config,
+                    wf_state.context,
+                    wf_state.step_results,
+                )
                 router_outcome = RouterOutcome(
                     type="llm_call",
                     payload={
-                        "prompt": outcome.config,
+                        "prompt": rendered_config,
                         "backend": "conversational",
                         "memory": {},
                         "plan_context": {},
@@ -772,6 +784,19 @@ class Supervisor:
 
             # ── Tool execute → dispatch to S4B → WAITING ──────────
             if outcome.type == "tool_execute":
+                # Try inline tool execution first
+                if self._inline_tool_executor is not None:
+                    try:
+                        inline_result = self._inline_tool_executor(outcome.config)
+                    except Exception:
+                        inline_result = None
+                    if inline_result is not None:
+                        wf_state, _ = engine.resume_with_result(
+                            wf_state, outcome.step_id, inline_result,
+                        )
+                        wf_store.save(wf_state)
+                        continue
+
                 tool_route = Route(
                     destination=DEST_S4B,
                     payload=outcome.config,
@@ -915,6 +940,56 @@ class Supervisor:
             self._store.save(state.agent_id, state)
         return state
 
+    # ── State access ─────────────────────────────────────────────────
+
+    def get_agent_state(self, agent_id: str) -> AgentState:
+        """Load agent state from the store by agent ID.
+
+        Args:
+            agent_id: The agent's unique identifier.
+
+        Returns:
+            The agent's current ``AgentState``.
+
+        Raises:
+            SupervisorError: If no agent exists with the given ID.
+        """
+        state = self._store.load(agent_id)
+        if state is None:
+            raise SupervisorError(
+                f"No agent found with id '{agent_id}'",
+            )
+        return state
+
+    # ── S4B job-result injection (for callbacks / test sims) ─────────
+
+    def set_tool_result(
+        self,
+        agent_id: str,
+        result: Dict[str, Any],
+    ) -> AgentState:
+        """Inject a tool result into a WAITING agent's metadata.
+
+        Simulates the S4B job-completion callback.  After calling this
+        method, invoke ``run_agent_step`` with a message that routes
+        ``DEST_WORKFLOW`` to resume the workflow with the injected result.
+
+        Args:
+            agent_id: The agent whose tool result to set.
+            result:   The tool result payload (becomes
+                      ``workflow_last_result`` in metadata).
+
+        Returns:
+            The updated ``AgentState`` (saved to store).
+
+        Raises:
+            SupervisorError: If the agent does not exist.
+        """
+        state = self.get_agent_state(agent_id)
+        meta = dict(state.supervisor_metadata)
+        meta["workflow_last_result"] = result
+        return self._persist(state.with_(supervisor_metadata=meta))
+
     @staticmethod
     def _compute_duration_ms(timestamp_iso: str) -> float:
         """Compute duration from *timestamp_iso* to now in milliseconds.
@@ -951,6 +1026,40 @@ def _freeze_wf_state(wf_state: WorkflowExecutionState) -> Dict[str, Any]:
         "status": wf_state.status.value,
         "error": wf_state.error,
     }
+
+
+def _render_context_templates(
+    config: Dict[str, Any],
+    context: Dict[str, Any],
+    step_results: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Replace ``{context.X}`` and ``{result.X}`` placeholders in config values.
+
+    Scans every string value in the config dict and substitutes:
+      - ``{context.key}`` -> ``context.get("key", "")``
+      - ``{result.step_id}`` -> ``step_results.get("step_id", "")``
+    """
+    rendered: Dict[str, Any] = {}
+    for key, raw_value in config.items():
+        if not isinstance(raw_value, str):
+            rendered[key] = raw_value
+            continue
+
+        def _replace(m: re.Match) -> str:
+            namespace = m.group(1)
+            name = m.group(2)
+            if namespace == "context":
+                return str(context.get(name, ""))
+            if namespace == "result":
+                return str(step_results.get(name, ""))
+            return m.group(0)
+
+        rendered[key] = re.sub(
+            r"\{(context|result)\.([a-zA-Z_0-9]+)\}",
+            _replace,
+            raw_value,
+        )
+    return rendered
 
 
 def _restore_wf_state(d: Dict[str, Any]) -> WorkflowExecutionState:

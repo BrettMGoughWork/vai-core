@@ -1,0 +1,22 @@
+# Tools execution workflow
+# Dispatches a tool via S4B then completes.
+workflow_id: tools-workflow
+name: "Tool Executor"
+description: "A workflow with one tool_execute step"
+version: "1.0.0"
+trigger_on:
+  - "workflow_request"
+
+steps:
+  run_tool:
+    step_id: run_tool
+    step_type: tool_execute
+    label: "Run a tool"
+    config:
+      skill_name: test_tool
+      arguments:
+        param1: value1
+    transitions:
+      on_success: __end__
+
+start_step: run_tool

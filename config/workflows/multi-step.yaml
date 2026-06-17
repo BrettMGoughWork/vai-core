@@ -1,0 +1,34 @@
+# Multi-step analysis workflow
+# Chains two LLM calls — analyze then summarise.
+workflow_id: multi-step
+name: "Multi-Step Analysis"
+description: "Chains two LLM calls — analyze then summarise"
+version: "1.0.0"
+trigger_on:
+  - "workflow_request"
+
+steps:
+  analyze:
+    step_id: analyze
+    step_type: llm_call
+    label: "Analyze the input"
+    config:
+      message: "Analyze the following input: {context.input}\n\nProvide a brief analysis."
+      agent_id: "default-agent"
+      agent_metadata:
+        name: "Multi-Step Agent"
+        description: "Analysis agent"
+    transitions:
+      on_success: summarize
+
+  summarize:
+    step_id: summarize
+    step_type: llm_call
+    label: "Summarize the analysis"
+    config:
+      message: "Based on this analysis: {context.result}\n\nProvide a one-sentence summary."
+      agent_id: "default-agent"
+    transitions:
+      on_success: __end__
+
+start_step: analyze

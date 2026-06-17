@@ -2250,6 +2250,7 @@ This phase produces the data model and YAML loader — no execution yet.
 | `sub_workflow` | Invoke another workflow | `workflow_id`, `input_map` |
 | `user_input` | Await human input | `prompt`, `input_schema` |
 | `condition` | Branch logic | `expression` (context path) |
+| `planner_call` | Decompose goal via S2 Planner | `goal`, `context` (see PHASE 5.8) |
 
 **Validation rules (all raise ValidationError):**
 - No orphan steps (all transition targets reference valid step_ids)
@@ -2439,7 +2440,147 @@ class EventBus:
 
 ✅ Outcome: The workflow layer has a clean ingress for events without owning transport. Stand-in event bus enables independent development.
 
-### PHASE 5.9 — Human-in-the-Loop
+### PHASE 5.8 — Planner Call Step
+
+**Context from session history:** The S2 planner (`AgentPlanner` + `SubgoalPlanner`) is fully built — it can decompose goals into subgoals, segments, and plans through `MemoryGovernance`. However, the workflow engine has no `planner_call` step type, and `capability_discoverer` is unwired. This phase bridges the gap.
+
+Bridge the gap between the workflow engine (S5/S6) and the S2 Planner. A workflow should be able to invoke the planner to decompose a goal into sub-steps, then execute those steps via `tool_execute` or `sub_workflow`.
+
+By the end of this phase, a YAML workflow with a `planner_call` step produces a plan, creates subgoals/segments in memory, and executes the plan steps — all from a single `/workflow planner-demo` CLI command.
+
+**Pre‑work (known issues to fix):**
+1. `_WiredPlanner.plan()` fallback uses wrong field names: `target_skill` → `targetskillid`, `reasoning` → `reasoning_summary` (for `Plan` from `src.strategy.planning.models.plan`)
+2. `capability_discoverer` must be wired in composition_root (at minimum a stub returning `["test_tool"]`)
+
+**Files to modify:**
+- `src/agent/workflow/engine.py` — Add `"planner_call": _handle_planner_call` to `_STEP_HANDLERS`
+- `src/agent/workflow/engine.py` — Implement `_handle_planner_call()` → returns `StepOutcome(type="planner_call", ...)`
+- `src/agent/supervisor.py` — Handle `planner_call` outcome in `_run_workflow_loop()` — route via `StrategyRouter._route_to_planner()`, feed result back as step completion
+- `src/agent/composition_root.py` — Wire `capability_discoverer` + `planner` into Supervisor
+- `src/agent/strategy_router.py` — Ensure `_route_to_planner()` works without `NotImplementedError`
+- `config/workflows/planner-demo.yaml` — New YAML workflow with `step_type: planner_call`
+- `tests/unit/agent/workflow/test_planner_call.py` — New tests
+
+**Implementation plan:**
+
+**5.8.1 — Add `planner_call` step type to Engine**
+
+In `src/agent/workflow/engine.py`:
+```python
+_STEP_HANDLERS = {
+    "llm_call": _handle_llm_call,
+    "tool_execute": _handle_tool_execute,
+    "sub_workflow": _handle_sub_workflow,
+    "user_input": _handle_user_input,
+    "condition": _handle_condition,
+    "planner_call": _handle_planner_call,  # <-- ADD
+}
+```
+
+Implement `_handle_planner_call(config, context, step_results) → StepOutcome`:
+```python
+def _handle_planner_call(config: dict, context: dict, step_results: list) -> StepOutcome:
+    """Emit a planner_call outcome for the supervisor to route to S2."""
+    goal = config.get("goal", config.get("message", ""))
+    rendered = _render_context_templates({"goal": goal}, context, step_results)
+    return StepOutcome(
+        type="planner_call",
+        output=rendered,
+        metadata={"goal": rendered["goal"]},
+    )
+```
+
+**5.8.2 — Handle `planner_call` in Supervisor**
+
+In `src/agent/supervisor.py`, `_run_workflow_loop()`:
+```python
+if outcome.type == "planner_call":
+    plan_result = self._strategy_router.route(RouterOutcome(
+        type="planner_call",
+        payload={
+            "goal": outcome.output.get("goal", ""),
+            "step_id": step.step_id,
+        },
+    ))
+    step_result = engine.make_step_result(step.step_id, plan_result)
+    engine.resume_with_result(step_result)
+```
+
+The StrategyRouter already has `_route_to_planner()` defined (line ~168). It calls `self._planner.plan()` with discovered capabilities. The key wiring fixes: provide a non-None `capability_discoverer`.
+
+**5.8.3 — Wire dependencies in composition_root**
+
+```python
+# Provide a minimal capability discoverer
+def _discover_capabilities() -> list[str]:
+    return ["test_tool"]  # Placeholder — expand when S3 registry is wired
+
+capability_discoverer = _discover_capabilities
+
+# Ensure StrategyRouter receives planner + capabilities
+strategy_router = StrategyRouter(
+    planner=_wire_planner(s1_executor),   # Already exists
+    capabilities=capability_discoverer,   # Was None
+    submit_s4_job=_submit_job,
+)
+```
+
+Fix the `_WiredPlanner.plan()` fallback field names:
+```python
+# Old (line ~101-106 of wiring/composition.py):
+# Plan(intent=..., target_skill=skill_name, reasoning=...)
+# New:
+Plan(intent=..., targetskillid=skill_name, reasoning_summary=...)
+```
+
+**5.8.4 — Create YAML workflow**
+
+`config/workflows/planner-demo.yaml`:
+```yaml
+workflow_id: planner-demo
+name: "Planner Demo"
+description: "Decompose a goal via S2 Planner, then execute steps"
+version: "1.0.0"
+start_step: plan_it
+steps:
+  plan_it:
+    step_id: plan_it
+    step_type: planner_call
+    label: "Decompose goal"
+    config:
+      goal: "{context.input}"
+    transitions:
+      on_success: execute_tools
+  execute_tools:
+    step_id: execute_tools
+    step_type: tool_execute
+    label: "Execute first plan step"
+    config:
+      skill_name: test_tool
+      params: {}
+    transitions:
+      on_success: __end__
+```
+
+**5.8.5 — Test via CLI**
+
+```bash
+python -m tools.channels.cli_app "/workflow planner-demo"
+```
+
+Expected: Engine calls `_handle_planner_call` → supervisor routes to StrategyRouter → `_route_to_planner()` → S2 Planner → plan with subgoals/segments created → `resume_with_result()` → next step executes.
+
+**Tests to write:**
+
+1. `_handle_planner_call` returns correct `StepOutcome` with goal from config
+2. Template rendering works in planner_call config (e.g., `{context.input}`)
+3. Supervisor dispatches `planner_call` outcome to `_strategy_router.route()`
+4. `StrategyRouter._route_to_planner()` with wired discoverer does not raise `NotImplementedError`
+5. Full workflow: planner_call → tool_execute → completed (via inline executor)
+6. Planner produces subgoals/segments when `MemoryGovernance` is available
+7. Planner fallback handles missing fields without error (regression for `targetskillid`/`reasoning_summary`)
+
+✅ Outcome: Workflows can decompose goals via S2 Planner and execute the resulting plan steps. Full CLI testable path: `/workflow planner-demo`.
 Workflows need to pause for human input. Core pause/resume already exists in the engine and supervisor. This phase wraps that functionality in a clean `InteractionManager` for validation and timeout.
 
 **File to create:** `src/agent/workflow/user_interaction.py`
@@ -3962,3 +4103,188 @@ These are the highest-priority tasks emerging from the current project audit. Th
 - N.5.4 — Verify tool_execute steps dispatch to S4 and return results
 - N.5.5 — Verify paused workflows resume correctly with user input
 - N.5.6 — Document all known gaps in an "end-to-end readiness" matrix
+
+
+## STRATUM 6 — Workflow Layer (Trigger Router + Definitions + Engine + Supervisor + Planner)
+
+S6 owns the workflow layer — definitions, state machine execution, trigger routing, agent
+selection, human-in-the-loop, and workflow supervision. S6 receives triggers via S4's event
+substrate (never owns transport), delegates LLM work to S1 (Runtime), delegates tool
+execution to S4 (Platform), and delegates planning to S2 (Planner).
+
+**Architectural rule:** S6 is a pure orchestrator. It owns the "what" and "when". It never
+calls LLMs directly, never executes tools, and never owns transport. Every capability is
+injected as a callable or adapter.
+
+```
+External world
+    │
+    ▼
+Channels (S4 — universal ingress)
+    │
+    ▼
+Event substrate (S4 — queueing, durability, supervision)
+    │
+    ▼
+S6.0 — Workflow Trigger Router (S6)
+    │  Filters workflow-relevant events, maps to workflow instances
+    ▼
+S6.2 — Workflow Engine (S6)
+    │  State machine: llm_call → S1 | tool_execute → S4 | planner_call → S2
+    ▼
+S6.5 — Workflow Supervisor (S6)
+    Observes, manages, debugs running workflows
+```
+
+### How S6 gets triggered
+
+There are exactly three valid trigger sources for S6:
+
+**A. User-initiated events (via S4 channels)**
+A user sends a message → channel normalizes → S4 creates a job → S5 routes to /workflow → S6 picks it up.
+This is the "chatbot" or "assistant" path.
+
+**B. System-initiated events (cron, timers, schedules)**
+A cron job or timer drops an event into the event substrate → S4 ingests → S6 trigger router sees it as a workflow trigger.
+This is the "run my weekly report" path.
+
+**C. Workflow-internal events (S6 itself)**
+A workflow step completes → S6 schedules the next step → engine executes it.
+This is the "X is done, now do Y" path.
+
+These three cover every use case. No other trigger sources exist.
+
+### The event model
+
+S6 subscribes to workflow‑trigger events, which are just a type of S4 event:
+
+- `workflow.start`
+- `workflow.resume`
+- `workflow.timeout`
+- `workflow.external_input`
+- `workflow.scheduled_trigger`
+
+These are not channel messages. They are not agent messages. They are workflow messages.
+S4 doesn't interpret them — it just delivers them. S6 interprets them.
+
+### S6 phases
+
+S6 is built in 6 phases, incrementally adding capability. The phases are designed to be
+PR-able independently, each delivering a testable vertical slice.
+
+---
+
+### S6.0 — Workflow Trigger Router
+
+The trigger router subscribes to S4's event substrate, filters workflow-relevant events,
+and maps them to `WorkflowDefinition` instances.
+
+**Implementation:** See PHASE 5.7 (listed under S5 in the roadmap but logically S6.0 — the
+router lives at the S5/S6 boundary and is tracked under S5 for implementation sequencing).
+
+**Status:** 📋 Planned — not yet implemented.
+
+---
+
+### S6.1 — Workflow Definition Model ✅ DONE
+
+The data model for workflows. A workflow is a directed graph of typed steps that share
+context. Steps support template rendering (`{context.key}`, `{result.key}`) and
+system_prompt overrides.
+
+**Step types:**
+
+| Step Type | Purpose | Config Fields |
+|-----------|---------|---------------|
+| `llm_call` | Call Runtime with a prompt | `system_prompt`, `model`, `message` |
+| `tool_execute` | Execute a tool/skill | `skill_name`, `params` |
+| `sub_workflow` | Invoke another workflow | `workflow_id`, `input_map` |
+| `user_input` | Await human input | `prompt`, `input_schema` |
+| `condition` | Branch logic | `expression` (context path) |
+| `planner_call` | Decompose goal via S2 Planner | `goal`, `context` |
+
+**Status:** ✅ Complete
+- `src/agent/workflow/workflow_definition.py` — Pydantic models (WorkflowDefinition, WorkflowStep)
+- `src/agent/workflow/loader.py` — YAML loader (scans `config/workflows/*.yaml`)
+- `src/agent/workflow/registry.py` — WorkflowRegistry (in-memory, registered in composition_root)
+- `config/workflows/` — 5 declarative YAML workflows:
+  - `default-agent.yaml` — single LLM call
+  - `tools-workflow.yaml` — tool execute (inline executor)
+  - `waiting-agent.yaml` — user_input + LLM chain
+  - `multi-step.yaml` — two-step LLM analysis
+  - `planner-demo.yaml` — planner_call + tool_execute (post-5.8)
+- Template rendering, system_prompt override, context passthrough all tested
+
+---
+
+### S6.2 — Workflow Engine (State Machine) ✅ DONE
+
+The core execution engine. A state machine that runs workflow steps, manages shared context,
+handles transitions, and exposes a clean API. Engine NEVER calls LLMs or tools directly —
+it delegates through callbacks.
+
+**Current step handlers:**
+- `_handle_llm_call` — emits `StepOutcome(type="llm_call")` — supervisor routes to S1
+- `_handle_tool_execute` — emits `StepOutcome(type="tool_execute")` — supervisor routes to inline executor or S4
+- `_handle_sub_workflow` — emits `StepOutcome(type="sub_workflow")` — engine recursively starts child
+- `_handle_user_input` — pauses workflow, emits `InteractionRequest`
+- `_handle_condition` — evaluates expression, follows branch transition
+- `_handle_planner_call` — emits `StepOutcome(type="planner_call")` — supervisor routes to S2
+
+**Key design decisions:**
+- Engine is stateless between steps — each invocation takes context, returns outcome
+- Supervisor manages the loop — engine is a pure function of (step, context) → outcome
+- `resume_with_result()` feeds tool/planner results back into shared_context
+- `last_output` extracted from LLM `PromptResponse` dict (`{"is_complete": ..., "message": ...}`)
+
+**Status:** ✅ Complete — 72 engine tests pass, 35 supervisor tests pass.
+
+---
+
+### S6.3 — Agent Selection Layer
+
+When a workflow step needs an agent (for `user_input` or delegated `llm_call`), the agent
+selection layer determines which agent/persona handles the step.
+
+**Not yet implemented.** Future phase.
+
+---
+
+### S6.4 — User Interaction Layer
+
+Workflows can pause for human input with validation. Core pause/resume exists in the engine
+and supervisor (see PHASE 5.9).
+
+**Files to create:**
+- `src/agent/workflow/user_interaction.py` — InteractionManager
+- `src/agent/workflow/interaction_request.py` — InteractionRequest/Response dataclasses
+
+**Status:** 📋 Planned — not yet implemented (PHASE 5.9).
+
+---
+
+### S6.5 — Workflow Supervisor
+
+Operational layer for observing and managing all running workflow instances. See PHASE 5.11.
+
+**Status:** 📋 Planned — not yet implemented.
+
+---
+
+### Known gaps (end-to-end readiness)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| YAML workflow loader | ✅ Done | Scans `config/workflows/*.yaml`, validated via Pydantic |
+| Workflow step types | ✅ Done | 6 types: llm_call, tool_execute, sub_workflow, user_input, condition, planner_call |
+| Template rendering | ✅ Done | `{context.X}`, `{result.X}` in step config |
+| System prompt override | ✅ Done | YAML `system_prompt` key overrides auto-generated prompt |
+| Inline tool executor | ✅ Done | Bypasses S4 for synchronous tool execution (test_tool stub) |
+| Gateway → S5 → S6 CLI | ✅ Done | `python -m tools.channels.cli_app "/workflow <name>"` |
+| Trigger Router (S6.0) | 📋 Planned | Subscribes to S4 event substrate, routes to workflow engine |
+| S4B job dispatch | 📋 Planned | Real durable execution queue (currently synthetic `_submit_job`) |
+| Planner call step | 🚧 In progress | PHASE 5.8 — step handler exists, needs wiring + tests |
+| Agent selection | 📋 Planned | Match workflow steps to agent personas |
+| User interaction manager | 📋 Planned | Validation, timeout for human-in-the-loop |
+| Workflow supervisor | 📋 Planned | Observability, DLQ, retry, metrics |
+| Real S3 skill registry | 📋 Planned | Beyond test_tool stub |

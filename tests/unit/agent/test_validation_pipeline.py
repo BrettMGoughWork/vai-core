@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-from src.agent.validation.pipeline import ValidationPipeline
+from src.strategy.validation.pipeline import ValidationPipeline
 from src.strategy.memory.drift_memory import DriftMemory
 from src.strategy.memory.drift_memory_types import DriftEvent
 from src.strategy.signals.model import (

@@ -1,0 +1,32 @@
+# Waiting agent workflow
+# Pauses for user input then confirms the choice.
+workflow_id: waiting-agent
+name: "Waiting Agent"
+description: "A workflow that pauses for user input before completing"
+version: "1.0.0"
+trigger_on:
+  - "workflow_request"
+
+steps:
+  ask:
+    step_id: ask
+    step_type: user_input
+    label: "Ask the user a question"
+    config:
+      prompt: "What would you like to do?"
+      timeout_seconds: 60
+    transitions:
+      on_success: confirm
+      on_timeout: __end__
+
+  confirm:
+    step_id: confirm
+    step_type: llm_call
+    label: "Confirm the user's choice"
+    config:
+      message: "The user said: {context.input}. Confirm this choice."
+      agent_id: "waiting-agent"
+    transitions:
+      on_success: __end__
+
+start_step: ask

@@ -124,6 +124,36 @@ tool_execute_workflow = WorkflowDefinition(
 
 
 # ======================================================================
+# Waiting-for-input workflow (tests WAITING state + resume path)
+# ======================================================================
+
+waiting_workflow = WorkflowDefinition(
+    workflow_id="waiting-agent",
+    name="Waiting Agent",
+    description="A workflow that pauses for user input before completing",
+    version="1.0.0",
+    trigger_on=["workflow.start", "workflow_request"],
+    steps={
+        "ask": WorkflowStep(
+            step_id="ask",
+            step_type="user_input",
+            label="Ask the user a question",
+            config={"prompt": "What would you like to do?", "timeout_seconds": 60},
+            transitions={"on_success": "confirm", "on_timeout": "__end__"},
+        ),
+        "confirm": WorkflowStep(
+            step_id="confirm",
+            step_type="llm_call",
+            label="Confirm the user's choice",
+            config={"prompt": "The user said: {{input}}. Confirm this choice."},
+            transitions={"on_success": "__end__"},
+        ),
+    },
+    start_step="ask",
+)
+
+
+# ======================================================================
 # Fixtures
 # ======================================================================
 
@@ -144,13 +174,21 @@ def workflow_registry() -> WorkflowRegistry:
 
 @pytest.fixture
 def agent_registry() -> AgentRegistry:
-    """``AgentRegistry`` with a default conversational agent."""
+    """``AgentRegistry`` with default + tools-workflow agents."""
     reg = AgentRegistry()
     reg.register_agent(AgentMetadata(
         identity=AgentIdentity(
             agent_id="default-agent",
             name="Default Agent",
             description="Default conversational agent",
+        ),
+        capabilities=["conversational"],
+    ))
+    reg.register_agent(AgentMetadata(
+        identity=AgentIdentity(
+            agent_id="tools-workflow",
+            name="Tools Workflow Agent",
+            description="Agent that dispatches tool execute jobs",
         ),
         capabilities=["conversational"],
     ))
@@ -225,3 +263,102 @@ def multi_workflow_registry(
     """Registry with both hello_world and tool_execute workflows."""
     workflow_registry.register(tool_execute_workflow)
     return workflow_registry
+
+
+@pytest.fixture
+def wired_tool_supervisor(
+    agent_registry: AgentRegistry,
+    store: MemoryAgentStateStore,
+    multi_workflow_registry: WorkflowRegistry,
+    job_queue: InMemoryJobQueue,
+    strategy_router: StrategyRouter,
+) -> Supervisor:
+    """A fully-wired ``Supervisor`` with tool_execute workflow support.
+
+    Same as ``wired_supervisor`` but uses ``multi_workflow_registry``
+    so tool_execute steps can be dispatched to S4B.
+    """
+    wf_store = WfStore()
+    return Supervisor(
+        registry=agent_registry,
+        store=store,
+        workflow_registry=multi_workflow_registry,
+        submit_job_callable=job_queue.submit,
+        strategy_router=strategy_router,
+        workflow_instance_store=wf_store,
+    )
+
+
+@pytest.fixture
+def tool_gateway_adapter(
+    wired_tool_supervisor: Supervisor,
+) -> AgentGatewayAdapter:
+    """``AgentGatewayAdapter`` wrapping the wired tool supervisor.
+
+    The adapter's supervisor has access to the ``tool_execute`` workflow
+    so tests can exercise the WAITING → resume path.
+    """
+    return AgentGatewayAdapter(wired_tool_supervisor)
+
+
+# ======================================================================
+# EventBus / WorkflowEngine / TriggerRouter fixtures
+# ======================================================================
+
+
+@pytest.fixture
+def event_bus() -> Any:
+    """Fresh in-process ``EventBus`` for each test."""
+    from src.agent.workflow.event_bus import EventBus
+    return EventBus()
+
+
+@pytest.fixture
+def workflow_engine(workflow_registry: WorkflowRegistry) -> Any:
+    """``WorkflowEngine`` wired to the hello_world registry."""
+    from src.agent.workflow.engine import WorkflowEngine
+    return WorkflowEngine(registry=workflow_registry)
+
+
+@pytest.fixture
+def trigger_router(
+    workflow_registry: WorkflowRegistry,
+    workflow_engine: Any,
+) -> Any:
+    """``TriggerRouter`` wired to the registry and engine."""
+    from src.agent.workflow.trigger_router import TriggerRouter
+    return TriggerRouter(registry=workflow_registry, engine=workflow_engine)
+
+
+@pytest.fixture
+def waiting_workflow_registry(
+    workflow_registry: WorkflowRegistry,
+) -> WorkflowRegistry:
+    """Registry with hello_world + waiting_agent workflows."""
+    workflow_registry.register(waiting_workflow)
+    return workflow_registry
+
+
+@pytest.fixture
+def full_gateway_registry() -> Any:
+    """``ChannelRegistry`` with all standard channels registered.
+
+    Provides a realistic registry for testing the Gateway entrypoint
+    (``submit_channel_input`` / ``process_channel_input``).
+    """
+    from src.gateway.channels.registry import ChannelRegistry
+    from src.gateway.channels.cli import register_cli_channel
+    from src.gateway.channels.web import register_web_channel
+    from src.gateway.channels.ws import register_websocket_channel
+    from src.gateway.channels.slack import register_slack_channel
+    from src.gateway.channels.mail import register_mail_channel
+    from src.gateway.channels.webhook import register_webhook_channel
+
+    reg = ChannelRegistry()
+    register_cli_channel(reg)
+    register_web_channel(reg)
+    register_websocket_channel(reg)
+    register_slack_channel(reg)
+    register_mail_channel(reg)
+    register_webhook_channel(reg)
+    return reg

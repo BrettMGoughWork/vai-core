@@ -281,6 +281,11 @@ class WorkflowEngine:
         step_results[step_id] = result
         context = dict(state.context)
         context["result"] = result
+        # Extract a readable text from dict results (LLM responses)
+        if isinstance(result, dict):
+            context["last_output"] = str(result.get("message", result))
+        else:
+            context["last_output"] = str(result)
         resumed = _copy_state(
             state,
             status=WorkflowStatus.RUNNING,
@@ -358,11 +363,15 @@ class WorkflowEngine:
         step: Any,
         outcome: StepOutcome,
     ) -> Tuple[WorkflowExecutionState, StepOutcome]:
-        """Follow ``on_success`` transition and advance current_step_id."""
+        """Follow ``on_success`` transition and advance current_step_id.
+
+        Does **not** complete the workflow when the target is ``__end__`` —
+        the caller (``_run_workflow_loop``) decides whether the step is
+        blocking (e.g. ``tool_execute`` → WAITING) or terminal.
+        """
         target = step.transitions.get("on_success", END_TARGET)
-        if target == END_TARGET:
-            return self._complete(state)
-        new_state = _copy_state(state, current_step_id=target)
+        new_id = None if target == END_TARGET else target
+        new_state = _copy_state(state, current_step_id=new_id)
         return new_state, outcome
 
     def _advance_on(
@@ -372,11 +381,14 @@ class WorkflowEngine:
         transition_key: str,
         outcome: StepOutcome,
     ) -> Tuple[WorkflowExecutionState, StepOutcome]:
-        """Follow a specific transition key and advance current_step_id."""
+        """Follow a specific transition key and advance current_step_id.
+
+        Does **not** complete the workflow when the target is ``__end__`` —
+        same contract as ``_advance``.
+        """
         target = step.transitions.get(transition_key, END_TARGET)
-        if target == END_TARGET:
-            return self._complete(state)
-        new_state = _copy_state(state, current_step_id=target)
+        new_id = None if target == END_TARGET else target
+        new_state = _copy_state(state, current_step_id=new_id)
         return new_state, outcome
 
     def _complete(

@@ -1,8 +1,8 @@
-"""R.11.7 — S5 Validation Pipeline.
+"""R.11.7 — Post-execution Validation Pipeline.
 
 Orchestrates shape validation, behavioural anomaly detection, and
-drift evaluation after skill execution.  Delegates to S2-owned
-functions but lives in S5 to keep the stratum boundary clean.
+drift evaluation after skill execution.  Lives in the utility stratum
+so it can legally import strategy-layer drift and validation helpers.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ class ValidationDiagnostics:
 
 
 class ValidationPipeline:
-    """Post-execution validation pipeline for S5.
+    """Post-execution validation pipeline.
 
     Holds a ``DriftMemory`` ring buffer and provides an ``apply`` method
     that runs shape validation -> anomaly detection -> drift evaluation.
@@ -69,7 +69,7 @@ class ValidationPipeline:
             Optional JSON-schema-like dict describing the expected output
             shape.  When ``None`` the pipeline is a graceful no-op.
         subgoal_id, segment_id, step_id:
-            Identifiers for drift-event correlation.
+            Identifiers for drift-event recording.
 
         Returns
         -------
