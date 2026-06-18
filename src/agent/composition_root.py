@@ -177,6 +177,27 @@ _s1_executor = _S1Executor()
 _wired_planner = wire_planner(s1_executor=_s1_executor)
 
 
+# ── Shared MemoryGovernance ──────────────────────────────────────────
+# Created once at the composition root so StrategyRouter, planner, and
+# any other component share the same memory stores and governance layer.
+from src.strategy.memory.segment_memory import SegmentMemory
+from src.strategy.memory.subgoal_memory import SubgoalMemory
+from src.strategy.memory.plan_memory import PlanMemory
+from src.strategy.memory.drift_memory import DriftMemory
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
+
+_segment_memory = SegmentMemory()
+_subgoal_memory = SubgoalMemory()
+_plan_memory = PlanMemory()
+_drift_memory = DriftMemory()
+_shared_governance = MemoryGovernance(
+    subgoal_memory=_subgoal_memory,
+    segment_memory=_segment_memory,
+    plan_memory=_plan_memory,
+    drift_memory=_drift_memory,
+)
+
+
 # ── Wired StrategyRouter → Supervisor ───────────────────────────────
 # Provide a minimal capability discoverer (stub — expand when S3 registry is wired)
 def _discover_capabilities() -> list[DiscoveredSkill]:
@@ -236,6 +257,7 @@ _strategy_router = StrategyRouter(
     capability_discoverer=_discover_capabilities,
     submit_s4_job=_submit_job,
     step_executor=_execute_plan_step,
+    governance=_shared_governance,
 )
 
 # ── Wired Supervisor ────────────────────────────────────────────────

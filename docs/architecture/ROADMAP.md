@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-18 (4.6 ✅, Y.7/Y.8 + concerns added)  
+> **Last updated:** 2026-06-18 (Sprint 4 ✅)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -120,7 +120,7 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 
 ## 🏃 Current Sprint
 
-### Sprint 4 — Planner Call Step (Active)
+### ✅ Sprint 4 — Planner Call Step (Completed)
 
 **Goal:** Wire the planner_call step type end-to-end so a YAML workflow can decompose a goal via S2 Planner, create subgoals/segments in memory, and execute the resulting steps.
 
@@ -134,9 +134,9 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 4.4 | Fix `_WiredPlanner.plan()` fallback field names | ✅ Done |
 | 4.5 | Create `planner-demo.yaml` workflow | ✅ Done |
 | 4.6 | Step execution wiring — plan steps → inline executor | ✅ Done |
-| 4.7 | Goals/subgoals/segments creation in MemoryGovernance | 🔜 Next |
-| 4.8 | Test: full planner_call → tool_execute → completion via CLI | 🔜 Next |
-| 4.9 | Test: drift detection, confidence scoring | 🔜 Next |
+| 4.7 | Goals/subgoals/segments creation in MemoryGovernance | ✅ Done |
+| 4.8 | Test: full planner_call → tool_execute → completion via CLI | ✅ Done |
+| 4.9 | Test: drift detection, confidence scoring | ✅ Done |
 
 ---
 
