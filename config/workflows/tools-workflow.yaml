@@ -13,9 +13,9 @@ steps:
     step_type: tool_execute
     label: "Run a tool"
     config:
-      skill_name: test_tool
+      skill_name: stdlib.echo
       arguments:
-        param1: value1
+        value: "Hello from the real stdlib.echo primitive!"
     transitions:
       on_success: __end__
 

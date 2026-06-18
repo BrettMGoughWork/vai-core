@@ -13,6 +13,8 @@ from __future__ import annotations
 from typing import Any, List
 
 from src.capabilities.contracts import DiscoveredSkill
+from src.capabilities.primitives.stdlib import load_all_primitives
+from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 
 # ── Infrastructure imports (adapter→infrastructure: allowed) ─────────
 from src.runtime.llm.types import CoreLLMResponse, RuntimeConfig
@@ -69,24 +71,42 @@ for defn in load_workflows_from_yaml("config/workflows"):
     wf_registry.register(defn)
 
 
+# ── Primitive registry (loaded from stdlib) ──────────────────────────
+_primitive_registry = PrimitiveRegistry()
+_primitives_loaded = load_all_primitives(_primitive_registry)
+
+
 def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
     """Execute a known tool synchronously, bypassing S4B.
 
-    Returns the result dict if the tool is recognised, or *None* to
-    fall through to S4B dispatch.
+    Looks up the skill name in the real ``PrimitiveRegistry``.  Returns
+    the result dict if the primitive is recognised, or *None* to fall
+    through to S4B dispatch.
     """
     skill_name = payload.get("skill_name", "")
     arguments = payload.get("arguments", {})
-    if skill_name == "test_tool":
+
+    primitive = _primitive_registry.get(skill_name)
+    if primitive is None:
+        return None  # unknown → dispatch to S4B
+
+    try:
+        result = primitive.execute(arguments, context={})
         return {
-            "status": "success",
+            "status": result.status,
             "message": (
-                f"Tool '{skill_name}' executed with "
-                f"args: {arguments}"
+                f"Primitive '{skill_name}' executed successfully"
+                if result.status == "success"
+                else f"Primitive '{skill_name}' failed"
             ),
-            "outputs": arguments,
+            "outputs": result.data if result.data is not None else {},
         }
-    return None  # unknown → dispatch to S4B
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": f"Primitive '{skill_name}' raised: {exc}",
+            "outputs": {},
+        }
 
 
 # ── S1 → S2: inject LLM transport via DI slot ──────────────────────
@@ -189,13 +209,11 @@ _shared_governance = MemoryGovernance(
 
 
 # ── Wired StrategyRouter → Supervisor ───────────────────────────────
-# Provide a minimal capability discoverer (stub — expand when S3 registry is wired)
 def _discover_capabilities() -> list[DiscoveredSkill]:
+    """Return all primitives from the real registry as discoverable skills."""
     return [
-        DiscoveredSkill(
-            name="test_tool",
-            description="Test tool for demonstrating S3 capability execution",
-        ),
+        DiscoveredSkill(name=p.name, description=p.description)
+        for p in _primitive_registry.list()
     ]
 
 
@@ -203,26 +221,37 @@ def _execute_plan_step(step_payload: dict[str, Any]) -> dict[str, Any]:
     """Execute a single plan step inline.
 
     Routes the step to the appropriate handler based on ``skill_ref``:
-    - ``test_tool`` → inline tool executor
-    - ``llm_call``  → S1 LLM transport
-    - anything else → unknown skill result
+    - registered stdlib primitive → ``PrimitiveRegistry``
+    - ``llm_call`` / ``llm``     → S1 LLM transport
+    - anything else               → unknown skill result
     """
     step_id = step_payload.get("step_id", "")
     skill_ref = step_payload.get("skill_ref", "")
     inputs = step_payload.get("inputs", {})
     description = step_payload.get("description", "")
 
-    if skill_ref == "test_tool":
-        result = _execute_tool_inline({
-            "skill_name": "test_tool",
-            "arguments": inputs,
-        })
-        return {
-            "status": "success",
-            "message": result.get("message", f"Tool '{skill_ref}' executed"),
-            "step_id": step_id,
-            "outputs": result.get("outputs", inputs),
-        }
+    # Look up real primitives from the registry
+    primitive = _primitive_registry.get(skill_ref)
+    if primitive is not None:
+        try:
+            result = primitive.execute(inputs, context={})
+            return {
+                "status": result.status,
+                "message": (
+                    f"Primitive '{skill_ref}' executed successfully"
+                    if result.status == "success"
+                    else f"Primitive '{skill_ref}' failed: {result.error}"
+                ),
+                "step_id": step_id,
+                "outputs": result.data if result.data is not None else {},
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "message": f"Primitive '{skill_ref}' raised: {exc}",
+                "step_id": step_id,
+                "outputs": {},
+            }
 
     if skill_ref in ("llm_call", "llm"):
         prompt = description or inputs.get("prompt", f"Execute step: {step_id}")
