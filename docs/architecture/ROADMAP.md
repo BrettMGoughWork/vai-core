@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-18 (Sprint 4 ✅)  
+> **Last updated:** 2026-06-19 (Sprint 4a — SessionedAdapter complete)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -139,8 +139,23 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 4.9 | Test: drift detection, confidence scoring | ✅ Done |
 
 ---
-
 ## 📋 Upcoming Sprints
+
+### Sprint 4a — Multi-Turn Conversation Memory
+
+**Goal:** Enable multi-turn conversation memory in the interactive CLI so each prompt can reference prior exchanges in the same session.
+
+| Task | What | Status |
+|------|------|--------|
+| 4a.1 | Add `conversation_history` field to `AgentState` dataclass | ✅ Done |
+| 4a.2 | Accumulate conversation history across turns in the CLI loop (`tools/agent/cli_app.py`) | ✅ Done |
+| 4a.3 | Wire accumulated history into `PromptRequest` via S5 → StrategyRouter → S1 | ✅ Done |
+| 4a.4 | Update S1 conversational backend to render prior turns in the system prompt | ✅ Done |
+| 4a.5 | Wire `MemoryGovernance` into the `DEST_RUNTIME` path in `strategy_router.py` | ✅ Done |
+| 4a.6 | Pass governance context into `PromptRequest.memory` | ✅ Done |
+| 4a.7 | Integration test: multi-turn conversation references prior content | ✅ Done |
+| 4a.8 | Integration test: fresh session boundary isolates history | ✅ Done |
+| 4a.9 | Test: drift events emitted for conversational turns | ✅ Done |
 
 ### Sprint 5 — End-to-End Wiring & Integration Tests
 
@@ -335,6 +350,7 @@ These are forward-looking capabilities that the architecture supports but are no
 - Self-improvement loops — "what could I have done better?"
 
 ### Y.2 — Long-Term Memory & Knowledge Graphs
+(note: see section Z before considering this section)
 - Persistent memory across sessions
 - Knowledge graph of entities, decisions, and past outcomes
 - Semantic retrieval for context injection
@@ -430,6 +446,50 @@ Learning Subsystem (async observer)
 - **Three-way classification is ambitious** — having the system autonomously decide "this is a workflow vs a skill vs a pattern" is a non-trivial classification problem. Recommend starting with the system surfacing *candidates* for human (or reviewer-agent) decision, then automating once there's enough labelled data.
 - **Sequencing dependency** — the learning subsystem depends on mature observability (Sprint 14), durable execution (Sprint 11), and stable base layers that produce reliable telemetry. Building it too early means building on shifting sand. Recommended post-Sprint-15.
 - **Feedback loop risk** — if the subsystem creates artifacts that are then used by agents, which are then observed by the subsystem, you risk reinforcing its own biases. Need a mechanism to detect and break circular codification.
+
+### Z — Multi-Tier Memory Architecture
+
+**Goal:** Evolve beyond simple in-memory conversation history into a layered memory system with compression, retrieval, and forgetting — enabling long-running, context-rich interactions.
+
+**Concept:** A Memory Controller sits between the agent and its context window, managing what goes in (recent messages, retrieved chunks), what gets compressed (summaries, reflection notes), what persists externally (vector DB, file store, episodic records), and what gets pruned.
+
+#### Z.1 — Short-Term (Context Window)
+
+| Task | What |
+|------|------|
+| Z.1.1 | Template-based system prompt injection (persona, instructions, constraints) |
+| Z.1.2 | Sliding window of recent `user`/`assistant` messages (configurable N) |
+| Z.1.3 | Retrieved memory chunk injection at query time (semantic + episodic) |
+| Z.1.4 | Token budget tracking — allocate tokens across system / window / retrieved chunks |
+
+#### Z.2 — Compression (Summaries & Reflection)
+
+| Task | What |
+|------|------|
+| Z.2.1 | Running structured summary summarizer — periodically condense older turns |
+| Z.2.2 | Reflection notes — agent-generated observations about goals, blockers, decisions |
+| Z.2.3 | Tiered eviction — oldest raw messages → summary → discarded |
+| Z.2.4 | Compression triggers — token threshold, idle time, turn count |
+
+#### Z.3 — External Memory (Long-Term Storage)
+
+| Task | What |
+|------|------|
+| Z.3.1 | Vector DB integration — semantic search over past conversations and documents |
+| Z.3.2 | File store — tool outputs, logs, generated artifacts indexed by session |
+| Z.3.3 | Episodic records — structured recall of past sessions (goals, outcomes, errors) |
+| Z.3.4 | Cross-session retrieval — "how did I solve this last week?" |
+
+#### Z.4 — Memory Controller
+
+| Task | What |
+|------|------|
+| Z.4.1 | Controller policy engine — configurable rules for keep / compress / retrieve / forget |
+| Z.4.2 | Decide what to keep in context window vs evict to summary |
+| Z.4.3 | Decide when to compress — triggers summarization of eligible windows |
+| Z.4.4 | Decide what to retrieve — semantic query construction from current turn context |
+| Z.4.5 | Decide what to forget — TTL-based, relevance-threshold, or explicit agent-directed pruning |
+| Z.4.6 | Memory inspection tools — `:memory` CLI command to view current context, summary, and linked records |
 
 ---
 

@@ -323,7 +323,10 @@ class Supervisor:
                         },
                     },
                     "backend": "conversational",
-                    "memory": {},
+                    "memory": {
+                        "conversation_history":
+                            ctx.context.conversation_history,
+                    },
                     "plan_context": {},
                     "tool_context": [],
                 },

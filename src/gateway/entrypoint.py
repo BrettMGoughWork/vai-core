@@ -291,8 +291,11 @@ def submit_channel_input(
     request = AgentRequest(
         channel=channel_name,
         message_text=text,
-        user_id=msg_metadata.pop("user_id", None)
-        or (payload.get("sender") if isinstance(payload, dict) else None),
+        user_id=(
+            msg_metadata.pop("user_id", None)
+            or (payload.get("sender") if isinstance(payload, dict) else None)
+            or msg_metadata.get("sender")  # CLI channel puts sender in metadata
+        ),
         metadata=msg_metadata,
     )
 

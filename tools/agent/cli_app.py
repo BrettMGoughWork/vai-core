@@ -28,6 +28,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 import traceback
 from collections.abc import Callable
@@ -42,6 +43,8 @@ from src.agent import (
     Supervisor,
     load_agent_manifest,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -134,22 +137,31 @@ def _handle_message(
     supervisor: Supervisor,
     text: str,
     agent_id: str,
-) -> None:
+    conversation_history: list[dict[str, Any]] | None = None,
+) -> tuple[AgentState, list[dict[str, Any]]]:
     """Route a user message through the S5 supervisor and print the response.
 
-    Creates an agent, activates it with the user message, runs one
-    cognitive step, and displays the ``AgentResponse``.
+    Creates a fresh agent, activates it with the accumulated conversation
+    history, runs one cognitive step, and displays the ``AgentResponse``.
+
+    Returns the updated state and the new conversation history.
     """
+    if conversation_history is None:
+        conversation_history = []
+
     try:
-        # 1. Create runtime state
+        # 1. Create runtime state (fresh lifecycle each turn)
         state: AgentState = supervisor.create_agent(agent_id)
 
-        # 2. Activate with the user's message
+        # 2. Activate with the user's message + prior history
         message = AgentMessage(
             message=text,
             context={"channel": "cli", "sender": None},
         )
-        state = supervisor.activate_agent(state, message, channel="cli")
+        state = supervisor.activate_agent(
+            state, message, channel="cli",
+            conversation_history=conversation_history,
+        )
 
         # 3. Run one routing step (route -> dispatch)
         state = supervisor.run_agent_step(state, message=text)
@@ -159,6 +171,9 @@ def _handle_message(
         if response is not None:
             if response.reply:
                 print(response.reply)
+                # Accumulate this turn into history
+                conversation_history.append({"role": "user", "content": text})
+                conversation_history.append({"role": "assistant", "content": response.reply})
             if response.metadata:
                 print(f"  [meta] agent={response.metadata.get('agent_id', '?')} "
                       f"confidence={response.metadata.get('confidence', '?')}")
@@ -176,6 +191,8 @@ def _handle_message(
     except Exception:
         print(f"  [error] unhandled exception:")
         traceback.print_exc()
+
+    return state, conversation_history
 
 
 def _list_agents(registry: AgentRegistry) -> None:
@@ -223,8 +240,13 @@ def run_interactive(
     registry: AgentRegistry,
     agent_id: str,
 ) -> None:
-    """Read commands from stdin in a continuous interactive loop."""
+    """Read commands from stdin in a continuous interactive loop.
+
+    Maintains conversation history across turns so the S1 backend sees
+    prior user/assistant exchanges.
+    """
     is_piped = not sys.stdout.isatty()
+    conversation_history: list[dict[str, Any]] = []
 
     if not is_piped:
         print(HEADER)
@@ -259,7 +281,9 @@ def run_interactive(
                     print("Goodbye.")
                 break
 
-            _handle_message(supervisor, text, agent_id)
+            _, conversation_history = _handle_message(
+                supervisor, text, agent_id, conversation_history,
+            )
 
             if not is_piped:
                 print()
@@ -268,6 +292,12 @@ def run_interactive(
     except (KeyboardInterrupt, EOFError):
         if not is_piped:
             print("\nGoodbye.")
+
+    if conversation_history:
+        logger.info(
+            "Session ended — %d conversation turns accumulated",
+            len(conversation_history) // 2,
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -73,9 +73,17 @@ class AgentGatewayAdapter:
                 **request.metadata,
             },
         )
+        # Extract conversation_history from metadata (injected by
+        # submit_channel_input) so the interactive CLI loop can preserve
+        # multi-turn context across fresh agent instances.
+        conversation_history = (
+            request.metadata.pop("conversation_history", [])
+            if request.metadata else []
+        )
         try:
             state = self._supervisor.activate_agent(
                 state, msg, channel=request.channel,
+                conversation_history=conversation_history,
             )
         except Exception as exc:
             return {"error": f"Failed to activate agent: {exc}"}

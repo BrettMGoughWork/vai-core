@@ -138,6 +138,11 @@ class AgentState:
     supervisor_metadata:
         Supervisor-specific metadata (e.g. timeout configuration, retry
         count, iteration limit).  Opaque to the rest of S5.
+    conversation_history:
+        Ordered list of prior conversation turns.  Each entry is a dict
+        with ``{"role": "user" | "assistant", "content": str}``.
+        Accumulated across turns in a session; injected into prompts for
+        multi-turn context.
     lifecycle_history:
         Ordered list of lifecycle events for audit/debug.
     """
@@ -159,6 +164,9 @@ class AgentState:
     version: int = 1
     supervisor_metadata: Dict[str, Any] = field(default_factory=dict)
 
+    # Conversation
+    conversation_history: List[Dict[str, Any]] = field(default_factory=list)
+
     # Audit
     lifecycle_history: List[LifecycleEvent] = field(default_factory=list)
 
@@ -176,6 +184,14 @@ class AgentState:
             for err in self.errors:
                 if not isinstance(err, dict):
                     raise ValueError("each error must be a dict")
+        if isinstance(self.conversation_history, list):
+            for entry in self.conversation_history:
+                if not isinstance(entry, dict):
+                    raise ValueError("each conversation_history entry must be a dict")
+                if "role" not in entry or "content" not in entry:
+                    raise ValueError(
+                        "each conversation_history entry must have 'role' and 'content' keys"
+                    )
 
     # ── Convenience factories ──────────────────────────────────────────
 
