@@ -405,7 +405,15 @@ class TestActivateAgent:
             correlation_id="fixed",
             trace_id="fixed",
         )
-        assert r1.envelope == r2.envelope
+        # Compare deterministic fields. The timestamp in activation_context
+        # is inherently non-deterministic (clock precision varies across
+        # runners), so we exclude it from the equality check.
+        assert r1.envelope.agent_id == r2.envelope.agent_id
+        assert r1.envelope.message == r2.envelope.message
+        assert (
+            {k: v for k, v in r1.envelope.activation_context.items() if k != "timestamp"}
+            == {k: v for k, v in r2.envelope.activation_context.items() if k != "timestamp"}
+        )
         assert r1.context == r2.context
 
     def test_is_read_only(self, sample_message, registry) -> None:

@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-19 (Sprint 4a — SessionedAdapter complete)  
+> **Last updated:** 2026-06-18 (Sprint 5 — End-to-End Wiring & Integration Tests complete)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -116,11 +116,7 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 - `multi-step.yaml` — two-step LLM analysis
 - `planner-demo.yaml` — planner_call + tool_execute
 
----
-
-## 🏃 Current Sprint
-
-### ✅ Sprint 4 — Planner Call Step (Completed)
+### Sprint 4 — Planner Call Step
 
 **Goal:** Wire the planner_call step type end-to-end so a YAML workflow can decompose a goal via S2 Planner, create subgoals/segments in memory, and execute the resulting steps.
 
@@ -138,9 +134,6 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 4.8 | Test: full planner_call → tool_execute → completion via CLI | ✅ Done |
 | 4.9 | Test: drift detection, confidence scoring | ✅ Done |
 
----
-## 📋 Upcoming Sprints
-
 ### Sprint 4a — Multi-Turn Conversation Memory
 
 **Goal:** Enable multi-turn conversation memory in the interactive CLI so each prompt can reference prior exchanges in the same session.
@@ -157,18 +150,22 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 4a.8 | Integration test: fresh session boundary isolates history | ✅ Done |
 | 4a.9 | Test: drift events emitted for conversational turns | ✅ Done |
 
-### Sprint 5 — End-to-End Wiring & Integration Tests
+### ✅ Sprint 5 — End-to-End Wiring & Integration Tests
 
 **Goal:** Wire the full Gateway → S5 → S6 → S1/S2/S3 pipeline so a single message exercises all layers.
 
-| Task | What |
-|------|------|
-| 5.1 | In-memory S4 job queue + test workflow fixture |
-| 5.2 | Wire FastAPI app with real Supervisor, WorkflowRegistry, submit_job_callable |
-| 5.3 | Integration test: Gateway → S5 → workflow → LLM call → complete |
-| 5.4 | Integration test: workflow tool_execute → S4 jobs → waiting/resume |
-| 5.5 | Integration test: full workflow with multiple step types |
-| 5.6 | CI step: run integration tests on every PR |
+| Task | What | Status |
+|------|------|--------|
+| 5.1 | In-memory S4 job queue + test workflow fixture | ✅ Done |
+| 5.2 | Wire FastAPI app with real Supervisor, WorkflowRegistry, submit_job_callable | ✅ Done |
+| 5.3 | Integration test: Gateway → S5 → workflow → LLM call → complete | ✅ Done |
+| 5.4 | Integration test: workflow tool_execute → S4 jobs → waiting/resume | ✅ Done |
+| 5.5 | Integration test: full workflow with multiple step types | ✅ Done |
+| 5.6 | CI step: run integration tests on every PR | ✅ Done |
+
+---
+
+## 🏃 Current Sprint
 
 ### Sprint 6 — Trigger Router
 

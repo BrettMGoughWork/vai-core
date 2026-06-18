@@ -154,30 +154,43 @@ def find_arch_violations(classes: list[dict], refs: list[dict]) -> list[dict]:
     Uses the references list (type=import) plus class stratum lookup.
     """
     issues = []
-    stratum_of: dict[str, str] = {c["name"]: c["inferred_stratum"] for c in classes}
+    # Build multi-stratum lookup — same class name may exist in multiple files/strata
+    stratum_of: dict[str, set[str]] = {}
+    for c in classes:
+        stratum_of.setdefault(c["name"], set()).add(c["inferred_stratum"])
 
     for ref in refs:
         if ref.get("type") != "import":
             continue
         src = ref["source"]
         tgt = ref["target"]
-        src_stratum = stratum_of.get(src, "utility")
-        tgt_stratum = stratum_of.get(tgt, "utility")
+        src_strata = stratum_of.get(src, {"utility"})
+        tgt_strata = stratum_of.get(tgt, {"utility"})
 
-        allowed = ALLOWED_IMPORTS.get(src_stratum, set())
-        if tgt_stratum not in allowed:
-            issues.append({
-                "severity": "high",
-                "category": "arch-violation",
-                "title": f"Forbidden import: `{src}` ({src_stratum}) → `{tgt}` ({tgt_stratum})",
-                "detail": (
-                    f"`{src}` (stratum: **{src_stratum}**) imports from "
-                    f"`{tgt}` (stratum: **{tgt_stratum}**). "
-                    f"Allowed strata for {src_stratum}: {sorted(allowed)}."
-                ),
-                "fan_in": 0,
-                "fan_out": 0,
-            })
+        # If ANY stratum of the target is allowed from ANY source stratum, skip.
+        # This handles same-name classes in different strata (e.g. ValidationError
+        # in domain, infrastructure, and utility) where the import may target
+        # the allowed variant — avoids non-determinism from file-iteration order.
+        if any(
+            not tgt_strata.isdisjoint(ALLOWED_IMPORTS.get(s, set()))
+            for s in src_strata
+        ):
+            continue
+
+        src_label = ", ".join(sorted(src_strata))
+        tgt_label = ", ".join(sorted(tgt_strata))
+        issues.append({
+            "severity": "high",
+            "category": "arch-violation",
+            "title": f"Forbidden import: `{src}` ({src_label}) → `{tgt}` ({tgt_label})",
+            "detail": (
+                f"`{src}` (strata: **{src_label}**) imports "
+                f"`{tgt}` (strata: **{tgt_label}**). "
+                f"No allowed overlap between source strata and target strata."
+            ),
+            "fan_in": 0,
+            "fan_out": 0,
+        })
 
     return issues
 

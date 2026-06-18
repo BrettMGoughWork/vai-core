@@ -204,6 +204,9 @@ STRATUM_RULES: list[tuple[str, str]] = [
     ("strategy\\planning", "utility"),
     ("strategy/config", "utility"),
     ("strategy\\config", "utility"),
+    # Strategy memory stores (used across all strata — infrastructure, not utility)
+    ("strategy/memory", "infrastructure"),
+    ("strategy\\memory", "infrastructure"),
     ("policy", "utility"),
     ("platform/util", "utility"),
     ("platform\\util", "utility"),

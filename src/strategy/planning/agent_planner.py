@@ -102,9 +102,9 @@ class AgentPlanner:
             skill_refs=skill_refs,
         )
 
-        # ── 2. Read back the stored Plan + record ──
-        plan = self._plan_memory.get(plan_id)
-        record = self._plan_memory.get_record(plan_id)
+        # ── 2. Read back from governance (shared PlanMemory) ──
+        plan = governance.get_plan(plan_id)
+        record = governance.get_plan_record(plan_id)
 
         if plan is None or record is None:
             raise RuntimeError(
