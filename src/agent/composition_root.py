@@ -11,7 +11,6 @@ and capability (``src.capabilities.*``).
 from __future__ import annotations
 
 from typing import Any, List
-from uuid import uuid4
 
 from src.capabilities.contracts import DiscoveredSkill
 
@@ -26,7 +25,7 @@ from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
 from src.agent.strategy_router import StrategyRouter
 from src.agent.supervisor import Supervisor
 from src.agent.wiring.composition import wire_planner
-from src.agent.workflow import WorkflowRegistry
+from src.agent.workflow import InMemoryJobQueue, WorkflowRegistry
 from src.agent.workflow.loader import load_workflows_from_yaml
 
 # ── Agent registry ────────────────────────────────────────────────────
@@ -65,19 +64,9 @@ _registry.register_agent(AgentMetadata(
 ))
 
 # ── Workflow registry (loaded from YAML files) ────────────────────────
-_wf_registry = WorkflowRegistry()
+wf_registry = WorkflowRegistry()
 for defn in load_workflows_from_yaml("config/workflows"):
-    _wf_registry.register(defn)
-
-# ── In-memory S4 job queue ───────────────────────────────────────────
-_job_call_count: int = 0
-
-
-def _submit_job(payload: dict[str, Any]) -> str:
-    """Record a job submission and return a synthetic job ID."""
-    global _job_call_count  # noqa: PLW0603
-    _job_call_count += 1
-    return f"job-{_job_call_count}-{uuid4().hex[:8]}"
+    wf_registry.register(defn)
 
 
 def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -253,21 +242,23 @@ def _execute_plan_step(step_payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+state_store = MemoryAgentStateStore()
+_job_queue = InMemoryJobQueue()
+
 _strategy_router = StrategyRouter(
     planner=_wired_planner.plan,
     capability_discoverer=_discover_capabilities,
-    submit_s4_job=_submit_job,
+    submit_s4_job=_job_queue.submit,
     step_executor=_execute_plan_step,
     governance=_shared_governance,
 )
 
 # ── Wired Supervisor ────────────────────────────────────────────────
-_store = MemoryAgentStateStore()
 _supervisor = Supervisor(
     registry=_registry,
-    store=_store,
-    workflow_registry=_wf_registry,
-    submit_job_callable=_submit_job,
+    store=state_store,
+    workflow_registry=wf_registry,
+    submit_job_callable=_job_queue.submit,
     strategy_router=_strategy_router,
     inline_tool_executor=_execute_tool_inline,
 )
