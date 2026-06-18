@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2025-07-17  
+> **Last updated:** 2026-06-18 (4.6 ✅, Y.7/Y.8 + concerns added)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -133,7 +133,7 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 4.3 | Wire planner + capability_discoverer in composition_root | ✅ Done |
 | 4.4 | Fix `_WiredPlanner.plan()` fallback field names | ✅ Done |
 | 4.5 | Create `planner-demo.yaml` workflow | ✅ Done |
-| 4.6 | Step execution wiring — plan steps → inline executor | 🚧 In progress |
+| 4.6 | Step execution wiring — plan steps → inline executor | ✅ Done |
 | 4.7 | Goals/subgoals/segments creation in MemoryGovernance | 🔜 Next |
 | 4.8 | Test: full planner_call → tool_execute → completion via CLI | 🔜 Next |
 | 4.9 | Test: drift detection, confidence scoring | 🔜 Next |
@@ -358,6 +358,78 @@ These are forward-looking capabilities that the architecture supports but are no
 - Approval gates for high-risk workflow steps
 - Audit trails for all agent actions
 - Policy enforcement at the S5 routing layer
+
+### Y.7 — Patterns (LLM-Level Reusable Instructions)
+
+**Concept:** A "pattern" is a reusable, LLM-readable instruction template — like a workflow but expressed as natural-language/in-context instructions rather than executable step graphs. Patterns codify successful emergent behaviour that is too complex, non-deterministic, or context-sensitive to be expressed as a YAML workflow.
+
+| Aspect | Workflows | Patterns |
+|--------|-----------|----------|
+| Form | Declarative YAML step graph | Natural-language instruction template |
+| Execution | Engine-driven state machine | LLM-interpreted guidance |
+| Determinism | High — explicit steps, conditions, transitions | Low — LLM decides how to apply the pattern |
+| Best for | Repeatable, predictable processes | Creative, nuanced, or context-heavy tasks |
+
+**Key properties:**
+- **Callable by agents** — an agent can say "apply pattern X" and receive instructions for how to handle a situation
+- **Callable by workflows** — a workflow step type `apply_pattern` that injects pattern instructions into an LLM call context
+- **Storage** — YAML/JSON files in `config/patterns/` with a `description` + `instructions` + optional `examples` field
+- **Discovery** — registered in a PatternRegistry, discoverable by agents and the planner
+
+**Examples:**
+- "How to handle a user asking for a refund" — multi-step negotiation pattern
+- "How to escalate a security-related user request" — routing with context preservation
+- "How to debug a failing test" — investigative checklist that adapts based on findings
+
+**⚠️ Concerns:**
+- **Adherence vs adaptation tension** — agents may ignore patterns if they're too prescriptive, or follow them rigidly when adaptation is needed. Need clear guardrails: when *must* the pattern be followed vs when *may* the agent adapt it?
+- **Pattern bloat** — without curation, patterns could accumulate into a graveyard of unused instruction files. A usage-based pruning mechanism (archive patterns not referenced in N days) should be considered from the start.
+- **Quality variance** — auto-generated patterns (from Y.8) may be lower quality than hand-authored ones. A review gate or confidence threshold before a pattern is discoverable may be necessary.
+
+### Y.8 — Learning Subsystem (Emergent Codification Engine)
+
+**Concept:** An async observer that watches agentic emergent actions. When an agent performs a successful bespoke action (not already covered by a workflow, skill, or pattern), the learning subsystem considers whether that action should be codified as a reusable artifact.
+
+**Flow:**
+
+```
+Agent performs bespoke action successfully
+    │
+    ▼
+Learning Subsystem (async observer)
+    │
+    ├── Is it simple and deterministic?
+    │   └── Yes → Create Workflow (YAML step graph)
+    │
+    ├── Is it a primitive, well-defined capability?
+    │   └── Yes → Create Skill (executable tool)
+    │
+    └── Is it complex, nuanced, or context-sensitive?
+        └── Yes → Create Pattern (LLM instruction template)
+```
+
+**Key properties:**
+- **Async observer** — does not block or slow down the primary execution path. Watches via S4 event subscription or post-hoc log analysis
+- **Codification decision criteria** (tunable):
+  - *Confidence* — how reliably did the action succeed? (e.g., >90% over 5+ attempts)
+  - *Reusability* — how likely is this action to be useful again? (parametric similarity to past requests)
+  - *Complexity* — can it be expressed as a workflow? a skill? or does it need a pattern?
+- **Artifact lifecycle**:
+  1. **Candidate** — identified but not yet reviewed
+  2. **Draft** — auto-generated YAML/instructions, pending human or agent review
+  3. **Published** — registered and available for use
+  4. **Deprecated/Removed** — superseded or no longer useful
+- **Workflow creation** — for simple, repeatable patterns, generates a YAML workflow file with the observed steps
+- **Skill creation** — for primitive, well-defined capabilities, generates a registered skill (e.g., a fetch + parse wrapper)
+- **Pattern creation** — for complex or context-heavy behaviour, generates a pattern file with natural-language instructions
+- **Human-in-the-loop** — optional approval gate before publishing any auto-generated artifact
+- **Calls to Y.4/Y.7** — the learning subsystem is the *producer* of emergent workflows (Y.4) and patterns (Y.7)
+
+**⚠️ Concerns:**
+- **Signal detection is the hard part** — how do you reliably determine "success"? User satisfaction? Task completion? Agent self-assessment? Without a trustworthy feedback signal, the subsystem will codify bad behaviour with high confidence. Needs careful thought before building.
+- **Three-way classification is ambitious** — having the system autonomously decide "this is a workflow vs a skill vs a pattern" is a non-trivial classification problem. Recommend starting with the system surfacing *candidates* for human (or reviewer-agent) decision, then automating once there's enough labelled data.
+- **Sequencing dependency** — the learning subsystem depends on mature observability (Sprint 14), durable execution (Sprint 11), and stable base layers that produce reliable telemetry. Building it too early means building on shifting sand. Recommended post-Sprint-15.
+- **Feedback loop risk** — if the subsystem creates artifacts that are then used by agents, which are then observed by the subsystem, you risk reinforcing its own biases. Need a mechanism to detect and break circular codification.
 
 ---
 
