@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-18 (Sprint 5 — End-to-End Wiring & Integration Tests complete)  
+> **Last updated:** 2026-06-18 (Sprint 9a — Workflow Discovery for Agents added)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -192,23 +192,19 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 - `workflow.external_input`
 - `workflow.scheduled_trigger`
 
-### Sprint 7 — Workflow Supervisor / WorkflowOps
+### Sprint 7 — Workflow Supervisor / WorkflowOps ✅
 
 **Goal:** Operational visibility and management for all running workflow instances — list, inspect, cancel, retry, dead-letter queue, metrics.
 
-**Files to create:**
-- `src/agent/workflow/instance_store.py` — WorkflowInstanceStore
-- `src/agent/workflow/ops.py` — WorkflowOps
-
-| Task | What |
-|------|------|
-| 7.1 | WorkflowInstanceStore — save, get, list (by workflow_id, status), delete |
-| 7.2 | WorkflowOps — list_instances, get_instance, cancel, retry |
-| 7.3 | WorkflowOps — dead_letter_queue, metrics |
-| 7.4 | Wire store updates into Supervisor (write-through on each state transition) |
-| 7.5 | Test: cancel running/paused workflow |
-| 7.6 | Test: retry failed workflow → preserves context |
-| 7.7 | Test: metrics returns correct counts |
+| Task | What | Status |
+|------|------|--------|
+| 7.1 | WorkflowInstanceStore — save, get, list (by workflow_id, status), delete | ✅ |
+| 7.2 | WorkflowOps — list_instances, get_instance, cancel, retry | ✅ |
+| 7.3 | WorkflowOps — dead_letter_queue, metrics | ✅ |
+| 7.4 | Wire store updates into Supervisor (write-through on each state transition) | ✅ |
+| 7.5 | Test: cancel running/paused workflow | ✅ |
+| 7.6 | Test: retry failed workflow → preserves context | ✅ |
+| 7.7 | Test: metrics returns correct counts | ✅ |
 
 ### Sprint 8 — User Interaction Layer
 
@@ -242,6 +238,24 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 9.5 | Test: explicit agent_profile → correct agent selected |
 | 9.6 | Test: no agent_profile → runtime agent used |
 | 9.7 | Test: agent not found → configurable fallback/fail |
+
+### Sprint 9a — Workflow Discovery for Agents
+
+**Goal:** Agents discover and select workflows as tools during LLM calls — the S5 agent sees registered workflows alongside skills and can invoke them via tool-call routing.
+
+**Files to create:**
+- `src/agent/workflow/workflow_tool_adapter.py` — WorkflowToolAdapter
+
+| Task | What |
+|------|------|
+| 9a.1 | WorkflowToolAdapter — converts WorkflowRegistry entries into LLM tool definitions (name, description, input_schema from YAML) |
+| 9a.2 | Wire adapter into S5 Supervisor's tool registry — workflows appear alongside skills as callable tools |
+| 9a.3 | Handle workflow tool call in Supervisor — route `workflow.execute` calls to WorkflowEngine instead of SkillRunner |
+| 9a.4 | Parameter passthrough — LLM tool call params → workflow input state |
+| 9a.5 | Test: agent invokes workflow via tool call → workflow starts and completes |
+| 9a.6 | Test: workflow tool call with params → correctly populates initial state |
+| 9a.7 | Test: agent calls non-existent workflow → graceful error (tool not found) |
+| 9a.8 | Test: workflow tool appears/disappears based on registration state |
 
 ### Sprint 10 — Refactor: Stratum Isolation 
 
