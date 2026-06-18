@@ -101,6 +101,7 @@ class Supervisor:
         *,
         submit_job_callable: Optional[Callable[[Any], str]] = None,
         workflow_registry: Optional[WorkflowRegistry] = None,
+        workflow_engine: Optional[WorkflowEngine] = None,
         workflow_instance_store: Optional[WorkflowInstanceStore] = None,
         interaction_manager: Optional[UserInteractionManager] = None,
         strategy_router: Optional[StrategyRouter] = None,
@@ -111,6 +112,7 @@ class Supervisor:
         self._store = store
         self._submit_job = submit_job_callable
         self._workflow_registry = workflow_registry
+        self._workflow_engine = workflow_engine
         self._workflow_store = workflow_instance_store or WorkflowInstanceStore()
         self._interaction_manager = interaction_manager
         self._strategy_router = strategy_router or StrategyRouter()
@@ -415,7 +417,7 @@ class Supervisor:
                 ))
 
             workflow_id = route.payload.get("workflow_id") or state.agent_id
-            engine = WorkflowEngine(self._workflow_registry)
+            engine = self._workflow_engine or WorkflowEngine(self._workflow_registry)
 
             # ── Resume path (workflow state exists in metadata) ────────
             wf_dict = meta.get("workflow_state")

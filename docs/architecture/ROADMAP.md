@@ -175,15 +175,15 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 - `src/agent/workflow/trigger_router.py` — TriggerRouter, WorkflowEvent
 - `src/agent/workflow/event_bus.py` — lightweight in-process event bus (stand-in for S4b)
 
-| Task | What |
-|------|------|
-| 6.1 | Define WorkflowEvent dataclass (event_type, payload, correlation_id, timestamp) |
-| 6.2 | Implement TriggerRouter.handle_event() — find matching workflows, start instances |
-| 6.3 | Implement lightweight EventBus with subscribe/publish |
-| 6.4 | Wire trigger router to event bus |
-| 6.5 | Test: matching event → workflow instance created |
-| 6.6 | Test: non-matching event → no instance |
-| 6.7 | Test: resume event for paused workflow → engine.resume() |
+| Task | What | Status |
+|------|------|--------|
+| 6.1 | Define WorkflowEvent dataclass (event_type, payload, correlation_id, timestamp) | ✅ |
+| 6.2 | Implement TriggerRouter.handle_event() — find matching workflows, start instances | ✅ |
+| 6.3 | Implement lightweight EventBus with subscribe/publish | ✅ |
+| 6.4 | Wire trigger router to event bus | ✅ |
+| 6.5 | Test: matching event → workflow instance created | ✅ |
+| 6.6 | Test: non-matching event → no instance | ✅ |
+| 6.7 | Test: resume event for paused workflow → engine.resume() | ✅ |
 
 **Events S6 subscribes to:**
 - `workflow.start`
