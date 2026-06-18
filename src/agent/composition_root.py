@@ -21,6 +21,7 @@ from src.runtime.llm.types import CoreLLMResponse, RuntimeConfig
 # ── Adapter imports (adapter→adapter: allowed) ────────────────────────
 from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
 from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
+from src.agent.adapters.sessioned_adapter import SessionedAdapter
 from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
 from src.agent.strategy_router import StrategyRouter
 from src.agent.supervisor import Supervisor
@@ -270,4 +271,6 @@ _supervisor = Supervisor(
     strategy_router=_strategy_router,
     inline_tool_executor=_execute_tool_inline,
 )
-s5_adapter = AgentGatewayAdapter(_supervisor)
+s5_adapter: GatewayAgentAdapter = SessionedAdapter(
+    AgentGatewayAdapter(_supervisor),
+)

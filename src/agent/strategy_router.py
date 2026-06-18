@@ -132,19 +132,52 @@ class StrategyRouter:
     # Route handlers
     # ------------------------------------------------------------------
 
+    def _build_governance_context(self) -> Dict[str, Any]:
+        """Gather current governance state for conversational turns.
+
+        Reads from the shared ``MemoryGovernance`` instance (if set) and
+        returns a dict that can be injected into ``PromptRequest.memory``
+        so the LLM has visibility into governance state (active subgoals,
+        drift events, consistency violations).
+
+        Returns an empty dict when governance is not configured, so callers
+        can simply merge the result without an ``if`` guard.
+        """
+        if self._governance is None:
+            return {}
+        try:
+            violations = self._governance.check_consistency()
+            return {
+                "consistency_issues": [str(v) for v in violations] if violations else [],
+            }
+        except Exception:
+            return {}
+
     def _route_to_llm(self, outcome: RouterOutcome) -> Dict[str, Any]:
         """Direct, synchronous LLM call via S1 Runtime with mock fallback.
 
         Attempts the requested backend (default ``"conversational"``).
         If that returns an ``S1Error``, falls back to the ``"mock"``
         backend so the supervisor always gets a usable response.
+
+        When a ``MemoryGovernance`` instance is configured, governance
+        context (consistency state, active subgoals) is also injected
+        into the memory payload so the LLM has visibility into the
+        current governance state (4a.5 / 4a.6).
         """
         prompt = outcome.payload.get("prompt", {})
         backend = outcome.payload.get("backend", "conversational")
 
+        # Build memory payload — start with base from outcome, enrich
+        # with governance context if governance is configured.
+        memory = outcome.payload.get("memory", {})
+        governance_context = self._build_governance_context()
+        if governance_context:
+            memory["governance"] = governance_context
+
         runtime_request = PromptRequest(
             prompt=prompt,
-            memory=outcome.payload.get("memory", {}),
+            memory=memory,
             plan_context=outcome.payload.get("plan_context", {}),
             tool_context=outcome.payload.get("tool_context", []),
         )

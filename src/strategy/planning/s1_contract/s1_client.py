@@ -182,10 +182,30 @@ def call_s1_backend(
                 "Respond conversationally. Be concise, helpful, and accurate."
             )
 
+        # Format the history block from prior turns
+        conversation_history = request.memory.get("conversation_history", [])
+        if conversation_history:
+            history_lines: list[str] = []
+            for entry in conversation_history:
+                role = entry.get("role", "user")
+                content = entry.get("content", "")
+                label = "User" if role == "user" else agent_name
+                history_lines.append(f"{label}: {content}")
+            history_block = "\n".join(history_lines) + "\n"
+        else:
+            history_block = ""
+
         try:
-            raw_text = transport.complete(
-                f"{system_prompt}\n\nUser: {user_message}\n{agent_name}:"
-            )
+            if history_block:
+                raw_text = transport.complete(
+                    f"{system_prompt}\n\n{history_block}"
+                    f"User: {user_message}\n{agent_name}:"
+                )
+            else:
+                raw_text = transport.complete(
+                    f"{system_prompt}\n\n"
+                    f"User: {user_message}\n{agent_name}:"
+                )
             import time
             return PromptResponse(
                 output={
