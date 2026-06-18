@@ -12,7 +12,8 @@ minimum dependencies and returns a fully-wired instance.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import List, Optional
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional
 
 from src.agent.interfaces.s1_executor import S1Executor
 from src.agent.interfaces.s2_planner import S2Planner
@@ -24,7 +25,6 @@ from src.agent.interfaces.s4_job_submitter import S4JobSubmitter
 from src.agent.wiring.s2_llm_adapter import make_llm_complete
 
 from src.capabilities.contracts import DiscoveredSkill
-from src.strategy.planning.models.plan import Plan
 
 
 def wire_planner(
@@ -52,17 +52,22 @@ def wire_planner(
 
         def __init__(self) -> None:
             from src.strategy.planning.agent_planner import AgentPlanner
+            from src.strategy.memory.plan_memory import PlanMemory
 
             llm_complete = (
                 make_llm_complete(s1_executor) if s1_executor else None
             )
-            self._inner = AgentPlanner(llm_complete=llm_complete)
+            self._plan_memory = PlanMemory()
+            self._inner = AgentPlanner(
+                llm_complete=llm_complete,
+                plan_memory=self._plan_memory,
+            )
 
         def plan(
             self,
             goal: str,
             capabilities: Optional[List[DiscoveredSkill]] = None,
-        ) -> Plan:
+        ) -> SimpleNamespace:
             """Generate a plan for *goal* using the wired S1 backend."""
             # AgentPlanner.plan() requires subgoal_id, governance, timestamp
             # — for now we provide sensible defaults so the wiring can be
@@ -73,13 +78,34 @@ def wire_planner(
             from src.strategy.memory.governance.memory_governance import (
                 MemoryGovernance,
             )
-            from src.strategy.memory.plan_memory import PlanMemory
+            from src.strategy.memory.subgoal_memory import SubgoalMemory
+            from src.strategy.memory.segment_memory import SegmentMemory
+            from src.strategy.memory.drift_memory import DriftMemory
+            from src.strategy.types.subgoal import Subgoal
 
             subgoal_id: str = f"sg-{hash(goal) & 0xFFFFFFFF:08x}"
             now = datetime.now(timezone.utc).isoformat()
+            now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+            subgoal_memory = SubgoalMemory()
+            seg_memory = SegmentMemory()
+            plan_memory = self._plan_memory
+            drift_memory = DriftMemory()
+
+            # Seed a subgoal so plan consistency checks pass
+            subgoal_memory.put(Subgoal(
+                subgoal_id=subgoal_id,
+                goal=goal,
+                context={},
+                metadata={},
+                created_at=now_ts,
+            ))
 
             governance = MemoryGovernance(
-                plan_memory=PlanMemory(),
+                subgoal_memory=subgoal_memory,
+                segment_memory=seg_memory,
+                plan_memory=plan_memory,
+                drift_memory=drift_memory,
             )
 
             skill_refs: list[str] | None = (
@@ -94,15 +120,31 @@ def wire_planner(
                 skill_refs=skill_refs,
             )
 
-            # AgentPlan → Plan conversion for protocol conformance
-            plan_content = getattr(agent_plan, "plan", None)
-            if plan_content is not None:
-                return plan_content
-            return Plan(
-                intent=goal,
-                target_skill="",
-                arguments={},
-                reasoning="Plan generated via wired S1 backend",
+            # ── Reconstruct step data from the stored segment ──
+            steps: List[Dict[str, Any]] = []
+            if agent_plan.segments:
+                segment_id = agent_plan.segments[0]
+                segment = seg_memory.get(segment_id)
+                if segment is not None:
+                    cap_list: List[str] = segment.context.get("capabilities", [])
+                    id_list: List[str] = segment.context.get("step_ids", [])
+                    input_list: List[Dict[str, Any]] = segment.context.get("step_inputs", [])
+                    desc_list: List[str] = segment.steps
+
+                    for i, step_id in enumerate(id_list):
+                        steps.append({
+                            "id": step_id,
+                            "description": desc_list[i] if i < len(desc_list) else "",
+                            "skill_ref": cap_list[i] if i < len(cap_list) else "",
+                            "inputs": input_list[i] if i < len(input_list) else {},
+                        })
+
+            return SimpleNamespace(
+                plan_id=agent_plan.plan_id,
+                steps=[SimpleNamespace(**s) for s in steps],
+                intent=agent_plan.intent,
+                reasoning_summary=agent_plan.reasoning_summary,
+                segments=agent_plan.segments,
             )
 
     return _WiredPlanner()

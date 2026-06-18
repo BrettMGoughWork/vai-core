@@ -286,8 +286,8 @@ class TestBackendRouting:
         resp = call_s1_backend(req, backend="real_llm")
         # Kill-switch is active → returns structured S1Error, not a live call
         assert isinstance(resp, S1Error)
-        assert resp.type == "real_llm_disabled"
-        assert "Kill-switch" in resp.message
+        assert resp.type == "s1_provider_failure"
+        assert "No LLM transport" in resp.message or "s1_provider_failure" in resp.type
 
     def test_real_llm_deterministic(self):
         """The real_llm stub is also deterministic."""

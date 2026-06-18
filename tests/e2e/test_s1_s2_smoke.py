@@ -308,22 +308,22 @@ class TestE2ESingleSubgoalSingleSegment:
             backend="real_llm",
         )
         assert isinstance(response, S1Error), (
-            f"Expected S1Error from kill-switch, got: {type(response)}"
+            f"Expected S1Error from real_llm backend, got: {type(response)}"
         )
-        assert response.type == "real_llm_disabled"
+        assert response.type == "s1_provider_failure"
 
     def test_real_llm_round_trip(self):
-        """Round-trip with real_llm (kill-switch active) → structured error."""
+        """Round-trip with real_llm (no transport configured) → structured error."""
         s2_updates = _run_s2_s1_s2_round_trip(
             cycle=0,
             subgoal_index=0,
             segment_index=0,
             backend="real_llm",
         )
-        # Kill-switch active → error is expected and structured
-        assert "error" in s2_updates, "Kill-switch should produce structured error"
+        # No transport → error is expected and structured
+        assert "error" in s2_updates, "real_llm should produce structured error"
         assert isinstance(s2_updates["error"], dict)
-        assert s2_updates["error"]["type"] == "real_llm_disabled"
+        assert s2_updates["error"]["type"] == "s1_provider_failure"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -393,12 +393,12 @@ class TestE2ESingleSubgoalThreeSegments:
             backend="real_llm",
         )
         assert isinstance(response, S1Error), (
-            f"Expected S1Error from kill-switch, got: {type(response)}"
+            f"Expected S1Error from real_llm backend, got: {type(response)}"
         )
-        assert response.type == "real_llm_disabled"
+        assert response.type == "s1_provider_failure"
 
     def test_real_llm_round_trip(self):
-        """Full round-trip with real_llm (kill-switch active), 1+3 plan."""
+        """Full round-trip with real_llm (no transport), 1+3 plan."""
         s2_updates = _run_s2_s1_s2_round_trip(
             cycle=1,
             subgoal_index=0,
@@ -406,7 +406,7 @@ class TestE2ESingleSubgoalThreeSegments:
             backend="real_llm",
         )
         assert "error" in s2_updates
-        assert s2_updates["error"]["type"] == "real_llm_disabled"
+        assert s2_updates["error"]["type"] == "s1_provider_failure"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -475,12 +475,12 @@ class TestE2ETwoSubgoalsTwoSegmentsEach:
             backend="real_llm",
         )
         assert isinstance(response, S1Error), (
-            f"Expected S1Error from kill-switch, got: {type(response)}"
+            f"Expected S1Error from real_llm backend, got: {type(response)}"
         )
-        assert response.type == "real_llm_disabled"
+        assert response.type == "s1_provider_failure"
 
     def test_real_llm_round_trip(self):
-        """Full round-trip with real_llm (kill-switch active), 2+2 plan."""
+        """Full round-trip with real_llm (no transport), 2+2 plan."""
         s2_updates = _run_s2_s1_s2_round_trip(
             cycle=2,
             subgoal_index=1,
@@ -488,7 +488,7 @@ class TestE2ETwoSubgoalsTwoSegmentsEach:
             backend="real_llm",
         )
         assert "error" in s2_updates
-        assert s2_updates["error"]["type"] == "real_llm_disabled"
+        assert s2_updates["error"]["type"] == "s1_provider_failure"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -618,9 +618,9 @@ class TestE2EErrorHandling:
         response = call_s1_backend(request, backend="real_llm")
         # Kill-switch active → S1Error, not a crash
         assert isinstance(response, S1Error), (
-            f"real_llm backend returned {type(response)} — expected S1Error from kill-switch"
+            f"real_llm backend returned {type(response)} — expected S1Error"
         )
-        assert response.type == "real_llm_disabled"
+        assert response.type == "s1_provider_failure"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

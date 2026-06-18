@@ -115,7 +115,7 @@ class TestToolExecutePath:
         state = supervisor.create_agent("tools-workflow")
         state = supervisor.activate_agent(
             state,
-            AgentMessage(message="run workflow", context={}),
+            AgentMessage(message="/workflow tools-workflow", context={}),
             channel="cli",
         )
         state = supervisor.run_agent_step(state)
@@ -271,7 +271,7 @@ class TestMultiWorkflowRouting:
         state = supervisor.create_agent("tools-workflow")  # uses name matching
         state = supervisor.activate_agent(
             state,
-            AgentMessage(message="execute workflow now", context={}),
+            AgentMessage(message="/workflow tools-workflow", context={}),
             channel="cli",
         )
         state = supervisor.run_agent_step(state)
@@ -319,7 +319,7 @@ class TestWaitingWorkflow:
         ))
 
         state = supervisor.create_agent("waiting-agent")
-        msg = AgentMessage(message="start workflow waiting", context={})
+        msg = AgentMessage(message="/workflow waiting-agent", context={})
         state = supervisor.activate_agent(state, msg, channel="cli")
         state = supervisor.run_agent_step(state)
 
@@ -360,15 +360,14 @@ class TestWaitingWorkflow:
 
         state = supervisor.create_agent("waiting-agent")
         state = supervisor.activate_agent(
-            state, AgentMessage(message="start workflow", context={}), channel="cli",
+            state, AgentMessage(message="/workflow waiting-agent", context={}), channel="cli",
         )
         state = supervisor.run_agent_step(state)
         assert state.lifecycle_state == LifecycleState.WAITING
 
         # Resume with user input — message must route to DEST_WORKFLOW
-        # (the message text becomes the user input for the engine)
         state = supervisor.run_agent_step(
-            state, message="start workflow I want to say goodbye",
+            state, message="/workflow waiting-agent",
         )
         assert state.lifecycle_state == LifecycleState.COMPLETED, (
             f"Expected COMPLETED after resume, got {state.lifecycle_state}"
@@ -413,12 +412,15 @@ class TestWorkflowEngine:
         state, outcome = workflow_engine.step(state)
         assert outcome.type == "llm_call"
 
+        # Resume stores the result (no longer auto-steps — returns "continue")
         state, _ = workflow_engine.resume_with_result(
             state, outcome.step_id,
             result={"message": "Hello, world!"},
         )
+        # Step explicitly to advance past __end__ → COMPLETED
+        state, outcome = workflow_engine.step(state)
         assert state.status == WorkflowStatus.COMPLETED, (
-            f"Expected COMPLETED after resume, got {state.status}"
+            f"Expected COMPLETED after resume+step, got {state.status}"
         )
 
     def test_start_missing_workflow(self, workflow_engine: WorkflowEngine) -> None:
@@ -517,7 +519,7 @@ class TestS4BJobCompletion:
         """tool_execute workflow runs→WAITING→set result→run_agent_step→COMPLETED."""
         agent_id = "tools-workflow"
         msg = AgentMessage(
-            message="run workflow",
+            message="/workflow tools-workflow",
             context={"channel": "cli"},
         )
 
@@ -584,7 +586,7 @@ class TestGatewayAdapterResume:
         # Step 1: Ingest a tool-workflow request
         result = tool_gateway_adapter.ingest(AgentRequest(
             channel="cli",
-            message_text="run workflow",
+            message_text="/workflow tools-workflow",
             user_id="test-user",
             metadata={"agent_id": "tools-workflow"},
         ))
@@ -596,8 +598,8 @@ class TestGatewayAdapterResume:
         # Simulate S4B completion
         tool_gateway_adapter._supervisor.set_tool_result(agent_id, '"hello from tool"')
 
-        # Step 2: Resume
-        result = tool_gateway_adapter.resume(agent_id, "continue")
+        # Step 2: Resume — message must route to DEST_WORKFLOW
+        result = tool_gateway_adapter.resume(agent_id, "/workflow tools-workflow")
         assert "error" not in result, f"resume failed: {result}"
         assert "reply" in result
         assert result["agent_id"] == agent_id

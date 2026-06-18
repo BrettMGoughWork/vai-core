@@ -28,6 +28,7 @@ StepType = Literal[
     "sub_workflow",
     "user_input",
     "condition",
+    "planner_call",
 ]
 
 VALID_STEP_TYPES: frozenset[str] = frozenset({
@@ -36,6 +37,7 @@ VALID_STEP_TYPES: frozenset[str] = frozenset({
     "sub_workflow",
     "user_input",
     "condition",
+    "planner_call",
 })
 
 # Reserved transition target (means "workflow complete")

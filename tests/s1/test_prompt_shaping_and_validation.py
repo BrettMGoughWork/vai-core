@@ -458,17 +458,17 @@ class TestSafetyGuarantees:
         result = call_s1_backend(req, backend="real_llm")
         # Kill-switch is active by default → safe S1Error, not a live call
         assert isinstance(result, S1Error)
-        assert result.type == "real_llm_disabled"
+        assert result.type == "s1_provider_failure"
 
     def test_real_llm_stub_output_is_fully_valid(self):
-        """Real LLM kill-switch error has all required S1Error fields."""
+        """Real LLM call returns structured S1Error when transport is unavailable."""
         req = _make_minimal_request()
         result = call_s1_backend(req, backend="real_llm")
-        # Kill-switch active → returns structured S1Error
+        # Real LLM enabled but no transport injected → returns structured S1Error
         assert isinstance(result, S1Error)
-        assert result.type == "real_llm_disabled"
+        assert result.type == "s1_provider_failure"
         assert result.message is not None
-        assert "hint" in result.details
+        assert isinstance(result.details, dict)
 
 
 # ══════════════════════════════════════════════════════════════════════

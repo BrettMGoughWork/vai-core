@@ -1,0 +1,22 @@
+workflow_id: planner-demo
+name: "Planner Demo"
+description: "Decompose a goal via S2 Planner, then execute steps"
+version: "1.0.0"
+start_step: plan_it
+steps:
+  plan_it:
+    step_id: plan_it
+    step_type: planner_call
+    label: "Decompose goal"
+    config:
+      goal: "{context.input}"
+    transitions:
+      on_success: summarize
+  summarize:
+    step_id: summarize
+    step_type: llm_call
+    label: "Summarize plan results"
+    config:
+      prompt: "The plan has been generated and executed. Results: {context.last_output}. Briefly summarise what happened and what was accomplished."
+    transitions:
+      on_success: __end__

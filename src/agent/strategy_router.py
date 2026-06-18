@@ -79,6 +79,7 @@ class StrategyRouter:
         submit_s4_job: Optional[Callable[[Any], Any]] = None,
         skill_executor: Optional[Any] = None,
         validation_pipeline: Optional[Any] = None,
+        step_executor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
     ) -> None:
         self._call_runtime = call_runtime
         self._planner = planner
@@ -86,6 +87,7 @@ class StrategyRouter:
         self._submit_s4_job = submit_s4_job
         self._skill_executor = skill_executor
         self._validation_pipeline = validation_pipeline
+        self._step_executor = step_executor
 
     # ------------------------------------------------------------------
     # Public API
@@ -166,49 +168,76 @@ class StrategyRouter:
         }
 
     def _route_to_planner(self, outcome: RouterOutcome) -> Dict[str, Any]:
-        """Generate a plan via S2, then submit plan steps as S4 jobs.
+        """Generate a plan via S2, then execute each plan step inline.
 
-        Requires ``planner``, ``capability_discoverer``, and
-        ``submit_s4_job`` to be configured at construction time.
+        If a ``step_executor`` is configured, steps are executed
+        synchronously and their results collected.  Otherwise falls
+        back to submitting each step as an S4 job.
+
+        Requires ``planner``, ``capability_discoverer``, and either
+        ``step_executor`` or ``submit_s4_job`` to be configured.
         """
         if self._planner is None or self._capability_discoverer is None:
             raise NotImplementedError(
                 "planner and capability_discoverer must be configured "
                 "before routing planner outcomes"
             )
-        if self._submit_s4_job is None:
-            raise NotImplementedError(
-                "submit_s4_job must be configured before routing planner outcomes"
-            )
 
         # 1. Discover available skills
         available = self._capability_discoverer()
 
-        # 2. Call S2 planner (stub — returns a mock plan for now)
+        # 2. Call S2 planner with capabilities so LLM knows what tools exist
         goal = outcome.payload.get("goal", "")
-        plan = self._planner(goal=goal, context=outcome.payload.get("context"))
+        plan = self._planner(goal=goal, capabilities=available)
 
-        # 3. Submit each plan step as an S4 job for durable execution
+        # 3. Execute each plan step (inline via step_executor, or submit as S4 job)
         steps = getattr(plan, "steps", [])
+        step_results: list[Dict[str, Any]] = []
         job_ids: list[str] = []
+
         for step in steps:
-            job = self._submit_s4_job({
+            step_payload = {
                 "type": "plan_step",
                 "plan_id": getattr(plan, "plan_id", ""),
                 "step_id": getattr(step, "id", ""),
                 "skill_ref": getattr(step, "skill_ref", ""),
-                "params": outcome.payload.get("params", {}),
-            })
-            job_ids.append(getattr(job, "job_id", str(job)))
+                "inputs": getattr(step, "inputs", {}),
+                "description": getattr(step, "description", ""),
+            }
+
+            if self._step_executor is not None:
+                result = self._step_executor(step_payload)
+                step_results.append(result)
+            elif self._submit_s4_job is not None:
+                job = self._submit_s4_job(step_payload)
+                job_ids.append(getattr(job, "job_id", str(job)))
+            else:
+                raise NotImplementedError(
+                    "step_executor or submit_s4_job must be configured "
+                    "before routing planner outcomes"
+                )
+
+        # Build a readable summary from step results
+        lines: list[str] = []
+        for sr in step_results:
+            status = sr.get("status", "unknown")
+            msg = sr.get("message", "")
+            sid = sr.get("step_id", "")
+            lines.append(f"  [{status}] {sid}: {msg}")
+        plan_summary = f"Plan {getattr(plan, 'plan_id', '')}: {len(steps)} steps\n" + "\n".join(lines)
 
         return {
-            "output": (
-                f"Plan created: {len(steps)} steps, "
-                f"{len(job_ids)} jobs submitted"
-            ),
+            "output": {
+                "message": plan_summary,
+                "plan_id": getattr(plan, "plan_id", ""),
+                "intent": getattr(plan, "intent", ""),
+                "reasoning_summary": getattr(plan, "reasoning_summary", ""),
+                "steps": step_results,
+            },
             "metadata": {
                 "plan_id": getattr(plan, "plan_id", ""),
-                "job_ids": job_ids,
+                "step_count": len(steps),
+                "job_ids": job_ids or None,
             },
             "error": None,
         }
