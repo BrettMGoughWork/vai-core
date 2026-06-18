@@ -1,0 +1,23 @@
+# File readhead workflow
+# Reads the first N lines of a file via stdlib.file.readhead.
+workflow_id: file-readhead
+name: "File readhead"
+description: "Read the first N lines of a file"
+version: "1.0.0"
+trigger_on:
+  - "workflow_request"
+
+steps:
+  read_file:
+    step_id: read_file
+    step_type: tool_execute
+    label: "Read file head"
+    config:
+      skill_name: stdlib.file.readhead
+      arguments:
+        path: "README.md"
+        lines: 10
+    transitions:
+      on_success: __end__
+
+start_step: read_file

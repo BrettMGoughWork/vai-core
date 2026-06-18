@@ -231,6 +231,10 @@ class MemoryGovernance:
         _raise_if(violations)
         return self._plan_memory.get(plan_id)
 
+    def get_plan_record(self, plan_id: str) -> Optional[PlanMemoryRecord]:
+        """Return the PlanMemoryRecord for *plan_id*, or None if not found."""
+        return self._plan_memory.get_record(plan_id)
+
     # ------------------------------------------------------------------
     # Cross-store consistency check
     # ------------------------------------------------------------------
