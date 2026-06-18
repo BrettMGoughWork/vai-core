@@ -27,7 +27,13 @@ from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
 from src.agent.strategy_router import StrategyRouter
 from src.agent.supervisor import Supervisor
 from src.agent.wiring.composition import wire_planner
-from src.agent.workflow import InMemoryJobQueue, WorkflowRegistry
+from src.agent.workflow import (
+    EventBus,
+    InMemoryJobQueue,
+    TriggerRouter,
+    WorkflowEngine,
+    WorkflowRegistry,
+)
 from src.agent.workflow.loader import load_workflows_from_yaml
 
 # ── Agent registry ────────────────────────────────────────────────────
@@ -283,14 +289,23 @@ _strategy_router = StrategyRouter(
 )
 
 # ── Wired Supervisor ────────────────────────────────────────────────
+_workflow_engine = WorkflowEngine(wf_registry)
 _supervisor = Supervisor(
     registry=_registry,
     store=state_store,
     workflow_registry=wf_registry,
+    workflow_engine=_workflow_engine,
     submit_job_callable=_job_queue.submit,
     strategy_router=_strategy_router,
     inline_tool_executor=_execute_tool_inline,
 )
+
+# ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────
+_event_bus = EventBus()
+_trigger_router = TriggerRouter(wf_registry, _workflow_engine)
+_trigger_router.subscribe_all(_event_bus)
+
 s5_adapter: GatewayAgentAdapter = SessionedAdapter(
     AgentGatewayAdapter(_supervisor),
 )
+s5_event_bus: EventBus = _event_bus

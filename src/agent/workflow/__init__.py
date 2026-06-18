@@ -6,6 +6,7 @@ from src.agent.workflow.engine import (
     WorkflowExecutionState,
     WorkflowStatus,
 )
+from src.agent.workflow.event_bus import EventBus
 from src.agent.workflow.instance_store import (
     WorkflowInstanceRecord,
     WorkflowInstanceStore,
@@ -13,6 +14,7 @@ from src.agent.workflow.instance_store import (
 from src.agent.workflow.job_queue import InMemoryJobQueue, JobRecord
 from src.agent.workflow.ops import WorkflowOps
 from src.agent.workflow.registry import WorkflowRegistry
+from src.agent.workflow.trigger_router import TriggerRouter, WorkflowEvent
 from src.agent.workflow.user_interaction import (
     InteractionRequest,
     InteractionResponse,
@@ -24,14 +26,17 @@ from src.agent.workflow.workflow_definition import (
 )
 
 __all__ = [
+    "EventBus",
     "InMemoryJobQueue",
     "InteractionRequest",
     "InteractionResponse",
     "JobRecord",
     "StepOutcome",
+    "TriggerRouter",
     "UserInteractionManager",
     "WorkflowDefinition",
     "WorkflowEngine",
+    "WorkflowEvent",
     "WorkflowExecutionState",
     "WorkflowInstanceRecord",
     "WorkflowInstanceStore",
