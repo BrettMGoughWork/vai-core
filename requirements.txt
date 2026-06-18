@@ -25,3 +25,4 @@ PyMuPDF==1.27.2.3
 markdown==3.10.2
 playwright==1.60.0
 curl_cffi==0.15.0
+numpy==2.2.5
