@@ -29,7 +29,10 @@ Step outcome types and caller responsibilities:
     Supervisor pauses the agent (WAITING) until the user responds.
 ``continue``
     Supervisor calls ``step()`` again — the engine advanced to the next
-    step automatically (used after deterministic transitions like conditions).
+    step automatically (used after deterministic transitions like
+    conditions, or returned by ``resume_with_result`` /
+    ``resume_with_input`` to signal the caller to loop back to
+    ``step()``).
 ``completed``
     Workflow is done — Supervisor marks the agent COMPLETED.
 ``failed``
@@ -92,6 +95,7 @@ OutcomeType = Literal[
     "tool_execute",
     "sub_workflow",
     "waiting_for_input",
+    "planner_call",
     "continue",
     "completed",
     "failed",
@@ -241,22 +245,26 @@ class WorkflowEngine:
         state: WorkflowExecutionState,
         user_input: str,
     ) -> Tuple[WorkflowExecutionState, StepOutcome]:
-        """Inject user input into context and evaluate the next step.
+        """Inject user input into context.
 
         The engine assumes ``current_step_id`` already points beyond
         the ``user_input`` step (set by the previous ``step()`` call).
+
+        The caller (Supervisor) must call ``step()`` afterwards to
+        evaluate the next step — this method stores the input only.
 
         Args:
             state: Execution state (should be WAITING_FOR_INPUT or RUNNING).
             user_input: The user's response text.
 
         Returns:
-            ``(new_state, outcome)`` — same contract as ``step()``.
+            ``(new_state, continue_outcome)`` — caller should loop
+            back to ``step()``.
         """
         context = dict(state.context)
         context["_user_input"] = user_input
         resumed = _copy_state(state, status=WorkflowStatus.RUNNING, context=context)
-        return self.step(resumed)
+        return resumed, StepOutcome(type="continue", step_id=state.current_step_id or "")
 
     def resume_with_result(
         self,
@@ -264,10 +272,13 @@ class WorkflowEngine:
         step_id: str,
         result: Any,
     ) -> Tuple[WorkflowExecutionState, StepOutcome]:
-        """Record a step result and evaluate the next step.
+        """Record a step result.
 
-        Called by the Supervisor when an ``llm_call`` or ``tool_execute``
-        step completes successfully.
+        Called by the Supervisor when an ``llm_call``, ``tool_execute``,
+        or ``planner_call`` step completes successfully.
+
+        The caller (Supervisor) must call ``step()`` afterwards to
+        evaluate the next step — this method stores the result only.
 
         Args:
             state: Execution state (current_step_id already advanced).
@@ -275,7 +286,8 @@ class WorkflowEngine:
             result: The result value to store in ``step_results``.
 
         Returns:
-            ``(new_state, outcome)`` — same contract as ``step()``.
+            ``(new_state, continue_outcome)`` — caller should loop
+            back to ``step()``.
         """
         step_results = dict(state.step_results)
         step_results[step_id] = result
@@ -292,7 +304,7 @@ class WorkflowEngine:
             context=context,
             step_results=step_results,
         )
-        return self.step(resumed)
+        return resumed, StepOutcome(type="continue", step_id=step_id)
 
     def fail_step(
         self,
@@ -466,6 +478,24 @@ def _handle_sub_workflow(
     )
 
 
+def _handle_planner_call(
+    engine: WorkflowEngine,
+    state: WorkflowExecutionState,
+    step: Any,
+    defn: Any,
+) -> Tuple[WorkflowExecutionState, StepOutcome]:
+    """Emit a planner_call outcome for the supervisor to route to S2."""
+    return engine._advance(
+        state,
+        step,
+        StepOutcome(
+            type="planner_call",
+            step_id=step.step_id,
+            config=step.config,
+        ),
+    )
+
+
 def _handle_user_input(
     engine: WorkflowEngine,
     state: WorkflowExecutionState,
@@ -531,6 +561,7 @@ _STEP_HANDLERS = {
     "sub_workflow": _handle_sub_workflow,
     "user_input": _handle_user_input,
     "condition": _handle_condition,
+    "planner_call": _handle_planner_call,
 }
 
 

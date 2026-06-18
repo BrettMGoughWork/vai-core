@@ -222,8 +222,13 @@ class TestStepUserInput:
         assert wf_state.status == WorkflowStatus.WAITING_FOR_INPUT
         assert wf_state.current_step_id == "after"
 
-        # resume — injects input and steps into "after"
+        # resume — injects input and returns "continue" (no longer auto-steps)
         resumed, outcome = engine.resume_with_input(wf_state, "my answer")
+        assert outcome.type == "continue"
+        assert resumed.current_step_id == "after"
+
+        # step explicitly to advance into "after"
+        resumed, outcome = engine.step(resumed)
 
         assert outcome.type == "llm_call"  # "after" is llm_call, on_success: __end__
         assert resumed.current_step_id is None
@@ -248,8 +253,13 @@ class TestResumeWithResult:
         state = engine.start_workflow("test-wf")
         wf_state, _outcome = engine.step(state)  # a → llm_call, advances to b
 
-        # Resume result for step "a" — stores result and steps into "b"
+        # Resume result for step "a" — stores result and returns "continue"
         resumed, outcome = engine.resume_with_result(wf_state, "a", "output text")
+        assert outcome.type == "continue"
+        assert resumed.current_step_id == "b"
+
+        # Step explicitly to advance into "b"
+        resumed, outcome = engine.step(resumed)
 
         assert outcome.type == "llm_call"
         assert outcome.step_id == "b"

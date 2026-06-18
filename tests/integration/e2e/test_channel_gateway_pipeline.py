@@ -265,20 +265,20 @@ class TestChannelGatewayResumeFlow:
 
         result = tool_gateway_adapter.ingest(AgentRequest(
             channel="cli",
-            message_text="run workflow",
+            message_text="/workflow tools-workflow",
             user_id="test-user",
             metadata={"agent_id": "tools-workflow"},
         ))
 
         assert "error" not in result, f"ingest failed: {result}"
-        assert result.get("state") == "waiting"
+        assert result.get("state") == "waiting", f"Expected 'waiting', got: {result}"
         agent_id = result["agent_id"]
 
         # Simulate S4B job completion
         tool_gateway_adapter._supervisor.set_tool_result(agent_id, '"hello from channel"')
 
         # Resume via the same adapter
-        result = tool_gateway_adapter.resume(agent_id, "continue")
+        result = tool_gateway_adapter.resume(agent_id, "/workflow tools-workflow")
         assert "error" not in result, f"resume failed: {result}"
         assert "reply" in result
         assert result["agent_id"] == agent_id
@@ -324,11 +324,11 @@ class TestAdapterErrorHandling:
         # Start a workflow that waits
         result = tool_gateway_adapter.ingest(AgentRequest(
             channel="cli",
-            message_text="run workflow",
+            message_text="/workflow tools-workflow",
             user_id="test-user",
             metadata={"agent_id": "tools-workflow"},
         ))
-        assert result.get("state") == "waiting"
+        assert result.get("state") == "waiting", f"Expected 'waiting', got: {result}"
 
         # Try resume with a tampered agent_id
         result = tool_gateway_adapter.resume("nonexistent-agent", "continue")

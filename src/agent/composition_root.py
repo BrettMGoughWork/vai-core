@@ -10,8 +10,10 @@ and capability (``src.capabilities.*``).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, List
 from uuid import uuid4
+
+from src.capabilities.contracts import DiscoveredSkill
 
 # ── Infrastructure imports (adapter→infrastructure: allowed) ─────────
 from src.runtime.llm.types import CoreLLMResponse, RuntimeConfig
@@ -176,10 +178,64 @@ _wired_planner = wire_planner(s1_executor=_s1_executor)
 
 
 # ── Wired StrategyRouter → Supervisor ───────────────────────────────
+# Provide a minimal capability discoverer (stub — expand when S3 registry is wired)
+def _discover_capabilities() -> list[DiscoveredSkill]:
+    return [
+        DiscoveredSkill(
+            name="test_tool",
+            description="Test tool for demonstrating S3 capability execution",
+        ),
+    ]
+
+
+def _execute_plan_step(step_payload: dict[str, Any]) -> dict[str, Any]:
+    """Execute a single plan step inline.
+
+    Routes the step to the appropriate handler based on ``skill_ref``:
+    - ``test_tool`` → inline tool executor
+    - ``llm_call``  → S1 LLM transport
+    - anything else → unknown skill result
+    """
+    step_id = step_payload.get("step_id", "")
+    skill_ref = step_payload.get("skill_ref", "")
+    inputs = step_payload.get("inputs", {})
+    description = step_payload.get("description", "")
+
+    if skill_ref == "test_tool":
+        result = _execute_tool_inline({
+            "skill_name": "test_tool",
+            "arguments": inputs,
+        })
+        return {
+            "status": "success",
+            "message": result.get("message", f"Tool '{skill_ref}' executed"),
+            "step_id": step_id,
+            "outputs": result.get("outputs", inputs),
+        }
+
+    if skill_ref in ("llm_call", "llm"):
+        prompt = description or inputs.get("prompt", f"Execute step: {step_id}")
+        response = _s1_executor.complete(prompt)
+        return {
+            "status": "success",
+            "message": response.text or f"LLM responded to step '{step_id}'",
+            "step_id": step_id,
+            "outputs": {"response": response.text},
+        }
+
+    return {
+        "status": "unknown",
+        "message": f"No handler for skill_ref='{skill_ref}' (step '{step_id}')",
+        "step_id": step_id,
+        "outputs": {},
+    }
+
+
 _strategy_router = StrategyRouter(
     planner=_wired_planner.plan,
-    capability_discoverer=None,
+    capability_discoverer=_discover_capabilities,
     submit_s4_job=_submit_job,
+    step_executor=_execute_plan_step,
 )
 
 # ── Wired Supervisor ────────────────────────────────────────────────
