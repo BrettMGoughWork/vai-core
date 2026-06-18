@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import List, Optional, Protocol, runtime_checkable
 
 from src.capabilities.contracts import DiscoveredSkill
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.planning.models.plan import Plan
 
 
@@ -37,12 +38,17 @@ class S2Planner(Protocol):
     def plan(
         self,
         goal: str,
+        subgoal_id: str,
+        governance: MemoryGovernance,
         capabilities: Optional[List[DiscoveredSkill]] = None,
     ) -> Plan:
         """Generate a plan for the given goal.
 
         Args:
             goal: The high-level objective to plan for.
+            subgoal_id: The ID of the subgoal this plan belongs to.
+            governance: Shared MemoryGovernance instance for cross-store
+                consistency checks during planning.
             capabilities: Optional list of discovered skills/tools
                 available to the planner.
 

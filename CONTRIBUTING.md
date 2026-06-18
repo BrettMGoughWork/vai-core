@@ -31,7 +31,6 @@ Use existing folders and keep scope narrow.
 - `src/platform/` (S4): channels, queue/event substrate, worker pool, supervision, control plane, observability, config, security, daemon, deployment.
 - `src/agents/` (S5): agent layer (placeholder).
 - `src/workflow/` (S6): workflow engine (placeholder).
-- `src/release/`: release checklist and gating.
 - `tests/unit/`, `tests/integration/`: test suites.
 - `tools/`: developer tooling, testing harness, channels CLIs, quarantine CLI.
 - `docs/`: architecture, API, channel, lifecycle, control plane, worker pool documentation.
@@ -100,33 +99,13 @@ python -m tools.code_analysers.stratum1.cli --root . --strict
 python -m tools.code_analysers.deadcode.analyser
 ```
 
-If your change touches S4 release boundaries, also run the release checklist:
-
-```bash
-python -m src.release.checklist
-```
-
 If your change is docs-only, still run at least:
 
 ```bash
 python -m pytest -q
 ```
 
-## 6) Release checklist
-
-S4 releases are gated by a mandatory checklist defined in `src/release/checklist.py`. The checklist validates:
-
-- **Invariants**: namespace boundaries, purity rules, import acyclicity, schema stability
-- **Determinism**: golden snapshot comparison across multiple cycles
-- **Safety**: panic guards, poison detection, degraded mode transitions
-- **Performance**: throughput, latency, memory, CPU thresholds
-- **Concurrency**: deadlock/race detection under load, forced delays
-- **Channels**: lossless, ordered, backpressure-safe, timeout-safe
-- **Observability**: structured logs, metrics, traces, health checks
-
-Run `python -m src.release.checklist` before any S4 release. Any failure blocks the release.
-
-## 7) Pull request notes
+## 6) Pull request notes
 
 - Keep PRs small and scoped to one issue.
 - Link the issue in the PR body (`Closes #<id>`).

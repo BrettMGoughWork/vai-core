@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from src.agent.interfaces.s1_executor import S1Executor
 from src.agent.interfaces.s2_planner import S2Planner
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.agent.interfaces.s3_executor import (
     S3CapabilityDiscovery,
     S3SkillExecutor,
@@ -66,47 +67,23 @@ def wire_planner(
         def plan(
             self,
             goal: str,
+            subgoal_id: str,
+            governance: MemoryGovernance,
             capabilities: Optional[List[DiscoveredSkill]] = None,
         ) -> SimpleNamespace:
-            """Generate a plan for *goal* using the wired S1 backend."""
-            # AgentPlanner.plan() requires subgoal_id, governance, timestamp
-            # — for now we provide sensible defaults so the wiring can be
-            # tested end-to-end.  A proper S2Planner contract that maps
-            # cleanly to AgentPlanner will be defined in a follow-up phase.
+            """Generate a plan for *goal* using the wired S1 backend.
+
+            The ``subgoal_id`` and ``governance`` are provided by the caller
+            (StrategyRouter), which creates the subgoal in shared governance
+            before invoking the planner.  This ensures cross-store consistency
+            is maintained across the full S5→S2 planning pipeline.
+            """
             from datetime import datetime, timezone
 
-            from src.strategy.memory.governance.memory_governance import (
-                MemoryGovernance,
-            )
-            from src.strategy.memory.subgoal_memory import SubgoalMemory
-            from src.strategy.memory.segment_memory import SegmentMemory
-            from src.strategy.memory.drift_memory import DriftMemory
-            from src.strategy.types.subgoal import Subgoal
+            if subgoal_id is None or governance is None:
+                raise ValueError("subgoal_id and governance are required")
 
-            subgoal_id: str = f"sg-{hash(goal) & 0xFFFFFFFF:08x}"
             now = datetime.now(timezone.utc).isoformat()
-            now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
-
-            subgoal_memory = SubgoalMemory()
-            seg_memory = SegmentMemory()
-            plan_memory = self._plan_memory
-            drift_memory = DriftMemory()
-
-            # Seed a subgoal so plan consistency checks pass
-            subgoal_memory.put(Subgoal(
-                subgoal_id=subgoal_id,
-                goal=goal,
-                context={},
-                metadata={},
-                created_at=now_ts,
-            ))
-
-            governance = MemoryGovernance(
-                subgoal_memory=subgoal_memory,
-                segment_memory=seg_memory,
-                plan_memory=plan_memory,
-                drift_memory=drift_memory,
-            )
 
             skill_refs: list[str] | None = (
                 [s.name for s in capabilities] if capabilities else None
@@ -124,7 +101,7 @@ def wire_planner(
             steps: List[Dict[str, Any]] = []
             if agent_plan.segments:
                 segment_id = agent_plan.segments[0]
-                segment = seg_memory.get(segment_id)
+                segment = governance.get_segment(segment_id)
                 if segment is not None:
                     cap_list: List[str] = segment.context.get("capabilities", [])
                     id_list: List[str] = segment.context.get("step_ids", [])

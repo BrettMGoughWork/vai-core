@@ -16,13 +16,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
+from uuid import uuid4
 
 from src.runtime.interfaces import (
     PromptRequest,
     PromptResponse,
     S1Error,
 )
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.planning.s1_contract.s1_client import call_runtime_backend
+from src.strategy.types.subgoal import Subgoal
 
 
 @dataclass(frozen=True)
@@ -68,6 +71,11 @@ class StrategyRouter:
         Optional callable to submit a job to S4.  Required for planner
         and capability routes.  When None, those routes raise
         ``NotImplementedError``.
+    governance:
+        Shared ``MemoryGovernance`` instance for cross-store consistency.
+        When set, a subgoal is created via ``governance.put_subgoal()``
+        before calling the planner.  When ``None``, the planner is called
+        without subgoal creation (backwards-compatible mode).
     """
 
     def __init__(
@@ -80,6 +88,7 @@ class StrategyRouter:
         skill_executor: Optional[Any] = None,
         validation_pipeline: Optional[Any] = None,
         step_executor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        governance: Optional[MemoryGovernance] = None,
     ) -> None:
         self._call_runtime = call_runtime
         self._planner = planner
@@ -88,6 +97,7 @@ class StrategyRouter:
         self._skill_executor = skill_executor
         self._validation_pipeline = validation_pipeline
         self._step_executor = step_executor
+        self._governance = governance
 
     # ------------------------------------------------------------------
     # Public API
@@ -186,11 +196,31 @@ class StrategyRouter:
         # 1. Discover available skills
         available = self._capability_discoverer()
 
-        # 2. Call S2 planner with capabilities so LLM knows what tools exist
+        # 2. Get goal from outcome
         goal = outcome.payload.get("goal", "")
-        plan = self._planner(goal=goal, capabilities=available)
 
-        # 3. Execute each plan step (inline via step_executor, or submit as S4 job)
+        # 3. Create subgoal in shared governance (if configured)
+        if self._governance is not None:
+            subgoal = Subgoal(
+                subgoal_id=f"sg-{uuid4().hex[:16]}",
+                goal=goal,
+                context=outcome.payload.get("context", {}),
+                metadata={},
+            )
+            self._governance.put_subgoal(subgoal)
+            subgoal_id = subgoal.subgoal_id
+        else:
+            subgoal_id = f"sg-{hash(goal) & 0xFFFFFFFF:08x}"
+
+        # 4. Call S2 planner with governance context
+        plan = self._planner(
+            goal=goal,
+            subgoal_id=subgoal_id,
+            governance=self._governance,
+            capabilities=available,
+        )
+
+        # 5. Execute each plan step (inline via step_executor, or submit as S4 job)
         steps = getattr(plan, "steps", [])
         step_results: list[Dict[str, Any]] = []
         job_ids: list[str] = []
