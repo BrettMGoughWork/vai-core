@@ -31,6 +31,7 @@ from src.agent.workflow import (
     EventBus,
     InMemoryJobQueue,
     TriggerRouter,
+    UserInteractionManager,
     WorkflowEngine,
     WorkflowRegistry,
 )
@@ -290,6 +291,7 @@ _strategy_router = StrategyRouter(
 
 # ── Wired Supervisor ────────────────────────────────────────────────
 _workflow_engine = WorkflowEngine(wf_registry)
+_interaction_manager = UserInteractionManager(_workflow_engine)
 _supervisor = Supervisor(
     registry=_registry,
     store=state_store,
@@ -298,6 +300,7 @@ _supervisor = Supervisor(
     submit_job_callable=_job_queue.submit,
     strategy_router=_strategy_router,
     inline_tool_executor=_execute_tool_inline,
+    interaction_manager=_interaction_manager,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────
