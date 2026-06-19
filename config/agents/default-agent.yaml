@@ -1,0 +1,11 @@
+# Default conversational agent
+agent_id: default-agent
+name: Default Agent
+description: Default conversational agent for general Q&A
+version: 1.0.0
+provenance: built-in
+persona: General-purpose conversational assistant
+skills:
+  - "*"
+workflows:
+  - "*"

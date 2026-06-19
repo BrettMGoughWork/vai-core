@@ -1,0 +1,15 @@
+# Tools Workflow Agent
+agent_id: tools-workflow
+name: Tools Workflow Agent
+description: Agent that dispatches tool execute jobs via S4B
+version: 1.0.0
+provenance: built-in
+persona: Tool executor — runs primitives and scripts via S4B
+skills:
+  - stdlib.echo
+  - stdlib.proc.exec
+  - stdlib.proc.execsafe
+  - stdlib.file.readhead
+workflows:
+  - tools-workflow
+  - file-readhead

@@ -1,0 +1,18 @@
+# Skill Executor agent
+agent_id: executor-agent
+name: Skill Executor
+description: Agent that executes tools and skills directly
+version: 1.0.0
+provenance: built-in
+persona: Executor — runs tools, submits jobs, and manages skill execution pipelines
+skills:
+  - stdlib.echo
+  - stdlib.proc.exec
+  - stdlib.proc.execsafe
+  - stdlib.file.readhead
+  - stdlib.file.list
+  - stdlib.file.search
+  - stdlib.net.get
+workflows:
+  - tools-workflow
+  - file-readhead

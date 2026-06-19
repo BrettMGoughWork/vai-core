@@ -42,6 +42,7 @@ from src.agent import (
     MemoryAgentStateStore,
     Supervisor,
     load_agent_manifest,
+    load_agents_from_directory,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,8 +61,9 @@ HEADER = r"""
 
 PROMPT = "vai> "
 
-DEFAULT_MANIFEST = Path(__file__).resolve().parents[2] / "config" / "agents.yaml"
-"""Path to the agent manifest YAML file."""
+DEFAULT_MANIFEST = Path(__file__).resolve().parents[2] / "config" / "agents"
+DEFAULT_MANIFEST_FILE = DEFAULT_MANIFEST.with_name("agents.yaml")  # legacy fallback
+"""Path to the agent manifest directory (config/agents/) or legacy file (config/agents.yaml)."""
 
 DEFAULT_AGENT_ID = "assistant"
 
@@ -100,7 +102,14 @@ def _bootstrap(
     registry = AgentRegistry()
     manifest = Path(manifest_path) if manifest_path else DEFAULT_MANIFEST
 
-    if manifest.exists():
+    if manifest.is_dir():
+        try:
+            count = load_agents_from_directory(registry, str(manifest))
+            print(f"  [init] loaded {count} agent(s) from {manifest.name}/", file=sys.stderr)
+        except Exception as exc:
+            print(f"  [init] failed to load agents from {manifest}: {exc}", file=sys.stderr)
+            sys.exit(1)
+    elif manifest.exists():
         try:
             count = load_agent_manifest(registry, str(manifest))
             print(f"  [init] loaded {count} agent(s) from {manifest.name}", file=sys.stderr)
@@ -111,10 +120,20 @@ def _bootstrap(
             )
             sys.exit(1)
     else:
-        print(
-            f"  [init] no manifest found at {manifest} — agent registry is empty",
-            file=sys.stderr,
-        )
+        # Fallback: try the legacy file path
+        legacy = DEFAULT_MANIFEST_FILE
+        if legacy.exists():
+            try:
+                count = load_agent_manifest(registry, str(legacy))
+                print(f"  [init] loaded {count} agent(s) from {legacy.name}", file=sys.stderr)
+            except Exception as exc:
+                print(f"  [init] failed to load {legacy}: {exc}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print(
+                f"  [init] no manifest found at {manifest} — agent registry is empty",
+                file=sys.stderr,
+            )
 
     # Ephemeral in-memory store — clean slate on every launch.
     store = MemoryAgentStateStore()
@@ -324,7 +343,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--manifest",
         default=None,
-        help="Path to agent manifest YAML (default: config/agents.yaml)",
+        help="Path to agent manifest dir (default: config/agents/) or legacy file (config/agents.yaml)",
     )
     parser.add_argument(
         "--dry-run",

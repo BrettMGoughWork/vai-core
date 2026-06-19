@@ -10,9 +10,7 @@ Destinations
 ------------
 - ``runtime`` — conversational / chat (→ Runtime stratum)
 - ``workflow`` — multi-step workflow (→ Workflow Engine)
-- ``s4b``     — direct platform job execution (→ Platform stratum)
 - ``planner`` — plan generation (→ S2 Planner)  *(reserved)*
-- ``capability`` — skill / tool execution (→ S3 via S4)  *(reserved)*
 """
 
 from __future__ import annotations
@@ -20,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-from src.agent.registry import AgentMetadata, CAP_JOB_SUBMISSION
+from src.agent.registry import AgentMetadata
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -38,11 +36,6 @@ DEST_CAPABILITY = "capability"  # → S3 via S4 (skill / tool)  *(reserved)*
 
 # Trigger prefix for explicit workflow dispatch
 _WORKFLOW_TRIGGER = "/workflow"
-
-# Keywords that hint at direct execution intent
-_EXECUTION_KEYWORDS = frozenset({
-    "execute ", "run ", "do ",
-})
 
 
 # ---------------------------------------------------------------------------
@@ -99,15 +92,14 @@ def route_message(
 ) -> Route:
     """Inspect an inbound message and decide where it should be routed.
 
-    Pure pattern matching — no LLM calls, no side effects.  Uses message
-    content and agent capabilities to determine the correct destination.
+    Pure pattern matching — no LLM calls, no side effects.
 
     Parameters
     ----------
     message:
         The raw user message to inspect.
     agent:
-        The agent's metadata (used to check declared capabilities).
+        The agent's metadata.
     context:
         Optional activation context for richer routing decisions.
 
@@ -137,20 +129,7 @@ def route_message(
             confidence=0.9,
         )
 
-    # ── 2. Execution keywords + capability → S4b ──────────────────────
-    if CAP_JOB_SUBMISSION in agent.capabilities:
-        if any(kw in msg_lower for kw in _EXECUTION_KEYWORDS):
-            return Route(
-                destination=DEST_S4B,
-                payload={
-                    "message": message,
-                    "action": "direct_execution",
-                },
-                agent_id=agent.identity.agent_id,
-                confidence=0.7,
-            )
-
-    # ── 3. Default → Runtime (conversational) ────────────────────────
+    # ── 2. Default → Runtime (conversational) ────────────────────────
     return Route(
         destination=DEST_RUNTIME,
         payload={"message": message},

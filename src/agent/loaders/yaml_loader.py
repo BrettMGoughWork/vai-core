@@ -2,17 +2,20 @@
 YAML Agent Manifest Loader
 ===========================
 
-Reads a declarative ``agents.yaml`` file and registers every agent
-definition into an ``AgentRegistry``.
+Reads declarative agent definitions from YAML files and registers
+them into an ``AgentRegistry``.
 
-Usage::
+Two load modes are supported:
 
-    from src.agent import AgentRegistry, load_agent_manifest
+1. Single-file manifest (``load_agent_manifest``): reads a top-level
+   ``agents`` list from one YAML file.
 
-    registry = AgentRegistry()
-    handles = load_agent_manifest(registry, "config/agents.yaml")
+2. Directory scan (``load_agents_from_directory``): scans a directory
+   for individual ``*.yaml`` / ``*.yml`` files, each containing one
+   agent definition (no wrapping ``agents`` key).  This mirrors the
+   ``load_workflows_from_yaml`` pattern.
 
-YAML format::
+Single-file YAML format::
 
     agents:
       - agent_id: my-agent
@@ -21,16 +24,25 @@ YAML format::
         version: 1.0.0
         provenance: built-in           # built-in | user-defined | system
         capabilities: [conversational, tool_use]
+        persona: "Role description for agent-selection matching"
         inputs: [text, markdown]
         outputs: [text, json]
         constraints:
           max_tokens: 4096
           timeout_ms: 30000
           sandbox: none                # none | process | container
+
+Per-file format (no ``agents`` wrapping key)::
+
+    agent_id: my-agent
+    name: My Agent
+    description: Does something useful
+    # … same fields as above, but at the top level
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List
 
 import yaml
@@ -140,8 +152,46 @@ def _parse_entry(entry: dict) -> AgentMetadata:
 
     return AgentMetadata(
         identity=identity,
-        capabilities=entry.get("capabilities", []),
+        persona=entry.get("persona", ""),
+        skills=entry.get("skills", []),
+        workflows=entry.get("workflows", []),
         inputs=entry.get("inputs", []),
         outputs=entry.get("outputs", []),
         constraints=constraints,
     )
+
+
+def load_agents_from_directory(
+    registry: AgentRegistry,
+    directory: str | Path,
+) -> List[AgentHandle]:
+    """Scan *directory* for ``*.yaml`` / ``*.yml`` files, each containing
+    a single agent definition (no wrapping ``agents`` key), and register
+    each into *registry*.
+
+    Skips non-existent directories and files that fail to parse or validate,
+    printing warnings to stderr so the caller knows an agent was skipped.
+    """
+    root = Path(directory)
+    if not root.is_dir():
+        return []
+
+    found: List[AgentHandle] = []
+    for yaml_path in sorted(root.glob("*.yaml")) + sorted(root.glob("*.yml")):
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                raw = yaml.safe_load(f)
+            if not isinstance(raw, dict):
+                print(
+                    f"[agent-loader] skipping {yaml_path.name}: "
+                    f"not a mapping"
+                )
+                continue
+            metadata = _parse_entry(raw)
+            handle = registry.register_agent(metadata)
+            found.append(handle)
+        except (AgentRegistryError, ValueError, TypeError, KeyError) as exc:
+            print(
+                f"[agent-loader] skipping {yaml_path.name}: {exc}"
+            )
+    return found

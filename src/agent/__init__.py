@@ -41,7 +41,6 @@ from src.agent.activation import (
     ActivationError,  
     UnauthorizedChannelError,  
     activate_agent,  
-    resolve_capabilities,  
 )  
 from src.agent.contracts import (  
     S5_CONTRACT_VERSION,  
@@ -82,23 +81,16 @@ from src.agent.adapters.file_agent_state_store import FileAgentStateStore
 from src.agent.adapters.sqlite_agent_state_store import SQLiteAgentStateStore
 from src.agent.loaders.yaml_loader import (
     load_agent_manifest,
+    load_agents_from_directory,
 )
 from src.agent.registry import (
     AGENT_REGISTRY_VERSION,
-    CAP_ANALYSIS,
-    CAP_CONVERSATIONAL,
-    CAP_JOB_SUBMISSION,
-    CAP_PLANNING,
-    CAP_ROUTING,
-    CAP_SUMMARIZATION,
-    CAP_TOOL_USE,
     PROVENANCE_BUILTIN,
     PROVENANCE_SYSTEM,
     PROVENANCE_USER_DEFINED,
     SANDBOX_CONTAINER,
     SANDBOX_NONE,
     SANDBOX_PROCESS,
-    VALID_CAPABILITIES,
     VALID_PROVENANCES,
     VALID_SANDBOX_LEVELS,
     AgentConstraints,
@@ -109,7 +101,6 @@ from src.agent.registry import (
     AgentRegistry,
     AgentRegistryError,
     DuplicateAgentError,
-    UnknownCapabilityError,
 )
 
 __all__ = [
@@ -119,20 +110,12 @@ __all__ = [
     "AgentResponse",
     # ── Registry (S5.1) ───────────────────────────────────────────────
     "AGENT_REGISTRY_VERSION",
-    "CAP_ANALYSIS",
-    "CAP_CONVERSATIONAL",
-    "CAP_JOB_SUBMISSION",
-    "CAP_PLANNING",
-    "CAP_ROUTING",
-    "CAP_SUMMARIZATION",
-    "CAP_TOOL_USE",
     "PROVENANCE_BUILTIN",
     "PROVENANCE_SYSTEM",
     "PROVENANCE_USER_DEFINED",
     "SANDBOX_CONTAINER",
     "SANDBOX_NONE",
     "SANDBOX_PROCESS",
-    "VALID_CAPABILITIES",
     "VALID_PROVENANCES",
     "VALID_SANDBOX_LEVELS",
     "AgentConstraints",
@@ -143,7 +126,6 @@ __all__ = [
     "AgentRegistry",
     "AgentRegistryError",
     "DuplicateAgentError",
-    "UnknownCapabilityError",
     # ── Activation (S5.2) ─────────────────────────────────────────────
     "CHANNEL_CLI",
     "CHANNEL_HTTP",
@@ -158,7 +140,6 @@ __all__ = [
     "ActivationError",
     "UnauthorizedChannelError",
     "activate_agent",
-    "resolve_capabilities",
     # ── Router (S5.2) ─────────────────────────────────────────────────
     "DEST_CAPABILITY",
     "DEST_PLANNER",

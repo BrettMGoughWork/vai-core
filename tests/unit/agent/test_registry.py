@@ -12,17 +12,11 @@ import pytest
 
 from src.agent.registry import (
     AGENT_REGISTRY_VERSION,
-    CAP_ANALYSIS,
-    CAP_CONVERSATIONAL,
-    CAP_PLANNING,
-    CAP_ROUTING,
-    CAP_TOOL_USE,
     PROVENANCE_BUILTIN,
     PROVENANCE_SYSTEM,
     PROVENANCE_USER_DEFINED,
     SANDBOX_NONE,
     SANDBOX_PROCESS,
-    VALID_CAPABILITIES,
     AgentConstraints,
     AgentHandle,
     AgentIdentity,
@@ -142,30 +136,30 @@ class TestAgentMetadata:
         ident = AgentIdentity(agent_id="a1", name="Agent 1")
         meta = AgentMetadata(identity=ident)
         assert meta.identity.agent_id == "a1"
-        assert meta.capabilities == []
+        assert meta.skills == []
+        assert meta.workflows == []
         assert meta.inputs == []
         assert meta.outputs == []
 
-    def test_with_capabilities(self) -> None:
+    def test_with_skills(self) -> None:
         ident = AgentIdentity(agent_id="a1", name="Agent 1")
         meta = AgentMetadata(
             identity=ident,
-            capabilities=[CAP_CONVERSATIONAL, CAP_TOOL_USE],
+            skills=["web_search", "file_read"],
             inputs=["text"],
             outputs=["text", "actions"],
         )
-        assert CAP_CONVERSATIONAL in meta.capabilities
+        assert "web_search" in meta.skills
         assert "text" in meta.inputs
 
-    def test_unknown_capability_raises(self) -> None:
+    def test_with_workflows(self) -> None:
         ident = AgentIdentity(agent_id="a1", name="Agent 1")
-        with pytest.raises(ValueError, match="unknown capability"):
-            AgentMetadata(identity=ident, capabilities=["telepathy"])
-
-    def test_non_list_capabilities_raises(self) -> None:
-        ident = AgentIdentity(agent_id="a1", name="Agent 1")
-        with pytest.raises(ValueError, match="capabilities must be a list"):
-            AgentMetadata(identity=ident, capabilities="conversational")  # type: ignore[arg-type]
+        meta = AgentMetadata(
+            identity=ident,
+            workflows=["data-pipeline", "report-gen"],
+        )
+        assert "data-pipeline" in meta.workflows
+        assert "report-gen" in meta.workflows
 
     def test_with_constraints(self) -> None:
         ident = AgentIdentity(agent_id="a1", name="Agent 1")
@@ -177,7 +171,7 @@ class TestAgentMetadata:
         ident = AgentIdentity(agent_id="a1", name="Agent 1")
         meta = AgentMetadata(identity=ident)
         with pytest.raises(Exception):
-            meta.capabilities = [CAP_PLANNING]  # type: ignore[misc]
+            meta.skills = ["web_search"]  # type: ignore[misc]
 
 
 # ===========================================================================
@@ -260,33 +254,52 @@ class TestAgentRegistryDiscovery:
         with pytest.raises(AgentNotFoundError, match="not found"):
             registry.get_agent("nonexistent")
 
-    def test_find_agents_by_capability(self) -> None:
+    def test_find_agents_by_skill(self) -> None:
         registry = AgentRegistry()
         registry.register_agent(
             AgentMetadata(
                 AgentIdentity(agent_id="a1", name="A"),
-                capabilities=[CAP_CONVERSATIONAL],
+                skills=["web_search"],
             )
         )
         registry.register_agent(
             AgentMetadata(
                 AgentIdentity(agent_id="a2", name="B"),
-                capabilities=[CAP_PLANNING],
+                workflows=["data-pipeline"],
             )
         )
         registry.register_agent(
             AgentMetadata(
                 AgentIdentity(agent_id="a3", name="C"),
-                capabilities=[CAP_CONVERSATIONAL, CAP_ROUTING],
+                skills=["web_search", "file_read"],
+                workflows=["report-gen"],
             )
         )
-        results = registry.find_agents_by_capability(CAP_CONVERSATIONAL)
+        results = registry.find_agents_by_skill("web_search")
         assert len(results) == 2
         assert {r.identity.agent_id for r in results} == {"a1", "a3"}
 
-    def test_find_agents_by_unknown_capability(self) -> None:
+    def test_find_agents_by_workflow(self) -> None:
         registry = AgentRegistry()
-        assert registry.find_agents_by_capability("telepathy") == []
+        registry.register_agent(
+            AgentMetadata(
+                AgentIdentity(agent_id="a1", name="A"),
+                workflows=["data-pipeline"],
+            )
+        )
+        registry.register_agent(
+            AgentMetadata(
+                AgentIdentity(agent_id="a2", name="B"),
+                workflows=["report-gen"],
+            )
+        )
+        results = registry.find_agents_by_workflow("data-pipeline")
+        assert len(results) == 1
+        assert results[0].identity.agent_id == "a1"
+
+    def test_find_agents_by_unknown_skill(self) -> None:
+        registry = AgentRegistry()
+        assert registry.find_agents_by_skill("telepathy") == []
 
     def test_list_agents(self) -> None:
         registry = AgentRegistry()
@@ -318,7 +331,8 @@ class TestAgentRegistryDiscovery:
             AgentMetadata(AgentIdentity(agent_id="a1", name="A"))
         )
         before = registry.agent_count
-        registry.find_agents_by_capability(CAP_CONVERSATIONAL)
         registry.list_agents()
         registry.get_agent("a1")
+        registry.find_agents_by_skill("nonexistent")
+        registry.find_agents_by_workflow("nonexistent")
         assert registry.agent_count == before

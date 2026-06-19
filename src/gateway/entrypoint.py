@@ -239,6 +239,7 @@ def submit_channel_input(
     raw_input: Any,
     adapter: GatewayAgentAdapter | None = None,
     *,
+    agent_id: str | None = None,
     queue: Any = None,
     control_plane: Any = None,
 ) -> dict[str, Any]:
@@ -259,6 +260,8 @@ def submit_channel_input(
         adapter:       The :class:`GatewayAgentAdapter` to hand off to S5.
                        If ``None``, returns the normalised payload dict only
                        (useful for testing/validation).
+        agent_id:      Optional explicit agent id to use (instead of the
+                       gateway adapter default).  Passed through metadata.
         queue:         **Deprecated** — kept for backward compatibility.
         control_plane: **Deprecated** — kept for backward compatibility.
 
@@ -287,6 +290,10 @@ def submit_channel_input(
     msg_metadata: dict[str, Any] = (
         payload.get("metadata", {}) if isinstance(payload, dict) else {}
     )
+
+    # Inject explicit agent_id into metadata (overrides adapter default)
+    if agent_id is not None:
+        msg_metadata["agent_id"] = agent_id
 
     request = AgentRequest(
         channel=channel_name,

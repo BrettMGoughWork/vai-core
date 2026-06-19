@@ -230,13 +230,13 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 
 | Task | What |
 |------|------|
-| 9.1 | Define agent_profile field in workflow step config |
-| 9.2 | Agent registry — list available agents with capabilities/persona |
-| 9.3 | Agent selection strategy — profile match, round-robin, explicit |
-| 9.4 | Wire selection into Supervisor when stepping workflow |
-| 9.5 | Test: explicit agent_profile → correct agent selected |
-| 9.6 | Test: no agent_profile → runtime agent used |
-| 9.7 | Test: agent not found → configurable fallback/fail |
+| 9.1 | Define agent_profile field in workflow step config | ✅ |
+| 9.2 | Agent registry — list available agents with capabilities/persona | ✅ |
+| 9.3 | Agent selection strategy — profile match, round-robin, explicit | ✅ |
+| 9.4 | Wire selection into Supervisor when stepping workflow | ✅ |
+| 9.5 | Test: explicit agent_profile → correct agent selected | ✅ |
+| 9.6 | Test: no agent_profile → runtime agent used | ✅ |
+| 9.7 | Test: agent not found → configurable fallback/fail | ✅ |
 
 ### Sprint 9a — Workflow Discovery for Agents
 
@@ -247,14 +247,14 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 
 | Task | What |
 |------|------|
-| 9a.1 | WorkflowToolAdapter — converts WorkflowRegistry entries into LLM tool definitions (name, description, input_schema from YAML) |
-| 9a.2 | Wire adapter into S5 Supervisor's tool registry — workflows appear alongside skills as callable tools |
-| 9a.3 | Handle workflow tool call in Supervisor — route `workflow.execute` calls to WorkflowEngine instead of SkillRunner |
-| 9a.4 | Parameter passthrough — LLM tool call params → workflow input state |
-| 9a.5 | Test: agent invokes workflow via tool call → workflow starts and completes |
-| 9a.6 | Test: workflow tool call with params → correctly populates initial state |
-| 9a.7 | Test: agent calls non-existent workflow → graceful error (tool not found) |
-| 9a.8 | Test: workflow tool appears/disappears based on registration state |
+| 9a.1 | WorkflowToolAdapter — converts WorkflowRegistry entries into LLM tool definitions (name, description, input_schema from YAML) | ✅ |
+| 9a.2 | Wire adapter into S5 Supervisor's tool registry — workflows appear alongside skills as callable tools | ✅ |
+| 9a.3 | Handle workflow tool call in Supervisor — route `workflow.execute` calls to WorkflowEngine instead of SkillRunner | ✅ |
+| 9a.4 | Parameter passthrough — LLM tool call params → workflow input state | ✅ |
+| 9a.5 | Test: agent invokes workflow via tool call → workflow starts and completes | ✅ |
+| 9a.6 | Test: workflow tool call with params → correctly populates initial state | ✅ |
+| 9a.7 | Test: agent calls non-existent workflow → graceful error (tool not found) | ✅ |
+| 9a.8 | Test: workflow tool appears/disappears based on registration state | ✅ |
 
 ### Sprint 10 — Refactor: Stratum Isolation 
 

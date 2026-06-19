@@ -41,9 +41,6 @@ from src.agent.registry import (
     AgentIdentity as AgentIdentity,
     AgentConstraints as AgentConstraints,
     AgentNotFoundError as AgentNotFoundError,
-    CAP_CONVERSATIONAL as CAP_CONVERSATIONAL,
-    CAP_TOOL_USE as CAP_TOOL_USE,
-    CAP_JOB_SUBMISSION as CAP_JOB_SUBMISSION,
 )
 
 # ── Cognitive Loop Types ──────────────────────────────────────────────────
@@ -119,9 +116,6 @@ __all__ = [
     "AgentIdentity",
     "AgentConstraints",
     "AgentNotFoundError",
-    "CAP_CONVERSATIONAL",
-    "CAP_TOOL_USE",
-    "CAP_JOB_SUBMISSION",
     # Job Interface (S5.4)
     "JobDispatchResult",
     "dispatch_route",

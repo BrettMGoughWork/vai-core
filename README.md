@@ -8,38 +8,66 @@ The core idea is simple: give LLMs structured jobs, not free rein. The runtime f
 
 ---
 
+## REPL test harness
+
+Use this channel harness to drive the system while it is being tested 
+
+```python -m tools.channels.cli_app --interactive```
+
+Note:
+- ```/workflow <workflow_id>``` explicitly runs a workflow
+- ```/agent <agent_id>``` explicitly changes agent
+
+---
+
 ## 🏗️ Architecture
 
 vai-core is organised into six strata (S1–S6) plus a Gateway layer with strict dependency rules:
 
 ```
-  External world (CLI, HTTP, WebSocket, webhook, cron, timer)
-         │
-         ▼
-  Gateway ── (ingress/egress, channels, FastAPI, transport, S5 interface)
-         │
-         ▼
-  S4 ── Platform (job system, queue, worker pool, supervision, event substrate,
-  │               durability, config, security, observability)
-  │
-  ├──────────────────┐
-  ▼                  ▼
-  S5 Agents        S6 Workflow Engine
-  (agent registry,  (trigger router, workflow state machine,
-   activation,       agent selection, user interaction,
-   routing,          instance store, WorkflowOps:
-   strategy skills,   list, cancel, retry, dead-letter
-   cognitive loop)    queue, metrics)
-  │                  │
-  └──────┬───────────┘
-         ▼
-  S3 ── Capabilities (primitives, skills, registry, quarantine, safety)
-         │
-         ▼
-  S2 ── Strategy (planning, cognition — pure function, no I/O)
-         │
-         ▼
-  S1 ── Runtime (execution engine, retry, panic guard, degraded mode)
+External world (CLI, HTTP, WebSocket, webhook, cron, timer)
+     │
+     ▼
+┌──────────────────────────────────────────────────────┐
+│  Gateway  (ingress/egress, channels, transport,      │
+│            FastAPI, S5 adapter interface)            │
+│                                                      │
+│  Channels normalise inbound events and hand off      │
+│  to S5 via AgentGatewayAdapter.                      │
+│  No knowledge of workflows, agents, or S6.           │
+│  Channels stay in Gateway — they are plumbing.       │
+└──────────────────────┬───────────────────────────────┘
+                       │  AgentGatewayAdapter.ingest()
+                       ▼
+┌──────────────────────────────────────────────────────┐
+│  S5 — Agents  (cognitive loop)                       │
+│                                                      │
+│  Agent registry, activation, routing, strategy,      │
+│  capabilities.                                       │
+│  Plan → execute → observe.                           │
+│                                                      │
+│  ┌────────────────────────────────────────────────┐  │
+│  │  Workflow Engine                               │  │
+│  │                                                │  │
+│  │  Trigger router, definition model, state       │  │
+│  │  machine, agent selection, user interaction.   │  │
+│  │  Pure orchestration — no transport/channels.   │  │
+│  └────────────────────────────────────────────────┘  │
+└──────┬──────────┬──────────┬──────────┬──────────────┘
+       │          │          │          │
+       │ llm_call │ plan     │ tool     │ durable job
+       ▼          ▼          ▼          ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐
+│ S1 — LLM │ │ S2 —     │ │ S3 —     │ │ S4 — Platform  │
+│ Runtime  │ │ Strategy │ │ Capab.   │ │                │
+│          │ │          │ │          │ │ Job system,    │
+│ LLM      │ │ Planning,│ │ Skills,  │ │ event substrate│
+│ transport│ │ task     │ │ prim.,   │ │ worker pool,   │
+│ exec     │ │ decompos │ │ discov., │ │ durability,    │
+│ engine,  │ │ state    │ │ ranking  │ │ supervision,   │
+│ config   │ │ (pure    │ │          │ │ observability  │
+│          │ │ function)│ │          │ │                │
+└──────────┘ └──────────┘ └──────────┘ └────────────────┘
 ```
 
 **Key invariants:**

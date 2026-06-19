@@ -1,0 +1,23 @@
+# General Assistant agent
+agent_id: assistant
+name: General Assistant
+description: A general-purpose conversational assistant handling free-form Q&A, tool-based tasks, and multi-step reasoning
+version: 1.0.0
+provenance: built-in
+persona: Versatile assistant — handles general Q&A, tool-based tasks, and multi-step reasoning
+skills:
+  - stdlib.echo
+  - stdlib.file.readhead
+workflows:
+  - file-readhead
+inputs:
+  - text
+  - markdown
+outputs:
+  - text
+  - markdown
+constraints:
+  max_tokens: 4096
+  max_iterations: 10
+  timeout_ms: 30000
+  sandbox: none

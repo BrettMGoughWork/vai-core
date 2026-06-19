@@ -25,7 +25,11 @@ import argparse
 import json
 import sys
 
-from src.agent.composition_root import s5_adapter
+from src.agent.composition_root import (
+    agent_registry,
+    s5_adapter,
+    workflow_registry,
+)
 from src.gateway.channels.cli import register_cli_channel
 from src.gateway.channels.registry import ChannelRegistry
 from src.gateway.entrypoint import submit_channel_input
@@ -53,6 +57,10 @@ _waiting_agent_id: str | None = None
 """Set when the last ``ingest()`` returned a WAITING state with HITL
 interaction metadata.  When set, the next user input is sent via
 ``resume()`` instead of ``ingest()``."""
+
+_current_agent_id: str = "default-agent"
+"""The agent selected via ``/agent <agent_id>``.  Defaults to the
+system default; changed at runtime via the ``/agent`` command."""
 
 
 def _handle_result(result: dict, registry: ChannelRegistry) -> None:
@@ -92,21 +100,85 @@ def _handle_result(result: dict, registry: ChannelRegistry) -> None:
     print()
 
 
+def _show_agent() -> None:
+    """Display the current agent."""
+    print(f"\n  Current agent: {_current_agent_id}")
+    if agent_registry.has_agent(_current_agent_id):
+        meta = agent_registry.get_agent(_current_agent_id)
+        act = meta.identity
+        print(f"    name:        {act.name}")
+        print(f"    description: {act.description}")
+        if meta.persona:
+            print(f"    persona:     {meta.persona}")
+    print()
+
+
+def _list_agents() -> None:
+    """Display all registered agents."""
+    print(f"\n  Registered agents ({agent_registry.agent_count}):")
+    for meta in agent_registry.list_agents():
+        act = meta.identity
+        print(f"    {act.agent_id:20s}  {act.name}")
+        if meta.persona:
+            print(f"    {'':20s}  persona: {meta.persona}")
+    print()
+
+
+def _list_workflows() -> None:
+    """Display all registered workflows."""
+    defs = workflow_registry.list()
+    print(f"\n  Registered workflows ({len(defs)}):")
+    for wf in defs:
+        print(f"    {wf.workflow_id:20s}  {wf.description or ''}")
+    print()
+
+
 def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None:
     """Submit a command through the Gateway → S5 pipeline.
+
+    Handles meta-commands:
+      ``/agent``          — show current agent
+      ``/agent <id>``     — switch to a different agent
+      ``/agents``         — list all registered agents
+      ``/workflows``      — list all registered workflows
 
     If the previous call left the agent ``WAITING`` for HITL input, this
     calls ``resume()`` instead of ``ingest()`` so the paused workflow
     receives the user's response.
     """
-    global _waiting_agent_id
+    global _waiting_agent_id, _current_agent_id
 
+    # ── Meta-commands ──────────────────────────────────────────────────
+    if text.startswith("/agent "):
+        agent_id = text[7:].strip()
+        if not agent_registry.has_agent(agent_id):
+            print(f"  Unknown agent: {agent_id!r}")
+            print(f"  Use /agents to see available agents.")
+            return
+        _current_agent_id = agent_id
+        _show_agent()
+        return
+
+    if text == "/agent":
+        _show_agent()
+        return
+
+    if text == "/agents":
+        _list_agents()
+        return
+
+    if text == "/workflows":
+        _list_workflows()
+        return
+
+    # ── Regular input ──────────────────────────────────────────────────
     if _waiting_agent_id:
         result = s5_adapter.resume(_waiting_agent_id, text)
     else:
         result = submit_channel_input(
             registry, "cli", {"text": text, "sender": sender},
             adapter=s5_adapter,
+            agent_id=_current_agent_id,
         )
 
     _handle_result(result, registry)

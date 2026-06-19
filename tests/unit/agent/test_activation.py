@@ -19,9 +19,6 @@ import pytest
 
 from src.agent.contracts import AgentMessage
 from src.agent.registry import (
-    CAP_CONVERSATIONAL,
-    CAP_PLANNING,
-    CAP_TOOL_USE,
     AgentConstraints,
     AgentIdentity,
     AgentMetadata,
@@ -41,7 +38,6 @@ from src.agent.activation import (
     ActivationError,
     UnauthorizedChannelError,
     activate_agent,
-    resolve_capabilities,
 )
 
 # ---------------------------------------------------------------------------
@@ -63,7 +59,8 @@ def sample_identity() -> AgentIdentity:
 def sample_metadata(sample_identity) -> AgentMetadata:
     return AgentMetadata(
         identity=sample_identity,
-        capabilities=[CAP_CONVERSATIONAL, CAP_PLANNING, CAP_TOOL_USE],
+        skills=["web_search", "file_read"],
+        workflows=["data-pipeline"],
     )
 
 
@@ -142,7 +139,6 @@ class TestActivationEnvelope:
 class TestActivationContext:
     def test_minimal_construction(self, sample_metadata) -> None:
         ctx = ActivationContext(agent_metadata=sample_metadata)
-        assert ctx.resolved_capabilities == []
         assert ctx.conversation_history == []
         assert ctx.routing_hints == {}
         assert ctx.channel_metadata == {}
@@ -170,13 +166,6 @@ class TestActivationContext:
         with pytest.raises(ValueError, match="must be an AgentMetadata"):
             ActivationContext(agent_metadata="not metadata")  # type: ignore[arg-type]
 
-    def test_non_list_capabilities_raises(self, sample_metadata) -> None:
-        with pytest.raises(ValueError, match="resolved_capabilities must be a list"):
-            ActivationContext(
-                agent_metadata=sample_metadata,
-                resolved_capabilities="not-a-list",  # type: ignore[arg-type]
-            )
-
     def test_non_list_history_raises(self, sample_metadata) -> None:
         with pytest.raises(ValueError, match="conversation_history must be a list"):
             ActivationContext(
@@ -194,7 +183,7 @@ class TestActivationContext:
     def test_is_frozen(self, sample_metadata) -> None:
         ctx = ActivationContext(agent_metadata=sample_metadata)
         with pytest.raises(AttributeError):
-            ctx.resolved_capabilities = ["new"]  # type: ignore[misc]
+            ctx.conversation_history = ["new"]  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -229,41 +218,23 @@ class TestActivatedAgentContext:
 
 
 # ---------------------------------------------------------------------------
-# TestCapabilityResolution
+# TestSkillWorkflowResolution
 # ---------------------------------------------------------------------------
 
 
-class TestCapabilityResolution:
-    def test_all_capabilities_on_cli(self, sample_metadata) -> None:
-        resolved = resolve_capabilities(sample_metadata, CHANNEL_CLI)
-        assert resolved == [CAP_CONVERSATIONAL, CAP_PLANNING, CAP_TOOL_USE]
+class TestSkillWorkflowResolution:
+    def test_skills_available_on_metadata(self, sample_metadata) -> None:
+        """Skills are directly available on agent metadata."""
+        assert sample_metadata.skills == ["web_search", "file_read"]
 
-    def test_all_capabilities_on_web(self, sample_metadata) -> None:
-        resolved = resolve_capabilities(sample_metadata, CHANNEL_WEB)
-        assert resolved == [CAP_CONVERSATIONAL, CAP_PLANNING, CAP_TOOL_USE]
+    def test_workflows_available_on_metadata(self, sample_metadata) -> None:
+        """Workflows are directly available on agent metadata."""
+        assert sample_metadata.workflows == ["data-pipeline"]
 
-    def test_unknown_channel_returns_all(self, sample_metadata) -> None:
-        # Unknown channel => no blocklist => all capabilities pass through.
-        resolved = resolve_capabilities(sample_metadata, "unknown_channel")
-        assert resolved == [CAP_CONVERSATIONAL, CAP_PLANNING, CAP_TOOL_USE]
-
-    def test_empty_capabilities(self, sample_identity) -> None:
-        metadata = AgentMetadata(
-            identity=sample_identity,
-            capabilities=[],
-        )
-        resolved = resolve_capabilities(metadata, CHANNEL_CLI)
-        assert resolved == []
-
-    def test_does_not_mutate_metadata(self, sample_metadata) -> None:
-        original = list(sample_metadata.capabilities)
-        resolve_capabilities(sample_metadata, CHANNEL_CLI)
-        assert list(sample_metadata.capabilities) == original
-
-    def test_deterministic(self, sample_metadata) -> None:
-        r1 = resolve_capabilities(sample_metadata, CHANNEL_CLI)
-        r2 = resolve_capabilities(sample_metadata, CHANNEL_CLI)
-        assert r1 == r2
+    def test_empty_skills(self, sample_identity) -> None:
+        metadata = AgentMetadata(identity=sample_identity)
+        assert metadata.skills == []
+        assert metadata.workflows == []
 
 
 # ---------------------------------------------------------------------------
@@ -291,11 +262,8 @@ class TestActivateAgent:
 
         # Context is populated
         assert result.context.agent_metadata is sample_metadata
-        assert result.context.resolved_capabilities == [
-            CAP_CONVERSATIONAL,
-            CAP_PLANNING,
-            CAP_TOOL_USE,
-        ]
+        assert "web_search" in result.context.agent_metadata.skills
+        assert "data-pipeline" in result.context.agent_metadata.workflows
         assert result.context.system_constraints["sandbox"] == "none"
 
     def test_agent_not_found_raises(self, sample_message, registry) -> None:
@@ -369,7 +337,7 @@ class TestActivateAgent:
     ) -> None:
         constrained = AgentMetadata(
             identity=sample_identity,
-            capabilities=[CAP_CONVERSATIONAL],
+            skills=["web_search"],
             constraints=AgentConstraints(
                 max_tokens=2048,
                 timeout_ms=15000,
@@ -524,7 +492,6 @@ class TestIntegration:
         msg = AgentMessage(
             message="Run analysis on the data",
             context={"project": "test", "user": "dev"},
-            capabilities=[CAP_CONVERSATIONAL, CAP_PLANNING],
         )
         result = activate_agent(
             agent_id="test-agent-1",
@@ -547,8 +514,8 @@ class TestIntegration:
 
         # Verify context
         assert result.context.agent_metadata.identity.name == "Test Agent"
-        assert CAP_CONVERSATIONAL in result.context.resolved_capabilities
-        assert CAP_PLANNING in result.context.resolved_capabilities
+        assert "web_search" in result.context.agent_metadata.skills
+        assert "data-pipeline" in result.context.agent_metadata.workflows
         assert len(result.context.conversation_history) == 1
         assert result.context.channel_metadata["method"] == "POST"
         assert result.context.system_constraints["sandbox"] == "none"

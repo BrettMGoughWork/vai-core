@@ -23,7 +23,8 @@ from src.runtime.llm.types import CoreLLMResponse, RuntimeConfig
 from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
 from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
 from src.agent.adapters.sessioned_adapter import SessionedAdapter
-from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
+from src.agent import load_agents_from_directory
+from src.agent.registry import AgentRegistry
 from src.agent.strategy_router import StrategyRouter
 from src.agent.supervisor import Supervisor
 from src.agent.wiring.composition import wire_planner
@@ -36,41 +37,11 @@ from src.agent.workflow import (
     WorkflowRegistry,
 )
 from src.agent.workflow.loader import load_workflows_from_yaml
+from src.agent.workflow.workflow_tool_adapter import WorkflowToolAdapter
 
-# ── Agent registry ────────────────────────────────────────────────────
+# ── Agent registry (loaded from declarative YAML) ─────────────────────
 _registry = AgentRegistry()
-_registry.register_agent(AgentMetadata(
-    identity=AgentIdentity(
-        agent_id="default-agent",
-        name="Default Agent",
-        description="Default conversational agent",
-    ),
-    capabilities=["conversational"],
-))
-_registry.register_agent(AgentMetadata(
-    identity=AgentIdentity(
-        agent_id="tools-workflow",
-        name="Tools Workflow Agent",
-        description="Agent that dispatches tool execute jobs via S4B",
-    ),
-    capabilities=["conversational"],
-))
-_registry.register_agent(AgentMetadata(
-    identity=AgentIdentity(
-        agent_id="waiting-agent",
-        name="Waiting Agent",
-        description="Agent that pauses for user input",
-    ),
-    capabilities=["conversational"],
-))
-_registry.register_agent(AgentMetadata(
-    identity=AgentIdentity(
-        agent_id="multi-step",
-        name="Multi-Step Analysis Agent",
-        description="Agent with a two-step analysis workflow",
-    ),
-    capabilities=["conversational"],
-))
+load_agents_from_directory(_registry, "config/agents")
 
 # ── Workflow registry (loaded from YAML files) ────────────────────────
 wf_registry = WorkflowRegistry()
@@ -292,6 +263,7 @@ _strategy_router = StrategyRouter(
 # ── Wired Supervisor ────────────────────────────────────────────────
 _workflow_engine = WorkflowEngine(wf_registry)
 _interaction_manager = UserInteractionManager(_workflow_engine)
+_workflow_tool_adapter = WorkflowToolAdapter(wf_registry)
 _supervisor = Supervisor(
     registry=_registry,
     store=state_store,
@@ -301,6 +273,7 @@ _supervisor = Supervisor(
     strategy_router=_strategy_router,
     inline_tool_executor=_execute_tool_inline,
     interaction_manager=_interaction_manager,
+    workflow_tool_adapter=_workflow_tool_adapter,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────
@@ -312,3 +285,7 @@ s5_adapter: GatewayAgentAdapter = SessionedAdapter(
     AgentGatewayAdapter(_supervisor),
 )
 s5_event_bus: EventBus = _event_bus
+
+# Exported for CLI introspection (e.g., /agent command, /agents list, /workflows list)
+agent_registry: AgentRegistry = _registry
+workflow_registry: WorkflowRegistry = wf_registry

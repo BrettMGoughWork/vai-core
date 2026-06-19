@@ -299,7 +299,6 @@ def agent_registry() -> AgentRegistry:
             name="Default Agent",
             description="Default conversational agent",
         ),
-        capabilities=["conversational"],
     ))
     reg.register_agent(AgentMetadata(
         identity=AgentIdentity(
@@ -307,7 +306,6 @@ def agent_registry() -> AgentRegistry:
             name="Tools Workflow Agent",
             description="Agent that dispatches tool execute jobs",
         ),
-        capabilities=["conversational"],
     ))
     return reg
 

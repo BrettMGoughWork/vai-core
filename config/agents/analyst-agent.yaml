@@ -1,0 +1,14 @@
+# Data Analyst agent
+agent_id: analyst-agent
+name: Data Analyst
+description: Specialist agent for data analysis and insight generation
+version: 1.0.0
+provenance: built-in
+persona: Data analyst — interprets data, generates summaries, and produces reports
+skills:
+  - stdlib.csv.read
+  - stdlib.file.readhead
+  - stdlib.text.extract
+  - stdlib.search.web
+workflows:
+  - agent-analysis

@@ -1,0 +1,16 @@
+# Help Agent
+agent_id: help
+name: Help Agent
+description: Provides inline help about the system itself — available agents, skills, workflows, and configuration
+version: 1.0.0
+provenance: built-in
+persona: Help assistant — answers questions about system agents, skills, workflows, and commands
+inputs:
+  - text
+outputs:
+  - text
+constraints:
+  max_tokens: 2048
+  max_iterations: 5
+  timeout_ms: 15000
+  sandbox: none
