@@ -120,10 +120,19 @@ class AgentGatewayAdapter:
             }
 
         # Agent is WAITING (jobs dispatched to S4B) or RUNNING
-        return {
+        result: Dict[str, Any] = {
             "state": state.lifecycle_state.value,
             "agent_id": agent_id,
         }
+        # Surface interaction prompt/schema for WAITING workflows
+        meta = state.supervisor_metadata
+        if meta.get("workflow_waiting_for") == "user_input":
+            result["prompt"] = meta.get("workflow_interaction_prompt", "")
+            result["request_id"] = meta.get("workflow_interaction_request_id", "")
+            schema = meta.get("workflow_interaction_schema")
+            if schema:
+                result["input_schema"] = schema
+        return result
 
     def resume(self, agent_id: str, message_text: str) -> Dict[str, Any]:
         """Resume a WAITING agent with new input.
@@ -177,9 +186,18 @@ class AgentGatewayAdapter:
                 }
 
             # Still waiting (multi-step resume) or running
-            return {
+            result: Dict[str, Any] = {
                 "state": state.lifecycle_state.value,
                 "agent_id": agent_id,
             }
+            # Surface interaction prompt/schema for multi-step resumes
+            meta = state.supervisor_metadata
+            if meta.get("workflow_waiting_for") == "user_input":
+                result["prompt"] = meta.get("workflow_interaction_prompt", "")
+                result["request_id"] = meta.get("workflow_interaction_request_id", "")
+                schema = meta.get("workflow_interaction_schema")
+                if schema:
+                    result["input_schema"] = schema
+            return result
 
         return {"error": f"Agent {agent_id!r} is not WAITING"}

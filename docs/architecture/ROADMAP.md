@@ -206,24 +206,23 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 7.6 | Test: retry failed workflow → preserves context | ✅ |
 | 7.7 | Test: metrics returns correct counts | ✅ |
 
-### Sprint 8 — User Interaction Layer
+### Sprint 8 — User Interaction Layer ✅
 
 **Goal:** Workflows pause for human input with validation, timeout, and resume.
 
-**Files to create:**
-- `src/agent/workflow/user_interaction.py` — UserInteractionManager
-- `src/agent/workflow/interaction_request.py` — InteractionRequest/Response
+**Files created:**
+- `src/agent/workflow/user_interaction.py` — UserInteractionManager, InteractionRequest, InteractionResponse
 
-| Task | What |
-|------|------|
-| 8.1 | InteractionRequest/Response dataclasses with input_schema |
-| 8.2 | UserInteractionManager — request_input, submit_response |
-| 8.3 | Validate input against schema (type checks, required fields) |
-| 8.4 | Timeout handling — engine transitions to timeout state |
-| 8.5 | Integration: CLI displays prompts, collects responses |
-| 8.6 | Test: valid input → resume → workflow continues |
-| 8.7 | Test: invalid input → returns False, engine not called |
-| 8.8 | Test: timeout → engine transitions correctly |
+| Task | What | Status |
+|------|------|--------|
+| 8.1 | InteractionRequest/Response dataclasses with input_schema | ✅ |
+| 8.2 | UserInteractionManager — request_input, submit_response | ✅ |
+| 8.3 | Validate input against schema (type checks, required fields) | ✅ |
+| 8.4 | Timeout handling — engine transitions to timeout state | ✅ |
+| 8.5 | Integration: CLI displays prompts, collects responses | ✅ |
+| 8.6 | Test: valid input → resume → workflow continues | ✅ |
+| 8.7 | Test: invalid input → returns False, engine not called | ✅ |
+| 8.8 | Test: timeout → engine transitions correctly | ✅ |
 
 ### Sprint 9 — Agent Selection Layer
 
