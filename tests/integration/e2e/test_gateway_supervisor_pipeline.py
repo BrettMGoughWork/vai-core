@@ -379,6 +379,186 @@ class TestWaitingWorkflow:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 5b. Sprint 8 HITL: validated input, invalid input + retry, timeout
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestSprint8Interaction:
+    """Human-In-The-Loop interaction tests (Sprint 8 roadmap)."""
+
+    def test_valid_input_resumes_and_completes(
+        self,
+        validated_workflow_registry: WorkflowRegistry,
+        job_queue: Any,
+        store: Any,
+        agent_registry: Any,
+        strategy_router: Any,
+    ) -> None:
+        """8.6: Valid input passes schema validation → workflow completes."""
+        from src.agent.registry import AgentMetadata, AgentIdentity
+        from src.agent.workflow import WorkflowEngine
+        from src.agent.workflow.user_interaction import UserInteractionManager
+
+        agent_registry.register_agent(AgentMetadata(
+            identity=AgentIdentity(
+                agent_id="validated-agent",
+                name="Validated Agent",
+                description="Agent with input schema",
+            ),
+            capabilities=["conversational"],
+        ))
+
+        wf_store = WorkflowInstanceStore()
+        wf_engine = WorkflowEngine(validated_workflow_registry)
+        supervisor = Supervisor(
+            registry=agent_registry,
+            store=store,
+            workflow_registry=validated_workflow_registry,
+            submit_job_callable=job_queue.submit,
+            strategy_router=strategy_router,
+            workflow_instance_store=wf_store,
+            interaction_manager=UserInteractionManager(wf_engine),
+        )
+
+        state = supervisor.create_agent("validated-agent")
+        state = supervisor.activate_agent(
+            state,
+            AgentMessage(message="/workflow validated-agent", context={}),
+            channel="cli",
+        )
+        state = supervisor.run_agent_step(state)
+        assert state.lifecycle_state == LifecycleState.WAITING
+
+        # Resume with valid input — schema requires "text" to be a string
+        state = supervisor.run_agent_step(
+            state, message="/workflow validated-agent",
+        )
+        assert state.lifecycle_state == LifecycleState.COMPLETED, (
+            f"Expected COMPLETED after valid input, "
+            f"got {state.lifecycle_state}"
+        )
+
+    def test_invalid_input_stays_waiting_then_retry(
+        self,
+        invalid_workflow_registry: WorkflowRegistry,
+        job_queue: Any,
+        store: Any,
+        agent_registry: Any,
+        strategy_router: Any,
+    ) -> None:
+        """8.7: Invalid schema → stays WAITING with error; retry succeeds."""
+        from src.agent.registry import AgentMetadata, AgentIdentity
+        from src.agent.workflow import WorkflowEngine
+        from src.agent.workflow.user_interaction import UserInteractionManager
+
+        agent_registry.register_agent(AgentMetadata(
+            identity=AgentIdentity(
+                agent_id="invalid-agent",
+                name="Invalid Agent",
+                description="Agent that rejects input until magic words",
+            ),
+            capabilities=["conversational"],
+        ))
+
+        wf_store = WorkflowInstanceStore()
+        wf_engine = WorkflowEngine(invalid_workflow_registry)
+        supervisor = Supervisor(
+            registry=agent_registry,
+            store=store,
+            workflow_registry=invalid_workflow_registry,
+            submit_job_callable=job_queue.submit,
+            strategy_router=strategy_router,
+            workflow_instance_store=wf_store,
+            interaction_manager=UserInteractionManager(wf_engine),
+        )
+
+        state = supervisor.create_agent("invalid-agent")
+        state = supervisor.activate_agent(
+            state,
+            AgentMessage(message="/workflow invalid-agent", context={}),
+            channel="cli",
+        )
+        state = supervisor.run_agent_step(state)
+        assert state.lifecycle_state == LifecycleState.WAITING
+
+        # First resume — invalid input (doesn't match enum)
+        state = supervisor.run_agent_step(
+            state, message="/workflow invalid-agent",
+        )
+        assert state.lifecycle_state == LifecycleState.WAITING, (
+            f"Expected WAITING after invalid input, "
+            f"got {state.lifecycle_state}"
+        )
+        # Verify an interaction error was recorded
+        err_msgs = [e["message"] for e in state.errors
+                    if e.get("type") == "interaction_error"]
+        assert any("must be one of" in msg for msg in err_msgs), (
+            f"No schema validation error found in {state.errors}"
+        )
+
+        # Retry with valid input — matches the enum exactly
+        state = supervisor.run_agent_step(
+            state, message="/workflow invalid-agent VALID",
+        )
+        assert state.lifecycle_state == LifecycleState.COMPLETED, (
+            f"Expected COMPLETED after retry, "
+            f"got {state.lifecycle_state}"
+        )
+
+    def test_expired_request_fails_workflow(
+        self,
+        timeout_workflow_registry: WorkflowRegistry,
+        job_queue: Any,
+        store: Any,
+        agent_registry: Any,
+        strategy_router: Any,
+    ) -> None:
+        """8.8: Expired HITL request → workflow fails."""
+        from src.agent.registry import AgentMetadata, AgentIdentity
+        from src.agent.workflow import WorkflowEngine
+        from src.agent.workflow.user_interaction import UserInteractionManager
+
+        agent_registry.register_agent(AgentMetadata(
+            identity=AgentIdentity(
+                agent_id="timeout-agent",
+                name="Timeout Agent",
+                description="Agent with expired HITL timeout",
+            ),
+            capabilities=["conversational"],
+        ))
+
+        wf_store = WorkflowInstanceStore()
+        wf_engine = WorkflowEngine(timeout_workflow_registry)
+        supervisor = Supervisor(
+            registry=agent_registry,
+            store=store,
+            workflow_registry=timeout_workflow_registry,
+            submit_job_callable=job_queue.submit,
+            strategy_router=strategy_router,
+            workflow_instance_store=wf_store,
+            interaction_manager=UserInteractionManager(wf_engine),
+        )
+
+        state = supervisor.create_agent("timeout-agent")
+        state = supervisor.activate_agent(
+            state,
+            AgentMessage(message="/workflow timeout-agent", context={}),
+            channel="cli",
+        )
+        state = supervisor.run_agent_step(state)
+        assert state.lifecycle_state == LifecycleState.WAITING
+
+        # Resume — interaction has already expired (timeout_seconds=-2)
+        state = supervisor.run_agent_step(
+            state, message="/workflow timeout-agent",
+        )
+        assert state.lifecycle_state == LifecycleState.FAILED, (
+            f"Expected FAILED after expiry, "
+            f"got {state.lifecycle_state}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 6. Workflow engine: pure state-machine transitions
 # ═══════════════════════════════════════════════════════════════════════════════
 

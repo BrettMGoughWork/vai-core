@@ -435,10 +435,35 @@ class Supervisor:
                                 "type": "interaction_error",
                                 "message": err or "Invalid interaction response",
                             })
-                            # Fall back to raw resume so the workflow doesn't stall
-                            wf_state, _outcome = engine.resume_with_input(
-                                wf_state, input_text,
-                            )
+                            if err and "expired" in err:
+                                # Timeout — transition engine to failed/timeout state
+                                step_id = meta.get("workflow_waiting_step_id", "")
+                                wf_state, _outcome = engine.handle_timeout(
+                                    wf_state, step_id,
+                                )
+                            else:
+                                # Validation error — stay WAITING, preserve
+                                # wf_state (still WAITING_FOR_INPUT) so the
+                                # user can retry.  The interaction request
+                                # remains in _pending (submit_response does
+                                # NOT delete it on validation failure).
+                                meta["workflow_state"] = _freeze_wf_state(wf_state)
+                                return self._persist(state.with_(
+                                    lifecycle_state=LifecycleState.WAITING,
+                                    route_result=route,
+                                    errors=(list(state.errors) + new_errors),
+                                    supervisor_metadata=meta,
+                                    _reason=(
+                                        "Workflow waiting for user input"
+                                        " (validation error)"
+                                    ),
+                                    _details={
+                                        "workflow_id": wf_state.workflow_id,
+                                        "step_id": meta.get(
+                                            "workflow_waiting_step_id", "",
+                                        ),
+                                    },
+                                ))
                         else:
                             wf_state, _outcome = result
                     else:
@@ -852,6 +877,7 @@ class Supervisor:
             if outcome.type == "waiting_for_input":
                 meta["workflow_state"] = _freeze_wf_state(wf_state)
                 meta["workflow_waiting_for"] = "user_input"
+                meta["workflow_waiting_step_id"] = outcome.step_id
 
                 # Register an interaction request with the manager
                 if self._interaction_manager is not None:
@@ -867,6 +893,7 @@ class Supervisor:
                     )
                     meta["workflow_interaction_request_id"] = req.request_id
                     meta["workflow_interaction_prompt"] = prompt
+                    meta["workflow_interaction_schema"] = schema
 
                 return self._persist(state.with_(
                     lifecycle_state=LifecycleState.WAITING,

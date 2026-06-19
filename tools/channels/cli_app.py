@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from src.agent.composition_root import s5_adapter
@@ -45,19 +46,22 @@ PROMPT = "vai> "
 
 
 # ---------------------------------------------------------------------------
-# Core loop
+# Module-level state for HITL resume tracking
 # ---------------------------------------------------------------------------
 
+_waiting_agent_id: str | None = None
+"""Set when the last ``ingest()`` returned a WAITING state with HITL
+interaction metadata.  When set, the next user input is sent via
+``resume()`` instead of ``ingest()``."""
 
-def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None:
-    """Submit a command through the Gateway → S5 pipeline."""
-    result = submit_channel_input(
-        registry, "cli", {"text": text, "sender": sender},
-        adapter=s5_adapter,
-    )
+
+def _handle_result(result: dict, registry: ChannelRegistry) -> None:
+    """Print a response result and update HITL resume tracking."""
+    global _waiting_agent_id
 
     if "error" in result:
         print(f"[!] {result['error']}")
+        _waiting_agent_id = None
         return
 
     if "reply" in result:
@@ -65,11 +69,47 @@ def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None
         print(f"  reply:    {result['reply']}")
         if result.get("metadata"):
             print(f"  metadata: {result['metadata']}")
-    else:
-        print(f"\n-- S5 Pending --------------------------------------------")
-        print(f"  state:    {result.get('state', 'unknown')}")
-        print(f"  agent_id: {result.get('agent_id', 'unknown')}")
+        _waiting_agent_id = None
+        return
+
+    # Pending / waiting state
+    _waiting_agent_id = result.get("agent_id")
+    print(f"\n-- S5 Pending --------------------------------------------")
+    print(f"  state:    {result.get('state', 'unknown')}")
+    print(f"  agent_id: {_waiting_agent_id}")
+
+    # Show HITL interaction prompt if the workflow is asking for user input
+    prompt_text = result.get("prompt")
+    if prompt_text:
+        print(f"\n  +- HITL Request ----")
+        for line in prompt_text.split("\n"):
+            print(f"  | {line}")
+        schema = result.get("input_schema")
+        if schema:
+            print(f"  |")
+            print(f"  | Schema: {json.dumps(schema)}")
+        print(f"  +--------------------")
     print()
+
+
+def run_single(text: str, sender: str | None, registry: ChannelRegistry) -> None:
+    """Submit a command through the Gateway → S5 pipeline.
+
+    If the previous call left the agent ``WAITING`` for HITL input, this
+    calls ``resume()`` instead of ``ingest()`` so the paused workflow
+    receives the user's response.
+    """
+    global _waiting_agent_id
+
+    if _waiting_agent_id:
+        result = s5_adapter.resume(_waiting_agent_id, text)
+    else:
+        result = submit_channel_input(
+            registry, "cli", {"text": text, "sender": sender},
+            adapter=s5_adapter,
+        )
+
+    _handle_result(result, registry)
 
 
 def run_interactive(registry: ChannelRegistry) -> None:
@@ -78,6 +118,10 @@ def run_interactive(registry: ChannelRegistry) -> None:
     When stdout is a TTY (interactive mode) the header and prompt are shown.
     When stdout is piped (``| python -m dashboard``), header and prompt are
     suppressed so only structured JSON lines reach the downstream consumer.
+
+    Supports Human-In-The-Loop (HITL) workflows: when the agent pauses at a
+    ``user_input`` step, the prompt is displayed and the user's next line
+    is submitted as the interaction response.
     """
     is_piped = not sys.stdout.isatty()
 

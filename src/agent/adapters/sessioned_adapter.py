@@ -69,6 +69,25 @@ class SessionedAdapter:
 
         return result
 
+    def resume(self, agent_id: str, message_text: str) -> Dict[str, Any]:
+        """Resume a WAITING agent, returning the same shape as ``ingest()``.
+
+        Delegates to the inner adapter's ``resume()``.  On success (reply in
+        the result) the turn is appended to the session history.
+        """
+        result = self._inner.resume(agent_id, message_text)
+
+        # Capture successful turns into session history.
+        if isinstance(result, dict) and "reply" in result:
+            key = f"cli:{agent_id}"
+            history = list(self._sessions.get(key, []))
+            self._sessions[key] = history + [
+                {"role": "user", "content": message_text},
+                {"role": "assistant", "content": result["reply"]},
+            ]
+
+        return result
+
     # ------------------------------------------------------------------
     # Session management helpers
     # ------------------------------------------------------------------

@@ -15,9 +15,13 @@ from src.agent.workflow.job_queue import InMemoryJobQueue, JobRecord
 from src.agent.workflow.ops import WorkflowOps
 from src.agent.workflow.registry import WorkflowRegistry
 from src.agent.workflow.trigger_router import TriggerRouter, WorkflowEvent
-from src.agent.workflow.user_interaction import (
+from src.agent.workflow.interaction_request import (
+    InputField,
+    InputSchema,
     InteractionRequest,
     InteractionResponse,
+)
+from src.agent.workflow.user_interaction import (
     UserInteractionManager,
 )
 from src.agent.workflow.workflow_definition import (
@@ -28,6 +32,8 @@ from src.agent.workflow.workflow_definition import (
 __all__ = [
     "EventBus",
     "InMemoryJobQueue",
+    "InputField",
+    "InputSchema",
     "InteractionRequest",
     "InteractionResponse",
     "JobRecord",

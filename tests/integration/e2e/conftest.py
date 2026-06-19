@@ -154,6 +154,123 @@ waiting_workflow = WorkflowDefinition(
 
 
 # ======================================================================
+# Validated input workflow (tests input_schema enforcement)
+# ======================================================================
+
+validated_workflow = WorkflowDefinition(
+    workflow_id="validated-agent",
+    name="Validated Agent",
+    description="A workflow that enforces an input_schema on user_input",
+    version="1.0.0",
+    trigger_on=["workflow.start", "workflow_request"],
+    steps={
+        "ask": WorkflowStep(
+            step_id="ask",
+            step_type="user_input",
+            label="Ask the user a question",
+            config={
+                "prompt": "Enter a value:",
+                "timeout_seconds": 60,
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                    },
+                    "required": ["text"],
+                },
+            },
+            transitions={"on_success": "confirm"},
+        ),
+        "confirm": WorkflowStep(
+            step_id="confirm",
+            step_type="llm_call",
+            label="Confirm the user's choice",
+            config={"prompt": "The user said: {{input}}. Confirm this choice."},
+            transitions={"on_success": "__end__"},
+        ),
+    },
+    start_step="ask",
+)
+
+
+# ======================================================================
+# Invalid-input workflow (tests schema failure + retry)
+# ======================================================================
+
+invalid_workflow = WorkflowDefinition(
+    workflow_id="invalid-agent",
+    name="Invalid Agent",
+    description="A workflow that rejects input until the exact expected message is sent",
+    version="1.0.0",
+    trigger_on=["workflow.start", "workflow_request"],
+    steps={
+        "ask": WorkflowStep(
+            step_id="ask",
+            step_type="user_input",
+            label="Ask the user a question",
+            config={
+                "prompt": "Say the magic words:",
+                "timeout_seconds": 60,
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "text": {
+                            "type": "string",
+                            "enum": ["/workflow invalid-agent VALID"],
+                        },
+                    },
+                    "required": ["text"],
+                },
+            },
+            transitions={"on_success": "confirm"},
+        ),
+        "confirm": WorkflowStep(
+            step_id="confirm",
+            step_type="llm_call",
+            label="Confirm the user's choice",
+            config={"prompt": "The user said: {{input}}. Confirm this choice."},
+            transitions={"on_success": "__end__"},
+        ),
+    },
+    start_step="ask",
+)
+
+
+# ======================================================================
+# Timeout workflow (tests expired HITL request handling)
+# ======================================================================
+
+timeout_workflow = WorkflowDefinition(
+    workflow_id="timeout-agent",
+    name="Timeout Agent",
+    description="A workflow with an immediately-expired user_input timeout",
+    version="1.0.0",
+    trigger_on=["workflow.start", "workflow_request"],
+    steps={
+        "ask": WorkflowStep(
+            step_id="ask",
+            step_type="user_input",
+            label="Ask the user a question",
+            config={
+                "prompt": "Quick question:",
+                "timeout_seconds": -2,  # expired immediately
+            },
+            transitions={"on_success": "confirm"},
+            # No on_timeout → handle_timeout will FAIL the workflow
+        ),
+        "confirm": WorkflowStep(
+            step_id="confirm",
+            step_type="llm_call",
+            label="Confirm the user's choice",
+            config={"prompt": "The user said: {{input}}. Confirm this choice."},
+            transitions={"on_success": "__end__"},
+        ),
+    },
+    start_step="ask",
+)
+
+
+# ======================================================================
 # Fixtures
 # ======================================================================
 
@@ -336,6 +453,33 @@ def waiting_workflow_registry(
 ) -> WorkflowRegistry:
     """Registry with hello_world + waiting_agent workflows."""
     workflow_registry.register(waiting_workflow)
+    return workflow_registry
+
+
+@pytest.fixture
+def validated_workflow_registry(
+    workflow_registry: WorkflowRegistry,
+) -> WorkflowRegistry:
+    """Registry with hello_world + validated_agent workflows."""
+    workflow_registry.register(validated_workflow)
+    return workflow_registry
+
+
+@pytest.fixture
+def timeout_workflow_registry(
+    workflow_registry: WorkflowRegistry,
+) -> WorkflowRegistry:
+    """Registry with hello_world + timeout_agent workflows."""
+    workflow_registry.register(timeout_workflow)
+    return workflow_registry
+
+
+@pytest.fixture
+def invalid_workflow_registry(
+    workflow_registry: WorkflowRegistry,
+) -> WorkflowRegistry:
+    """Registry with hello_world + invalid_agent workflows."""
+    workflow_registry.register(invalid_workflow)
     return workflow_registry
 
 

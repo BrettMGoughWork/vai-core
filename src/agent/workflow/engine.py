@@ -99,6 +99,7 @@ OutcomeType = Literal[
     "continue",
     "completed",
     "failed",
+    "timeout",
 ]
 
 
@@ -366,6 +367,56 @@ class WorkflowEngine:
             New state with ``status=CANCELLED``.
         """
         return _copy_state(state, status=WorkflowStatus.CANCELLED)
+
+    def handle_timeout(
+        self,
+        state: WorkflowExecutionState,
+        step_id: str,
+    ) -> Tuple[WorkflowExecutionState, StepOutcome]:
+        """Handle a timeout on a ``user_input`` step.
+
+        Records the timeout in ``step_results`` and follows the step's
+        ``on_failure`` transition if one is defined, otherwise marks the
+        workflow as FAILED.
+
+        Args:
+            state: Execution state (should be WAITING_FOR_INPUT).
+            step_id: The ID of the step that timed out.
+
+        Returns:
+            ``(new_state, outcome)`` — if the step defines an
+            ``on_failure`` transition, advances to that step; otherwise
+            the workflow is marked FAILED with a timeout error.
+        """
+        error = f"Step {step_id!r} timed out waiting for user input"
+        step_results = dict(state.step_results)
+        step_results[step_id] = {"error": error, "status": "timeout"}
+
+        defn = self._registry.get(state.workflow_id)
+        if defn is None:
+            return self._fail(_copy_state(state, step_results=step_results), error)
+
+        step = defn.steps.get(step_id)
+        if step is None or "on_failure" not in step.transitions:
+            return self._fail(_copy_state(state, step_results=step_results), error)
+
+        target = step.transitions["on_failure"]
+        if target == END_TARGET:
+            completed = _copy_state(
+                state,
+                status=WorkflowStatus.COMPLETED,
+                current_step_id=None,
+                step_results=step_results,
+            )
+            return completed, StepOutcome(type="completed")
+
+        advanced = _copy_state(
+            state,
+            status=WorkflowStatus.RUNNING,
+            current_step_id=target,
+            step_results=step_results,
+        )
+        return advanced, StepOutcome(type="continue", next_step_id=target)
 
     # ── Internal helpers ──────────────────────────────────────────────
 

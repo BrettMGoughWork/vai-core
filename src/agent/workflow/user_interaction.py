@@ -17,8 +17,6 @@ This layer adds the missing polish:
 from __future__ import annotations
 
 import time
-import uuid
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.agent.workflow.engine import (
@@ -27,38 +25,12 @@ from src.agent.workflow.engine import (
     WorkflowExecutionState,
     WorkflowStatus,
 )
-
-
-# ---------------------------------------------------------------------------
-# Dataclasses
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class InteractionRequest:
-    """A request for human input, created when a workflow hits a user_input step."""
-
-    request_id: str
-    instance_id: str
-    step_id: str
-    prompt: str
-    input_schema: Dict[str, Any]
-    timeout_seconds: Optional[float] = None
-    created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
-
-    def __post_init__(self) -> None:
-        if self.expires_at is None and self.timeout_seconds is not None:
-            object.__setattr__(self, "expires_at", self.created_at + self.timeout_seconds)
-
-
-@dataclass
-class InteractionResponse:
-    """A validated response to an InteractionRequest."""
-
-    request_id: str
-    data: Dict[str, Any]
-    received_at: float = field(default_factory=time.time)
+from src.agent.workflow.interaction_request import (
+    InputSchema,
+    InteractionRequest,
+    InteractionResponse,
+    _make_request_id,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +57,7 @@ class UserInteractionManager:
         instance_id: str,
         step_id: str,
         prompt: str,
-        schema: Dict[str, Any],
+        schema: Dict[str, Any] | InputSchema,
         *,
         timeout_seconds: Optional[float] = None,
     ) -> InteractionRequest:
@@ -94,7 +66,13 @@ class UserInteractionManager:
         The caller (Supervisor) is responsible for persisting the
         workflow state in WAITING mode.  This method only tracks the
         interaction metadata.
+
+        ``schema`` may be a raw ``Dict[str, Any]`` (JSON-Schema-like
+        format from YAML) or an ``InputSchema`` instance.
         """
+        if isinstance(schema, dict):
+            schema = InputSchema.from_dict(schema)
+
         request_id = _make_request_id(instance_id, step_id)
         now = time.time()
         expires_at = (now + timeout_seconds) if timeout_seconds is not None else None
@@ -131,15 +109,15 @@ class UserInteractionManager:
         if req is None:
             return False, f"Unknown request_id {request_id!r}", None
 
-        # ── Validate ────────────────────────────────────────────────
-        error = _validate_against_schema(data, req.input_schema)
-        if error is not None:
-            return False, error, None
-
-        # ── Timeout check ───────────────────────────────────────────
+        # ── Timeout check (before validation — don't accept stale) ──
         if req.expires_at is not None and time.time() > req.expires_at:
             self._expire_request(request_id)
             return False, "Interaction request has expired", None
+
+        # ── Validate ────────────────────────────────────────────────
+        error = _validate_against_schema(data, req.input_schema.to_dict())
+        if error is not None:
+            return False, error, None
 
         # ── Resume ──────────────────────────────────────────────────
         new_state, outcome = self._engine.resume_with_input(state, _serialise(data))
@@ -287,10 +265,22 @@ def _validate_value(
             return (
                 f"Field {path!r} must be one of {enum_values}, got {value!r}"
             )
+        min_len = schema.get("minLength")
+        max_len = schema.get("maxLength")
+        if min_len is not None and len(value) < min_len:
+            return f"Field {path!r} must be at least {min_len} characters, got {len(value)}"
+        if max_len is not None and len(value) > max_len:
+            return f"Field {path!r} must be at most {max_len} characters, got {len(value)}"
 
     elif expected_type == "number":
         if not isinstance(value, (int, float)):
             return f"Field {path!r} expected number, got {type(value).__name__}"
+        min_val = schema.get("minimum")
+        max_val = schema.get("maximum")
+        if min_val is not None and value < min_val:
+            return f"Field {path!r} must be at least {min_val}, got {value}"
+        if max_val is not None and value > max_val:
+            return f"Field {path!r} must be at most {max_val}, got {value}"
 
     elif expected_type == "boolean":
         if not isinstance(value, bool):
@@ -312,12 +302,6 @@ def _validate_value(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_request_id(instance_id: str, step_id: str) -> str:
-    """Deterministic request ID based on instance and step."""
-    raw = f"{instance_id}::{step_id}"
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, raw))
 
 
 def _serialise(data: Dict[str, Any]) -> str:
