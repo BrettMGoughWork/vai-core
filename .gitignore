@@ -24,6 +24,10 @@ agent_traces/
 # Custom tools
 tools/custom/
 
+# Plugins (opinionated integrations, not in the open-source repo)
+plugins/*
+!plugins/.gitkeep
+
 # Local dev binaries (MailHog, smtp4dev, etc.)
 tools/dev/*.exe
 

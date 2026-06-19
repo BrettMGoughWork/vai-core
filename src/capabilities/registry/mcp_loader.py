@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 
 
-def load_mcp_primitives(registry: PrimitiveRegistry, directory: str) -> None:
+def load_mcp_primitives(registry: PrimitiveRegistry, directory: str) -> list[str]:
     """Scan *directory* for ``.json``, ``.yaml``, and ``.yml`` files defining
     MCP server manifests, extract tool definitions, and register the resulting
     ``MCPPrimitive`` instances into *registry*.
@@ -24,14 +24,18 @@ def load_mcp_primitives(registry: PrimitiveRegistry, directory: str) -> None:
 
     Each tool entry must contain:
         ``name`` (str), ``description`` (str).
+
+    Returns:
+        A list of registered primitive names (e.g. ``["gmail.send", "drive.read"]``).
     """
 
     EXTENSIONS: tuple[str, ...] = (".json", ".yaml", ".yml")
+    registered: list[str] = []
 
     try:
         entries = os.scandir(directory)
     except OSError:
-        return
+        return registered
 
     for entry in entries:
         if not entry.is_file():
@@ -80,3 +84,6 @@ def load_mcp_primitives(registry: PrimitiveRegistry, directory: str) -> None:
                 continue
 
             registry.register(primitive.name, primitive)
+            registered.append(primitive.name)
+
+    return registered
