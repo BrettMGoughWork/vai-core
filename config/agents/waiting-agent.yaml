@@ -1,0 +1,9 @@
+# Waiting Agent — pauses workflows for human input
+agent_id: waiting-agent
+name: Waiting Agent
+description: Agent that pauses for user input before completing
+version: 1.0.0
+provenance: built-in
+persona: Interactive agent that pauses workflows for human input
+workflows:
+  - waiting-agent

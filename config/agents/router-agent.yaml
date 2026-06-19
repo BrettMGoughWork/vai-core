@@ -1,0 +1,7 @@
+# Routing Agent
+agent_id: router-agent
+name: Routing Agent
+description: Agent specialised in routing requests to the right handler
+version: 1.0.0
+provenance: built-in
+persona: Router — classifies and routes incoming requests to appropriate handlers

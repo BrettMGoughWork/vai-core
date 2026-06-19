@@ -58,20 +58,6 @@ ACTIVATION_AUTHORIZED_CHANNELS = frozenset({
 # ---------------------------------------------------------------------------
 # Channel-to-capability constraints
 # ---------------------------------------------------------------------------
-# Some capabilities may be restricted on certain channels.  The dict
-# below lists capabilities that are *blocked* per channel.
-#   key   = channel name
-#   value = frozenset of blocked capability labels
-
-CHANNEL_CAPABILITY_BLOCKLIST: Dict[str, frozenset] = {
-    # The CLI is text-only — no tool-use or job-submission over stdin.
-    CHANNEL_CLI: frozenset(),
-    # Web channels may restrict certain analysis paths for safety.
-    CHANNEL_WEB: frozenset(),
-    # All other channels currently have no blocklisted capabilities.
-}
-
-# ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
 
@@ -146,10 +132,7 @@ class ActivationContext:
     Fields
     ------
     agent_metadata:
-        The agent's own metadata (identity, capabilities, constraints).
-    resolved_capabilities:
-        Capabilities that are available for *this* activation, after
-        channel‑based filtering.
+        The agent's own metadata (identity, skills, workflows, constraints).
     conversation_history:
         Prior messages in the conversation (may be empty).
     routing_hints:
@@ -162,7 +145,6 @@ class ActivationContext:
     """
 
     agent_metadata: AgentMetadata
-    resolved_capabilities: List[str] = field(default_factory=list)
     conversation_history: List[Dict[str, Any]] = field(default_factory=list)
     routing_hints: Dict[str, Any] = field(default_factory=dict)
     channel_metadata: Dict[str, Any] = field(default_factory=dict)
@@ -173,8 +155,6 @@ class ActivationContext:
             raise ValueError(
                 "agent_metadata must be an AgentMetadata instance"
             )
-        if not isinstance(self.resolved_capabilities, list):
-            raise ValueError("resolved_capabilities must be a list")
         if not isinstance(self.conversation_history, list):
             raise ValueError("conversation_history must be a list")
         if not isinstance(self.routing_hints, dict):
@@ -214,36 +194,6 @@ class ActivatedAgentContext:
             raise ValueError("envelope must be an ActivationEnvelope instance")
         if not isinstance(self.context, ActivationContext):
             raise ValueError("context must be an ActivationContext instance")
-
-
-# ---------------------------------------------------------------------------
-# Capability resolution
-# ---------------------------------------------------------------------------
-
-
-def resolve_capabilities(
-    agent_metadata: AgentMetadata,
-    channel: str,
-) -> List[str]:
-    """Resolve the capabilities available for *agent* on *channel*.
-
-    Starts from the agent's declared capabilities and filters out any
-    capabilities that are blocklisted for the given channel.
-
-    Parameters
-    ----------
-    agent_metadata:
-        The agent's registered metadata.
-    channel:
-        The channel initiating the activation.
-
-    Returns
-    -------
-    list[str]
-        Capabilities available for this activation, in declaration order.
-    """
-    blocked = CHANNEL_CAPABILITY_BLOCKLIST.get(channel, frozenset())
-    return [cap for cap in agent_metadata.capabilities if cap not in blocked]
 
 
 # ---------------------------------------------------------------------------
@@ -321,10 +271,7 @@ def activate_agent(
             f"cannot activate unknown agent {agent_id!r}"
         )
 
-    # ── 3. Resolve capabilities ───────────────────────────────────────
-    resolved = resolve_capabilities(metadata, channel)
-
-    # ── 4. Build activation context (metadata) ────────────────────────
+    # ── 3. Build activation context (metadata) ────────────────────────
     now = datetime.now(timezone.utc).isoformat()
     cid = correlation_id or str(uuid.uuid4())
     tid = trace_id or str(uuid.uuid4())
@@ -336,7 +283,7 @@ def activate_agent(
         "trace_id": tid,
     }
 
-    # ── 5. Build injected context ─────────────────────────────────────
+    # ── 4. Build injected context ─────────────────────────────────────
     constraints = metadata.constraints
     system_constraints: Dict[str, Any] = {
         "max_tokens": constraints.max_tokens,
@@ -346,7 +293,6 @@ def activate_agent(
 
     injected = ActivationContext(
         agent_metadata=metadata,
-        resolved_capabilities=resolved,
         conversation_history=conversation_history or [],
         routing_hints=routing_hints or {},
         channel_metadata=channel_metadata or {},

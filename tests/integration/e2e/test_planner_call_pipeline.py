@@ -182,7 +182,7 @@ def planner_registry() -> WorkflowRegistry:
 
 @pytest.fixture
 def planner_agent_registry() -> AgentRegistry:
-    """AgentRegistry with the planner-demo agent."""
+    """AgentRegistry with the planner-demo and default agents."""
     reg = AgentRegistry()
     reg.register_agent(AgentMetadata(
         identity=AgentIdentity(
@@ -190,7 +190,13 @@ def planner_agent_registry() -> AgentRegistry:
             name="Planner Demo Agent",
             description="Agent that demonstrates S2 planning",
         ),
-        capabilities=["conversational"],
+    ))
+    reg.register_agent(AgentMetadata(
+        identity=AgentIdentity(
+            agent_id="default-agent",
+            name="Default Agent",
+            description="Default conversational agent",
+        ),
     ))
     return reg
 

@@ -6,29 +6,22 @@ Tests for the deterministic pattern-matching message router.
 
 Covers:
 - Route dataclass construction and validation
-- route_message routing decisions (DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B)
+- route_message routing decisions (DEST_RUNTIME, DEST_WORKFLOW)
 - Keyword matching and case insensitivity
-- Capability-gated execution routing
-- Edge cases (empty messages, unknown agents)
+- Edge cases (empty messages, metadata-only checks)
 """
 
 from __future__ import annotations
-
-from typing import Any, Dict, List
 
 import pytest
 
 from src.agent.router import (
     DEST_RUNTIME,
-    DEST_S4B,
     DEST_WORKFLOW,
     Route,
     route_message,
-    _WORKFLOW_TRIGGER,
 )
 from src.agent.registry import (
-    CAP_JOB_SUBMISSION,
-    CAP_CONVERSATIONAL,
     AgentConstraints,
     AgentIdentity,
     AgentMetadata,
@@ -42,37 +35,24 @@ from src.agent.registry import (
 
 @pytest.fixture
 def default_agent() -> AgentMetadata:
-    """An agent with only conversational capability."""
+    """A basic agent with no special skills or workflows."""
     return AgentMetadata(
         identity=AgentIdentity(
             agent_id="test-agent",
             name="Test Agent",
         ),
-        capabilities=[CAP_CONVERSATIONAL],
     )
 
 
 @pytest.fixture
-def job_capable_agent() -> AgentMetadata:
-    """An agent with job_submission capability."""
+def workflow_capable_agent() -> AgentMetadata:
+    """An agent with a declared workflow."""
     return AgentMetadata(
         identity=AgentIdentity(
-            agent_id="job-agent",
-            name="Job Agent",
+            agent_id="wf-agent",
+            name="Workflow Agent",
         ),
-        capabilities=[CAP_JOB_SUBMISSION],
-    )
-
-
-@pytest.fixture
-def full_capability_agent() -> AgentMetadata:
-    """An agent with all capabilities declared."""
-    return AgentMetadata(
-        identity=AgentIdentity(
-            agent_id="full-agent",
-            name="Full Agent",
-        ),
-        capabilities=[CAP_CONVERSATIONAL, CAP_JOB_SUBMISSION],
+        workflows=["data-pipeline"],
     )
 
 
@@ -85,7 +65,7 @@ class TestRouteConstruction:
     """Route is a frozen dataclass with post-init validation."""
 
     def test_valid_destinations(self) -> None:
-        for dest in (DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B):
+        for dest in (DEST_RUNTIME, DEST_WORKFLOW):
             r = Route(destination=dest, agent_id="a1")
             assert r.destination == dest
             assert r.payload == {}
@@ -132,7 +112,7 @@ class TestRouteConstruction:
     def test_is_frozen(self) -> None:
         r = Route(destination=DEST_RUNTIME, agent_id="a1")
         with pytest.raises(AttributeError):
-            r.destination = DEST_S4B  # type: ignore[misc]
+            r.destination = DEST_WORKFLOW  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -205,56 +185,6 @@ class TestRouteMessageS6:
         assert route.payload.get("message") == "/workflow"
 
 
-class TestRouteMessageS4B:
-    """Execution keywords route to DEST_S4B only when capability is present."""
-
-    @pytest.mark.parametrize(
-        "msg",
-        [
-            "execute task",
-            "run deployment",
-            "do something",
-        ],
-    )
-    def test_execution_keyword_with_capability(
-        self, msg: str, job_capable_agent: AgentMetadata
-    ) -> None:
-        route = route_message(msg, job_capable_agent)
-        assert route.destination == DEST_S4B
-        assert route.confidence == 0.7
-        assert route.payload.get("action") == "direct_execution"
-
-    def test_execution_keyword_no_capability(
-        self, default_agent: AgentMetadata
-    ) -> None:
-        """Without CAP_JOB_SUBMISSION, execution keywords → Runtime."""
-        route = route_message("execute task", default_agent)
-        assert route.destination == DEST_RUNTIME
-        assert route.confidence == 1.0
-
-    def test_full_capability_agent_uses_execution(
-        self, full_capability_agent: AgentMetadata
-    ) -> None:
-        """An agent with multiple caps still routes to S4B when appropriate."""
-        route = route_message("run backup", full_capability_agent)
-        assert route.destination == DEST_S4B
-
-    def test_workflow_prefix_takes_precedence(
-        self, job_capable_agent: AgentMetadata
-    ) -> None:
-        """/workflow prefix is checked first and takes priority over S4B."""
-        route = route_message("/workflow tools-workflow", job_capable_agent)
-        assert route.destination == DEST_WORKFLOW  # not S4B
-        assert route.payload.get("workflow_id") == "tools-workflow"
-
-    def test_s4b_carries_agent_id(
-        self, job_capable_agent: AgentMetadata
-    ) -> None:
-        route = route_message("run task", job_capable_agent)
-        assert route.agent_id == "job-agent"
-        assert route.payload.get("message") == "run task"
-
-
 class TestRouteMessageEdgeCases:
     """Edge cases and boundary conditions."""
 
@@ -281,30 +211,10 @@ class TestRouteMessageEdgeCases:
             identity=AgentIdentity(
                 agent_id="whatever", name="Whatever", version="2.0.0"
             ),
-            capabilities=[CAP_CONVERSATIONAL],
+            skills=["web_search"],
             inputs=["text"],
             outputs=["text"],
             constraints=AgentConstraints(max_tokens=500),
         )
         route = route_message("hello", agent)
         assert route.destination == DEST_RUNTIME
-
-    def test_case_insensitivity(self, job_capable_agent: AgentMetadata) -> None:
-        """All routing checks are case-insensitive."""
-        route = route_message("EXECUTE DEPLOY", job_capable_agent)
-        assert route.destination == DEST_S4B
-
-    def test_partial_word_match_avoided(
-        self, job_capable_agent: AgentMetadata
-    ) -> None:
-        """Partial words don't trigger execution routing (keywords have trailing space)."""
-        route = route_message("running_script", job_capable_agent)
-        # "running_script" doesn't contain "run " (with space) so no match
-        assert route.destination == DEST_RUNTIME
-
-    def test_execution_keyword_spaces(
-        self, job_capable_agent: AgentMetadata
-    ) -> None:
-        """'run ' with trailing space triggers execution route."""
-        route = route_message("run something", job_capable_agent)
-        assert route.destination == DEST_S4B

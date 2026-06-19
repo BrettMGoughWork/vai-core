@@ -1,0 +1,53 @@
+# Agent-aware analysis workflow
+# Demonstrates agent_profile matching — steps are routed to agents
+# whose `persona` field matches the profile string.
+workflow_id: agent-analysis
+name: "Agent Analysis Workflow"
+description: "Multi-step analysis workflow that routes steps to analyst, researcher, and executor agents by persona"
+version: "1.0.0"
+trigger_on:
+  - "workflow_request"
+
+steps:
+  research:
+    step_id: research
+    step_type: llm_call
+    label: "Research the topic"
+    config:
+      message: "Research the following topic and gather key insights: {context.input}"
+      agent_profile: "research"
+    transitions:
+      on_success: analyze
+
+  analyze:
+    step_id: analyze
+    step_type: llm_call
+    label: "Analyze findings"
+    config:
+      message: "Analyze the following research findings and identify patterns: {context.result}"
+      agent_profile: "analyst"
+    transitions:
+      on_success: review
+
+  review:
+    step_id: review
+    step_type: user_input
+    label: "Review results"
+    config:
+      prompt: "The analysis is complete. Review the results and provide feedback or approval to proceed."
+      timeout_seconds: 120
+    transitions:
+      on_success: finalize
+      on_timeout: __end__
+
+  finalize:
+    step_id: finalize
+    step_type: llm_call
+    label: "Finalize report"
+    config:
+      message: "Based on the analysis and user feedback, produce a final summary. Analysis: {context.result}"
+      agent_profile: "analyst"
+    transitions:
+      on_success: __end__
+
+start_step: research

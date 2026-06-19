@@ -112,6 +112,25 @@ def set_llm_transport(transport: object | None) -> None:
     _llm_transport = transport
 
 
+def _tool_matches_workflows(tool: dict, agent_workflows: list[str]) -> bool:
+    """Check if a tool definition matches one of the agent's allowed workflows.
+
+    Supports the ``workflow.execute.<id>`` naming convention used by
+    ``WorkflowToolAdapter``, as well as bare workflow IDs.
+    A wildcard ``"*"`` in agent_workflows matches everything.
+    """
+    if "*" in agent_workflows:
+        return True
+    name = tool.get("function", {}).get("name", "") or tool.get("name", "")
+    # Extract workflow ID from "workflow.execute.<id>" or use bare name
+    wf_id = name
+    for prefix in ("workflow.execute.", "workflow."):
+        if wf_id.startswith(prefix):
+            wf_id = wf_id[len(prefix):]
+            break
+    return wf_id in agent_workflows or name in agent_workflows
+
+
 def call_s1_backend(
     request: PromptRequest, backend: str = "simulation"
 ) -> Union[PromptResponse, S1Error]:
@@ -165,11 +184,12 @@ def call_s1_backend(
 
         user_message = request.prompt.get("message", "")
         agent_id = request.prompt.get("agent_id", "assistant")
-        agent_name = (
-            request.prompt.get("agent_metadata", {})
-            .get("name", agent_id)
-        )
-        description = request.prompt.get("agent_metadata", {}).get("description", "")
+        agent_metadata = request.prompt.get("agent_metadata", {})
+        agent_name = agent_metadata.get("name", agent_id)
+        description = agent_metadata.get("description", "")
+        persona = agent_metadata.get("persona", "")
+        agent_skills = agent_metadata.get("skills", [])
+        agent_workflows = agent_metadata.get("workflows", [])
 
         # Allow workflow YAMLs to override the system prompt
         explicit_system_prompt = request.prompt.get("system_prompt")
@@ -178,9 +198,75 @@ def call_s1_backend(
         else:
             system_prompt = (
                 f"You are {agent_name}, an AI assistant in the VAI platform.\n"
-                f"{description}\n\n"
+                f"Role: {persona}\n"
+                f"Description: {description}\n\n"
                 "Respond conversationally. Be concise, helpful, and accurate."
             )
+
+        # Inject agent capabilities — available skills and workflows
+        cap_lines = []
+        if agent_skills:
+            if "*" in agent_skills:
+                cap_lines.append("\nYou have access to all available skills.")
+            else:
+                cap_lines.append("\nYour available skills:\n" + "\n".join(f"  - {s}" for s in agent_skills))
+        if agent_workflows:
+            if "*" in agent_workflows:
+                # Derive actual workflow names from tool_context for display
+                wf_names = sorted({
+                    t.get("name", "").replace("workflow.execute.", "")
+                    for t in (request.tool_context or [])
+                    if t.get("name", "")
+                })
+                if wf_names:
+                    cap_lines.append("\nYour available workflows:\n" + "\n".join(f"  - {w}" for w in wf_names))
+                else:
+                    cap_lines.append("\nYou have access to all available workflows.")
+            else:
+                cap_lines.append("\nYour available workflows:\n" + "\n".join(f"  - {w}" for w in agent_workflows))
+        if cap_lines:
+            system_prompt += "".join(cap_lines)
+
+        # Inject workflow tool descriptions so the LLM can discover and
+        # invoke workflows.  Only include workflows the agent has access to.
+        # The LLM invokes one by including a line like:
+        #   /invoke-workflow <workflow_id> param1=value1 param2=value2
+        all_tool_context = request.tool_context or []
+        tool_context = [
+            t for t in all_tool_context
+            if not agent_workflows or _tool_matches_workflows(t, agent_workflows)
+        ]
+        if tool_context:
+            tool_lines = []
+            for tool in tool_context:
+                # Support both flat format (adapter) and OpenAI function-wrapper format
+                func = tool.get("function")
+                if func is not None:
+                    name = func.get("name", "unknown")
+                    desc = func.get("description", "")
+                    params = func.get("parameters", {})
+                else:
+                    name = tool.get("name", "unknown")
+                    desc = tool.get("description", "")
+                    params = tool.get("input_schema", tool.get("parameters", {}))
+                props = params.get("properties", {})
+                param_strs = []
+                for pname, pinfo in props.items():
+                    req = "required" if pname in params.get("required", []) else "optional"
+                    param_strs.append(f"    - {pname} ({req}): {pinfo.get('description', '')}")
+                tool_lines.append(f"\n  **{name}**: {desc}")
+                if param_strs:
+                    tool_lines.append("    Parameters:")
+                    tool_lines.extend(param_strs)
+            if tool_lines:
+                system_prompt += (
+                    "\n\nYou have access to the following workflows which you can invoke "
+                    "when a user's request matches their purpose.\n"
+                    "To invoke a workflow, include a line in your response exactly in the format:\n"
+                    '/invoke-workflow <workflow_id> key1="value1" key2="value2"\n'
+                    "You may invoke one or more workflows \u2014 one per line."
+                )
+                system_prompt += "".join(tool_lines)
 
         # Format the history block from prior turns
         conversation_history = request.memory.get("conversation_history", [])

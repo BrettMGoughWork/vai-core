@@ -38,23 +38,6 @@ SANDBOX_PROCESS = "process"
 SANDBOX_CONTAINER = "container"
 VALID_SANDBOX_LEVELS = frozenset({SANDBOX_NONE, SANDBOX_PROCESS, SANDBOX_CONTAINER})
 
-# Known capabilities (extensible over time)
-CAP_CONVERSATIONAL = "conversational"
-CAP_PLANNING = "planning"
-CAP_ANALYSIS = "analysis"
-CAP_TOOL_USE = "tool_use"
-CAP_JOB_SUBMISSION = "job_submission"
-CAP_SUMMARIZATION = "summarization"
-CAP_ROUTING = "routing"
-VALID_CAPABILITIES = frozenset({
-    CAP_CONVERSATIONAL,
-    CAP_PLANNING,
-    CAP_ANALYSIS,
-    CAP_TOOL_USE,
-    CAP_JOB_SUBMISSION,
-    CAP_SUMMARIZATION,
-    CAP_ROUTING,
-})
 
 
 # ---------------------------------------------------------------------------
@@ -156,8 +139,14 @@ class AgentMetadata:
     ------
     identity:
         The agent's unique identity.
-    capabilities:
-        Explicit list of capability labels the agent declares.
+    persona:
+        Human‑readable persona / role description for agent selection matching.
+        Used by the ``AgentSelectionStrategy`` when a workflow step specifies
+        an ``agent_profile`` in its config.
+    skills:
+        Explicit list of skill names the agent has access to.
+    workflows:
+        Explicit list of workflow IDs the agent has access to.
     inputs:
         Input types the agent accepts.
     outputs:
@@ -167,24 +156,22 @@ class AgentMetadata:
     """
 
     identity: AgentIdentity
-    capabilities: List[str] = field(default_factory=list)
+    persona: str = ""
+    skills: List[str] = field(default_factory=list)
+    workflows: List[str] = field(default_factory=list)
     inputs: List[str] = field(default_factory=list)
     outputs: List[str] = field(default_factory=list)
     constraints: AgentConstraints = field(default_factory=AgentConstraints)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.capabilities, list):
-            raise ValueError("capabilities must be a list")
+        if not isinstance(self.skills, list):
+            raise ValueError("skills must be a list")
+        if not isinstance(self.workflows, list):
+            raise ValueError("workflows must be a list")
         if not isinstance(self.inputs, list):
             raise ValueError("inputs must be a list")
         if not isinstance(self.outputs, list):
             raise ValueError("outputs must be a list")
-        for cap in self.capabilities:
-            if cap not in VALID_CAPABILITIES:
-                raise ValueError(
-                    f"unknown capability {cap!r}; "
-                    f"valid: {sorted(VALID_CAPABILITIES)}"
-                )
 
 
 # ---------------------------------------------------------------------------
@@ -217,10 +204,6 @@ class DuplicateAgentError(AgentRegistryError):
     """Raised when registering an agent with a duplicate ID."""
 
 
-class UnknownCapabilityError(AgentRegistryError):
-    """Raised when registering an agent with an unknown capability."""
-
-
 class AgentNotFoundError(AgentRegistryError):
     """Raised when a lookup by agent_id fails."""
 
@@ -244,8 +227,8 @@ class AgentRegistry:
     def register_agent(self, metadata: AgentMetadata) -> AgentHandle:
         """Register an agent.
 
-        Validates metadata, rejects duplicate IDs and unknown
-        capabilities.  Registration is idempotent — calling with the
+        Validates metadata, rejects duplicate IDs.
+        Registration is idempotent — calling with the
         same metadata is a no‑op; calling with different metadata for
         an existing ID raises ``DuplicateAgentError``.
         """
@@ -283,24 +266,23 @@ class AgentRegistry:
             raise AgentNotFoundError(f"agent {agent_id!r} not found")
         return agent
 
-    def find_agents_by_capability(
-        self, capability: str
-    ) -> List[AgentMetadata]:
-        """Find all agents that declare *capability*.
-
-        If *capability* is not a known capability label, returns an
-        empty list (the registry does not validate capability strings
-        at query time — validation only happens at registration).
-        """
-        return [
-            m
-            for m in self._agents.values()
-            if capability in m.capabilities
-        ]
-
     def list_agents(self) -> List[AgentMetadata]:
         """Return metadata for every registered agent."""
         return list(self._agents.values())
+
+    def find_agents_by_skill(self, skill_name: str) -> List[AgentMetadata]:
+        """Return all agents that have *skill_name* in their skills list."""
+        return [
+            a for a in self._agents.values()
+            if skill_name in a.skills
+        ]
+
+    def find_agents_by_workflow(self, workflow_id: str) -> List[AgentMetadata]:
+        """Return all agents that have *workflow_id* in their workflows list."""
+        return [
+            a for a in self._agents.values()
+            if workflow_id in a.workflows
+        ]
 
     # ------------------------------------------------------------------
     # Introspection

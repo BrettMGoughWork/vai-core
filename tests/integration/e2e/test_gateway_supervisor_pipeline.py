@@ -99,7 +99,6 @@ class TestToolExecutePath:
                 name="Tool Agent",
                 description="Agent that executes tools",
             ),
-            capabilities=["conversational"],
         ))
 
         wf_store = WorkflowInstanceStore()
@@ -256,7 +255,6 @@ class TestMultiWorkflowRouting:
                 name="Tools Workflow Agent",
                 description="Agent that dispatches tool execute jobs",
             ),
-            capabilities=["conversational"],
         ))
 
         supervisor = Supervisor(
@@ -315,7 +313,6 @@ class TestWaitingWorkflow:
                 name="Waiting Agent",
                 description="Agent that pauses for input",
             ),
-            capabilities=["conversational"],
         ))
 
         state = supervisor.create_agent("waiting-agent")
@@ -345,7 +342,6 @@ class TestWaitingWorkflow:
                 name="Waiting Agent",
                 description="Agent that pauses for input",
             ),
-            capabilities=["conversational"],
         ))
 
         wf_store = WorkflowInstanceStore()
@@ -405,7 +401,6 @@ class TestSprint8Interaction:
                 name="Validated Agent",
                 description="Agent with input schema",
             ),
-            capabilities=["conversational"],
         ))
 
         wf_store = WorkflowInstanceStore()
@@ -457,7 +452,6 @@ class TestSprint8Interaction:
                 name="Invalid Agent",
                 description="Agent that rejects input until magic words",
             ),
-            capabilities=["conversational"],
         ))
 
         wf_store = WorkflowInstanceStore()
@@ -524,7 +518,6 @@ class TestSprint8Interaction:
                 name="Timeout Agent",
                 description="Agent with expired HITL timeout",
             ),
-            capabilities=["conversational"],
         ))
 
         wf_store = WorkflowInstanceStore()

@@ -61,7 +61,6 @@ def agent_registry() -> AgentRegistry:
             name="Default Agent",
             description="Default conversational agent",
         ),
-        capabilities=["conversational"],
     ))
     return reg
 

@@ -1,0 +1,43 @@
+# Agent-aware research workflow
+# Researcher gathers information, executor runs a tool, then analyst summarizes.
+workflow_id: agent-research
+name: "Agent Research Workflow"
+description: "Research workflow with agent_profile routing — research, execute, then summarize"
+version: "1.0.0"
+trigger_on:
+  - "workflow_request"
+
+steps:
+  plan:
+    step_id: plan
+    step_type: llm_call
+    label: "Plan the research"
+    config:
+      message: "Create a research plan for: {context.input}. Outline the key questions and approach."
+      agent_profile: "research"
+    transitions:
+      on_success: execute
+
+  execute:
+    step_id: execute
+    step_type: tool_execute
+    label: "Execute a tool"
+    config:
+      skill_name: "read_file"
+      arguments:
+        filepath: "{context.input}"
+      agent_profile: "executor"
+    transitions:
+      on_success: summarize
+
+  summarize:
+    step_id: summarize
+    step_type: llm_call
+    label: "Summarize results"
+    config:
+      message: "Summarize the results of this research task. Research findings: {context.result}"
+      agent_profile: "analyst"
+    transitions:
+      on_success: __end__
+
+start_step: plan

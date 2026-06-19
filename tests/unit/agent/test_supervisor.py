@@ -29,7 +29,6 @@ from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
 from src.agent.interfaces.agent_state import AgentState, LifecycleState
 from src.agent.interfaces.agent_state_store import AgentStateStore
 from src.agent.registry import (
-    CAP_CONVERSATIONAL,
     AgentConstraints,
     AgentIdentity,
     AgentMetadata,
@@ -62,13 +61,13 @@ def _make_identity(
 
 
 def _make_metadata(
-    capabilities: Optional[List[str]] = None,
+    skills: Optional[List[str]] = None,
     agent_id: str = "test-agent",
     name: str = "Test Agent",
 ) -> AgentMetadata:
     return AgentMetadata(
         identity=_make_identity(agent_id=agent_id, name=name),
-        capabilities=capabilities or [CAP_CONVERSATIONAL],
+        skills=skills or [],
         inputs=["text"],
         outputs=["text", "action_intents"],
         constraints=AgentConstraints(max_tokens=4096, timeout_ms=30000),
@@ -85,7 +84,6 @@ def _make_agent_message(text: str = "Hello") -> AgentMessage:
     return AgentMessage(
         message=text,
         context={"channel": "cli"},
-        capabilities=[CAP_CONVERSATIONAL],
     )
 
 
@@ -138,7 +136,6 @@ def _make_activated_state(agent_id: str = "test-agent") -> AgentState:
     )
     ctx = ActivationContext(
         agent_metadata=_make_metadata(agent_id=agent_id),
-        resolved_capabilities=[CAP_CONVERSATIONAL],
         conversation_history=[],
         system_constraints={"max_tokens": 4096, "timeout_ms": 30000, "sandbox": "none"},
     )

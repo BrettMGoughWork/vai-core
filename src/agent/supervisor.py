@@ -52,7 +52,9 @@ from src.agent.interfaces.agent_state import (
 from src.agent.interfaces.agent_state_store import AgentStateStore
 from src.agent.job_interface import JobDispatchResult, dispatch_route
 from src.agent.registry import AgentRegistry, AgentNotFoundError
+from src.agent.registry import AgentRegistry, AgentNotFoundError  # noqa: F811
 from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
+from src.agent.selection import AgentSelectionStrategy
 from src.agent.workflow import WorkflowEngine, WorkflowInstanceStore, WorkflowRegistry
 from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.agent.workflow.user_interaction import UserInteractionManager
@@ -107,6 +109,7 @@ class Supervisor:
         strategy_router: Optional[StrategyRouter] = None,
         auto_persist: bool = True,
         inline_tool_executor: Optional[Callable[[dict[str, Any]], dict[str, Any] | None]] = None,
+        workflow_tool_adapter: Optional[Any] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -118,6 +121,10 @@ class Supervisor:
         self._strategy_router = strategy_router or StrategyRouter()
         self._auto_persist = auto_persist
         self._inline_tool_executor = inline_tool_executor
+        self._agent_selector = (
+            AgentSelectionStrategy(registry) if registry is not None else None
+        )
+        self._workflow_tool_adapter = workflow_tool_adapter
 
     # ── 1. create_agent ────────────────────────────────────────────────
 
@@ -313,6 +320,12 @@ class Supervisor:
         if route.destination == DEST_RUNTIME:
             # LLM conversation path — route via StrategyRouter
             agent_meta = ctx.context.agent_metadata
+
+            # Build tool_context from workflow tool adapter (sprint 9a)
+            tool_context: list[dict] = []
+            if self._workflow_tool_adapter is not None:
+                tool_context = self._workflow_tool_adapter.list_tools()
+
             outcome = RouterOutcome(
                 type="llm_call",
                 payload={
@@ -322,6 +335,9 @@ class Supervisor:
                         "agent_metadata": {
                             "name": agent_meta.identity.name,
                             "description": agent_meta.identity.description,
+                            "persona": agent_meta.persona,
+                            "skills": list(agent_meta.skills),
+                            "workflows": list(agent_meta.workflows),
                         },
                     },
                     "backend": "conversational",
@@ -330,7 +346,7 @@ class Supervisor:
                             ctx.context.conversation_history,
                     },
                     "plan_context": {},
-                    "tool_context": [],
+                    "tool_context": tool_context,
                 },
             )
             result = self._strategy_router.route(outcome)
@@ -350,6 +366,103 @@ class Supervisor:
                     metadata["runtime_fallback"] = True
                     metadata["runtime_error"] = result["runtime_error"]
                     _reason = "Agent produced conversational response via mock fallback"
+
+                # Sprint 9a: process /invoke-workflow directives from LLM
+                reply = self._handle_invoke_workflow(reply)
+
+                # Sprint 9a: handle native tool_calls if the backend supports them
+                for tc in result.get("tool_calls", []):
+                    if isinstance(tc, dict):
+                        func_name = (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "") or tc.get("name", "")
+                        if func_name.startswith("workflow.execute."):
+                            wf_id = func_name[len("workflow.execute."):]
+                            args = tc.get("arguments", tc.get("args", {}))
+                            if isinstance(args, str):
+                                try:
+                                    import json
+                                    args = json.loads(args)
+                                except json.JSONDecodeError:
+                                    args = {}
+                            context = {"args": args}
+                            try:
+                                wf_state = self._workflow_engine.start_workflow(
+                                    wf_id, context=context,
+                                )
+                                wf_store = self._workflow_store
+                                wf_store.save(wf_state)
+                                iteration = 0
+                                while iteration < self._WF_MAX_ITERATIONS:
+                                    iteration += 1
+                                    wf_state, outcome = self._workflow_engine.step(wf_state)
+                                    wf_store.save(wf_state)
+                                    if outcome.type == "continue":
+                                        continue
+                                    if outcome.type == "completed":
+                                        final_msg = (
+                                            wf_state.context.get("_workflow_result")
+                                            or wf_state.context.get("result")
+                                            or "Completed."
+                                        )
+                                        reply += f"\n\n[Executed workflow {wf_id!r}: {final_msg}]"
+                                        break
+                                    if outcome.type == "failed":
+                                        reply += f"\n\n[Workflow {wf_id!r} failed: {outcome.error}]"
+                                        break
+                                    if outcome.type == "waiting_for_input":
+                                        reply += f"\n\n[Workflow {wf_id!r} awaiting input: {outcome.prompt}]"
+                                        break
+                                    if outcome.type in ("llm_call", "planner_call"):
+                                        rendered = _render_context_templates(
+                                            outcome.config,
+                                            wf_state.context,
+                                            wf_state.step_results,
+                                        )
+                                        ro = RouterOutcome(
+                                            type=outcome.type,
+                                            payload=dict(rendered) if isinstance(rendered, dict) else {},
+                                            step_id=outcome.step_id,
+                                        )
+                                        rr = self._strategy_router.route(ro)
+                                        if rr.get("error") is None:
+                                            wf_state, _ = self._workflow_engine.resume_with_result(
+                                                wf_state, outcome.step_id, rr["output"],
+                                            )
+                                        else:
+                                            wf_state, _ = self._workflow_engine.fail_step(
+                                                wf_state, outcome.step_id, rr["error"],
+                                            )
+                                        wf_store.save(wf_state)
+                                        continue
+                                    if outcome.type == "tool_execute":
+                                        if self._inline_tool_executor is not None:
+                                            try:
+                                                inline_result = self._inline_tool_executor(outcome.config)
+                                            except Exception:
+                                                inline_result = None
+                                            if inline_result is not None:
+                                                wf_state, _ = self._workflow_engine.resume_with_result(
+                                                    wf_state, outcome.step_id, inline_result,
+                                                )
+                                                wf_store.save(wf_state)
+                                                continue
+                                        reply += f"\n\n[Workflow {wf_id!r} deferred tool_execute]"
+                                        break
+                                    if outcome.type == "sub_workflow":
+                                        sub_id = outcome.workflow_id or ""
+                                        try:
+                                            wf_state = self._workflow_engine.start_workflow(
+                                                sub_id, context=dict(wf_state.context),
+                                            )
+                                        except ValueError as exc:
+                                            wf_state, _ = self._workflow_engine.fail_step(
+                                                wf_state, outcome.step_id, str(exc),
+                                            )
+                                        wf_store.save(wf_state)
+                                        continue
+                                else:
+                                    reply += f"\n\n[Workflow {wf_id!r} exceeded iteration limit]"
+                            except ValueError as exc:
+                                reply += f"\n\n[Workflow {wf_id!r} not found: {exc}]"
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"
                 metadata["runtime_error"] = result["error"]
@@ -789,6 +902,32 @@ class Supervisor:
                     wf_state.context,
                     wf_state.step_results,
                 )
+
+                # Agent selection: resolve agent_profile / agent_id from step config
+                selected_agent_id: Optional[str] = None
+                selected_agent_meta: Any = None
+                if self._agent_selector is not None:
+                    selected_agent_id = self._agent_selector.select(outcome.config)
+                    try:
+                        selected_agent_meta = self._registry.get_agent(selected_agent_id)
+                    except AgentNotFoundError:
+                        selected_agent_meta = None
+
+                # Inject selected agent metadata into prompt
+                if selected_agent_meta is not None:
+                    if isinstance(rendered_config, dict):
+                        rendered_config.setdefault("agent_id", selected_agent_id)
+                        rendered_config.setdefault("agent_metadata", {
+                            "name": selected_agent_meta.identity.name,
+                            "description": selected_agent_meta.identity.description,
+                            "persona": selected_agent_meta.persona,
+                        })
+
+                # Build tool_context from workflow tool adapter (sprint 9a)
+                tool_context: list[dict] = []
+                if self._workflow_tool_adapter is not None:
+                    tool_context = self._workflow_tool_adapter.list_tools()
+
                 router_outcome = RouterOutcome(
                     type="llm_call",
                     payload={
@@ -796,7 +935,7 @@ class Supervisor:
                         "backend": "conversational",
                         "memory": {},
                         "plan_context": {},
-                        "tool_context": [],
+                        "tool_context": tool_context,
                     },
                     step_id=outcome.step_id,
                 )
@@ -979,6 +1118,163 @@ class Supervisor:
             supervisor_metadata=meta,
             _reason=f"Exceeded {self._WF_MAX_ITERATIONS} step iterations",
         ))
+
+    # ── Workflow tool invocation ───────────────────────────────────────
+
+    def _handle_invoke_workflow(
+        self, reply: str, wf_context: dict | None = None,
+    ) -> str:
+        """Parse and execute ``/invoke-workflow`` directives in an LLM reply.
+
+        Scans *reply* for lines matching::
+
+            /invoke-workflow <workflow_id> key1="value1" key2="value2"
+
+        Each matching line starts a fresh workflow via
+        ``self._workflow_engine``, runs **all non-blocking steps**
+        (``llm_call``, ``planner_call``, ``sub_workflow``, ``tool_execute``)
+        inline, and **waits** if the workflow reaches ``waiting_for_input``
+        or terminates.  Results are appended to *reply* so the caller sees
+        both the LLM's original text and the workflow outcomes.
+
+        Returns *reply* unmodified if ``self._workflow_engine`` is ``None``
+        or no ``/invoke-workflow`` directives are found.
+        """
+        if self._workflow_engine is None:
+            return reply
+
+        pattern = re.compile(
+            r'^/invoke-workflow\s+(\S+)'          # workflow_id
+            r'(?:\s+(\S+="[^"]*"(?:\s+\S+="[^"]*")*))?',  # key="val" pairs
+            re.MULTILINE,
+        )
+
+        parts: list[str] = [reply]
+        for match in pattern.finditer(reply):
+            raw_wf_id = match.group(1)
+            # Strip the "workflow.execute." prefix used by WorkflowToolAdapter
+            wf_id = raw_wf_id
+            for prefix in ("workflow.execute.", "workflow."):
+                if wf_id.startswith(prefix):
+                    wf_id = wf_id[len(prefix):]
+                    break
+            raw_params = match.group(2) or ""
+
+            # Parse key="value" pairs
+            params: dict[str, str] = {}
+            for kv in re.finditer(r'(\w+)="([^"]*)"', raw_params):
+                params[kv.group(1)] = kv.group(2)
+
+            context = dict(wf_context or {})
+            context.update(params)
+
+            try:
+                wf_state = self._workflow_engine.start_workflow(
+                    wf_id, context=context,
+                )
+            except ValueError as exc:
+                parts.append(
+                    f"\n\n[Workflow {wf_id!r} not found: {exc}]"
+                )
+                continue
+
+            wf_store = self._workflow_store
+            wf_store.save(wf_state)
+
+            iteration = 0
+            final_result: str | None = None
+            hitl_input: str | None = None
+
+            while iteration < self._WF_MAX_ITERATIONS:
+                iteration += 1
+                wf_state, outcome = self._workflow_engine.step(wf_state)
+                wf_store.save(wf_state)
+
+                if outcome.type == "continue":
+                    continue
+
+                if outcome.type == "completed":
+                    final_result = (
+                        wf_state.context.get("_workflow_result")
+                        or wf_state.context.get("result")
+                        or "Workflow completed successfully."
+                    )
+                    break
+
+                if outcome.type == "failed":
+                    final_result = (
+                        f"Workflow failed: {outcome.error or 'Unknown error'}"
+                    )
+                    break
+
+                if outcome.type == "waiting_for_input":
+                    hitl_input = outcome.prompt or "Awaiting your input."
+                    break
+
+                if outcome.type in ("llm_call", "planner_call"):
+                    rendered_config = _render_context_templates(
+                        outcome.config,
+                        wf_state.context,
+                        wf_state.step_results,
+                    )
+                    ro = RouterOutcome(
+                        type=outcome.type,
+                        payload=dict(rendered_config) if isinstance(rendered_config, dict) else {},
+                        step_id=outcome.step_id,
+                    )
+                    route_result = self._strategy_router.route(ro)
+                    if route_result.get("error") is None:
+                        wf_state, _ = self._workflow_engine.resume_with_result(
+                            wf_state, outcome.step_id, route_result["output"],
+                        )
+                    else:
+                        wf_state, _ = self._workflow_engine.fail_step(
+                            wf_state, outcome.step_id, route_result["error"],
+                        )
+                    wf_store.save(wf_state)
+                    continue
+
+                if outcome.type == "tool_execute":
+                    if self._inline_tool_executor is not None:
+                        try:
+                            inline_result = self._inline_tool_executor(outcome.config)
+                        except Exception:
+                            inline_result = None
+                        if inline_result is not None:
+                            wf_state, _ = self._workflow_engine.resume_with_result(
+                                wf_state, outcome.step_id, inline_result,
+                            )
+                            wf_store.save(wf_state)
+                            continue
+                    parts.append(
+                        f"\n\n[Workflow {wf_id!r} reached tool_execute — "
+                        f"dispatch not available in tool context]"
+                    )
+                    final_result = "Tool execution deferred."
+                    break
+
+                if outcome.type == "sub_workflow":
+                    sub_id = outcome.workflow_id or ""
+                    try:
+                        wf_state = self._workflow_engine.start_workflow(
+                            sub_id, context=dict(wf_state.context),
+                        )
+                    except ValueError as exc:
+                        wf_state, _ = self._workflow_engine.fail_step(
+                            wf_state, outcome.step_id, str(exc),
+                        )
+                    wf_store.save(wf_state)
+                    continue
+
+            else:
+                final_result = f"Workflow exceeded {self._WF_MAX_ITERATIONS} iterations"
+
+            summary = final_result or "Workflow completed."
+            parts.append(f"\n\n---\n**Workflow {wf_id!r} result:** {summary}")
+            if hitl_input:
+                parts.append(f"\n_Input required: {hitl_input}_")
+
+        return "".join(parts)
 
     # ── Internal helpers ───────────────────────────────────────────────
 
