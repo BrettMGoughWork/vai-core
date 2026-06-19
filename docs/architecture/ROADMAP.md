@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-18 (Sprint 9a — Workflow Discovery for Agents added)  
+> **Last updated:** 2026-06-20 (Sprint 9+9a — completed)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -224,7 +224,7 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 8.7 | Test: invalid input → returns False, engine not called | ✅ |
 | 8.8 | Test: timeout → engine transitions correctly | ✅ |
 
-### Sprint 9 — Agent Selection Layer
+### Sprint 9 — Agent Selection Layer ✅
 
 **Goal:** Match workflow steps to agent personas. When a workflow step needs an agent (for `user_input` or delegated `llm_call`), determine which agent/persona handles it.
 
@@ -238,7 +238,7 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 9.6 | Test: no agent_profile → runtime agent used | ✅ |
 | 9.7 | Test: agent not found → configurable fallback/fail | ✅ |
 
-### Sprint 9a — Workflow Discovery for Agents
+### Sprint 9a — Workflow Discovery for Agents ✅
 
 **Goal:** Agents discover and select workflows as tools during LLM calls — the S5 agent sees registered workflows alongside skills and can invoke them via tool-call routing.
 
