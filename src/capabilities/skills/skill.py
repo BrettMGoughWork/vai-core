@@ -189,16 +189,33 @@ def _validate_against_schema(
     """Validate *data* against a JSON‑Schema‑like *schema* dict.
 
     Supports ``type``, ``properties``, and ``required``.
+
+    The schema may be in either format:
+
+    * **JSON Schema format**::
+        {"type": "object", "properties": {"action": {...}}, "required": ["action"]}
+
+    * **VAI-native flat format**::
+        {"action": {"type": "string", "required": True}, "params": {"type": "object"}}
     """
     if not isinstance(data, dict):
         raise ValueError(f"{label} data must be a dict, got {type(data).__name__}")
 
-    schema_type = schema.get("type")
-    if schema_type and schema_type != "object":
-        raise ValueError(f"{label}_schema type must be 'object', got {schema_type!r}")
-
-    properties = schema.get("properties", {})
-    required: list[str] = schema.get("required", [])
+    # Normalize: detect VAI-native flat format {field: {type, required, ...}}
+    # vs JSON Schema format {type: "object", properties: {...}, required: [...]}.
+    if "type" not in schema:
+        # Flat format — convert inline.
+        flat_schema: dict[str, Any] = schema
+        properties: dict[str, Any] = {}
+        required: list[str] = []
+        for field_name, field_def in flat_schema.items():
+            if isinstance(field_def, dict):
+                properties[field_name] = field_def
+                if field_def.get("required", False):
+                    required.append(field_name)
+    else:
+        properties = schema.get("properties", {})
+        required = schema.get("required", [])
 
     # Check required keys.
     for key in required:

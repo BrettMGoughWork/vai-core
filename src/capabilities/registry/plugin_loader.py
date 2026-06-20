@@ -139,6 +139,18 @@ class PluginLoader:
                     self._prim_registry.register(inst.name, inst)
                     primitive_names.append(inst.name)
 
+        # --- load MCP servers (BEFORE skills, so MCP primitives are available) ---
+        mcp_dir = plugin_path / "mcp"
+        if mcp_dir.is_dir():
+            mcp_names = load_mcp_primitives(self._prim_registry, str(mcp_dir))
+            for name in mcp_names:
+                if name not in primitive_names:
+                    prim = self._prim_registry.get(name)
+                    if prim is not None:
+                        prim.plugin_name = manifest.name
+                        prim.plugin_version = manifest.version
+                    primitive_names.append(name)
+
         # --- load skills ---
         skill_names: list[str] = []
         skills_dir = plugin_path / "skills"
@@ -170,18 +182,6 @@ class PluginLoader:
                     skill_names.append(name)
                 except Exception:
                     continue
-
-        # --- load MCP servers ---
-        mcp_dir = plugin_path / "mcp"
-        if mcp_dir.is_dir():
-            mcp_names = load_mcp_primitives(self._prim_registry, str(mcp_dir))
-            for name in mcp_names:
-                if name not in primitive_names:
-                    prim = self._prim_registry.get(name)
-                    if prim is not None:
-                        prim.plugin_name = manifest.name
-                        prim.plugin_version = manifest.version
-                    primitive_names.append(name)
 
         # --- track ---
         self._loaded[manifest.name] = _LoadedPlugin(

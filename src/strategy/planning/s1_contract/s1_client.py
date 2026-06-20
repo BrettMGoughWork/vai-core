@@ -131,6 +131,21 @@ def _tool_matches_workflows(tool: dict, agent_workflows: list[str]) -> bool:
     return wf_id in agent_workflows or name in agent_workflows
 
 
+def _tool_matches_skills(tool: dict, agent_skills: list[str]) -> bool:
+    """Check if a tool definition matches one of the agent's allowed skills.
+
+    Supports the ``skill.execute.<name>`` naming convention used by
+    ``SkillToolAdapter``, as well as bare skill names.
+    """
+    name = tool.get("function", {}).get("name", "") or tool.get("name", "")
+    skill_name = name
+    for prefix in ("skill.execute.", "skill."):
+        if skill_name.startswith(prefix):
+            skill_name = skill_name[len(prefix):]
+            break
+    return skill_name in agent_skills or name in agent_skills
+
+
 def call_s1_backend(
     request: PromptRequest, backend: str = "simulation"
 ) -> Union[PromptResponse, S1Error]:
@@ -232,13 +247,16 @@ def call_s1_backend(
         # The LLM invokes one by including a line like:
         #   /invoke-workflow <workflow_id> param1=value1 param2=value2
         all_tool_context = request.tool_context or []
-        tool_context = [
+
+        # ── Workflow tools ───────────────────────────────────────────
+        wf_tool_context = [
             t for t in all_tool_context
-            if not agent_workflows or _tool_matches_workflows(t, agent_workflows)
+            if not t.get("name", "").startswith("skill.")
+            and (not agent_workflows or _tool_matches_workflows(t, agent_workflows))
         ]
-        if tool_context:
+        if wf_tool_context:
             tool_lines = []
-            for tool in tool_context:
+            for tool in wf_tool_context:
                 # Support both flat format (adapter) and OpenAI function-wrapper format
                 func = tool.get("function")
                 if func is not None:
@@ -265,6 +283,44 @@ def call_s1_backend(
                     "To invoke a workflow, include a line in your response exactly in the format:\n"
                     '/invoke-workflow <workflow_id> key1="value1" key2="value2"\n'
                     "You may invoke one or more workflows \u2014 one per line."
+                )
+                system_prompt += "".join(tool_lines)
+
+        # ── Skill tools ──────────────────────────────────────────────
+        skill_tool_context = [
+            t for t in all_tool_context
+            if t.get("name", "").startswith("skill.")
+            and (not agent_skills or "*" in agent_skills
+                 or _tool_matches_skills(t, agent_skills))
+        ]
+        if skill_tool_context:
+            tool_lines = []
+            for tool in skill_tool_context:
+                func = tool.get("function")
+                if func is not None:
+                    name = func.get("name", "unknown")
+                    desc = func.get("description", "")
+                    params = func.get("parameters", {})
+                else:
+                    name = tool.get("name", "unknown")
+                    desc = tool.get("description", "")
+                    params = tool.get("input_schema", tool.get("parameters", {}))
+                props = params.get("properties", {})
+                param_strs = []
+                for pname, pinfo in props.items():
+                    req = "required" if pname in params.get("required", []) else "optional"
+                    param_strs.append(f"    - {pname} ({req}): {pinfo.get('description', '')}")
+                tool_lines.append(f"\n  **{name}**: {desc}")
+                if param_strs:
+                    tool_lines.append("    Parameters:")
+                    tool_lines.extend(param_strs)
+            if tool_lines:
+                system_prompt += (
+                    "\n\nYou have access to the following skills which you can invoke "
+                    "when a user's request matches their purpose.\n"
+                    "To invoke a skill, include a line in your response exactly in the format:\n"
+                    '/invoke-skill <skill_name> action="..." key1="value1"\n'
+                    "You may invoke one or more skills \u2014 one per line."
                 )
                 system_prompt += "".join(tool_lines)
 

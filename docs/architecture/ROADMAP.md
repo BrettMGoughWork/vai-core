@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-20 (Sprint 9+9a — completed)  
+> **Last updated:** 2026-06-20 (Sprint 16 — added)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -348,6 +348,18 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 15.8 | Graceful degradation strategy |
 | 15.9 | Disaster recovery story |
 | 15.10 | Architecture doc for future contributors |
+
+### Sprint 16 — Local Custom Overlay (Personal Workspace Isolation)
+
+*Keep the repo clean of opinionated/experimental/test content by adding gitignored "custom" subfolders across all configurable namespaces.*
+
+| Task | What |
+|------|------|
+| 16.1 | Add `custom/` subfolder to `config/workflows/`, `config/agents/`, and update loaders to scan both the standard dir and the `custom/` sibling |
+| 16.2 | Add `custom/` subfolder to `plugins/` (for MCP, skills, primitives, etc.) and update `PluginLoader` to scan both |
+| 16.3 | Add `custom/` to `.gitignore` so local experiments never pollute the repo |
+| 16.4 | Update boot sequence / `composition_root.py` to merge standard + custom artifacts with priority semantics (custom wins on conflict) |
+| 16.5 | Write a `docs/custom_workflows.md` guide explaining the overlay pattern for users who fork the repo |
 
 ---
 

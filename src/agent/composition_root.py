@@ -10,11 +10,22 @@ and capability (``src.capabilities.*``).
 
 from __future__ import annotations
 
+import os
 from typing import Any, List
 
+# Load .env into the process environment BEFORE any module-level init that
+# depends on env vars (e.g. MCP client config resolution expands ${VAR}
+# placeholders via os.path.expandvars).
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
 from src.capabilities.contracts import DiscoveredSkill
+from src.capabilities.primitives.mcp_client import MCPClientManager
 from src.capabilities.primitives.stdlib import load_all_primitives
+from src.capabilities.registry.plugin_loader import PluginLoader
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
+from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
 
 # ── Infrastructure imports (adapter→infrastructure: allowed) ─────────
 from src.runtime.llm.types import CoreLLMResponse, RuntimeConfig
@@ -37,6 +48,7 @@ from src.agent.workflow import (
     WorkflowRegistry,
 )
 from src.agent.workflow.loader import load_workflows_from_yaml
+from src.agent.workflow.skill_tool_adapter import SkillToolAdapter
 from src.agent.workflow.workflow_tool_adapter import WorkflowToolAdapter
 
 # ── Agent registry (loaded from declarative YAML) ─────────────────────
@@ -52,6 +64,19 @@ for defn in load_workflows_from_yaml("config/workflows"):
 # ── Primitive registry (loaded from stdlib) ──────────────────────────
 _primitive_registry = PrimitiveRegistry()
 _primitives_loaded = load_all_primitives(_primitive_registry)
+
+# ── MCP client manager (manages MCP server subprocesses) ─────────────
+_mcp_client_manager = MCPClientManager("config/mcp_servers.yaml")
+
+# ── Skill registry + plugin loader ──────────────────────────────────
+_skill_registry = CapabilitySkillRegistry()
+_plugin_loader = PluginLoader(_primitive_registry, _skill_registry)
+_plugin_loader.load_all("plugins")
+
+# ── Shared context injected into every primitive.execute() call ──────
+_PRIMITIVE_CONTEXT: dict[str, object] = {
+    "mcpclient": _mcp_client_manager,
+}
 
 
 def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -69,7 +94,7 @@ def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
         return None  # unknown → dispatch to S4B
 
     try:
-        result = primitive.execute(arguments, context={})
+        result = primitive.execute(arguments, context=_PRIMITIVE_CONTEXT)
         return {
             "status": result.status,
             "message": (
@@ -83,6 +108,31 @@ def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
         return {
             "status": "error",
             "message": f"Primitive '{skill_name}' raised: {exc}",
+            "outputs": {},
+        }
+
+
+def _execute_skill_inline(skill_name: str, inputs: dict[str, object]) -> dict[str, object]:
+    """Execute a skill synchronously, bypassing S4B.
+
+    Looks up the skill in ``_skill_registry``, validates inputs, and calls
+    ``skill.run()``.  Returns the result dict on success or an error dict.
+    """
+    skill = _skill_registry.get(skill_name)
+    if skill is None:
+        return {"status": "error", "message": f"Skill '{skill_name}' not found"}
+
+    try:
+        output = skill.run(context=_PRIMITIVE_CONTEXT, **inputs)
+        return {
+            "status": "success",
+            "message": f"Skill '{skill_name}' executed successfully",
+            "outputs": output if output is not None else {},
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": f"Skill '{skill_name}' raised: {exc}",
             "outputs": {},
         }
 
@@ -212,7 +262,7 @@ def _execute_plan_step(step_payload: dict[str, Any]) -> dict[str, Any]:
     primitive = _primitive_registry.get(skill_ref)
     if primitive is not None:
         try:
-            result = primitive.execute(inputs, context={})
+            result = primitive.execute(inputs, context=_PRIMITIVE_CONTEXT)
             return {
                 "status": result.status,
                 "message": (
@@ -264,6 +314,7 @@ _strategy_router = StrategyRouter(
 _workflow_engine = WorkflowEngine(wf_registry)
 _interaction_manager = UserInteractionManager(_workflow_engine)
 _workflow_tool_adapter = WorkflowToolAdapter(wf_registry)
+_skill_tool_adapter = SkillToolAdapter(_skill_registry)
 _supervisor = Supervisor(
     registry=_registry,
     store=state_store,
@@ -274,6 +325,8 @@ _supervisor = Supervisor(
     inline_tool_executor=_execute_tool_inline,
     interaction_manager=_interaction_manager,
     workflow_tool_adapter=_workflow_tool_adapter,
+    skill_tool_adapter=_skill_tool_adapter,
+    inline_skill_executor=_execute_skill_inline,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────

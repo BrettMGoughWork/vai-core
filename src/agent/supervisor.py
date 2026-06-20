@@ -33,6 +33,7 @@ Public API
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -110,6 +111,8 @@ class Supervisor:
         auto_persist: bool = True,
         inline_tool_executor: Optional[Callable[[dict[str, Any]], dict[str, Any] | None]] = None,
         workflow_tool_adapter: Optional[Any] = None,
+        skill_tool_adapter: Optional[Any] = None,
+        inline_skill_executor: Optional[Callable[[str, dict[str, Any]], dict[str, Any]]] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -125,6 +128,8 @@ class Supervisor:
             AgentSelectionStrategy(registry) if registry is not None else None
         )
         self._workflow_tool_adapter = workflow_tool_adapter
+        self._skill_tool_adapter = skill_tool_adapter
+        self._inline_skill_executor = inline_skill_executor
 
     # ── 1. create_agent ────────────────────────────────────────────────
 
@@ -321,10 +326,13 @@ class Supervisor:
             # LLM conversation path — route via StrategyRouter
             agent_meta = ctx.context.agent_metadata
 
-            # Build tool_context from workflow tool adapter (sprint 9a)
+            # Build tool_context from workflow + skill tool adapters (sprint 9a)
             tool_context: list[dict] = []
             if self._workflow_tool_adapter is not None:
                 tool_context = self._workflow_tool_adapter.list_tools()
+            if self._skill_tool_adapter is not None:
+                skill_tools = self._skill_tool_adapter.list_tools()
+                tool_context.extend(skill_tools)
 
             outcome = RouterOutcome(
                 type="llm_call",
@@ -367,8 +375,43 @@ class Supervisor:
                     metadata["runtime_error"] = result["runtime_error"]
                     _reason = "Agent produced conversational response via mock fallback"
 
-                # Sprint 9a: process /invoke-workflow directives from LLM
+                # Sprint 9a: process /invoke-workflow and /invoke-skill directives
                 reply = self._handle_invoke_workflow(reply)
+                reply = self._handle_invoke_skill(reply)
+
+                # Sprint 8.x: LLM synthesis of skill results into conversational response
+                if self._inline_skill_executor is not None and "\n\n---\n**Skill" in reply:
+                    summary_prompt = {
+                        "message": (
+                            f"The following skill result was returned. "
+                            f"As {agent_meta.identity.name}, synthesize this into a natural "
+                            f"conversational response for the user.\n\n{reply}"
+                        ),
+                        "agent_id": agent_meta.identity.agent_id,
+                        "agent_metadata": {
+                            "name": agent_meta.identity.name,
+                            "description": agent_meta.identity.description,
+                            "persona": agent_meta.persona,
+                            "skills": list(agent_meta.skills),
+                            "workflows": list(agent_meta.workflows),
+                        },
+                    }
+                    summary_outcome = RouterOutcome(
+                        type="llm_call",
+                        payload={
+                            "prompt": summary_prompt,
+                            "backend": "conversational",
+                            "memory": {
+                                "conversation_history":
+                                    ctx.context.conversation_history,
+                            },
+                            "plan_context": {},
+                            "tool_context": [],  # No tools — synthesis only
+                        },
+                    )
+                    summary_result = self._strategy_router.route(summary_outcome)
+                    if summary_result.get("error") is None:
+                        reply = summary_result["output"].get("message", reply)
 
                 # Sprint 9a: handle native tool_calls if the backend supports them
                 for tc in result.get("tool_calls", []):
@@ -923,10 +966,13 @@ class Supervisor:
                             "persona": selected_agent_meta.persona,
                         })
 
-                # Build tool_context from workflow tool adapter (sprint 9a)
+                # Build tool_context from workflow + skill tool adapters (sprint 9a)
                 tool_context: list[dict] = []
                 if self._workflow_tool_adapter is not None:
                     tool_context = self._workflow_tool_adapter.list_tools()
+                if self._skill_tool_adapter is not None:
+                    skill_tools = self._skill_tool_adapter.list_tools()
+                    tool_context.extend(skill_tools)
 
                 router_outcome = RouterOutcome(
                     type="llm_call",
@@ -1145,7 +1191,7 @@ class Supervisor:
 
         pattern = re.compile(
             r'^/invoke-workflow\s+(\S+)'          # workflow_id
-            r'(?:\s+(\S+="[^"]*"(?:\s+\S+="[^"]*")*))?',  # key="val" pairs
+            r'(?:\s+(.+))?',                       # everything after → key="val" pairs
             re.MULTILINE,
         )
 
@@ -1160,10 +1206,8 @@ class Supervisor:
                     break
             raw_params = match.group(2) or ""
 
-            # Parse key="value" pairs
-            params: dict[str, str] = {}
-            for kv in re.finditer(r'(\w+)="([^"]*)"', raw_params):
-                params[kv.group(1)] = kv.group(2)
+            # Parse key="value" pairs (handles \" inside JSON values)
+            params: dict[str, str] = self._parse_invoke_params(raw_params)
 
             context = dict(wf_context or {})
             context.update(params)
@@ -1276,7 +1320,80 @@ class Supervisor:
 
         return "".join(parts)
 
+    def _handle_invoke_skill(self, reply: str) -> str:
+        """Parse and execute ``/invoke-skill`` directives in an LLM reply.
+
+        Scans *reply* for lines matching::
+
+            /invoke-skill <skill_name> action="..." params.query="..."
+
+        Each matching line executes the skill via ``_inline_skill_executor``.
+        Results are appended to *reply*.
+
+        Returns *reply* unmodified if no ``/invoke-skill`` directives are found.
+        """
+        if self._inline_skill_executor is None:
+            return reply
+
+        pattern = re.compile(
+            r'^/invoke-skill\s+(\S+)'           # skill_name
+            r'(?:\s+(.+))?',                     # everything after → key="val" pairs
+            re.MULTILINE,
+        )
+
+        parts: list[str] = [reply]
+        for match in pattern.finditer(reply):
+            raw_skill_name = match.group(1)
+            # Strip the "skill.execute." prefix used by SkillToolAdapter
+            skill_name = raw_skill_name
+            for prefix in ("skill.execute.", "skill."):
+                if skill_name.startswith(prefix):
+                    skill_name = skill_name[len(prefix):]
+                    break
+            raw_params = match.group(2) or ""
+
+            # Parse key="value" pairs (handles \" inside JSON values)
+            params: dict[str, str] = self._parse_invoke_params(raw_params)
+
+            try:
+                result = self._inline_skill_executor(skill_name, params)
+            except Exception as exc:
+                parts.append(
+                    f"\n\n---\n**Skill {skill_name!r} raised exception:** {exc}"
+                )
+                continue
+
+            summary = result.get("message", "Skill executed.")
+            outputs = result.get("outputs")
+            if outputs not in (None, {}, []):
+                try:
+                    summary += "\n\n" + json.dumps(outputs, indent=2, default=str)
+                except Exception:
+                    summary += "\n\n" + str(outputs)
+            parts.append(
+                f"\n\n---\n**Skill {skill_name!r} result:** {summary}"
+            )
+
+        return "".join(parts)
+
     # ── Internal helpers ───────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_invoke_params(raw: str) -> dict[str, Any]:
+        """Parse ``key="value"`` pairs, handling ``\\"`` inside JSON values."""
+        result: dict[str, Any] = {}
+        for kv in re.finditer(r'(\w+)="((?:[^"\\]|\\.)*)"', raw):
+            raw_val = kv.group(2)
+            # Unescape \" -> "
+            val = re.sub(r'\\(.)', r'\1', raw_val)
+            # Auto‑deserialize JSON values (dicts and lists)
+            if val and val[0] in ("{", "["):
+                try:
+                    val = json.loads(val)
+                except json.JSONDecodeError:
+                    pass  # keep as string
+            result[kv.group(1)] = val
+        return result
 
     def _require_not_terminal(self, state: AgentState) -> None:
         """Guard: raise if the agent is in a terminal state."""

@@ -19,8 +19,12 @@ from src.capabilities.primitives.types import PrimitiveResult
 if TYPE_CHECKING:
     from src.capabilities.skills.skill import CapabilitySkill
 
-_TEMPLATE_RE = re.compile(r"^\{\{\s*(\w+)\s*\}\}$")  # matches strings that are exactly one token
-_ANY_TEMPLATE_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")  # matches tokens anywhere in a string
+_TEMPLATE_RE = re.compile(r"^\{\{\s*([\w.]+)\s*\}\}$")  # matches strings that are exactly one token
+_ANY_TEMPLATE_RE = re.compile(r"\{\{\s*([\w.]+)\s*\}\}")  # matches tokens anywhere in a string
+# Matches {{ key == 'value' }} conditions used in switch/case branches
+_SWITCH_CASE_RE = re.compile(
+    r"^\{\{\s*(\w+)\s*==\s*'([^']*)'\s*\}\}$"
+)
 
 
 @dataclass
@@ -39,6 +43,23 @@ class SkillExecutionResult:
 
 class SkillExecutor:
     """Executes a ``CapabilitySkill`` by stepping through its manifest steps sequentially."""
+
+    @staticmethod
+    def _resolve_dotted_key(key: str, inputs: dict[str, Any]) -> Any | None:
+        """Resolve a possibly-dotted key against *inputs*.
+
+        ``"params.query"`` traverses ``inputs["params"]["query"]``.
+        A simple key like ``"action"`` returns ``inputs["action"]``.
+        Returns ``None`` if any part of the path is missing.
+        """
+        parts = key.split(".")
+        val: Any = inputs
+        for part in parts:
+            if isinstance(val, dict) and part in val:
+                val = val[part]
+            else:
+                return None
+        return val
 
     @staticmethod
     def _execute_python_block(code: str, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -128,8 +149,9 @@ class SkillExecutor:
                 m = _TEMPLATE_RE.match(value)
                 if m:
                     key = m.group(1)
-                    if key in resolved_inputs:
-                        return _cast(key, resolved_inputs[key])
+                    resolved = SkillExecutor._resolve_dotted_key(key, resolved_inputs)
+                    if resolved is not None:
+                        return _cast(key, resolved)
                     # Fallback: {{step-N}} → stringified accumulated inputs
                     if _STEP_REF_RE.match(key):
                         return json.dumps(resolved_inputs, default=str)
@@ -140,8 +162,9 @@ class SkillExecutor:
                 # Embedded tokens: "prefix {{key}} suffix" → stringify
                 def _replace(m: re.Match[str]) -> str:
                     key = m.group(1)
-                    if key in resolved_inputs:
-                        return str(resolved_inputs[key])
+                    resolved = SkillExecutor._resolve_dotted_key(key, resolved_inputs)
+                    if resolved is not None:
+                        return str(resolved)
                     # Fallback: {{step-N}} → stringified accumulated inputs
                     if _STEP_REF_RE.match(key):
                         return json.dumps(resolved_inputs, default=str)
@@ -160,15 +183,26 @@ class SkillExecutor:
 
     @staticmethod
     def _interpolate_value(
-        value: str,
+        value: str | dict[str, Any],
         inputs: dict[str, Any],
         step_results: list[PrimitiveResult],
-    ) -> str:
+    ) -> str | dict[str, Any]:
         """Resolve ``{{key}}`` tokens in *value* against *inputs* and prior results.
+
+        If *value* is a dict, returns a new dict with each string field interpolated.
+        Non‑string fields are returned as‑is.
 
         ``{{N}}`` references resolve to the data of ``step_results[N]``.
         Named references like ``{{result.value}}`` resolve from the last result.
         """
+        if isinstance(value, dict):
+            return {
+                k: SkillExecutor._interpolate_value(v, inputs, step_results)
+                for k, v in value.items()
+            }
+        if not isinstance(value, str):
+            return value
+
         _STEP_REF_RE = re.compile(r"^\d+$")
 
         def _resolve_token(m: re.Match[str]) -> str:
@@ -188,9 +222,10 @@ class SkillExecutor:
                         return str(last.data.get("value", last.data))
                     field = parts[1]
                     return str(last.data.get(field, ""))
-            # {{key}} → inputs
-            if key in inputs:
-                return str(inputs[key])
+            # {{key}} or {{key.subkey}} → inputs / inputs[key][subkey]
+            resolved = SkillExecutor._resolve_dotted_key(key, inputs)
+            if resolved is not None:
+                return str(resolved)
             # {{step-N}} → stringified accumulated inputs
             if key.startswith("step-"):
                 return json.dumps(inputs, default=str)
@@ -199,6 +234,87 @@ class SkillExecutor:
             )
 
         return _ANY_TEMPLATE_RE.sub(_resolve_token, value)
+
+    @staticmethod
+    def _evaluate_switch_case(
+        condition: str,
+        inputs: dict[str, Any],
+        step_results: list[PrimitiveResult],
+    ) -> bool:
+        """Evaluate a single ``case`` condition string against *inputs*."""
+        m = _SWITCH_CASE_RE.match(condition)
+        if m:
+            key, expected = m.group(1), m.group(2)
+            resolved = SkillExecutor._interpolate_value(
+                f"{{{{ {key} }}}}", inputs, step_results,
+            )
+            return resolved == expected
+        # If the condition is a bare key name, treat as truthiness check.
+        if condition in inputs:
+            resolved = SkillExecutor._interpolate_value(
+                f"{{{{ {condition} }}}}", inputs, step_results,
+            )
+            return bool(resolved)
+        return False
+
+    def _execute_switch_step(
+        self,
+        step: dict,
+        inputs: dict[str, Any],
+        step_results: list[PrimitiveResult],
+        skill: "CapabilitySkill",
+        context: dict[str, Any] | None = None,
+    ) -> PrimitiveResult:
+        """Evaluate a ``switch`` step — find a matching case and run its sub-steps."""
+        branches: list[dict] = step["switch"]
+        matched_steps: list[dict] | None = None
+
+        for branch in branches:
+            if "default" in branch:
+                continue
+            condition = branch.get("case", "")
+            if self._evaluate_switch_case(condition, inputs, step_results):
+                matched_steps = branch.get("steps", [])
+                break
+
+        if matched_steps is None:
+            for branch in branches:
+                if "default" in branch:
+                    # YAML: default: is null; steps are at the same level.
+                    matched_steps = branch.get("steps", [])
+                    break
+
+        if not matched_steps:
+            return PrimitiveResult(status="success", data={"value": None})
+
+        for sub in matched_steps:
+            if "return" in sub:
+                val = SkillExecutor._interpolate_value(
+                    sub["return"], inputs, step_results,
+                )
+                return PrimitiveResult(status="success", data={"value": val})
+            if "call" in sub:
+                call = sub["call"]
+                args = sub.get("args") or sub.get("with", {})
+                primitive = skill.primitives.get(call)
+                if primitive is None:
+                    return PrimitiveResult(
+                        status="error", error=f"Primitive '{call}' not found",
+                    )
+                from copy import deepcopy
+                resolved = SkillExecutor._interpolate_args(
+                    deepcopy(args), inputs, None, skill.input_schema,
+                )
+                result = primitive.execute(resolved, context=context or inputs)
+                step_results.append(result)
+                if result.status == "error":
+                    return result
+                # Store ``as`` alias so subsequent steps can interpolate
+                alias = sub.get("as")
+                if alias and result.data is not None:
+                    inputs[alias] = result.data.get("value", result.data) if isinstance(result.data, dict) else result.data
+
+        return PrimitiveResult(status="success", data={"value": None})
 
     def execute(
         self,
@@ -266,6 +382,16 @@ class SkillExecutor:
                     )
                 continue
 
+            # ── switch step ── (conditional branch)
+            if "switch" in step:
+                result = self._execute_switch_step(step, inputs, step_results, skill, context)
+                step_results.append(result)
+                if result.status == "error":
+                    return SkillExecutionResult(
+                        status="error", results=step_results, error=result.error,
+                    )
+                continue
+
             if not has_call:
                 raise ValueError("Invalid step: must contain 'call' or 'python'")
 
@@ -279,6 +405,11 @@ class SkillExecutor:
 
             result = primitive.execute(self._interpolate_args(args, inputs, defaults, skill.input_schema), context)
             step_results.append(result)
+
+            # Store ``as`` alias so subsequent steps can interpolate
+            alias = step.get("as")
+            if alias and result.data is not None:
+                inputs[alias] = result.data.get("value", result.data) if isinstance(result.data, dict) else result.data
 
             if result.status == "error":
                 if on_error == "continue":

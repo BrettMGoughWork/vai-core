@@ -83,7 +83,11 @@ class SkillManifest:
 
             # ── return step ── (terminal step: return a value or template)
             if "return" in step:
-                # A return step is valid as-is; nothing else to validate.
+                continue
+
+            # ── switch step ── (conditional branch based on input values)
+            if "switch" in step:
+                _validate_switch_step(step, i, primitive_set)
                 continue
 
             # ── call step ── (invoke a primitive)
@@ -142,12 +146,7 @@ class SkillManifest:
 
 
 def _compute_manifest_hash(manifest: SkillManifest) -> str:
-    """Compute a stable SHA-256 hash of the skill's canonical definition.
-
-    Only the skill-intrinsic fields are hashed — plugin_name and
-    plugin_version are excluded so the hash is stable regardless of
-    which plugin provides the skill.
-    """
+    """Compute a stable SHA-256 hash of the skill's canonical definition."""
     canonical: dict[str, Any] = {
         "name": manifest.name,
         "description": manifest.description,
@@ -156,3 +155,56 @@ def _compute_manifest_hash(manifest: SkillManifest) -> str:
     }
     json_bytes = json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(json_bytes).hexdigest()
+
+
+def _validate_switch_step(step: dict, idx: int, primitive_set: set[str]) -> None:
+    """Validate a ``switch`` step structure."""
+    branches = step["switch"]
+    if not isinstance(branches, list):
+        raise ValueError(
+            f"SkillManifest.steps[{idx}].switch must be a list, "
+            f"got {type(branches).__name__}"
+        )
+    seen_default = False
+    for j, branch in enumerate(branches):
+        if not isinstance(branch, dict):
+            raise ValueError(
+                f"SkillManifest.steps[{idx}].switch[{j}] must be a dict, "
+                f"got {type(branch).__name__}"
+            )
+        if "default" in branch:
+            if seen_default:
+                raise ValueError(
+                    f"SkillManifest.steps[{idx}].switch has multiple default branches"
+                )
+            seen_default = True
+            # YAML: default: is a key with null value; steps are at the same level.
+            inner = branch.get("steps", [])
+        elif "case" in branch:
+            inner = branch.get("steps", [])
+        else:
+            raise ValueError(
+                f"SkillManifest.steps[{idx}].switch[{j}] must have 'case' or 'default'"
+            )
+        if not isinstance(inner, list):
+            raise ValueError(
+                f"SkillManifest.steps[{idx}].switch[{j}] steps must be a list"
+            )
+        for k, sub in enumerate(inner):
+            if not isinstance(sub, dict):
+                raise ValueError(
+                    f"SkillManifest.steps[{idx}].switch[{j}].steps[{k}] "
+                    f"must be a dict"
+                )
+            if "call" in sub:
+                call = sub.get("call")
+                if not isinstance(call, str):
+                    raise ValueError(
+                        f"SkillManifest.steps[{idx}].switch[{j}].steps[{k}].call "
+                        f"must be a str, got {type(call).__name__}"
+                    )
+                if call not in primitive_set:
+                    raise ValueError(
+                        f"SkillManifest.steps[{idx}].switch[{j}].steps[{k}].call="
+                        f"'{call}' is not listed in SkillManifest.primitives"
+                    )
