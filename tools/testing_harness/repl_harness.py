@@ -45,7 +45,6 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 from src.capabilities.primitives.stdlib import load_all_primitives
-from src.capabilities.skills.stdlib import load_all_skills
 
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.strategy.memory.subgoal_memory import SubgoalMemory
@@ -61,7 +60,6 @@ from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
 from src.strategy.planning.agent_planner import AgentPlanner
 from src.strategy.planning.models.plan import Plan
 from src.capabilities.contracts import SkillCallRequest, DiscoveryQuery
-from src.capabilities.runtime.skill_runner import SkillRunner
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -696,45 +694,12 @@ def main() -> None:
         model = os.environ.get("LLM_MODEL", "deepseek-chat")
         llm = factory.create(provider, model)
 
-    # ── Wire up skill execution (PrimitiveRegistry → SkillRegistry → SkillRunner) ──
-    runner: SkillRunner | None = None
+    # ── Wire up primitive registry ──
     if not args.no_execute:
         from src.capabilities.registry.primitive_registry import PrimitiveRegistry
-        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
-        from src.capabilities.discovery.embedder import SkillEmbedder
-        from src.capabilities.discovery.providers.local_provider import LocalEmbeddingProvider
-        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
-
-        # Use real embeddings for real LLM, mock for mock
-        if args.mock:
-            provider = MockEmbeddingProvider(dimensions=8)
-        else:
-            provider = LocalEmbeddingProvider(model="all-MiniLM-L6-v2", dimensions=384)
-        embedder = SkillEmbedder(provider=provider)
 
         prim_registry = PrimitiveRegistry()
         load_all_primitives(prim_registry)
-
-        skill_registry = CapabilitySkillRegistry(embedder=embedder)
-        load_all_skills(skill_registry, prim_registry, embedder)
-
-        # ── Wire up SkillAuthor pipeline (3.17.5 capability discovery) ──
-        from src.capabilities.registry.skill_safety import SkillSafetyValidator
-        from src.capabilities.skills.author import SkillAuthor
-        from src.capabilities.primitives.stdlib.skill_author import set_author_pipeline
-
-        safety_validator = SkillSafetyValidator(
-            primitive_registry=prim_registry,
-            skill_registry=skill_registry,
-        )
-        author = SkillAuthor(
-            primitive_registry=prim_registry,
-            skill_registry=skill_registry,
-            safety_validator=safety_validator,
-        )
-        set_author_pipeline(author)
-
-        runner = SkillRunner(registry=skill_registry, embedder=embedder)
 
     def _llm_complete(sys_prompt: str, user_msg: str) -> str:
         raw = llm.chat(model=model, messages=[
@@ -748,7 +713,7 @@ def main() -> None:
     repair = PlanRepair()
     ctx = ConversationContext()
 
-    repl_loop(ctx, governance, planner, repair, pm, runner=runner, execute=not args.no_execute)
+    repl_loop(ctx, governance, planner, repair, pm, runner=None, execute=False)
 
     print(f"\nDone.  {len(ctx.turns)} turn(s) processed.")
 

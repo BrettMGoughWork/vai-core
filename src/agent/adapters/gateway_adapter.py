@@ -132,8 +132,8 @@ class AgentGatewayAdapter:
             schema = meta.get("workflow_interaction_schema")
             if schema:
                 result["input_schema"] = schema
-        # Surface confirmation prompt for skill HITL gate
-        elif meta.get("waiting_for") == "skill_confirmation":
+        # Surface confirmation prompt for primitive HITL gate
+        elif meta.get("waiting_for") == "tool_confirmation":
             resp = self._supervisor.get_response(state)
             if resp is not None and resp.reply is not None:
                 result["prompt"] = resp.reply
@@ -203,8 +203,8 @@ class AgentGatewayAdapter:
                 schema = meta.get("workflow_interaction_schema")
                 if schema:
                     result["input_schema"] = schema
-            # Surface confirmation prompt for skill HITL gate
-            elif meta.get("waiting_for") == "skill_confirmation":
+            # Surface confirmation prompt for primitive HITL gate
+            elif meta.get("waiting_for") == "tool_confirmation":
                 resp = self._supervisor.get_response(state)
                 if resp is not None and resp.reply is not None:
                     result["prompt"] = resp.reply

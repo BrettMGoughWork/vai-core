@@ -131,20 +131,6 @@ def _tool_matches_workflows(tool: dict, agent_workflows: list[str]) -> bool:
     return wf_id in agent_workflows or name in agent_workflows
 
 
-def _tool_matches_skills(tool: dict, agent_skills: list[str]) -> bool:
-    """Check if a tool definition matches one of the agent's allowed skills.
-
-    Supports the ``skill.execute.<name>`` naming convention used by
-    ``SkillToolAdapter``, as well as bare skill names.
-    """
-    name = tool.get("function", {}).get("name", "") or tool.get("name", "")
-    skill_name = name
-    for prefix in ("skill.execute.", "skill."):
-        if skill_name.startswith(prefix):
-            skill_name = skill_name[len(prefix):]
-            break
-    return skill_name in agent_skills or name in agent_skills
-
 
 def call_s1_backend(
     request: PromptRequest, backend: str = "simulation"
@@ -203,7 +189,6 @@ def call_s1_backend(
         agent_name = agent_metadata.get("name", agent_id)
         description = agent_metadata.get("description", "")
         persona = agent_metadata.get("persona", "")
-        agent_skills = agent_metadata.get("skills", [])
         agent_workflows = agent_metadata.get("workflows", [])
 
         # Allow workflow YAMLs to override the system prompt
@@ -218,13 +203,8 @@ def call_s1_backend(
                 "Respond conversationally. Be concise, helpful, and accurate."
             )
 
-        # Inject agent capabilities — available skills and workflows
+        # Inject agent capabilities — available workflows
         cap_lines = []
-        if agent_skills:
-            if "*" in agent_skills:
-                cap_lines.append("\nYou have access to all available skills.")
-            else:
-                cap_lines.append("\nYour available skills:\n" + "\n".join(f"  - {s}" for s in agent_skills))
         if agent_workflows:
             if "*" in agent_workflows:
                 # Derive actual workflow names from tool_context for display
@@ -251,8 +231,7 @@ def call_s1_backend(
         # ── Workflow tools ───────────────────────────────────────────
         wf_tool_context = [
             t for t in all_tool_context
-            if not t.get("name", "").startswith("skill.")
-            and (not agent_workflows or _tool_matches_workflows(t, agent_workflows))
+            if not agent_workflows or _tool_matches_workflows(t, agent_workflows)
         ]
         if wf_tool_context:
             tool_lines = []
@@ -283,44 +262,6 @@ def call_s1_backend(
                     "To invoke a workflow, include a line in your response exactly in the format:\n"
                     '/invoke-workflow <workflow_id> key1="value1" key2="value2"\n'
                     "You may invoke one or more workflows \u2014 one per line."
-                )
-                system_prompt += "".join(tool_lines)
-
-        # ── Skill tools ──────────────────────────────────────────────
-        skill_tool_context = [
-            t for t in all_tool_context
-            if t.get("name", "").startswith("skill.")
-            and (not agent_skills or "*" in agent_skills
-                 or _tool_matches_skills(t, agent_skills))
-        ]
-        if skill_tool_context:
-            tool_lines = []
-            for tool in skill_tool_context:
-                func = tool.get("function")
-                if func is not None:
-                    name = func.get("name", "unknown")
-                    desc = func.get("description", "")
-                    params = func.get("parameters", {})
-                else:
-                    name = tool.get("name", "unknown")
-                    desc = tool.get("description", "")
-                    params = tool.get("input_schema", tool.get("parameters", {}))
-                props = params.get("properties", {})
-                param_strs = []
-                for pname, pinfo in props.items():
-                    req = "required" if pname in params.get("required", []) else "optional"
-                    param_strs.append(f"    - {pname} ({req}): {pinfo.get('description', '')}")
-                tool_lines.append(f"\n  **{name}**: {desc}")
-                if param_strs:
-                    tool_lines.append("    Parameters:")
-                    tool_lines.extend(param_strs)
-            if tool_lines:
-                system_prompt += (
-                    "\n\nYou have access to the following skills which you can invoke "
-                    "when a user's request matches their purpose.\n"
-                    "To invoke a skill, include a line in your response exactly in the format:\n"
-                    '/invoke-skill <skill_name> action="..." key1="value1"\n'
-                    "You may invoke one or more skills \u2014 one per line."
                 )
                 system_prompt += "".join(tool_lines)
 
