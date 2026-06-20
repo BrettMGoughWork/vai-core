@@ -61,6 +61,38 @@ from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.agent.workflow.user_interaction import UserInteractionManager
 from src.agent.strategy_router import RouterOutcome, StrategyRouter
 
+# ── Hallucination guard patterns ──────────────────────────────────────────
+_ACTION_CLAIM_RE = re.compile(
+    r"(?i)"
+    r"(?:"
+    # "I've sent", "I've replied", "I've deleted" etc.
+    r"\bI'?ve\s+(?:sent|replied|deleted|forwarded|drafted|created|"
+    r"cancelled|canceled|archived|moved|marked)"
+    r"|"
+    # "I sent your", "I replied to", etc.
+    r"\bI\s+(?:sent|replied|deleted|forwarded|drafted|created)\s+"
+    r"(?:your|the|this)"
+    r"|"
+    # "has been sent", "have been deleted", etc.
+    r"\b(?:has been|have been)\s+(?:sent|deleted|forwarded|replied|"
+    r"created|cancelled|canceled|archived)"
+    r"|"
+    # "sent your reply", "deleted the email", etc. — bare past-tense claim
+    r"(?:sent|replied|deleted|forwarded|drafted)\s+(?:your|the|this)\s+"
+    r"(?:reply|email|message|draft)"
+    r")",
+)
+
+# ── Confirm-then-execute gate (Sprint 8.5) ───────────────────────────────
+_SIDE_EFFECT_ACTIONS: set[str] = {
+    "send", "delete", "archive", "move", "mark", "update",
+    "create", "forward", "draft", "trash", "spam",
+}
+
+_CONFIRMATION_RE = re.compile(
+    r"(?i)^\s*(?:yes|yep|yeah|sure|confirm|send it|go ahead|proceed|do it|ok(?:ay)?)\s*$"
+)
+
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
@@ -112,6 +144,7 @@ class Supervisor:
         inline_tool_executor: Optional[Callable[[dict[str, Any]], dict[str, Any] | None]] = None,
         workflow_tool_adapter: Optional[Any] = None,
         skill_tool_adapter: Optional[Any] = None,
+        primitive_tool_adapter: Optional[Any] = None,
         inline_skill_executor: Optional[Callable[[str, dict[str, Any]], dict[str, Any]]] = None,
     ) -> None:
         self._registry = registry
@@ -129,7 +162,9 @@ class Supervisor:
         )
         self._workflow_tool_adapter = workflow_tool_adapter
         self._skill_tool_adapter = skill_tool_adapter
+        self._primitive_tool_adapter = primitive_tool_adapter
         self._inline_skill_executor = inline_skill_executor
+        self._pinned_skill_outputs: dict[str, dict[str, Any]] = {}
 
     # ── 1. create_agent ────────────────────────────────────────────────
 
@@ -323,16 +358,27 @@ class Supervisor:
         meta["total_routes"] = meta.get("total_routes", 0) + 1
 
         if route.destination == DEST_RUNTIME:
+            # ── Resume path: user responding to a skill confirmation prompt ─
+            pending = meta.pop("pending_skill_directives", None)
+            if pending is not None:
+                meta.pop("waiting_for", None)
+                return self._run_confirmed_skills(
+                    state, pending, input_text, route, meta,
+                )
+
             # LLM conversation path — route via StrategyRouter
             agent_meta = ctx.context.agent_metadata
 
-            # Build tool_context from workflow + skill tool adapters (sprint 9a)
+            # Build tool_context from workflow + skill + primitive tool adapters
             tool_context: list[dict] = []
             if self._workflow_tool_adapter is not None:
                 tool_context = self._workflow_tool_adapter.list_tools()
             if self._skill_tool_adapter is not None:
                 skill_tools = self._skill_tool_adapter.list_tools()
                 tool_context.extend(skill_tools)
+            if self._primitive_tool_adapter is not None:
+                primitive_tools = self._primitive_tool_adapter.list_tools()
+                tool_context.extend(primitive_tools)
 
             outcome = RouterOutcome(
                 type="llm_call",
@@ -375,17 +421,109 @@ class Supervisor:
                     metadata["runtime_error"] = result["runtime_error"]
                     _reason = "Agent produced conversational response via mock fallback"
 
+                # Sprint 8.5: Hallucination guard — detect claimed side-effects without directives
+                reply = self._apply_hallucination_guard(reply)
+
+                # Sprint 8.5: Confirm-then-execute gate — pause before
+                # side-effect skill actions, unless user already affirmed
+                if self._has_side_effect_directives(reply):
+                    if self._AFFIRMATIVE_RE.fullmatch(
+                        input_text.strip(),
+                    ):
+                        # User already affirmed — auto-execute
+                        reply = self._handle_invoke_workflow(reply)
+                        reply = self._handle_invoke_skill(reply)
+                    else:
+                        confirmation_msg = (
+                            self._build_confirmation_message(reply)
+                        )
+                        meta["pending_skill_directives"] = {
+                            "original_reply": reply,
+                        }
+                        meta["waiting_for"] = "skill_confirmation"
+                        reply = reply + f"\n\n{confirmation_msg}"
+                        return self._persist(state.with_(
+                            lifecycle_state=LifecycleState.WAITING,
+                            route_result=route,
+                            final_response=AgentResponse(
+                                reply=reply, metadata=metadata,
+                            ),
+                            supervisor_metadata=meta,
+                            _reason=(
+                                "Awaiting user confirmation for"
+                                " side-effect skill action"
+                            ),
+                        ))
+
                 # Sprint 9a: process /invoke-workflow and /invoke-skill directives
                 reply = self._handle_invoke_workflow(reply)
                 reply = self._handle_invoke_skill(reply)
 
+                # Sprint 8.5: HITL gate for native primitive.* tool_calls
+                tool_calls = result.get("tool_calls", [])
+                side_effect_calls = self._has_side_effect_tool_calls(tool_calls)
+                if side_effect_calls:
+                    if self._AFFIRMATIVE_RE.fullmatch(input_text.strip()):
+                        # User already affirmed — execute below in the tool_calls loop
+                        pass
+                    else:
+                        actions = sorted(set(
+                            self._describe_side_effect(c)
+                            for c in side_effect_calls
+                        ))
+                        meta["pending_skill_directives"] = {
+                            "original_reply": reply,
+                            "tool_calls": tool_calls,
+                            "side_effect_indices": [
+                                tool_calls.index(c) for c in side_effect_calls
+                            ],
+                        }
+                        meta["waiting_for"] = "skill_confirmation"
+                        confirmation_msg = (
+                            "\n\n---\n"
+                            "⚡ **Confirmation required** – The assistant is about to"
+                            f" perform: **{', '.join(actions)}**.\n\n"
+                            "Reply **yes** to proceed, or **no** / revise your"
+                            " request to cancel."
+                        )
+                        reply = reply + confirmation_msg
+                        return self._persist(state.with_(
+                            lifecycle_state=LifecycleState.WAITING,
+                            route_result=route,
+                            final_response=AgentResponse(
+                                reply=reply, metadata=metadata,
+                            ),
+                            supervisor_metadata=meta,
+                            _reason=(
+                                "Awaiting user confirmation for"
+                                " side-effect primitive tool_calls"
+                            ),
+                        ))
+
                 # Sprint 8.x: LLM synthesis of skill results into conversational response
                 if self._inline_skill_executor is not None and "\n\n---\n**Skill" in reply:
+                    # Sprint 8.5: Strip LLM-hallucinated text — only feed actual skill
+                    # results to the synthesis LLM so it doesn't echo fake "Done!" claims.
+                    skill_results_only = reply
+                    marker = "\n\n---\n**Skill"
+                    idx = reply.find(marker)
+                    if idx != -1:
+                        skill_results_only = reply[idx:].strip()
+                    # Inject pinned skill outputs so the LLM uses real values
+                    pinned_block = ""
+                    if self._pinned_skill_outputs:
+                        pinned_block = (
+                            "\n\n**Pinned skill outputs — use these EXACT values "
+                            "(do NOT guess, fabricate, or modify them):**\n"
+                            f"{json.dumps(self._pinned_skill_outputs, indent=2, default=str)}"
+                        )
                     summary_prompt = {
                         "message": (
                             f"The following skill result was returned. "
                             f"As {agent_meta.identity.name}, synthesize this into a natural "
-                            f"conversational response for the user.\n\n{reply}"
+                            f"conversational response for the user."
+                            f"{pinned_block}"
+                            f"\n\n{skill_results_only}"
                         ),
                         "agent_id": agent_meta.identity.agent_id,
                         "agent_metadata": {
@@ -422,7 +560,6 @@ class Supervisor:
                             args = tc.get("arguments", tc.get("args", {}))
                             if isinstance(args, str):
                                 try:
-                                    import json
                                     args = json.loads(args)
                                 except json.JSONDecodeError:
                                     args = {}
@@ -506,6 +643,32 @@ class Supervisor:
                                     reply += f"\n\n[Workflow {wf_id!r} exceeded iteration limit]"
                             except ValueError as exc:
                                 reply += f"\n\n[Workflow {wf_id!r} not found: {exc}]"
+                        elif func_name.startswith("primitive."):
+                            prim_name = func_name[len("primitive."):]
+                            args = tc.get("arguments", tc.get("args", {}))
+                            if isinstance(args, str):
+                                    try:
+                                        args = json.loads(args)
+                                    except json.JSONDecodeError:
+                                        args = {}
+                            if self._inline_tool_executor is not None:
+                                    try:
+                                        prim_result = self._inline_tool_executor({
+                                            "skill_name": prim_name,
+                                            "arguments": args,
+                                        })
+                                    except Exception as exc:
+                                        prim_result = None
+                                        reply += f"\n\n[Primitive {prim_name!r} failed: {exc}]"
+                                    if prim_result is not None:
+                                        result_str = str(prim_result.get("data", prim_result.get("result", prim_result)))
+                                        if len(result_str) > 500:
+                                            result_str = result_str[:500] + "..."
+                                        reply += f"\n\n[Primitive {prim_name!r} → {result_str}]"
+                                    else:
+                                        reply += f"\n\n[Primitive {prim_name!r} returned no result]"
+                            else:
+                                    reply += f"\n\n[Primitive {prim_name!r} cannot execute (no inline executor)]"
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"
                 metadata["runtime_error"] = result["error"]
@@ -966,13 +1129,16 @@ class Supervisor:
                             "persona": selected_agent_meta.persona,
                         })
 
-                # Build tool_context from workflow + skill tool adapters (sprint 9a)
+                # Build tool_context from workflow + skill + primitive tool adapters
                 tool_context: list[dict] = []
                 if self._workflow_tool_adapter is not None:
                     tool_context = self._workflow_tool_adapter.list_tools()
                 if self._skill_tool_adapter is not None:
                     skill_tools = self._skill_tool_adapter.list_tools()
                     tool_context.extend(skill_tools)
+                if self._primitive_tool_adapter is not None:
+                    primitive_tools = self._primitive_tool_adapter.list_tools()
+                    tool_context.extend(primitive_tools)
 
                 router_outcome = RouterOutcome(
                     type="llm_call",
@@ -1320,17 +1486,251 @@ class Supervisor:
 
         return "".join(parts)
 
+    @staticmethod
+    def _apply_hallucination_guard(reply: str) -> str:
+        """Detect and block LLM claims of side-effects without directives.
+
+        If the LLM claims an action was performed (sent, deleted, drafted, etc.)
+        but the reply contains no ``/invoke-skill`` or ``/invoke-workflow``
+        directive, the claim is a hallucination — replace the reply with a
+        safety message.
+
+        Returns the original *reply* when safe, or a guard message when a
+        hallucination is detected.
+        """
+        if "/invoke-skill" in reply or "/invoke-workflow" in reply:
+            return reply  # directives present — legitimate execution path
+
+        if _ACTION_CLAIM_RE.search(reply):
+            # Strip the hallucinated claim and inject a transparent warning
+            return (
+                "⚠️ **Safety guard triggered:** The assistant appeared to claim "
+                "that an action was performed (e.g., sending, deleting, or "
+                "forwarding) without issuing the required `/invoke-skill` "
+                "directive.\n\n"
+                "**The action was NOT executed.**\n\n"
+                "Please rephrase your request — the system needs a clear "
+                "`/invoke-skill` instruction to perform actions."
+            )
+
+        return reply
+
+    # ------------------------------------------------------------------
+    # Sprint 8.5: HITL confirmation resume for side-effect skill actions
+    # ------------------------------------------------------------------
+
+    _AFFIRMATIVE_RE: "re.Pattern[str]" = re.compile(
+        r"^(?:\s*(?:yes|yeah|yep|sure|go ahead|proceed|confirm|do it"
+        r"|send it|execute)\s*[,!.?]*)*\s*$",
+        re.IGNORECASE,
+    )
+
+    def _run_confirmed_skills(
+        self,
+        state: AgentState,
+        pending: dict[str, Any],
+        input_text: str,
+        route: RouteResult,
+        meta: dict[str, Any],
+    ) -> AgentState:
+        """Execute or cancel pending skill directives based on user input.
+
+        Called when the supervisor resumes from a WAITING state that
+        was entered for skill confirmation.
+
+        * If the user affirms (yes/yeah/sure/etc.): run the pending
+          directives and return the result as a conversational answer.
+        * Otherwise: discard the pending directives and return a
+          cancellation message.
+
+        Supports both ``/invoke-skill`` text DSL and native ``tool_calls``
+        (``primitive.*``) pending directives.
+        """
+        if self._AFFIRMATIVE_RE.fullmatch(input_text.strip()):
+            tool_calls = pending.get("tool_calls")
+            if tool_calls:
+                # Native tool_calls resume path
+                reply = pending.get("original_reply", "")
+                for tc in tool_calls:
+                    if isinstance(tc, dict):
+                        func_name = (
+                            (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "")
+                            or tc.get("name", "")
+                        )
+                        if func_name.startswith("primitive."):
+                            prim_name = func_name[len("primitive."):]
+                            args = tc.get("arguments", tc.get("args", {}))
+                            if isinstance(args, str):
+                                try:
+                                    args = json.loads(args)
+                                except json.JSONDecodeError:
+                                    args = {}
+                            if self._inline_tool_executor is not None:
+                                try:
+                                    prim_result = self._inline_tool_executor({
+                                        "skill_name": prim_name,
+                                        "arguments": args,
+                                    })
+                                except Exception as exc:
+                                    reply += f"\n\n[Primitive {prim_name!r} failed: {exc}]"
+                                    continue
+                                if prim_result is not None:
+                                    result_str = str(prim_result.get("data", prim_result.get("result", prim_result)))
+                                    if len(result_str) > 500:
+                                        result_str = result_str[:500] + "..."
+                                    reply += f"\n\n[Primitive {prim_name!r} → {result_str}]"
+                                else:
+                                    reply += f"\n\n[Primitive {prim_name!r} returned no result]"
+                            else:
+                                reply += f"\n\n[Primitive {prim_name!r} cannot execute (no inline executor)]"
+            else:
+                # Legacy /invoke-skill text DSL resume path
+                original_reply: str = pending.get("original_reply", "")
+                reply = self._handle_invoke_workflow(original_reply)
+                reply = self._handle_invoke_skill(reply)
+            metadata: dict[str, Any] = {
+                "correlation_id": state.correlation_id,
+                "trace_id": state.trace_id,
+                "agent_id": state.agent_id,
+                "confidence": route.confidence,
+                "route_destination": route.destination,
+            }
+            return self._persist(state.with_(
+                lifecycle_state=LifecycleState.ACTIVATED,
+                route_result=route,
+                final_response=AgentResponse(
+                    reply=reply, metadata=metadata,
+                ),
+                supervisor_metadata=meta,
+                _reason="User confirmed — executing pending skill directives",
+            ))
+        # User declined or gave unexpected input → cancel
+        metadata = {
+            "correlation_id": state.correlation_id,
+            "trace_id": state.trace_id,
+            "agent_id": state.agent_id,
+            "confidence": route.confidence,
+            "route_destination": route.destination,
+        }
+        return self._persist(state.with_(
+            lifecycle_state=LifecycleState.ACTIVATED,
+            route_result=route,
+            final_response=AgentResponse(
+                reply=(
+                    "The action was cancelled based on your response."
+                ),
+                metadata=metadata,
+            ),
+            supervisor_metadata=meta,
+            _reason="User declined — pending skill directives cancelled",
+        ))
+
+    # ------------------------------------------------------------------
+    # Sprint 8.5: Confirmation gate for side-effect skill directives
+    # ------------------------------------------------------------------
+    _SIDE_EFFECT_ACTIONS: "frozenset[str]" = frozenset({
+        "send", "delete", "forward", "draft", "create", "cancel",
+        "archive", "move", "mark", "trash", "untrash", "modify",
+        "update", "remove",
+    })
+
+    def _has_side_effect_directives(self, reply: str) -> bool:
+        """Return ``True`` if *reply* contains side-effect skill directives.
+
+        Scans for ``/invoke-skill`` lines and checks whether the action
+        parameter is in the ``_SIDE_EFFECT_ACTIONS`` set.
+        """
+        for raw_line in reply.splitlines():
+            line = raw_line.strip()
+            if not line.startswith("/invoke-skill"):
+                continue
+            # Extract action="..." parameter
+            m = re.search(r'\baction\s*=\s*"([^"]+)"', line)
+            if m and m.group(1).lower() in self._SIDE_EFFECT_ACTIONS:
+                return True
+        return False
+
+    def _build_confirmation_message(self, reply: str) -> str:
+        """Build a HITL confirmation prompt from the side-effect directives."""
+        side_effects: list[str] = []
+        for raw_line in reply.splitlines():
+            line = raw_line.strip()
+            if not line.startswith("/invoke-skill"):
+                continue
+            m = re.search(r'\baction\s*=\s*"([^"]+)"', line)
+            if m and m.group(1).lower() in self._SIDE_EFFECT_ACTIONS:
+                side_effects.append(m.group(1))
+        actions_str = ", ".join(sorted(set(side_effects)))
+        return (
+            "\n\n---\n"
+            f"⚡ **Confirmation required** – The assistant is about to perform"
+            f" the following action(s): **{actions_str}**.\n\n"
+            "Reply **yes** to proceed, or **no** / revise your request to"
+            " cancel."
+        )
+
+    # ── Native tool_calls HITL gate (Sprint 8.5) ───────────────────────
+
+    @staticmethod
+    def _has_side_effect_tool_calls(
+        tool_calls: list[dict],
+    ) -> list[dict]:
+        """Return side-effect ``primitive.*`` tool calls from *tool_calls*.
+
+        Uses a name-based heuristic: if the primitive name (last dot-segment)
+        starts with any action in ``_SIDE_EFFECT_ACTIONS``, it is
+        classified as a side-effect operation.
+
+        Returns the subset of calls that need confirmation.
+        """
+        side_effects = {
+            "send", "delete", "forward", "draft", "create",
+            "cancel", "archive", "move", "mark", "trash",
+            "untrash", "modify", "update", "remove",
+        }
+        result: list[dict] = []
+        for tc in tool_calls:
+            if not isinstance(tc, dict):
+                continue
+            func_name = (
+                (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "")
+                or tc.get("name", "")
+            )
+            if not func_name.startswith("primitive."):
+                continue
+            # Extract the last segment for action heuristics
+            last_segment = func_name.rsplit(".", 1)[-1].lower()
+            # Check if it starts with any side-effect word
+            for action in side_effects:
+                if last_segment.startswith(action):
+                    result.append(tc)
+                    break
+        return result
+
+    @staticmethod
+    def _describe_side_effect(tc: dict) -> str:
+        """Return a human-readable description of a side-effect tool call."""
+        func_name = (
+            (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "")
+            or tc.get("name", "")
+        )
+        # Strip the "primitive." prefix for readability
+        display = func_name
+        for prefix in ("primitive.", "mcp."):
+            if display.startswith(prefix):
+                display = display[len(prefix):]
+                break
+        return display
+
     def _handle_invoke_skill(self, reply: str) -> str:
         """Parse and execute ``/invoke-skill`` directives in an LLM reply.
 
-        Scans *reply* for lines matching::
+        DEPRECATED: The ``/invoke-skill`` text DSL is being replaced by native
+        LLM ``tool_calls`` routed through ``primitive.<name>`` handlers. Skills
+        are being removed from the system entirely — see the migration to
+        Primitives + Workflows + Patterns.
 
-            /invoke-skill <skill_name> action="..." params.query="..."
-
-        Each matching line executes the skill via ``_inline_skill_executor``.
-        Results are appended to *reply*.
-
-        Returns *reply* unmodified if no ``/invoke-skill`` directives are found.
+        Kept for backward compatibility. Will be removed in the clean sweep.
         """
         if self._inline_skill_executor is None:
             return reply
@@ -1363,8 +1763,14 @@ class Supervisor:
                 )
                 continue
 
-            summary = result.get("message", "Skill executed.")
+            # Sprint 8.5: Pin structured outputs for synthesis / next-turn accuracy
             outputs = result.get("outputs")
+            if outputs not in (None, {}, []):
+                self._pinned_skill_outputs[skill_name] = (
+                    outputs if isinstance(outputs, dict) else {"result": outputs}
+                )
+
+            summary = result.get("message", "Skill executed.")
             if outputs not in (None, {}, []):
                 try:
                     summary += "\n\n" + json.dumps(outputs, indent=2, default=str)

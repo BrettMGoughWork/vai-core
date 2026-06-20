@@ -287,6 +287,12 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 11.6 | Wire real queue into S4 worker, replacing InMemoryJobStore |
 | 11.7 | Test: crash recovery — jobs requeued on restart |
 | 11.8 | Test: retry backoff — increasing delays between retries |
+| 11.9 | S4 fan-out — dispatch N independent steps as parallel sub-agents from a single workflow step |
+| 11.10 | S4 fan-in — collect results from parallel sub-agents, join on completion or first-failure |
+| 11.11 | Per-sub-agent model/agent override — each parallel branch can specify a different agent or LLM model |
+| 11.12 | Dependency graph support — express step dependencies (not just flat list) for partial parallelism |
+| 11.13 | Test: 3 parallel steps → all complete → join merges results correctly |
+| 11.14 | Test: one parallel step fails → fan-in handles partial failure (configurable: abort-all vs continue) |
 
 ### Sprint 12 — Real S3 Skill Registry
 
@@ -301,6 +307,20 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 12.5 | Skill documentation generation (LLM-readable tool descriptions) |
 | 12.6 | Test: register → discover → execute cycle |
 | 12.7 | I would like to test both a cli tool registered, and a basic MCP tool registered with both working, discoverable, and callable
+
+### Sprint 12a — SQL Structured Data Skill
+
+**Goal:** A built-in skill that lets agents store, query, and manage structured data using SQLite — enabling todo lists, state tracking, batch processing, and persistent session artifacts without external infrastructure.
+
+| Task | What |
+|------|------|
+| 12a.1 | Define `db-store` skill interface — `query(sql, params)` and `execute(sql, params)` actions with structured JSON input/output schemas |
+| 12a.2 | Implement SQLite store wrapper — handles connection lifecycle, parameterized queries, result-set serialization |
+| 12a.3 | Register `db-store` as a built-in capability skill (available to all agents by default) |
+| 12a.4 | Skill instructions — tell agents how to use SQL for tracking progress, storing intermediate results, managing state |
+| 12a.5 | Test: agent stores and retrieves structured data across multiple turns |
+| 12a.6 | Test: concurrent skill calls to different tables do not interfere |
+| 12a.7 | Test: skill returns clear error on invalid SQL (malformed query, missing table) |
 
 ### Sprint 13 — Hardening & Resilience
 
@@ -554,6 +574,7 @@ Learning Subsystem (async observer)
 | 4 | 7–9 | Operations + Human-in-the-Loop + Agent Selection |
 | 5 | 10 | Stratum Isolation Refactor |
 | 6 | 11–12 | Durable Execution + Real Skills |
+| 6a | 12a | SQL Structured Data Skill |
 | 7 | 13 | Resilience & Self-Healing |
 | 8 | 14 | Observability & DX |
 | 9 | 15 | Polish & Production Readiness |

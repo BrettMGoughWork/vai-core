@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 from src.capabilities.contracts import DiscoveredSkill
+from src.capabilities.primitives.mcp import MCPPrimitive
 from src.capabilities.primitives.mcp_client import MCPClientManager
 from src.capabilities.primitives.stdlib import load_all_primitives
 from src.capabilities.registry.plugin_loader import PluginLoader
@@ -48,6 +49,7 @@ from src.agent.workflow import (
     WorkflowRegistry,
 )
 from src.agent.workflow.loader import load_workflows_from_yaml
+from src.agent.workflow.primitive_tool_adapter import PrimitiveToolAdapter
 from src.agent.workflow.skill_tool_adapter import SkillToolAdapter
 from src.agent.workflow.workflow_tool_adapter import WorkflowToolAdapter
 
@@ -67,6 +69,34 @@ _primitives_loaded = load_all_primitives(_primitive_registry)
 
 # ── MCP client manager (manages MCP server subprocesses) ─────────────
 _mcp_client_manager = MCPClientManager("config/mcp_servers.yaml")
+
+# ── Auto-discover MCP tools and register as primitives ──────────────
+# Phase 8.5: MCP tools are auto-discovered via `tools/list` protocol,
+# bypassing the legacy YAML plugin ceremony. Each tool becomes an
+# MCPPrimitive registered as "mcp.<server>.<tool>" in the registry.
+_mcp_discovered = _mcp_client_manager.discover_tools()
+_mcp_primitive_count = 0
+for _server_name, _tools in _mcp_discovered.items():
+    for _tool_def in _tools:
+        _primitive_name = f"mcp.{_server_name}.{_tool_def['name']}"
+        try:
+            _primitive = MCPPrimitive(
+                name=_primitive_name,
+                description=_tool_def.get("description", ""),
+                server_name=_server_name,
+                tool_name=_tool_def["name"],
+                input_schema=_tool_def.get("input_schema", {"type": "object", "properties": {}}),
+            )
+            _primitive_registry.register(_primitive_name, _primitive)
+            _mcp_primitive_count += 1
+        except ValueError:
+            pass  # already registered (e.g. via plugin manifest) — skip
+if _mcp_primitive_count > 0:
+    import logging
+    logging.getLogger(__name__).info(
+        "Auto-discovered %d MCP tools from %d server(s)",
+        _mcp_primitive_count, len(_mcp_discovered),
+    )
 
 # ── Skill registry + plugin loader ──────────────────────────────────
 _skill_registry = CapabilitySkillRegistry()
@@ -315,6 +345,7 @@ _workflow_engine = WorkflowEngine(wf_registry)
 _interaction_manager = UserInteractionManager(_workflow_engine)
 _workflow_tool_adapter = WorkflowToolAdapter(wf_registry)
 _skill_tool_adapter = SkillToolAdapter(_skill_registry)
+_primitive_tool_adapter = PrimitiveToolAdapter(_primitive_registry)
 _supervisor = Supervisor(
     registry=_registry,
     store=state_store,
@@ -326,6 +357,7 @@ _supervisor = Supervisor(
     interaction_manager=_interaction_manager,
     workflow_tool_adapter=_workflow_tool_adapter,
     skill_tool_adapter=_skill_tool_adapter,
+    primitive_tool_adapter=_primitive_tool_adapter,
     inline_skill_executor=_execute_skill_inline,
 )
 

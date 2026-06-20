@@ -1,4 +1,13 @@
-"""MCP primitive loader — scans JSON/YAML server manifests and registers MCPPrimitive instances."""
+"""
+MCP primitive loader — scans JSON/YAML server manifests and registers MCPPrimitive instances.
+
+DEPRECATED: This module uses static YAML/JSON manifests to define MCP server tools.
+Auto-discovery via MCPClientManager.discover_tools() (tools/list protocol) now
+replaces this — MCP servers need only be listed in config/mcp_servers.yaml and
+their tools are discovered automatically at startup.
+
+Kept for backward compatibility during migration. Will be removed in the clean sweep.
+"""
 
 from __future__ import annotations
 

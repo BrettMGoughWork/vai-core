@@ -29,7 +29,7 @@ from typing import Any
 import yaml
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
-from mcp.types import CallToolResult
+from mcp.types import CallToolResult, ListToolsResult, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -380,6 +380,45 @@ class _MCPServerHandle:
 
         return _extract_content(result)
 
+    def list_tools(self) -> list[dict[str, Any]]:
+        """List available tools from the MCP server synchronously.
+
+        Returns a list of tool definitions::
+
+            [
+                {
+                    "name": "tool_name",
+                    "description": "...",
+                    "input_schema": {"type": "object", "properties": {...}},
+                },
+            ]
+        """
+        self._check_session()
+        assert self._session is not None
+        assert self._loop is not None
+
+        future = asyncio.run_coroutine_threadsafe(
+            self._session.list_tools(),
+            self._loop,
+        )
+
+        try:
+            result: ListToolsResult = future.result(timeout=_CALL_TIMEOUT)
+        except asyncio.TimeoutError:
+            raise ToolCallFailed(
+                f"list_tools on server {self._config.name!r} "
+                f"timed out after {_CALL_TIMEOUT}s"
+            ) from None
+
+        tools: list[dict[str, Any]] = []
+        for tool in result.tools:
+            tools.append({
+                "name": tool.name,
+                "description": tool.description or "",
+                "input_schema": tool.inputSchema or {"type": "object", "properties": {}},
+            })
+        return tools
+
     def stop(self) -> None:
         """Signal the background thread to shut down gracefully."""
         if self._shutdown_event and self._loop and not self._shutdown_event.is_set():
@@ -449,6 +488,25 @@ class MCPClientManager:
     def is_started(self, name: str) -> bool:
         """Return ``True`` if the server *name* has been started."""
         return name in self._handles
+
+    def discover_tools(self) -> dict[str, list[dict[str, Any]]]:
+        """Auto-discover all tools from all configured MCP servers.
+
+        Servers are started lazily (if not already connected).
+        Returns ``{server_name: [tool_def, ...], ...}`` keyed by server name.
+        """
+        result: dict[str, list[dict[str, Any]]] = {}
+        for name in self._configs:
+            try:
+                server = self.get_server(name)
+                if server is not None:
+                    result[name] = server.list_tools()
+                else:
+                    result[name] = []
+            except Exception:
+                logger.exception("Failed to discover tools from MCP server %r", name)
+                result[name] = []
+        return result
 
     def shutdown(self) -> None:
         """Gracefully stop all connected MCP servers."""

@@ -1,0 +1,17 @@
+# S2 Plan workflow
+# Triggers the Strategic Planner (S2) to decompose a goal into a plan.
+# Use this when the user asks for a plan, strategy, or multi-step approach.
+workflow_id: s2-plan
+name: "S2 Plan"
+description: "Decompose a goal via the Strategic Planner (S2)"
+version: "1.0.0"
+start_step: plan
+steps:
+  plan:
+    step_id: plan
+    step_type: planner_call
+    label: "Generate plan"
+    config:
+      goal: "{context.input}"
+    transitions:
+      on_success: __end__
