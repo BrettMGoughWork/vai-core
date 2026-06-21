@@ -10,10 +10,5 @@
 # first use.
 #
 servers:
-  google-workspace-mcp:
-    command: npx
-    args: ["-y", "@dguido/google-workspace-mcp"]
-    env:
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
-      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
-      GOOGLE_WORKSPACE_SERVICES: "${GOOGLE_WORKSPACE_SERVICES}"
+  # Custom Gmail primitives now handle email directly — no MCP server needed.
+  # See src/capabilities/primitives/custom/gmail_*.py

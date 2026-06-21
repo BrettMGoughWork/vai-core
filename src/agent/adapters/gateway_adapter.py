@@ -17,7 +17,8 @@ Flow
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict
+import dataclasses
+from typing import Any, Dict, List, Optional
 
 from src.agent.contracts import AgentMessage
 from src.agent.interfaces.agent_state import LifecycleState
@@ -140,7 +141,13 @@ class AgentGatewayAdapter:
                 result["prompt"] = meta.get("tool_confirmation_prompt", resp.reply)
         return result
 
-    def resume(self, agent_id: str, message_text: str) -> Dict[str, Any]:
+    def resume(
+        self,
+        agent_id: str,
+        message_text: str,
+        *,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
         """Resume a WAITING agent with new input.
 
         Loads the agent's state from the store, runs one step with the
@@ -150,6 +157,11 @@ class AgentGatewayAdapter:
         Args:
             agent_id:     The WAITING agent to resume.
             message_text: Input text to resume the workflow with.
+            conversation_history:
+                Fresh session history to inject into the activation
+                snapshot before running the step.  If omitted the
+                snapshot keeps the history from initial activation
+                (which may be stale).
 
         Returns:
             Same shape as ``ingest()`` — one of:
@@ -162,6 +174,19 @@ class AgentGatewayAdapter:
             state = self._supervisor.get_agent_state(agent_id)
         except Exception as exc:
             return {"error": f"Failed to load agent state: {exc}"}
+
+        # Inject fresh conversation history into the activation snapshot
+        # so that subsequent LLM calls see the full session context.
+        if conversation_history is not None and state.activation_snapshot is not None:
+            fresh_context = dataclasses.replace(
+                state.activation_snapshot.context,
+                conversation_history=conversation_history,
+            )
+            fresh_snapshot = dataclasses.replace(
+                state.activation_snapshot,
+                context=fresh_context,
+            )
+            state = state.with_(activation_snapshot=fresh_snapshot)
 
         if state.lifecycle_state.value == "waiting":
             # Transition from WAITING — no activation needed

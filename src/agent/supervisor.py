@@ -406,7 +406,11 @@ class Supervisor:
                 # Sprint 8.5: Hallucination guard — detect claimed side-effects without directives
                 # When native tool_calls are present, the LLM chose a tool via
                 # function calling — the guard is not needed.
-                if not result.get("tool_calls"):
+                # Also skip when the user explicitly affirmed (e.g. "yes" to "shall I reply?")
+                # to avoid false-positives on user-requested actions.
+                if not result.get("tool_calls") and not self._AFFIRMATIVE_RE.fullmatch(
+                    input_text.strip()
+                ):
                     reply = self._apply_hallucination_guard(reply)
 
                 # Sprint 9a: process /invoke-workflow directives
@@ -644,7 +648,7 @@ class Supervisor:
                             "backend": "conversational",
                             "memory": {"conversation_history": conv_history},
                             "plan_context": {},
-                            "tool_context": [],  # No tools — we want a text response only
+                            "tool_context": tool_context,  # Keep tools so the LLM can make follow-up calls if needed
                         },
                     )
                     follow_up_result = self._strategy_router.route(follow_up_outcome)
