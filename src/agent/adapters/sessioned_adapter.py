@@ -67,7 +67,7 @@ class SessionedAdapter:
         if isinstance(result, dict) and "reply" in result:
             self._sessions[key] = history + [
                 {"role": "user", "content": request.message_text},
-                {"role": "assistant", "content": result["reply"]},
+                {"role": "assistant", "content": self._strip_annotations(result["reply"])},
             ]
 
         return result
@@ -75,10 +75,18 @@ class SessionedAdapter:
     def resume(self, agent_id: str, message_text: str) -> Dict[str, Any]:
         """Resume a WAITING agent, returning the same shape as ``ingest()``.
 
-        Delegates to the inner adapter's ``resume()``.  On success (reply in
-        the result) the turn is appended to the session history.
+        1. Load session history for the last-ingest session key.
+        2. Inject it as ``conversation_history`` into the inner adapter
+           so the LLM sees the full multi-turn context on resume.
+        3. On success (reply in the result) the new turn is appended
+           to the session history.
         """
-        result = self._inner.resume(agent_id, message_text)
+        key = self._last_session_key or f"cli:{agent_id}"
+        history = list(self._sessions.get(key, []))
+        result = self._inner.resume(
+            agent_id, message_text,
+            conversation_history=history,
+        )
 
         # Capture successful turns into session history.
         if isinstance(result, dict) and "reply" in result:
@@ -86,7 +94,7 @@ class SessionedAdapter:
             history = list(self._sessions.get(key, []))
             self._sessions[key] = history + [
                 {"role": "user", "content": message_text},
-                {"role": "assistant", "content": result["reply"]},
+                {"role": "assistant", "content": self._strip_annotations(result["reply"])},
             ]
 
         return result
@@ -94,6 +102,45 @@ class SessionedAdapter:
     # ------------------------------------------------------------------
     # Session management helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _strip_annotations(text: str) -> str:
+        """Remove ``[Primitive '...' → ...]`` / ``[Workflow '...' → ...]`` annotations.
+
+        These annotations are useful in the **display** reply (the user sees
+        what happened), but when stored in conversation history they leak
+        raw tool errors and internal state that confuses the LLM on future
+        turns.
+        """
+        result: list[str] = []
+        i = 0
+        while i < len(text):
+            if text[i] == "[" and (
+                text[i : i + 10] == "[Primitive "
+                or text[i : i + 9] == "[Workflow "
+            ):
+                # Find the matching closing bracket (bracket-depth aware)
+                depth = 0
+                for j in range(i, len(text)):
+                    if text[j] == "[":
+                        depth += 1
+                    elif text[j] == "]":
+                        depth -= 1
+                        if depth == 0:
+                            # j points at the closing ] — skip past it
+                            i = j + 1
+                            break
+                else:
+                    # No matching bracket found — stop scanning
+                    i = len(text)
+
+                # Skip trailing whitespace/newline
+                while i < len(text) and text[i] in " \t\n\r":
+                    i += 1
+            else:
+                result.append(text[i])
+                i += 1
+        return "".join(result)
 
     @staticmethod
     def _session_key(request: AgentRequest) -> str:

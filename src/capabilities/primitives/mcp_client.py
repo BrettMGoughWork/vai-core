@@ -9,9 +9,9 @@ block the caller until the result is ready (or a timeout fires).
 Usage::
 
     manager = MCPClientManager("config/mcp_servers.yaml")
-    server = manager.get_server("google-workspace-mcp")
+    server = manager.get_server("my-server")
     if server:
-        result = server.call_tool("drive.search", {"query": "..."})
+        result = server.call_tool("some_tool", {"input": "..."})
     manager.shutdown()
 """
 
@@ -166,7 +166,7 @@ class MCPServerConfig:
     """Configuration for a single MCP server process."""
 
     name: str
-    """Unique identifier for this server (e.g. ``'google-workspace-mcp'``)."""
+    """Unique identifier for this server (e.g. ``'my-server'``)."""
 
     command: str
     """Executable to run (e.g. ``'npx'``, ``'uvx'``, ``'python'``)."""
@@ -236,13 +236,11 @@ def load_server_configs(path: str | Path = _DEFAULT_CONFIG_PATH) -> dict[str, MC
     Expected format::
 
         servers:
-          google-workspace-mcp:
-            command: npx
-            args: ["-y", "@dguido/google-workspace-mcp"]
+          my-server:
+            command: uvx
+            args: ["-y", "some-mcp-package"]
             env:
-              GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
-              GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
-              GOOGLE_WORKSPACE_SERVICES: "${GOOGLE_WORKSPACE_SERVICES}"
+              MY_API_KEY: "${MY_API_KEY}"
     """
     path = Path(path)
     if not path.exists():

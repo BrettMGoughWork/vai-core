@@ -80,7 +80,7 @@ class PrimitiveToolAdapter:
         """Resolve a tool call name/args to a primitive name + params.
 
         Args:
-            tool_name: Full tool name (e.g. ``"primitive.mcp.google-workspace-mcp.sendEmail"``).
+            tool_name: Full tool name (e.g. ``"primitive.custom.gmail.search"``).
             arguments: The arguments dict from the LLM tool call.
 
         Returns:

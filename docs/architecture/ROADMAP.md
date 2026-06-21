@@ -398,6 +398,20 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 17.9 | Regression test — full suite passes with all providers |
 | 17.10 | Document adapter architecture in `docs/architecture/provider_adapters.md` |
 
+### Sprint 18 — Supervisor Refactor (Breakup)
+
+*`src/agent/supervisor.py` currently mixes 5+ concerns in a single 600+ line file: agent orchestration and routing, HITL confirmation state machine, hallucination guard, workflow invocation (`/invoke-workflow`), tool execution and follow-up (phase 2), and AgentState management. This sprint breaks each concern into its own module, leaving `supervisor.py` as a thin orchestrator. Separation of concerns makes testing easier — each module gets isolated tests — and reduces cognitive load when editing any single concern.*
+
+| Task | What |
+|------|------|
+| 18.1 | Extract **hallucination guard** to `src/agent/guards/hallucination_guard.py` — move `_ACTION_CLAIM_RE`, `_apply_hallucination_guard()` and any related regex helpers. Keep the `_AFFIRMATIVE_RE` in the HITL module (18.2) since it's about confirmation, not hallucination detection |
+| 18.2 | Extract **HITL confirmation** to `src/agent/hitl_manager.py` — move `_AFFIRMATIVE_RE`, `_run_confirmed_skills()`, `_has_side_effect_tool_calls()`, `_format_hitl_prompt()`, and the `WAITING` state transitions. The HITL manager owns the lifecycle: pending → confirmed → execute → done |
+| 18.3 | Extract **tool orchestrator** to `src/agent/tool_orchestrator.py` — move phase-1 tool execution loop, phase-2 follow-up LLM call (including the `tool_context` assembly), and primitive-result collection. The supervisor should just call `orchestrator.execute_tool_plan(tool_calls)` and get back `(reply, metadata_deltas)` |
+| 18.4 | Extract **workflow invoker** to `src/agent/workflow_invoker.py` — move `_handle_invoke_workflow()` and any `/invoke-workflow` directive parsing. Returns structured workflow execution results that the supervisor inserts into the response |
+| 18.5 | Slim `supervisor.py` to core orchestration: `_process_input()` → route → HITL check → tool orchestration → guard → workflow invocation. Each step delegates to the appropriate module. The state machine (`_ACTIVATED → _WAITING → _PROCESSING → _IDLE`) stays in the supervisor since it governs the overall flow |
+| 18.6 | Write isolated unit tests for each extracted module — hallucination guard (known action phrases, `/invoke-workflow` exemptions, safe replies), HITL manager (affirmation regex matches, side-effect detection, state transitions), tool orchestrator (tool call execution, follow-up with/without tools, error propagation), workflow invoker (directive parsing, execution results) |
+| 18.7 | Full integration test — CLI session covering: search → read → HITL confirm → delete → follow-up reply with tool call → hallucination guard on tool-less claim |
+
 ---
 
 ## 🔮 Future / Exploration

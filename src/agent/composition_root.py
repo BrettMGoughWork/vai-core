@@ -22,7 +22,8 @@ load_dotenv(override=True)
 
 from src.capabilities.primitives.mcp import MCPPrimitive
 from src.capabilities.primitives.mcp_client import MCPClientManager
-from src.capabilities.primitives.stdlib import load_all_primitives
+from src.capabilities.primitives.stdlib import load_all_primitives as load_stdlib_primitives
+from src.capabilities.primitives.custom import load_all_primitives as load_custom_primitives
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 
 # ── Infrastructure imports (adapter→infrastructure: allowed) ─────────
@@ -59,9 +60,10 @@ for defn in load_workflows_from_yaml("config/workflows"):
     wf_registry.register(defn)
 
 
-# ── Primitive registry (loaded from stdlib) ──────────────────────────
+# ── Primitive registry (loaded from stdlib + custom) ────────────────
 _primitive_registry = PrimitiveRegistry()
-_primitives_loaded = load_all_primitives(_primitive_registry)
+_primitives_loaded = load_stdlib_primitives(_primitive_registry)
+_custom_primitives_loaded = load_custom_primitives(_primitive_registry)
 
 # ── MCP client manager (manages MCP server subprocesses) ─────────────
 _mcp_client_manager = MCPClientManager("config/mcp_servers.yaml")
