@@ -412,6 +412,19 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 18.6 | Write isolated unit tests for each extracted module — hallucination guard (known action phrases, `/invoke-workflow` exemptions, safe replies), HITL manager (affirmation regex matches, side-effect detection, state transitions), tool orchestrator (tool call execution, follow-up with/without tools, error propagation), workflow invoker (directive parsing, execution results) |
 | 18.7 | Full integration test — CLI session covering: search → read → HITL confirm → delete → follow-up reply with tool call → hallucination guard on tool-less claim |
 
+### Sprint 19 — Conversation Quality & Prompt Engineering
+
+*Sprint 18 fixes the supervisor's orchestration. Sprint 19 fixes what the LLM actually *says*. The biggest UX improvements will come from prompt quality, not routing code — system prompts that teach better error recovery, conversation history that doesn't drown the LLM in noise, and error handling that recovers gracefully instead of repeating the same non-answer.*
+
+| Task | What |
+|------|------|
+| 19.1 | **System prompt audit** — Review all agent personas in `config/agents/*.yaml`. Ensure each prompt explicitly teaches: (a) graceful error recovery ("if a tool 404s, tell the user and offer alternatives, don't keep retrying"), (b) tool selection guidance ("prefer search → read → act flow"), (c) when to ask clarifying questions vs. infer |
+| 19.2 | **Sliding-window conversation history** — Replace flat list in `SessionedAdapter` with a smarter strategy: keep full recent N turns, summarize older turns into a compressed memory slot. Prevents the LLM from losing track in long sessions |
+| 19.3 | **Error recovery prompt pattern** — When a tool call fails, inject structured guidance into the prompt (not just raw `[Primitive ... → {error}]`). E.g., "The tool failed. You may: (a) retry with modified params, (b) explain the issue and suggest alternatives, (c) ask the user what to do next." |
+| 19.4 | **Conversation-state anchoring** — After each side-effect tool call (delete, send, update), inject a plain-English summary into history so the LLM can recall what happened without parsing tool output. E.g., "Action taken: deleted email from Google (security alert)" |
+| 19.5 | **Regression test suite** — Record real CLI sessions (good and bad), replay them as regression tests. Ensure the fixes from Sprint 17 (this sprint) don't regress. Each test asserts: no annotation leakage, hallucination guard fires correctly, follow-up tools are available, error recovery is graceful |
+| 19.6 | **Field-testing & tuning** — Run 10+ real conversation flows through the CLI: search → read → reply (with HITL), search → delete (with HITL), multi-turn with agent switching, error cases (bad search, already-deleted message). Tune prompts based on observed failures. Document findings in `docs/operations/conversation_quality.md` |
+
 ---
 
 ## 🔮 Future / Exploration
