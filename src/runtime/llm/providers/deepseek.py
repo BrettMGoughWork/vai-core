@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from urllib import request
+from urllib import request, error
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -81,7 +81,23 @@ class DeepSeekClient(ChatProvider):
             headers=headers,
             method="POST",
         )
-        with request.urlopen(req, timeout=self.timeout) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
 
-            return result
+        try:
+            with request.urlopen(req, timeout=self.timeout) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                return result
+
+        except error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8")
+            except Exception:
+                body = ""
+
+            raise RuntimeError(
+                f"DeepSeek chat completions failed: HTTP {getattr(e, 'code', '???')} {getattr(e, 'reason', '')} "
+                f"body={body}"
+            ) from e
+
+        except error.URLError as e:
+            raise RuntimeError(f"DeepSeek chat completions failed: {e}") from e

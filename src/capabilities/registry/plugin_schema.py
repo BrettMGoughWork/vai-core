@@ -4,12 +4,14 @@ Plugin manifest schema (Phase 3.14.1).
 Defines the ``PluginManifest`` dataclass that validates a ``plugin.yml``
 file and the ``PLUGIN_MANIFEST_SCHEMA`` JSON Schema for external validation.
 
-A plugin bundles primitives and skills into a single distributable directory::
+A plugin bundles primitives, skills, and optional MCP servers into a
+single distributable directory::
 
     plugins/my-plugin/
     ├── plugin.yml          # manifest
     ├── primitives/         # Python files with PrimitiveBase subclasses
-    └── skills/             # .skill.md files
+    ├── skills/             # .skill.md files
+    └── mcp/                # MCP server manifests (.json / .yaml)
 
 Usage::
 
@@ -64,6 +66,11 @@ PLUGIN_MANIFEST_SCHEMA: dict[str, Any] = {
             "description": "Skill manifest files under skills/ to load.",
             "items": {"type": "string"},
         },
+        "mcp_servers": {
+           "type": "array",
+           "description": "MCP server manifest files under mcp/ to load.",
+           "items": {"type": "string"},
+        },
     },
     "additionalProperties": False,
 }
@@ -94,6 +101,9 @@ class PluginManifest:
     skills: list[str] = field(default_factory=list)
     """Skill file names under the plugin's ``skills/`` directory."""
 
+    mcp_servers: list[str] = field(default_factory=list)
+    """MCP server manifest file names under the plugin's ``mcp/`` directory."""
+
     def validate(self) -> None:
         """Validate all manifest fields.
 
@@ -122,6 +132,10 @@ class PluginManifest:
             raise ValueError("PluginManifest.skills must be a list")
         if not all(isinstance(s, str) for s in self.skills):
             raise ValueError("PluginManifest.skills must be a list of str")
+        if not isinstance(self.mcp_servers, list):
+            raise ValueError("PluginManifest.mcp_servers must be a list")
+        if not all(isinstance(s, str) for s in self.mcp_servers):
+            raise ValueError("PluginManifest.mcp_servers must be a list of str")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginManifest:
@@ -144,6 +158,7 @@ class PluginManifest:
             dependencies=data.get("dependencies", {}),
             primitives=data.get("primitives", []),
             skills=data.get("skills", []),
+            mcp_servers=data.get("mcp_servers", []),
         )
         manifest.validate()
         return manifest

@@ -132,6 +132,12 @@ class AgentGatewayAdapter:
             schema = meta.get("workflow_interaction_schema")
             if schema:
                 result["input_schema"] = schema
+        # Surface confirmation prompt for primitive HITL gate
+        elif meta.get("waiting_for") == "tool_confirmation":
+            resp = self._supervisor.get_response(state)
+            if resp is not None and resp.reply is not None:
+                result["reply"] = resp.reply
+                result["prompt"] = meta.get("tool_confirmation_prompt", resp.reply)
         return result
 
     def resume(self, agent_id: str, message_text: str) -> Dict[str, Any]:
@@ -169,6 +175,7 @@ class AgentGatewayAdapter:
             if state.lifecycle_state in (
                 LifecycleState.COMPLETED,
                 LifecycleState.FAILED,
+                LifecycleState.ACTIVATED,
             ):
                 resp = self._supervisor.get_response(state)
                 if resp is not None and resp.reply is not None:
@@ -198,6 +205,12 @@ class AgentGatewayAdapter:
                 schema = meta.get("workflow_interaction_schema")
                 if schema:
                     result["input_schema"] = schema
+            # Surface confirmation prompt for primitive HITL gate
+            elif meta.get("waiting_for") == "tool_confirmation":
+                resp = self._supervisor.get_response(state)
+                if resp is not None and resp.reply is not None:
+                    result["reply"] = resp.reply
+                    result["prompt"] = meta.get("tool_confirmation_prompt", resp.reply)
             return result
 
         return {"error": f"Agent {agent_id!r} is not WAITING"}

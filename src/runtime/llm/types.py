@@ -25,10 +25,12 @@ class CoreLLMResponse:
     - text: normal assistant message
     - tool_name: if the LLM wants to call a tool
     - tool_args: parsed arguments for the tool
+    - tool_calls: raw tool_calls from the LLM when multiple are returned
     """
     text: Optional[str] = None
     tool_name: Optional[str] = None
     tool_args: Optional[Dict[str, Any]] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass

@@ -29,6 +29,7 @@ class MCPPrimitive(PrimitiveBase):
         description: str,
         server_name: str,
         tool_name: str,
+        input_schema: dict | None = None,
     ) -> None:
         super().__init__(
             name=name,
@@ -39,6 +40,8 @@ class MCPPrimitive(PrimitiveBase):
         """Key used to look up the MCP server in the registry."""
         self.tool_name = tool_name
         """The MCP tool to invoke on that server."""
+        self.input_schema = input_schema or {"type": "object", "properties": {}}
+        """JSON Schema for the tool's input parameters (from MCP tools/list)."""
 
     # ------------------------------------------------------------------
     # PrimitiveBase interface

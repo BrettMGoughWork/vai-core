@@ -9,7 +9,7 @@ routing, job dispatch, suspension, cancellation, and completion.
 S5.5 does **not**:
 - call LLMs
 - execute tools
-- invoke skills
+- execute tools
 - perform cognitive reasoning
 - mutate S4 state
 - define new execution semantics
@@ -33,6 +33,7 @@ Public API
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -59,6 +60,28 @@ from src.agent.workflow import WorkflowEngine, WorkflowInstanceStore, WorkflowRe
 from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.agent.workflow.user_interaction import UserInteractionManager
 from src.agent.strategy_router import RouterOutcome, StrategyRouter
+
+# ── Hallucination guard patterns ──────────────────────────────────────────
+_ACTION_CLAIM_RE = re.compile(
+    r"(?i)"
+    r"(?:"
+    # "I've sent", "I've replied", "I've deleted" etc.
+    r"\bI'?ve\s+(?:sent|replied|deleted|forwarded|drafted|created|"
+    r"cancelled|canceled|archived|moved|marked)"
+    r"|"
+    # "I sent your", "I replied to", etc.
+    r"\bI\s+(?:sent|replied|deleted|forwarded|drafted|created)\s+"
+    r"(?:your|the|this)"
+    r"|"
+    # "has been sent", "have been deleted", etc.
+    r"\b(?:has been|have been)\s+(?:sent|deleted|forwarded|replied|"
+    r"created|cancelled|canceled|archived)"
+    r"|"
+    # "sent your reply", "deleted the email", etc. — bare past-tense claim
+    r"(?:sent|replied|deleted|forwarded|drafted)\s+(?:your|the|this)\s+"
+    r"(?:reply|email|message|draft)"
+    r")",
+)
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -110,6 +133,7 @@ class Supervisor:
         auto_persist: bool = True,
         inline_tool_executor: Optional[Callable[[dict[str, Any]], dict[str, Any] | None]] = None,
         workflow_tool_adapter: Optional[Any] = None,
+        primitive_tool_adapter: Optional[Any] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -125,6 +149,7 @@ class Supervisor:
             AgentSelectionStrategy(registry) if registry is not None else None
         )
         self._workflow_tool_adapter = workflow_tool_adapter
+        self._primitive_tool_adapter = primitive_tool_adapter
 
     # ── 1. create_agent ────────────────────────────────────────────────
 
@@ -318,13 +343,24 @@ class Supervisor:
         meta["total_routes"] = meta.get("total_routes", 0) + 1
 
         if route.destination == DEST_RUNTIME:
+            # ── Resume path: user responding to a HITL confirmation prompt ─
+            pending = meta.pop("pending_tool_calls", None)
+            if pending is not None:
+                meta.pop("waiting_for", None)
+                return self._run_confirmed_skills(
+                    state, pending, input_text, route, meta,
+                )
+
             # LLM conversation path — route via StrategyRouter
             agent_meta = ctx.context.agent_metadata
 
-            # Build tool_context from workflow tool adapter (sprint 9a)
+            # Build tool_context from workflow + primitive tool adapters
             tool_context: list[dict] = []
             if self._workflow_tool_adapter is not None:
                 tool_context = self._workflow_tool_adapter.list_tools()
+            if self._primitive_tool_adapter is not None:
+                primitive_tools = self._primitive_tool_adapter.list_tools()
+                tool_context.extend(primitive_tools)
 
             outcome = RouterOutcome(
                 type="llm_call",
@@ -367,19 +403,71 @@ class Supervisor:
                     metadata["runtime_error"] = result["runtime_error"]
                     _reason = "Agent produced conversational response via mock fallback"
 
-                # Sprint 9a: process /invoke-workflow directives from LLM
+                # Sprint 8.5: Hallucination guard — detect claimed side-effects without directives
+                # When native tool_calls are present, the LLM chose a tool via
+                # function calling — the guard is not needed.
+                if not result.get("tool_calls"):
+                    reply = self._apply_hallucination_guard(reply)
+
+                # Sprint 9a: process /invoke-workflow directives
                 reply = self._handle_invoke_workflow(reply)
 
+                # Sprint 8.5: HITL gate for native primitive.* tool_calls
+                tool_calls = result.get("tool_calls", [])
+                side_effect_calls = self._has_side_effect_tool_calls(tool_calls)
+                if side_effect_calls:
+                    if self._AFFIRMATIVE_RE.fullmatch(input_text.strip()):
+                        # User already affirmed — execute below in the tool_calls loop
+                        pass
+                    else:
+                        actions = sorted(set(
+                            self._describe_side_effect(c)
+                            for c in side_effect_calls
+                        ))
+                        meta["pending_tool_calls"] = {
+                            "original_reply": reply,
+                            "tool_calls": tool_calls,
+                            "side_effect_indices": [
+                                tool_calls.index(c) for c in side_effect_calls
+                            ],
+                        }
+                        meta["waiting_for"] = "tool_confirmation"
+                        confirmation_msg = (
+                            "\n\n---\n"
+                            "⚡ **Confirmation required** – The assistant is about to"
+                            f" perform: **{', '.join(actions)}**.\n\n"
+                            "Reply **yes** to proceed, or **no** / revise your"
+                            " request to cancel."
+                        )
+                        meta["tool_confirmation_prompt"] = confirmation_msg
+                        reply = reply + confirmation_msg
+                        return self._persist(state.with_(
+                            lifecycle_state=LifecycleState.WAITING,
+                            route_result=route,
+                            final_response=AgentResponse(
+                                reply=reply, metadata=metadata,
+                            ),
+                            supervisor_metadata=meta,
+                            _reason=(
+                                "Awaiting user confirmation for"
+                                " side-effect primitive tool_calls"
+                            ),
+                        ))
+
                 # Sprint 9a: handle native tool_calls if the backend supports them
+                executed_primitives: list[dict] = []
                 for tc in result.get("tool_calls", []):
                     if isinstance(tc, dict):
                         func_name = (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "") or tc.get("name", "")
                         if func_name.startswith("workflow.execute."):
                             wf_id = func_name[len("workflow.execute."):]
-                            args = tc.get("arguments", tc.get("args", {}))
+                            func = tc.get("function", {})
+                            if isinstance(func, dict):
+                                args = func.get("arguments", tc.get("arguments", tc.get("args", {})))
+                            else:
+                                args = tc.get("arguments", tc.get("args", {}))
                             if isinstance(args, str):
                                 try:
-                                    import json
                                     args = json.loads(args)
                                 except json.JSONDecodeError:
                                     args = {}
@@ -463,6 +551,108 @@ class Supervisor:
                                     reply += f"\n\n[Workflow {wf_id!r} exceeded iteration limit]"
                             except ValueError as exc:
                                 reply += f"\n\n[Workflow {wf_id!r} not found: {exc}]"
+                        elif func_name.startswith("primitive."):
+                            prim_name = func_name[len("primitive."):]
+                            func = tc.get("function", {})
+                            if isinstance(func, dict):
+                                args = func.get("arguments", tc.get("arguments", tc.get("args", {})))
+                            else:
+                                args = tc.get("arguments", tc.get("args", {}))
+                            if isinstance(args, str):
+                                    try:
+                                        args = json.loads(args)
+                                    except json.JSONDecodeError:
+                                        args = {}
+                            if self._inline_tool_executor is not None:
+                                    try:
+                                        prim_result = self._inline_tool_executor({
+                                            "skill_name": prim_name,
+                                            "arguments": args,
+                                        })
+                                    except Exception as exc:
+                                        prim_result = None
+                                        reply += f"\n\n[Primitive {prim_name!r} failed: {exc}]"
+                                    if prim_result is not None:
+                                        result_str = str(prim_result.get("data", prim_result.get("result", prim_result)))
+                                        if len(result_str) > 500:
+                                            result_str = result_str[:500] + "..."
+                                        executed_primitives.append({
+                                            "tool_call_id": tc.get("id", f"prim_{prim_name}"),
+                                            "name": prim_name,
+                                            "result_str": result_str,
+                                        })
+                                        reply += f"\n\n[Primitive {prim_name!r} → {result_str}]"
+                                    else:
+                                        reply += f"\n\n[Primitive {prim_name!r} returned no result]"
+                            else:
+                                    reply += f"\n\n[Primitive {prim_name!r} cannot execute (no inline executor)]"
+
+                # Conversational loop: feed primitive tool results back to LLM
+                if executed_primitives:
+                    conv_history = list(ctx.context.conversation_history)
+                    orig_tool_calls = result.get("tool_calls", [])
+
+                    # Assistant message with tool_calls that LLM originally chose
+                    initial_text = result.get("output", {}).get("message", "")
+                    assistant_msg: dict[str, object] = {
+                        "role": "assistant",
+                        "content": initial_text if initial_text else None,
+                        "tool_calls": [
+                            {
+                                "id": tc.get("id", ""),
+                                "type": "function",
+                                "function": {
+                                    "name": (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "") or tc.get("name", ""),
+                                    "arguments": (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("arguments", "") or tc.get("arguments", "{}"),
+                                },
+                            }
+                            for tc in orig_tool_calls
+                            if any(
+                                tc.get("id", "") == pe["tool_call_id"]
+                                or pe["name"] in (
+                                    tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}
+                                ).get("name", "")
+                                for pe in executed_primitives
+                            )
+                        ],
+                    }
+                    conv_history.append(assistant_msg)
+
+                    # Tool result messages
+                    for pe in executed_primitives:
+                        conv_history.append({
+                            "role": "tool",
+                            "tool_call_id": pe["tool_call_id"],
+                            "content": pe["result_str"],
+                        })
+
+                    # Follow-up S1 call — LLM sees tool results and responds naturally
+                    follow_up_outcome = RouterOutcome(
+                        type="llm_call",
+                        payload={
+                            "prompt": {
+                                "message": "Based on the tool results, what's your response?",  # continuation nudge
+                                "agent_id": agent_meta.identity.agent_id,
+                                "agent_metadata": {
+                                    "name": agent_meta.identity.name,
+                                    "description": agent_meta.identity.description,
+                                    "persona": agent_meta.persona,
+                                    "skills": list(agent_meta.skills),
+                                    "workflows": list(agent_meta.workflows),
+                                },
+                            },
+                            "backend": "conversational",
+                            "memory": {"conversation_history": conv_history},
+                            "plan_context": {},
+                            "tool_context": [],  # No tools — we want a text response only
+                        },
+                    )
+                    follow_up_result = self._strategy_router.route(follow_up_outcome)
+                    if follow_up_result.get("error") is None:
+                        reply = follow_up_result["output"].get("message", reply)
+                    else:
+                        # Keep the raw primitive reply as fallback
+                        pass
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"
                 metadata["runtime_error"] = result["error"]
@@ -923,10 +1113,13 @@ class Supervisor:
                             "persona": selected_agent_meta.persona,
                         })
 
-                # Build tool_context from workflow tool adapter (sprint 9a)
+                # Build tool_context from workflow + primitive tool adapters
                 tool_context: list[dict] = []
                 if self._workflow_tool_adapter is not None:
                     tool_context = self._workflow_tool_adapter.list_tools()
+                if self._primitive_tool_adapter is not None:
+                    primitive_tools = self._primitive_tool_adapter.list_tools()
+                    tool_context.extend(primitive_tools)
 
                 router_outcome = RouterOutcome(
                     type="llm_call",
@@ -1145,7 +1338,7 @@ class Supervisor:
 
         pattern = re.compile(
             r'^/invoke-workflow\s+(\S+)'          # workflow_id
-            r'(?:\s+(\S+="[^"]*"(?:\s+\S+="[^"]*")*))?',  # key="val" pairs
+            r'(?:\s+(.+))?',                       # everything after → key="val" pairs
             re.MULTILINE,
         )
 
@@ -1160,10 +1353,8 @@ class Supervisor:
                     break
             raw_params = match.group(2) or ""
 
-            # Parse key="value" pairs
-            params: dict[str, str] = {}
-            for kv in re.finditer(r'(\w+)="([^"]*)"', raw_params):
-                params[kv.group(1)] = kv.group(2)
+            # Parse key="value" pairs (handles \" inside JSON values)
+            params: dict[str, str] = self._parse_invoke_params(raw_params)
 
             context = dict(wf_context or {})
             context.update(params)
@@ -1276,7 +1467,217 @@ class Supervisor:
 
         return "".join(parts)
 
+    @staticmethod
+    def _apply_hallucination_guard(reply: str) -> str:
+        """Detect and block LLM claims of side-effects without tool_calls.
+
+        If the LLM claims an action was performed (sent, deleted, drafted, etc.)
+        but the reply contains no ``/invoke-workflow`` directive, the claim is a
+        hallucination — return a safety message.
+
+        Returns the original *reply* when safe, or a guard message when a
+        hallucination is detected.
+        """
+        if "/invoke-workflow" in reply:
+            return reply  # directives present — legitimate execution path
+
+        if _ACTION_CLAIM_RE.search(reply):
+            return (
+                "⚠️ **Safety guard triggered:** The assistant appeared to claim "
+                "that an action was performed (e.g., sending, deleting, or "
+                "forwarding) without issuing a tool_call or `/invoke-workflow` "
+                "directive.\n\n"
+                "**The action was NOT executed.**\n\n"
+                "Please rephrase your request."
+            )
+
+        return reply
+
+    # ------------------------------------------------------------------
+    # Sprint 8.5: HITL confirmation resume for side-effect primitive tool_calls
+    # ------------------------------------------------------------------
+
+    _AFFIRMATIVE_RE: "re.Pattern[str]" = re.compile(
+        r"^(?:\s*(?:yes|yeah|yep|sure|go ahead|proceed|confirm|do it"
+        r"|send it|execute)\s*[,!.?]*)*\s*$",
+        re.IGNORECASE,
+    )
+
+    def _run_confirmed_skills(
+        self,
+        state: AgentState,
+        pending: dict[str, Any],
+        input_text: str,
+        route: RouteResult,
+        meta: dict[str, Any],
+    ) -> AgentState:
+        """Execute or cancel pending primitive tool_calls based on user input.
+
+        Called when the supervisor resumes from a WAITING state that
+        was entered for HITL confirmation of side-effect ``primitive.*``
+        tool_calls.
+
+        * If the user affirms: run the pending tool_calls inline and
+          return the result as a conversational answer.
+        * Otherwise: discard and return a cancellation message.
+        """
+        if self._AFFIRMATIVE_RE.fullmatch(input_text.strip()):
+            tool_calls = pending.get("tool_calls", [])
+            # Native tool_calls resume path
+            reply = pending.get("original_reply", "")
+            for tc in tool_calls:
+                if isinstance(tc, dict):
+                    func_name = (
+                        (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "")
+                        or tc.get("name", "")
+                    )
+                    if func_name.startswith("primitive."):
+                        prim_name = func_name[len("primitive."):]
+                        func = tc.get("function", {})
+                        if isinstance(func, dict):
+                            args = func.get("arguments", tc.get("arguments", tc.get("args", {})))
+                        else:
+                            args = tc.get("arguments", tc.get("args", {}))
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except json.JSONDecodeError:
+                                args = {}
+                        if self._inline_tool_executor is not None:
+                            try:
+                                prim_result = self._inline_tool_executor({
+                                    "skill_name": prim_name,
+                                    "arguments": args,
+                                })
+                            except Exception as exc:
+                                reply += f"\n\n[Primitive {prim_name!r} failed: {exc}]"
+                                continue
+                            if prim_result is not None:
+                                result_str = str(prim_result.get("data", prim_result.get("result", prim_result)))
+                                if len(result_str) > 500:
+                                    result_str = result_str[:500] + "..."
+                                reply += f"\n\n[Primitive {prim_name!r} → {result_str}]"
+                            else:
+                                reply += f"\n\n[Primitive {prim_name!r} returned no result]"
+                        else:
+                            reply += f"\n\n[Primitive {prim_name!r} cannot execute (no inline executor)]"
+            metadata: dict[str, Any] = {
+                "correlation_id": state.correlation_id,
+                "trace_id": state.trace_id,
+                "agent_id": state.agent_id,
+                "confidence": route.confidence,
+                "route_destination": route.destination,
+            }
+            return self._persist(state.with_(
+                lifecycle_state=LifecycleState.ACTIVATED,
+                route_result=route,
+                final_response=AgentResponse(
+                    reply=reply, metadata=metadata,
+                ),
+                supervisor_metadata=meta,
+                _reason="User confirmed — executing pending tool_calls",
+            ))
+        # User declined or gave unexpected input → cancel
+        metadata = {
+            "correlation_id": state.correlation_id,
+            "trace_id": state.trace_id,
+            "agent_id": state.agent_id,
+            "confidence": route.confidence,
+            "route_destination": route.destination,
+        }
+        return self._persist(state.with_(
+            lifecycle_state=LifecycleState.ACTIVATED,
+            route_result=route,
+            final_response=AgentResponse(
+                reply=(
+                    "The action was cancelled based on your response."
+                ),
+                metadata=metadata,
+            ),
+            supervisor_metadata=meta,
+            _reason="User declined — pending tool_calls cancelled",
+        ))
+
+    # ------------------------------------------------------------------
+    # Sprint 8.5: Confirmation gate for side-effect primitive tool_calls
+    # ------------------------------------------------------------------
+    _SIDE_EFFECT_ACTIONS: "frozenset[str]" = frozenset({
+        "send", "delete", "forward", "draft", "create", "cancel",
+        "archive", "move", "mark", "trash", "untrash", "modify",
+        "update", "remove",
+    })
+
+    # ── Native tool_calls HITL gate (Sprint 8.5) ───────────────────────
+
+    @staticmethod
+    def _has_side_effect_tool_calls(
+        tool_calls: list[dict],
+    ) -> list[dict]:
+        """Return side-effect ``primitive.*`` tool calls from *tool_calls*.
+
+        Uses a name-based heuristic: if the primitive name (last dot-segment)
+        starts with any action in ``_SIDE_EFFECT_ACTIONS``, it is
+        classified as a side-effect operation.
+
+        Returns the subset of calls that need confirmation.
+        """
+        side_effects = {
+            "send", "delete", "forward", "draft", "create",
+            "cancel", "archive", "move", "mark", "trash",
+            "untrash", "modify", "update", "remove",
+        }
+        result: list[dict] = []
+        for tc in tool_calls:
+            if not isinstance(tc, dict):
+                continue
+            func_name = (
+                (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "")
+                or tc.get("name", "")
+            )
+            if not func_name.startswith("primitive."):
+                continue
+            # Extract the last segment for action heuristics
+            last_segment = func_name.rsplit(".", 1)[-1].lower()
+            # Check if it starts with any side-effect word
+            for action in side_effects:
+                if last_segment.startswith(action):
+                    result.append(tc)
+                    break
+        return result
+
+    @staticmethod
+    def _describe_side_effect(tc: dict) -> str:
+        """Return a human-readable description of a side-effect tool call."""
+        func_name = (
+            (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "")
+            or tc.get("name", "")
+        )
+        # Strip the "primitive." prefix for readability
+        display = func_name
+        for prefix in ("primitive.", "mcp."):
+            if display.startswith(prefix):
+                display = display[len(prefix):]
+                break
+        return display
+
     # ── Internal helpers ───────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_invoke_params(raw: str) -> dict[str, Any]:
+        """Parse ``key="value"`` pairs, handling ``\\"`` inside JSON values."""
+        result: dict[str, Any] = {}
+        for kv in re.finditer(r'(\w+)="((?:[^"\\]|\\.)*)"', raw):
+            raw_val = kv.group(2)
+            # Unescape \" -> "
+            val = re.sub(r'\\(.)', r'\1', raw_val)
+            # Auto‑deserialize JSON values (dicts and lists)
+            if val and val[0] in ("{", "["):
+                try:
+                    val = json.loads(val)
+                except json.JSONDecodeError:
+                    pass  # keep as string
+            result[kv.group(1)] = val
+        return result
 
     def _require_not_terminal(self, state: AgentState) -> None:
         """Guard: raise if the agent is in a terminal state."""

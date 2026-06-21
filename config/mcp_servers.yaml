@@ -1,0 +1,19 @@
+# ------------------------------------------------------------------
+# MCP server configurations
+# ------------------------------------------------------------------
+#
+# Each entry defines how to spawn an MCP server subprocess.
+# Environment variables use ${VAR} / $VAR syntax and are expanded
+# from the OS environment (typically loaded from .env).
+#
+# Multiple servers can be configured; they are started lazily on
+# first use.
+#
+servers:
+  google-workspace-mcp:
+    command: npx
+    args: ["-y", "@dguido/google-workspace-mcp"]
+    env:
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      GOOGLE_WORKSPACE_SERVICES: "${GOOGLE_WORKSPACE_SERVICES}"

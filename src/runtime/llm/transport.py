@@ -46,13 +46,15 @@ class LLMTransport:
 
         # Tool call
         if msg.get("tool_calls"):
-            tc = msg["tool_calls"][0]
+            raw_tool_calls = msg["tool_calls"]
+            tc = raw_tool_calls[0]
             args = tc["function"].get("arguments")
             if isinstance(args, str):
                 args = json.loads(args)
             return CoreLLMResponse(
                 tool_name=tc["function"]["name"],
                 tool_args=args,
+                tool_calls=raw_tool_calls,
             )
 
         # Normal text
@@ -66,3 +68,28 @@ class LLMTransport:
             max_tokens=self.max_tokens,
         )
         return resp["choices"][0]["message"]["content"]
+
+    # ---------------------------------------------------------
+    # Tool-aware completion (native function calling)
+    # ---------------------------------------------------------
+
+    def complete_with_tools(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: List[Dict[str, Any]],
+    ) -> CoreLLMResponse:
+        """Call the LLM with structured messages and tool definitions.
+
+        Uses the instance's configured model, temperature and max_tokens.
+        Returns a CoreLLMResponse with either text (no tool chosen) or
+        tool_name/tool_args/tool_calls (tool chosen by the LLM).
+        """
+        raw = self.client.chat(
+            model=self.model,
+            messages=messages,
+            tools=tools,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+        )
+
+        return self._parse_response(raw)

@@ -66,22 +66,6 @@ def load_all_primitives(registry) -> int:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def load_all_skills(skill_registry, prim_registry, embedder=None) -> int:
-    """Load all .skill.md files from stdlib into the CapabilitySkillRegistry.
-
-    Delegates to the canonical loader in ``src.capabilities.skills.stdlib``.
-
-    **PHASE 3.19.2**: If *embedder* is provided, it is set on the registry
-    before loading so that every skill receives a pre‑computed embedding at
-    registration time.  The embedding is stored on ``CapabilitySkill.embedding``
-    and in the vector store.
-
-    Returns the count of loaded skills.
-    """
-    from src.capabilities.skills.stdlib import load_all_skills as _load
-
-    return _load(skill_registry, prim_registry, embedder=embedder)
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # E2E Harness
@@ -130,42 +114,9 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         _out(f"{MINOR} PRIMITIVES {MINOR}")
         _out(f"  Loaded: {prim_count} primitives")
 
-        # ── 2. Wire up SkillRegistry ─────────────────────────────────────
-        from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
-        from src.capabilities.discovery.embedder import SkillEmbedder
-        from src.capabilities.discovery.providers.mock_provider import MockEmbeddingProvider
-        from src.capabilities.discovery.providers.local_provider import LocalEmbeddingProvider
-
-        # Use real embeddings for real_llm, mock for mock tests
-        if backend == "real_llm":
-            provider = LocalEmbeddingProvider(model="all-MiniLM-L6-v2", dimensions=384)
-        else:
-            provider = MockEmbeddingProvider(dimensions=8)
-        embedder = SkillEmbedder(provider=provider)
-        skill_registry = CapabilitySkillRegistry(embedder=embedder)
-        skill_count = load_all_skills(skill_registry, prim_registry, embedder=embedder)
-        _out(f"  Loaded: {skill_count} skills")
-
-        # ── 3. Wire up SkillRunner ───────────────────────────────────────
-        from src.capabilities.runtime.skill_runner import SkillRunner
-
-        # ── Wire up SkillAuthor pipeline (3.17.5 capability discovery) ──
-        from src.capabilities.registry.skill_safety import SkillSafetyValidator
-        from src.capabilities.skills.author import SkillAuthor
-        from src.capabilities.primitives.stdlib.skill_author import set_author_pipeline
-
-        safety_validator = SkillSafetyValidator(
-            primitive_registry=prim_registry,
-            skill_registry=skill_registry,
-        )
-        author = SkillAuthor(
-            primitive_registry=prim_registry,
-            skill_registry=skill_registry,
-            safety_validator=safety_validator,
-        )
-        set_author_pipeline(author)
-
-        runner = SkillRunner(registry=skill_registry, embedder=embedder)
+        # ── 2. Wire up primitives (skills removed; only primitives remain) ──
+        # SkillRegistry, SkillRunner, SkillAuthor all removed in Phase 4 clean sweep.
+        # Only PrimitiveRegistry is needed for primitive execution.
 
         # ── 4. Wire up MemoryGovernance ──────────────────────────────────
         from src.strategy.memory.segment_memory import SegmentMemory
@@ -222,13 +173,6 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
             created_at=1704067200000,
         ))
 
-        # ── 7a. Discover relevant skills via SkillRunner ─────────────────
-        from src.capabilities.contracts import DiscoveryQuery
-        discovered = runner.discover(DiscoveryQuery(query=prompt, limit=5))
-        skill_refs = [sk.name for sk in discovered.skills]
-        if skill_refs:
-            _out(f"  Discovered {len(skill_refs)} relevant skills: {skill_refs[:3]}{'...' if len(skill_refs) > 3 else ''}")
-
         _out(f"\n{MINOR} LLM PLANNING {MINOR}")
         _out(f"  Prompt: {prompt}")
         _out(f"  Calling LLM ({backend}:{model}) ...")
@@ -238,7 +182,7 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
             goal=prompt,
             governance=governance,
             timestamp=timestamp,
-            skill_refs=skill_refs,
+            skill_refs=[],
         )
         result.plan_id = plan_id
 
@@ -275,60 +219,12 @@ def run_e2e(prompt: str, backend: str = "real_llm", verbose: bool = True) -> Har
         _out(f"  Discovered:  {result.discovered_skills}")
         _out(f"  Steps:       {len(result.plan_steps)}")
 
-        # ── 9. Execute plan steps via SkillRunner ────────────────────────
-        _out(f"\n{MINOR} SKILL EXECUTION {MINOR}")
-
-        from src.capabilities.contracts import SkillCallRequest
-
-        accumulated_outputs: dict[str, Any] = {}
-
-        for i, step in enumerate(result.plan_steps):
-            skill_name = result.target_skill if i == 0 else step.get("capability", result.target_skill)
-            description = step.get("description", f"step-{i}")
-            raw_inputs = step.get("inputs") or plan_record.arguments or {}
-
-            _out(f"\n  [{i+1}/{len(result.plan_steps)}] {description}")
-            _out(f"       skill: {skill_name}")
-
-            call_request = SkillCallRequest(
-                skill_name=skill_name,
-                arguments=raw_inputs,
-            )
-
-            try:
-                s_result = runner.execute(call_request)
-                exec_entry = {
-                    "step_index": i,
-                    "description": description,
-                    "skill_name": skill_name,
-                    "success": s_result.success,
-                    "output": s_result.output,
-                    "error": s_result.error,
-                }
-                result.execution_results.append(exec_entry)
-
-                if s_result.success:
-                    _out(f"       [OK] success  output={json.dumps(s_result.output, default=str)[:120]}")
-                    if s_result.output and isinstance(s_result.output, dict):
-                        accumulated_outputs.update(s_result.output)
-                else:
-                    _out(f"       [FAIL] error={s_result.error}")
-            except Exception as exc:
-                exec_entry = {
-                    "step_index": i,
-                    "description": description,
-                    "skill_name": skill_name,
-                    "success": False,
-                    "output": None,
-                    "error": str(exc),
-                }
-                result.execution_results.append(exec_entry)
-                _out(f"       [EXCEPTION] {exc}")
+        # ── 9. Execute plan steps (SkillRunner removed in Phase 4 clean sweep) ─
+        _out(f"\n{MINOR} SKILL EXECUTION (legacy, disabled) {MINOR}")
+        _out(f"  SkillRunner removed in Phase 4 clean sweep. No execution performed.\n")
 
         # ── 10. Determine overall success ────────────────────────────────
-        result.success = all(
-            r["success"] for r in result.execution_results
-        ) if result.execution_results else bool(result.plan_id)
+        result.success = bool(result.plan_id)
 
     except Exception as exc:
         import traceback

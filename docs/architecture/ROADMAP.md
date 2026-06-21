@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-20 (Sprint 9+9a — completed)  
+> **Last updated:** 2026-06-21 (Sprint 17 — added, Sprint 8 env-var fix)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -287,6 +287,12 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 11.6 | Wire real queue into S4 worker, replacing InMemoryJobStore |
 | 11.7 | Test: crash recovery — jobs requeued on restart |
 | 11.8 | Test: retry backoff — increasing delays between retries |
+| 11.9 | S4 fan-out — dispatch N independent steps as parallel sub-agents from a single workflow step |
+| 11.10 | S4 fan-in — collect results from parallel sub-agents, join on completion or first-failure |
+| 11.11 | Per-sub-agent model/agent override — each parallel branch can specify a different agent or LLM model |
+| 11.12 | Dependency graph support — express step dependencies (not just flat list) for partial parallelism |
+| 11.13 | Test: 3 parallel steps → all complete → join merges results correctly |
+| 11.14 | Test: one parallel step fails → fan-in handles partial failure (configurable: abort-all vs continue) |
 
 ### Sprint 12 — Real S3 Skill Registry
 
@@ -301,6 +307,20 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 12.5 | Skill documentation generation (LLM-readable tool descriptions) |
 | 12.6 | Test: register → discover → execute cycle |
 | 12.7 | I would like to test both a cli tool registered, and a basic MCP tool registered with both working, discoverable, and callable
+
+### Sprint 12a — SQL Structured Data Skill
+
+**Goal:** A built-in skill that lets agents store, query, and manage structured data using SQLite — enabling todo lists, state tracking, batch processing, and persistent session artifacts without external infrastructure.
+
+| Task | What |
+|------|------|
+| 12a.1 | Define `db-store` skill interface — `query(sql, params)` and `execute(sql, params)` actions with structured JSON input/output schemas |
+| 12a.2 | Implement SQLite store wrapper — handles connection lifecycle, parameterized queries, result-set serialization |
+| 12a.3 | Register `db-store` as a built-in capability skill (available to all agents by default) |
+| 12a.4 | Skill instructions — tell agents how to use SQL for tracking progress, storing intermediate results, managing state |
+| 12a.5 | Test: agent stores and retrieves structured data across multiple turns |
+| 12a.6 | Test: concurrent skill calls to different tables do not interfere |
+| 12a.7 | Test: skill returns clear error on invalid SQL (malformed query, missing table) |
 
 ### Sprint 13 — Hardening & Resilience
 
@@ -348,6 +368,35 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 15.8 | Graceful degradation strategy |
 | 15.9 | Disaster recovery story |
 | 15.10 | Architecture doc for future contributors |
+
+### Sprint 16 — Local Custom Overlay (Personal Workspace Isolation)
+
+*Keep the repo clean of opinionated/experimental/test content by adding gitignored "custom" subfolders across all configurable namespaces.*
+
+| Task | What |
+|------|------|
+| 16.1 | Add `custom/` subfolder to `config/workflows/`, `config/agents/`, and update loaders to scan both the standard dir and the `custom/` sibling |
+| 16.2 | Add `custom/` subfolder to `plugins/` (for MCP, skills, primitives, etc.) and update `PluginLoader` to scan both |
+| 16.3 | Add `custom/` to `.gitignore` so local experiments never pollute the repo |
+| 16.4 | Update boot sequence / `composition_root.py` to merge standard + custom artifacts with priority semantics (custom wins on conflict) |
+| 16.5 | Write a `docs/custom_workflows.md` guide explaining the overlay pattern for users who fork the repo |
+
+### Sprint 17 — LLM Provider Abstraction
+
+*Each LLM provider has unique quirks — tool name sanitisation (dots→underscores), `tool_choice` defaults, schema handling (e.g. `required` field injection), token limits, streaming vs non-streaming. These are currently patched ad-hoc across the codebase. This sprint builds a proper abstraction layer.*
+
+| Task | What |
+|------|------|
+| 17.1 | Audit all provider-specific workarounds — search for `tool_choice`, `required` field hacks, name sanitisation, `stop_reason` handling, and any `if provider == "deepseek"`-style branching |
+| 17.2 | Design an `LLMProviderAdapter` interface — a thin shim that translates provider-native schemas into a canonical S1 contract. Each provider implements one adapter; S1 client talks only to the adapter |
+| 17.3 | Adapter — **OpenAI-compatible** (covers OpenAI, DeepSeek, Together, Groq, etc.) |
+| 17.4 | Adapter — **Anthropic** (handles `stop_reason` vs `finish_reason`, tool_use content blocks) |
+| 17.5 | Adapter — **Gemini** (handles `functionCall` content parts, different error schema) |
+| 17.6 | Adapter — **Mistral** (handles `tool_calls` format differences) |
+| 17.7 | Move provider-specific config (tool_choice default, name sanitisation rules) into per-provider adapter config, not the S1 client |
+| 17.8 | Write integration tests — each adapter with its real provider (or recorded fixture), covering: tool call with params, tool call with empty args, no-tool response, error propagation |
+| 17.9 | Regression test — full suite passes with all providers |
+| 17.10 | Document adapter architecture in `docs/architecture/provider_adapters.md` |
 
 ---
 
@@ -542,6 +591,7 @@ Learning Subsystem (async observer)
 | 4 | 7–9 | Operations + Human-in-the-Loop + Agent Selection |
 | 5 | 10 | Stratum Isolation Refactor |
 | 6 | 11–12 | Durable Execution + Real Skills |
+| 6a | 12a | SQL Structured Data Skill |
 | 7 | 13 | Resilience & Self-Healing |
 | 8 | 14 | Observability & DX |
 | 9 | 15 | Polish & Production Readiness |

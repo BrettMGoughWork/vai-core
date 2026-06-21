@@ -10,9 +10,18 @@ and capability (``src.capabilities.*``).
 
 from __future__ import annotations
 
+import os
 from typing import Any, List
 
-from src.capabilities.contracts import DiscoveredSkill
+# Load .env into the process environment BEFORE any module-level init that
+# depends on env vars (e.g. MCP client config resolution expands ${VAR}
+# placeholders via os.path.expandvars).
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
+from src.capabilities.primitives.mcp import MCPPrimitive
+from src.capabilities.primitives.mcp_client import MCPClientManager
 from src.capabilities.primitives.stdlib import load_all_primitives
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 
@@ -37,6 +46,7 @@ from src.agent.workflow import (
     WorkflowRegistry,
 )
 from src.agent.workflow.loader import load_workflows_from_yaml
+from src.agent.workflow.primitive_tool_adapter import PrimitiveToolAdapter
 from src.agent.workflow.workflow_tool_adapter import WorkflowToolAdapter
 
 # ── Agent registry (loaded from declarative YAML) ─────────────────────
@@ -52,6 +62,48 @@ for defn in load_workflows_from_yaml("config/workflows"):
 # ── Primitive registry (loaded from stdlib) ──────────────────────────
 _primitive_registry = PrimitiveRegistry()
 _primitives_loaded = load_all_primitives(_primitive_registry)
+
+# ── MCP client manager (manages MCP server subprocesses) ─────────────
+_mcp_client_manager = MCPClientManager("config/mcp_servers.yaml")
+
+# ── Auto-discover MCP tools and register as primitives ──────────────
+# Phase 8.5: MCP tools are auto-discovered via `tools/list` protocol,
+# bypassing the legacy YAML plugin ceremony. Each tool becomes an
+# MCPPrimitive registered as "mcp.<server>.<tool>" in the registry.
+_mcp_discovered = _mcp_client_manager.discover_tools()
+_mcp_primitive_count = 0
+for _server_name, _tools in _mcp_discovered.items():
+    for _tool_def in _tools:
+        _primitive_name = f"mcp.{_server_name}.{_tool_def['name']}"
+        try:
+            _primitive = MCPPrimitive(
+                name=_primitive_name,
+                description=_tool_def.get("description", ""),
+                server_name=_server_name,
+                tool_name=_tool_def["name"],
+                input_schema=_tool_def.get("input_schema", {"type": "object", "properties": {}}),
+            )
+            _primitive_registry.register(_primitive_name, _primitive)
+            _mcp_primitive_count += 1
+        except ValueError:
+            pass  # already registered (e.g. via plugin manifest) — skip
+if _mcp_primitive_count > 0:
+    import logging
+    logging.getLogger(__name__).info(
+        "Auto-discovered %d MCP tools from %d server(s)",
+        _mcp_primitive_count, len(_mcp_discovered),
+    )
+
+# ── Plugin loader ───────────────────────────────────────────────────
+# Skills layer has been removed (Phase 4 clean sweep). Plugins that
+# previously defined skills should now register Primitives directly.
+# The PluginLoader is retained for backward-compatible plugin YAML loading
+# but will be migrated to a pure primitive-based model in a future sprint.
+
+# ── Shared context injected into every primitive.execute() call ──────
+_PRIMITIVE_CONTEXT: dict[str, object] = {
+    "mcpclient": _mcp_client_manager,
+}
 
 
 def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -69,13 +121,13 @@ def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
         return None  # unknown → dispatch to S4B
 
     try:
-        result = primitive.execute(arguments, context={})
+        result = primitive.execute(arguments, context=_PRIMITIVE_CONTEXT)
         return {
             "status": result.status,
             "message": (
                 f"Primitive '{skill_name}' executed successfully"
                 if result.status == "success"
-                else f"Primitive '{skill_name}' failed"
+                else f"Primitive '{skill_name}' failed: {result.error}"
             ),
             "outputs": result.data if result.data is not None else {},
         }
@@ -85,6 +137,8 @@ def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
             "message": f"Primitive '{skill_name}' raised: {exc}",
             "outputs": {},
         }
+
+
 
 
 # ── S1 → S2: inject LLM transport via DI slot ──────────────────────
@@ -156,6 +210,10 @@ class _S1Executor:
     ) -> CoreLLMResponse:
         if _llm_transport is None:
             return CoreLLMResponse(text="", tool_name=None, tool_args=None)
+        messages = [{"role": "user", "content": prompt}]
+        if hasattr(_llm_transport, "complete_with_tools"):
+            return _llm_transport.complete_with_tools(messages, tools)
+        # Fallback: text-only complete if tool-calling not available
         text = _llm_transport.complete(prompt)
         return CoreLLMResponse(text=text, tool_name=None, tool_args=None)
 
@@ -187,10 +245,10 @@ _shared_governance = MemoryGovernance(
 
 
 # ── Wired StrategyRouter → Supervisor ───────────────────────────────
-def _discover_capabilities() -> list[DiscoveredSkill]:
-    """Return all primitives from the real registry as discoverable skills."""
+def _discover_capabilities() -> list[dict]:
+    """Return all primitives from the real registry as tool definitions."""
     return [
-        DiscoveredSkill(name=p.name, description=p.description)
+        {"name": p.name, "description": p.description}
         for p in _primitive_registry.list()
     ]
 
@@ -212,7 +270,7 @@ def _execute_plan_step(step_payload: dict[str, Any]) -> dict[str, Any]:
     primitive = _primitive_registry.get(skill_ref)
     if primitive is not None:
         try:
-            result = primitive.execute(inputs, context={})
+            result = primitive.execute(inputs, context=_PRIMITIVE_CONTEXT)
             return {
                 "status": result.status,
                 "message": (
@@ -264,6 +322,7 @@ _strategy_router = StrategyRouter(
 _workflow_engine = WorkflowEngine(wf_registry)
 _interaction_manager = UserInteractionManager(_workflow_engine)
 _workflow_tool_adapter = WorkflowToolAdapter(wf_registry)
+_primitive_tool_adapter = PrimitiveToolAdapter(_primitive_registry)
 _supervisor = Supervisor(
     registry=_registry,
     store=state_store,
@@ -274,6 +333,7 @@ _supervisor = Supervisor(
     inline_tool_executor=_execute_tool_inline,
     interaction_manager=_interaction_manager,
     workflow_tool_adapter=_workflow_tool_adapter,
+    primitive_tool_adapter=_primitive_tool_adapter,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────

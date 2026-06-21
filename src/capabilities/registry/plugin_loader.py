@@ -1,21 +1,18 @@
 """
-Plugin loader — discovers, validates, and registers filesystem plugins (Phase 3.14.2).
+Plugin loader — discovers, validates, and registers filesystem plugins.
 
 A plugin is a directory containing a ``plugin.yml`` manifest plus
-``primitives/`` and ``skills/`` subdirectories.  The PluginLoader scans
+``primitives/`` and/or ``mcp/`` subdirectories.  The PluginLoader scans
 a ``plugins/`` directory, validates manifests, imports Python primitives,
-parses ``.skill.md`` files, and registers everything into the existing
-``PrimitiveRegistry`` and ``CapabilitySkillRegistry``.
+and registers everything into the existing ``PrimitiveRegistry``.
 
 Usage::
 
     from src.capabilities.registry.plugin_loader import PluginLoader
     from src.capabilities.registry.primitive_registry import PrimitiveRegistry
-    from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
 
     prim_registry = PrimitiveRegistry()
-    skill_registry = CapabilitySkillRegistry()
-    loader = PluginLoader(prim_registry, skill_registry)
+    loader = PluginLoader(prim_registry)
     loader.load_all("plugins/")
 """
 
@@ -32,12 +29,9 @@ import yaml
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.registry.plugin_schema import PluginManifest
 from src.capabilities.registry.snapshot import SnapshotManager
-from src.capabilities.skills.manifest import SkillManifest
-from src.capabilities.skills.skill import CapabilitySkill
 
 if TYPE_CHECKING:
     from src.capabilities.registry.primitive_registry import PrimitiveRegistry
-    from src.capabilities.registry.skill_registry import CapabilitySkillRegistry
 
 
 class PluginLoader:
@@ -46,10 +40,8 @@ class PluginLoader:
     def __init__(
         self,
         prim_registry: PrimitiveRegistry,
-        skill_registry: CapabilitySkillRegistry,
     ) -> None:
         self._prim_registry = prim_registry
-        self._skill_registry = skill_registry
         self._loaded: dict[str, _LoadedPlugin] = {}
         self._snapshot_manager = SnapshotManager()
         # Persist paths of unloaded plugins so reload_plugin works after explicit unload.
@@ -104,10 +96,10 @@ class PluginLoader:
                 f"Plugin '{manifest.name}' is already loaded. "
                 f"Unload it first before re‑loading."
             )
-        if _has_stdlib_collision(manifest.name, self._prim_registry, self._skill_registry):
+        if self._prim_registry.get(manifest.name) is not None:
             raise ValueError(
                 f"Plugin name '{manifest.name}' collides with a stdlib primitive "
-                f"or skill — plugin names must not shadow built‑ins."
+                f"— plugin names must not shadow built‑ins."
             )
 
         # --- load primitives ---
@@ -138,43 +130,22 @@ class PluginLoader:
                     self._prim_registry.register(inst.name, inst)
                     primitive_names.append(inst.name)
 
-        # --- load skills ---
-        skill_names: list[str] = []
-        skills_dir = plugin_path / "skills"
-        if skills_dir.is_dir():
-            for filename in manifest.skills:
-                skill_file = skills_dir / filename
-                if not skill_file.is_file():
-                    raise ValueError(
-                        f"Plugin '{manifest.name}': skill file '{filename}' not found"
-                    )
-                name = _load_skill_from_file(
-                    skill_file, self._prim_registry, self._skill_registry,
-                    plugin_name=manifest.name,
-                    plugin_version=manifest.version,
-                )
-                skill_names.append(name)
-
-        # --- auto-discover skills not listed in manifest ---
-        if skills_dir.is_dir():
-            for skill_file in sorted(skills_dir.glob("*.skill.md")):
-                if skill_file.name in manifest.skills:
-                    continue  # already loaded above
-                try:
-                    name = _load_skill_from_file(
-                        skill_file, self._prim_registry, self._skill_registry,
-                        plugin_name=manifest.name,
-                        plugin_version=manifest.version,
-                    )
-                    skill_names.append(name)
-                except Exception:
-                    continue
+        # --- load MCP servers (via MCPLoader from YAML config) ---
+        mcp_config_path = plugin_path / "mcp" / "mcp_servers.yaml"
+        if mcp_config_path.is_file():
+            from src.capabilities.registry.loaders.mcp_loader import MCPLoader
+            with open(mcp_config_path) as f:
+                config = yaml.safe_load(f) or {}
+            for prim in MCPLoader.load_from_config(config):
+                prim.plugin_name = manifest.name
+                prim.plugin_version = manifest.version
+                self._prim_registry.register(prim.name, prim)
+                primitive_names.append(prim.name)
 
         # --- track ---
         self._loaded[manifest.name] = _LoadedPlugin(
             manifest=manifest,
             primitive_names=primitive_names,
-            skill_names=skill_names,
             plugin_path=str(plugin_path),
         )
 
@@ -219,10 +190,6 @@ class PluginLoader:
         # Remember the path so reload_plugin can find it later.
         self._reloadable_paths[plugin_name] = info.plugin_path
 
-        # Deregister skills first (they may reference plugin primitives)
-        for skill_name in info.skill_names:
-            self._skill_registry.remove(skill_name)
-
         # Deregister primitives
         for prim_name in info.primitive_names:
             self._prim_registry.remove(prim_name)
@@ -255,13 +222,11 @@ class PluginLoader:
 
     def _capture_snapshot(self) -> None:
         """Capture a deterministic registry snapshot after state change."""
-        skills = self._skill_registry.ordered_list()
-        # Primitives sorted by name for deterministic ordering
         primitives = sorted(
             self._prim_registry.list(),
             key=lambda p: p.name,
         )
-        self._snapshot_manager.capture(skills, primitives)
+        self._snapshot_manager.capture([], primitives)
 
     def list_loaded(self) -> list[str]:
         """Return sorted list of currently loaded plugin names."""
@@ -280,12 +245,10 @@ class _LoadedPlugin:
         self,
         manifest: PluginManifest,
         primitive_names: list[str],
-        skill_names: list[str],
         plugin_path: str,
     ) -> None:
         self.manifest = manifest
         self.primitive_names = primitive_names
-        self.skill_names = skill_names
         self.plugin_path = plugin_path
 
 
@@ -351,55 +314,4 @@ def _load_primitives_from_file(
             f"No PrimitiveBase subclass found in '{py_file}'"
         )
     return instances
-
-
-def _load_skill_from_file(
-    skill_file: Path,
-    prim_registry: PrimitiveRegistry,
-    skill_registry: CapabilitySkillRegistry,
-    plugin_name: str | None = None,
-    plugin_version: str | None = None,
-) -> str:
-    """Parse a .skill.md file and register it.  Returns the skill name."""
-    raw_text = skill_file.read_text(encoding="utf-8")
-    yaml_text = _extract_yaml_frontmatter(raw_text, str(skill_file))
-    data = yaml.safe_load(yaml_text)
-    if not isinstance(data, dict):
-        raise ValueError(
-            f"Invalid skill manifest in {skill_file}: YAML must be a mapping"
-        )
-    data["plugin_name"] = plugin_name
-    data["plugin_version"] = plugin_version
-    manifest = SkillManifest.from_dict(data)
-    skill = CapabilitySkill.from_manifest(manifest, prim_registry)
-    skill_registry.register(skill)
-    return manifest.name
-
-
-def _extract_yaml_frontmatter(text: str, source: str) -> str:
-    """Extract YAML between ``---`` delimiters from a .skill.md file."""
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        raise ValueError(f"Missing opening --- in {source}")
-    end_idx: int | None = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end_idx = i
-            break
-    if end_idx is None:
-        raise ValueError(f"Missing closing --- in {source}")
-    return "\n".join(lines[1:end_idx])
-
-
-def _has_stdlib_collision(
-    name: str,
-    prim_registry: PrimitiveRegistry,
-    skill_registry: CapabilitySkillRegistry,
-) -> bool:
-    """Return True if *name* collides with a stdlib primitive or skill name."""
-    if prim_registry.get(name) is not None:
-        return True
-    if skill_registry.get(name) is not None:
-        return True
-    return False
 
