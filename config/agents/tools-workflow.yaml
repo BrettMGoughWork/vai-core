@@ -5,7 +5,7 @@ description: Agent that dispatches tool execute jobs via S4B
 version: 1.0.0
 provenance: built-in
 persona: Tool executor — runs primitives and scripts via S4B
-skills:
+tools:
   - stdlib.echo
   - stdlib.proc.exec
   - stdlib.proc.execsafe

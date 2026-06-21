@@ -5,7 +5,7 @@ description: Agent specialised in research, planning, and knowledge synthesis
 version: 1.0.0
 provenance: built-in
 persona: Researcher — plans complex tasks, synthesises knowledge, and produces structured outputs
-skills:
+tools:
   - stdlib.search.web
   - stdlib.fetch.simple
   - stdlib.file.readhead

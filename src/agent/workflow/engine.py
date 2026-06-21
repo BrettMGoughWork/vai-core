@@ -296,7 +296,7 @@ class WorkflowEngine:
         context["result"] = result
         # Extract a readable text from dict results (LLM responses)
         if isinstance(result, dict):
-            context["last_output"] = str(result.get("message", result))
+            context["last_output"] = str(result.get("message") or result)
         else:
             context["last_output"] = str(result)
         resumed = _copy_state(
