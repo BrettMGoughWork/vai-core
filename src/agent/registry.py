@@ -152,6 +152,11 @@ class AgentMetadata:
         If empty or contains ``"*"``, all registered tools are available.
     workflows:
         Explicit list of workflow IDs the agent has access to.
+    patterns:
+        Explicit list of pattern IDs the agent knows about.
+        Pattern instructions are injected into the LLM context, and the
+        pattern's required primitives are automatically resolved — the
+        agent does not need to list them explicitly in ``tools``.
     inputs:
         Input types the agent accepts.
     outputs:
@@ -165,6 +170,7 @@ class AgentMetadata:
     skills: List[str] = field(default_factory=list)
     tools: List[str] = field(default_factory=list)
     workflows: List[str] = field(default_factory=list)
+    patterns: List[str] = field(default_factory=list)
     inputs: List[str] = field(default_factory=list)
     outputs: List[str] = field(default_factory=list)
     constraints: AgentConstraints = field(default_factory=AgentConstraints)
@@ -176,6 +182,8 @@ class AgentMetadata:
             raise ValueError("tools must be a list")
         if not isinstance(self.workflows, list):
             raise ValueError("workflows must be a list")
+        if not isinstance(self.patterns, list):
+            raise ValueError("patterns must be a list")
         if not isinstance(self.inputs, list):
             raise ValueError("inputs must be a list")
         if not isinstance(self.outputs, list):
@@ -290,6 +298,13 @@ class AgentRegistry:
         return [
             a for a in self._agents.values()
             if workflow_id in a.workflows
+        ]
+
+    def find_agents_by_pattern(self, pattern_id: str) -> List[AgentMetadata]:
+        """Return all agents that have *pattern_id* in their patterns list."""
+        return [
+            a for a in self._agents.values()
+            if pattern_id in a.patterns
         ]
 
     # ------------------------------------------------------------------

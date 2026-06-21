@@ -74,7 +74,7 @@ def _check_s1_contract_locked() -> bool:
             parse_prompt_response,
             map_s1_error_to_agent_error,
         )
-        from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+        from src.runtime.llm.client import call_s1_backend
         from src.strategy.planning.s1_contract.s1_simulation_backend import (
             simulate_prompt_response,
         )
@@ -160,7 +160,7 @@ def _check_real_llm_behind_flag() -> bool:
     - unknown backends raise an error
     """
     try:
-        from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+        from src.runtime.llm.client import call_s1_backend
         from src.strategy.planning.s1_contract.types import (
             PromptRequest,
             PromptResponse,

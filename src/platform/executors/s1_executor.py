@@ -18,7 +18,7 @@ from typing import Any
 
 from src.platform.adapter.adapter import s1_to_s2_adapter, s2_to_s1_adapter
 from src.platform.transport.normalization import ChannelMessage
-from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.runtime.llm.client import call_s1_backend
 from src.strategy.planning.s1_contract.s1_real_client import ENABLE_REAL_LLM
 from src.strategy.planning.s1_contract.types import PromptRequest, S1Error
 

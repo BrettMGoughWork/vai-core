@@ -29,7 +29,7 @@ from src.strategy.planning.s1_contract.s1_prompt_builder import (
 )
 from src.strategy.planning.s1_contract.s1_response_validator import validate_llm_response
 from src.strategy.planning.s1_contract.s1_to_s2_adapter import map_s1_error_to_agent_error
-from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.runtime.llm.client import call_s1_backend
 
 
 # ──────────────────────────────────────────────────────────────────────

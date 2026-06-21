@@ -43,7 +43,7 @@ from src.strategy.planning.s1_contract.s1_to_s2_adapter import (
     parse_prompt_response,
     validate_s1_to_s2,
 )
-from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.runtime.llm.client import call_s1_backend
 from src.strategy.planning.s1_contract.validators import (
     validate_prompt_request,
     validate_prompt_response,

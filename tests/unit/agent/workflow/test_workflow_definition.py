@@ -369,6 +369,18 @@ class TestInvalidStepType:
                 transitions={"on_success": END_TARGET},
             )
 
+    def test_apply_pattern_is_valid_step_type(self) -> None:
+        """apply_pattern is accepted as a valid step type."""
+        step = WorkflowStep(
+            step_id="apply",
+            step_type="apply_pattern",
+            label="Apply pattern",
+            config={"pattern_id": "reply_to_email"},
+            transitions={"on_success": END_TARGET},
+        )
+        assert step.step_type == "apply_pattern"
+        assert step.config["pattern_id"] == "reply_to_email"
+
 
 # ===================================================================
 # 9. Registry: register → get → returns same definition

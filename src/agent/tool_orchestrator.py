@@ -156,6 +156,13 @@ class ToolOrchestrator:
                                 wf_state.context,
                                 wf_state.step_results,
                             )
+                            # Merge pattern_instructions (from apply_pattern step) into agent_metadata
+                            if isinstance(rendered, dict):
+                                pattern_instructions = rendered.pop("pattern_instructions", None)
+                                if pattern_instructions:
+                                    rendered.setdefault("agent_metadata", {})
+                                    existing = rendered["agent_metadata"].get("patterns", [])
+                                    rendered["agent_metadata"]["patterns"] = pattern_instructions + existing
                             from src.agent.strategy_router import RouterOutcome
                             ro = RouterOutcome(
                                 type=outcome.type,

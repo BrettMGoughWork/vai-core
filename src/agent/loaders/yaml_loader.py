@@ -156,6 +156,7 @@ def _parse_entry(entry: dict) -> AgentMetadata:
         skills=entry.get("skills", []),
         tools=entry.get("tools", []),
         workflows=entry.get("workflows", []),
+        patterns=entry.get("patterns", []),
         inputs=entry.get("inputs", []),
         outputs=entry.get("outputs", []),
         constraints=constraints,

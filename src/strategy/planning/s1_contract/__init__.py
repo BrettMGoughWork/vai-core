@@ -31,7 +31,7 @@ from src.strategy.planning.s1_contract.validators import (
 
 from src.strategy.planning.s1_contract.s2_to_s1_adapter import build_prompt_request, validate_s2_to_s1, validate_s2_to_s1_detailed
 from src.strategy.planning.s1_contract.s1_to_s2_adapter import parse_prompt_response, validate_s1_to_s2, validate_s1_to_s2_detailed
-from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.runtime.llm.client import call_s1_backend
 from src.strategy.planning.s1_contract.s1_simulation_backend import simulate_prompt_response
 from src.strategy.planning.s1_contract.s1_prompt_builder import build_llm_prompt
 from src.strategy.planning.s1_contract.s1_response_validator import validate_llm_response

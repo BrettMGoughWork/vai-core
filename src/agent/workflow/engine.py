@@ -145,8 +145,14 @@ class WorkflowEngine:
     produces the same result.
     """
 
-    def __init__(self, registry: WorkflowRegistry) -> None:
+    def __init__(
+        self,
+        registry: WorkflowRegistry,
+        *,
+        pattern_registry: Any = None,
+    ) -> None:
         self._registry = registry
+        self._pattern_registry = pattern_registry
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -529,6 +535,60 @@ def _handle_sub_workflow(
     )
 
 
+def _handle_apply_pattern(
+    engine: WorkflowEngine,
+    state: WorkflowExecutionState,
+    step: Any,
+    defn: Any,
+) -> Tuple[WorkflowExecutionState, StepOutcome]:
+    """Resolve pattern instructions and emit an enriched llm_call outcome.
+
+    Looks up the pattern by ``config.pattern_id`` in the engine's
+    ``_pattern_registry``, injects the pattern's instructions into the
+    step config, and emits an ``llm_call`` outcome so the invoker
+    routes it to the LLM with pattern guidance.
+    """
+    pattern_id = step.config.get("pattern_id")
+    if not pattern_id:
+        return engine._fail(
+            state,
+            f"apply_pattern step {step.step_id!r} missing config.pattern_id",
+        )
+
+    pattern_registry = engine._pattern_registry
+    if pattern_registry is None:
+        return engine._fail(
+            state,
+            f"apply_pattern step {step.step_id!r}: no pattern_registry configured",
+        )
+
+    pattern = pattern_registry.get(pattern_id)
+    if pattern is None:
+        return engine._fail(
+            state,
+            f"apply_pattern step {step.step_id!r}: "
+            f"pattern {pattern_id!r} not found in registry",
+        )
+
+    # Enrich config with pattern instructions for the LLM
+    enriched_config = dict(step.config)
+    enriched_config["pattern_instructions"] = [{
+        "pattern_id": pattern.pattern_id,
+        "name": pattern.name,
+        "instructions": pattern.instructions,
+    }]
+
+    return engine._advance(
+        state,
+        step,
+        StepOutcome(
+            type="llm_call",
+            step_id=step.step_id,
+            config=enriched_config,
+        ),
+    )
+
+
 def _handle_planner_call(
     engine: WorkflowEngine,
     state: WorkflowExecutionState,
@@ -613,6 +673,7 @@ _STEP_HANDLERS = {
     "user_input": _handle_user_input,
     "condition": _handle_condition,
     "planner_call": _handle_planner_call,
+    "apply_pattern": _handle_apply_pattern,
 }
 
 

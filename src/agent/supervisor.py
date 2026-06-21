@@ -68,6 +68,7 @@ from src.agent.selection import AgentSelectionStrategy
 from src.agent.workflow import WorkflowEngine, WorkflowInstanceStore, WorkflowRegistry
 from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.agent.workflow.user_interaction import UserInteractionManager
+from src.capabilities.patterns.pattern_registry import PatternRegistry
 from src.agent.strategy_router import RouterOutcome, StrategyRouter
 
 # ---------------------------------------------------------------------------
@@ -121,6 +122,7 @@ class Supervisor:
         inline_tool_executor: Optional[Callable[[dict[str, Any]], dict[str, Any] | None]] = None,
         workflow_tool_adapter: Optional[Any] = None,
         primitive_tool_adapter: Optional[Any] = None,
+        pattern_registry: Optional[PatternRegistry] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -137,6 +139,7 @@ class Supervisor:
         )
         self._workflow_tool_adapter = workflow_tool_adapter
         self._primitive_tool_adapter = primitive_tool_adapter
+        self._pattern_registry = pattern_registry
         self._hitl = HitlManager(
             inline_tool_executor=inline_tool_executor,
             strategy_router=strategy_router,
@@ -203,6 +206,42 @@ class Supervisor:
                     filtered.append(tool)
                     break
         return filtered
+
+    def _resolve_pattern_primitives(self, agent_meta) -> list[str]:
+        """Expand the agent's patterns into their required primitive tool names.
+
+        Patterns act as capability gateways — an agent that lists pattern-X
+        gets access to pattern-X's primitives without needing to list them
+        explicitly in ``tools``.  Returns the union of the agent's explicit
+        ``tools`` and all primitives declared by the agent's patterns.
+        """
+        if not self._pattern_registry:
+            return list(agent_meta.tools)
+        all_tools = set(agent_meta.tools)
+        for pid in agent_meta.patterns:
+            pattern = self._pattern_registry.get(pid)
+            if pattern:
+                all_tools.update(pattern.primitives)
+        return sorted(all_tools)
+
+    def _get_pattern_instructions(self, agent_meta) -> list[dict]:
+        """Return pattern instructions for patterns listed by the agent.
+
+        Each entry includes pattern_id, name, and instructions — intended
+        for injection into the LLM system prompt as contextual guidance.
+        """
+        if not self._pattern_registry:
+            return []
+        result: list[dict] = []
+        for pid in agent_meta.patterns:
+            pattern = self._pattern_registry.get(pid)
+            if pattern:
+                result.append({
+                    "pattern_id": pattern.pattern_id,
+                    "name": pattern.name,
+                    "instructions": pattern.instructions,
+                })
+        return result
 
     # ── 1. create_agent ────────────────────────────────────────────────
 
@@ -409,7 +448,7 @@ class Supervisor:
                     primitive_tools = self._primitive_tool_adapter.list_tools()
                     tool_context.extend(primitive_tools)
                 tool_context = self._filter_tool_context(
-                    tool_context, agent_meta.tools,
+                    tool_context, self._resolve_pattern_primitives(agent_meta),
                 )
                 return self._hitl.run_confirmed_skills(
                     state, pending, input_text, route, meta, self._persist,
@@ -433,8 +472,9 @@ class Supervisor:
             # Filter tool_context to only include tools the agent is allowed to use.
             # When agent_meta.tools is populated, only tools whose function name
             # matches an entry (substring or fnmatch glob) are included.
+            resolved_skills = self._resolve_pattern_primitives(agent_meta)
             tool_context = self._filter_tool_context(
-                tool_context, agent_meta.tools,
+                tool_context, resolved_skills,
             )
 
             outcome = RouterOutcome(
@@ -449,6 +489,7 @@ class Supervisor:
                             "persona": agent_meta.persona,
                             "tools": list(agent_meta.tools),
                             "workflows": list(agent_meta.workflows),
+                                "patterns": self._get_pattern_instructions(agent_meta),
                         },
                     },
                     "backend": "conversational",
@@ -604,7 +645,9 @@ class Supervisor:
                 ))
 
             workflow_id = route.payload.get("workflow_id") or state.agent_id
-            engine = self._workflow_engine or WorkflowEngine(self._workflow_registry)
+            engine = self._workflow_engine or WorkflowEngine(
+                self._workflow_registry, pattern_registry=self._pattern_registry,
+            )
 
             # ── Resume path (workflow state exists in metadata) ────────
             wf_dict = meta.get("workflow_state")

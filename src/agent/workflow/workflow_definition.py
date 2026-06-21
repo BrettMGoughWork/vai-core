@@ -12,6 +12,8 @@ Step types:
     sub_workflow   — Invoke another workflow
     user_input     — Await human input
     condition      — Branch logic based on context expression
+    planner_call   — Delegate to S2 Planner
+    apply_pattern  — Apply pattern instructions as LLM guidance
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ StepType = Literal[
     "user_input",
     "condition",
     "planner_call",
+    "apply_pattern",
 ]
 
 VALID_STEP_TYPES: frozenset[str] = frozenset({
@@ -38,6 +41,7 @@ VALID_STEP_TYPES: frozenset[str] = frozenset({
     "user_input",
     "condition",
     "planner_call",
+    "apply_pattern",
 })
 
 # Reserved transition target (means "workflow complete")

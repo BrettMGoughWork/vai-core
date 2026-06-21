@@ -240,6 +240,12 @@ class WorkflowInvoker:
                             "persona": selected_agent_meta.persona,
                         })
 
+                # Merge pattern_instructions (from apply_pattern step) into agent_metadata
+                pattern_instructions = rendered_config.pop("pattern_instructions", None)
+                if pattern_instructions and "agent_metadata" in rendered_config:
+                    existing_patterns = rendered_config["agent_metadata"].get("patterns", [])
+                    rendered_config["agent_metadata"]["patterns"] = pattern_instructions + existing_patterns
+
                 # Build tool_context from workflow + primitive tool adapters
                 tool_context: list[dict] = []
                 if self._workflow_tool_adapter is not None:

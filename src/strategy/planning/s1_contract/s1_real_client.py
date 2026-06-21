@@ -151,7 +151,7 @@ def _call_provider(prompt_text: str) -> str:
     providers (OpenAI, Anthropic, Gemini, DeepSeek, Qwen, Mistral) are
     supported through a single code path.
     """
-    from src.strategy.planning.s1_contract.s1_client import _llm_transport
+    from src.runtime.llm.client import _llm_transport
 
     if _llm_transport is None:
         raise S1RealLLMError(

@@ -28,9 +28,6 @@ tools/custom/
 plugins/*
 !plugins/.gitkeep
 
-# User-specific agent configs
-config/agents/email-agent.yaml
-
 # Local dev binaries (MailHog, smtp4dev, etc.)
 tools/dev/*.exe
 
