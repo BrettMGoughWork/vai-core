@@ -24,6 +24,7 @@ from src.capabilities.patterns.pattern_loader import load_patterns_from_director
 from src.capabilities.patterns.pattern_registry import PatternRegistry
 from src.capabilities.primitives.mcp import MCPPrimitive
 from src.capabilities.primitives.mcp_client import MCPClientManager
+from src.capabilities.primitives.fetch import load_all_primitives as load_fetch_primitives
 from src.capabilities.primitives.stdlib import load_all_primitives as load_stdlib_primitives
 from src.capabilities.primitives.custom import load_all_primitives as load_custom_primitives
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
@@ -56,6 +57,14 @@ from src.agent.workflow.workflow_tool_adapter import WorkflowToolAdapter
 _registry = AgentRegistry()
 load_agents_from_directory(_registry, "config/agents")
 
+# Validate deferral graph for acyclicity before any runtime operations
+# (catches cycles, self-references, and references to unknown agents)
+from src.agent.deferral import validate_deferral_graph  # noqa: E402
+_deferral_errors = validate_deferral_graph(_registry)
+if _deferral_errors:
+    _error_msgs = "\n  ".join(str(e) for e in _deferral_errors)
+    raise ValueError(f"Deferral graph validation failed:\n  {_error_msgs}")
+
 # ── Workflow registry (loaded from YAML files) ────────────────────────
 wf_registry = WorkflowRegistry()
 for defn in load_workflows_from_yaml("config/workflows"):
@@ -66,6 +75,7 @@ for defn in load_workflows_from_yaml("config/workflows"):
 _primitive_registry = PrimitiveRegistry()
 _primitives_loaded = load_stdlib_primitives(_primitive_registry)
 _custom_primitives_loaded = load_custom_primitives(_primitive_registry)
+_fetch_primitives_loaded = load_fetch_primitives(_primitive_registry)
 
 # ── Pattern registry (loaded from declarative YAML files) ──────────
 _pattern_registry = PatternRegistry()

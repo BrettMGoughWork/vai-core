@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.fetch.domain_policy import DomainPolicy
-from src.strategy.types.fetch.mode_selector import FetchMode, ModeHistory
-from src.strategy.types.fetch.request import FetchRequest
-from src.strategy.types.fetch.response import FetchResponse
-from src.strategy.types.fetch.signal_extraction import FetchSignals
-from src.strategy.types.fetch.signal_fallback import (
+from src.capabilities.primitives.fetch.domain_policy import DomainPolicy
+from src.capabilities.primitives.fetch.mode_selector import FetchMode, ModeHistory
+from src.capabilities.primitives.fetch.request import FetchRequest
+from src.capabilities.primitives.fetch.response import FetchResponse
+from src.capabilities.primitives.fetch.signal_extraction import FetchSignals
+from src.capabilities.primitives.fetch.signal_fallback import (
     FallbackDecision,
     _ESCALATION_CHAIN,
     _MODE_TIMEOUTS,

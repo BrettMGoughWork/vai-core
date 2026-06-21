@@ -7,7 +7,7 @@ provenance: built-in
 persona: Researcher — plans complex tasks, synthesises knowledge, and produces structured outputs
 tools:
   - stdlib.search.web
-  - stdlib.fetch.simple
+  - stdlib.fetch
   - stdlib.file.readhead
   - stdlib.text.extract
 workflows:

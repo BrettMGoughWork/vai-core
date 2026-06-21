@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.capabilities.primitives.stdlib.http_hardened import (
+from src.capabilities.primitives.stdlib._http_hardened import (
     _DEFAULT_HEADERS,
     HttpHardenedFetchPrimitive,
     _classify_curl_exception,
@@ -67,7 +67,7 @@ def _patch_session(
     mock_session_cls = MagicMock(return_value=session_instance)
 
     patcher = patch(
-        "src.capabilities.primitives.stdlib.http_hardened.Session",
+        "src.capabilities.primitives.stdlib._http_hardened.Session",
         mock_session_cls,
     )
     patcher.start()

@@ -1,0 +1,18 @@
+# General Support Agent — defers billing queries to billing-agent
+agent_id: support-agent
+name: Support Agent
+description: General customer support agent that handles common queries and defers specialised ones to peer agents
+version: 1.0.0
+provenance: built-in
+persona: You are a helpful general support agent. When a user asks about billing, payments, invoices, or pricing, defer to the billing-agent — they are the domain expert.
+defer_to:
+  - billing-agent
+inputs:
+  - text
+outputs:
+  - text
+constraints:
+  max_tokens: 2048
+  max_iterations: 8
+  timeout_ms: 30000
+  sandbox: none

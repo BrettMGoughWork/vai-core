@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.fetch.sanitisation import sanitise_response
+from src.capabilities.primitives.fetch.sanitisation import sanitise_response
 
 
 # ============================================================================
@@ -387,7 +387,7 @@ class TestEdgeCases:
 
     def test_every_error_type_mapped(self):
         """All entries in _ERROR_TYPE_MAP produce valid output."""
-        from src.strategy.types.fetch.sanitisation import _ERROR_TYPE_MAP
+        from src.capabilities.primitives.fetch.sanitisation import _ERROR_TYPE_MAP
 
         for raw_type in _ERROR_TYPE_MAP:
             raw = _raw_failure()

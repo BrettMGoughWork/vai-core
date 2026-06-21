@@ -64,6 +64,14 @@ An agent is a **persona plus a capability set** — it has a system prompt (pers
 
 Agents can also select and invoke workflows as tools — the agent decides which workflow fits the user's intent, and the workflow engine takes over from there.
 
+#### Agent Deferral
+
+An agent can optionally declare a list of peer agents it can **defer** to — handing off work mid-conversation when another agent is better suited. The delegating agent suspends, the delegate runs with its own persona and tools, and control returns to the delegator with the delegate's response injected as context.
+
+This enables **specialisation** (a general support agent hands off billing queries to a billing specialist), **capability mismatch** (a chat assistant defers execution to a task-specific agent), and **task decomposition** (one agent breaks a complex request into sub-tasks for peers). The deferral graph is validated for acyclicity at registration time — no agent can defer, directly or indirectly, back to itself.
+
+See [Agent Deferral](docs/architecture/agent-deferral.md) for the full design.
+
 ---
 
 ## Compositional Philosophy

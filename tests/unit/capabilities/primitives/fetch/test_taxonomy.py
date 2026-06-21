@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.fetch.taxonomy import classify_url, choose_fetch_mode
+from src.capabilities.primitives.fetch.taxonomy import classify_url, choose_fetch_mode
 
 
 # ── classify_url: article URLs ──────────────────────────────────────────

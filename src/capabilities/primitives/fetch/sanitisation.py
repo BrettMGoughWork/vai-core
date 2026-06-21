@@ -8,7 +8,7 @@ exposes ONLY the fields allowed by the ``fetch_url`` interface.
 
 Usage::
 
-    from src.strategy.types.fetch.sanitisation import sanitise_response
+    from src.capabilities.primitives.fetch.sanitisation import sanitise_response
 
     clean = sanitise_response(raw_response)
     # clean contains only: ok, status_code, final_url, headers, cookies,

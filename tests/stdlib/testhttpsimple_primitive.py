@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from src.capabilities.primitives.stdlib.http_simple import HttpSimpleFetchPrimitive
+from src.capabilities.primitives.stdlib._http_simple import HttpSimpleFetchPrimitive
 from src.capabilities.primitives.types import PrimitiveResult
 
 

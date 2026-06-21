@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.fetch.mode_selector import (
+from src.capabilities.primitives.fetch.mode_selector import (
     ALL_MODES,
     FetchMode,
     ModeHistory,
@@ -13,7 +13,7 @@ from src.strategy.types.fetch.mode_selector import (
     _url_pattern_score,
     select_initial_mode,
 )
-from src.strategy.types.fetch.request import FetchRequest
+from src.capabilities.primitives.fetch.request import FetchRequest
 
 
 # ---------------------------------------------------------------------------

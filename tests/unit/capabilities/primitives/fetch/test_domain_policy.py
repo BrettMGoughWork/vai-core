@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.fetch.domain_policy import (
+from src.capabilities.primitives.fetch.domain_policy import (
     DomainPolicy,
     _extract_domain,
     _normalise_forbidden_modes,

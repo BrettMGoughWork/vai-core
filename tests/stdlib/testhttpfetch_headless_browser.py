@@ -16,7 +16,7 @@ import pytest
 
 from playwright.sync_api import Error as PwError, TimeoutError as PwTimeoutError
 
-from src.capabilities.primitives.stdlib.http_headless_browser import (
+from src.capabilities.primitives.stdlib._http_headless_browser import (
     _classify_pw_exception,
     HttpHeadlessBrowserPrimitive,
 )
@@ -102,7 +102,7 @@ def _patch_playwright(
     mock_cm.__enter__.return_value = mock_pw
 
     patcher = patch(
-        "src.capabilities.primitives.stdlib.http_headless_browser.sync_playwright",
+        "src.capabilities.primitives.stdlib._http_headless_browser.sync_playwright",
         return_value=mock_cm,
     )
     patcher.start()
@@ -340,7 +340,7 @@ class TestHttpHeadlessBrowserExecuteSuccess:
     def test_missing_dependency(self) -> None:
         """When Playwright is not installed, return MissingDependencyError."""
         with patch(
-            "src.capabilities.primitives.stdlib.http_headless_browser._playwright_available",
+            "src.capabilities.primitives.stdlib._http_headless_browser._playwright_available",
             False,
         ):
             f = HttpHeadlessBrowserPrimitive()
