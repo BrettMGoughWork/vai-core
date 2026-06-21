@@ -36,6 +36,8 @@ class SessionedAdapter:
         self._inner = inner
         # {session_key: [{"role": "user"/"assistant", "content": str}, ...]}
         self._sessions: dict[str, list[dict[str, str]]] = {}
+        # Track the last ingest session key so resume() uses a consistent key.
+        self._last_session_key: str | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -44,6 +46,7 @@ class SessionedAdapter:
     def ingest(self, request: AgentRequest) -> Dict[str, Any]:
         """Send a request through the session-managed pipeline."""
         key = self._session_key(request)
+        self._last_session_key = key
         history = list(self._sessions.get(key, []))
 
         # Inject session history into a copy of the request
@@ -79,7 +82,7 @@ class SessionedAdapter:
 
         # Capture successful turns into session history.
         if isinstance(result, dict) and "reply" in result:
-            key = f"cli:{agent_id}"
+            key = self._last_session_key or f"cli:{agent_id}"
             history = list(self._sessions.get(key, []))
             self._sessions[key] = history + [
                 {"role": "user", "content": message_text},

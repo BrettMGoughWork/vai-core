@@ -20,6 +20,9 @@ LLM client path.
 from __future__ import annotations
 
 import json
+import os
+import re
+import sys
 from typing import Optional, Union
 
 from src.strategy.planning.s1_contract.types import PromptRequest, PromptResponse, S1Error
@@ -131,6 +134,93 @@ def _tool_matches_workflows(tool: dict, agent_workflows: list[str]) -> bool:
     return wf_id in agent_workflows or name in agent_workflows
 
 
+DEEPSEEK_SAFE_NAME_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
+
+
+def _sanitize_tool_name(name: str) -> str:
+    """Sanitize a tool name for LLM providers that reject dots.
+
+    DeepSeek requires tool names matching ``^[a-zA-Z0-9_-]+$``.
+    We replace any non-compliant character with ``_``.
+
+    The mapping is tracked via ``_tool_name_map`` so the caller can reverse it.
+    """
+    return DEEPSEEK_SAFE_NAME_CHARS.sub("_", name)
+
+
+# Global mapping: sanitized_name → original_name, populated by _to_openai_tools
+_tool_name_map: dict[str, str] = {}
+
+
+def _to_openai_tools(tool_context: list[dict]) -> list[dict]:
+    """Normalize tool definitions to OpenAI-compatible format.
+
+    Supports both flat adapter format (``{name, description, input_schema}``)
+    and OpenAI function-wrapper format (``{type: "function", function: {...}}``).
+
+    **Name sanitisation**: tool names are sanitised to match ``^[a-zA-Z0-9_-]+$``
+    (required by DeepSeek). The original name is recorded in ``_tool_name_map``
+    for reverse mapping.
+    """
+    _tool_name_map.clear()
+    result: list[dict] = []
+    for tool in tool_context:
+        if tool.get("type") == "function":
+            result.append(tool)
+            continue
+        func = tool.get("function")
+        if func:
+            name = func.get("name", tool.get("name", "unknown"))
+            desc = func.get("description", tool.get("description", ""))
+            params = func.get("parameters", tool.get("input_schema", {}))
+        else:
+            name = tool.get("name", "unknown")
+            desc = tool.get("description", "")
+            params = tool.get("input_schema", tool.get("parameters", {}))
+        safe_name = _sanitize_tool_name(name)
+        if safe_name != name:
+            _tool_name_map[safe_name] = name
+
+        # Ensure at least one param is required when the schema has
+        # properties but no ``required`` list — prevents LLMs
+        # (especially DeepSeek) from calling tools with empty ``{}``.
+        if isinstance(params, dict) and "properties" in params and "required" not in params:
+            props = params.get("properties", {})
+            if props:
+                params = dict(params)  # shallow copy
+                first_prop = next(iter(props.keys()))
+                params["required"] = [first_prop]
+                if os.environ.get("S1_DEBUG"):
+                    print(f"[S1_DEBUG] Tool '{safe_name}': added required=[{first_prop!r}]", file=sys.stderr)
+        result.append({
+            "type": "function",
+            "function": {
+                "name": safe_name,
+                "description": desc,
+                "parameters": params,
+            },
+        })
+    return result
+
+
+def _restore_tool_name(name: str) -> str:
+    """Reverse-map a sanitised tool name to its original form."""
+    return _tool_name_map.get(name, name)
+
+
+def _restore_tool_names_in_response(
+    tool_calls: list[dict],
+) -> list[dict]:
+    """Restore original tool names in a list of tool_call dicts.
+
+    Mutates and returns the same list (in-place update of ``function.name``).
+    """
+    for tc in tool_calls:
+        func = tc.get("function", {})
+        if isinstance(func, dict) and "name" in func:
+            func["name"] = _restore_tool_name(func["name"])
+    return tool_calls
+
 
 def call_s1_backend(
     request: PromptRequest, backend: str = "simulation"
@@ -222,81 +312,89 @@ def call_s1_backend(
         if cap_lines:
             system_prompt += "".join(cap_lines)
 
-        # Inject workflow tool descriptions so the LLM can discover and
-        # invoke workflows.  Only include workflows the agent has access to.
-        # The LLM invokes one by including a line like:
-        #   /invoke-workflow <workflow_id> param1=value1 param2=value2
+        # ── Build tool definitions and prepare for native function calling ──
         all_tool_context = request.tool_context or []
 
-        # ── Workflow tools ───────────────────────────────────────────
+        # Filter to workflows the agent has access to
         wf_tool_context = [
             t for t in all_tool_context
             if not agent_workflows or _tool_matches_workflows(t, agent_workflows)
         ]
-        if wf_tool_context:
-            tool_lines = []
-            for tool in wf_tool_context:
-                # Support both flat format (adapter) and OpenAI function-wrapper format
-                func = tool.get("function")
-                if func is not None:
-                    name = func.get("name", "unknown")
-                    desc = func.get("description", "")
-                    params = func.get("parameters", {})
-                else:
-                    name = tool.get("name", "unknown")
-                    desc = tool.get("description", "")
-                    params = tool.get("input_schema", tool.get("parameters", {}))
-                props = params.get("properties", {})
-                param_strs = []
-                for pname, pinfo in props.items():
-                    req = "required" if pname in params.get("required", []) else "optional"
-                    param_strs.append(f"    - {pname} ({req}): {pinfo.get('description', '')}")
-                tool_lines.append(f"\n  **{name}**: {desc}")
-                if param_strs:
-                    tool_lines.append("    Parameters:")
-                    tool_lines.extend(param_strs)
-            if tool_lines:
-                system_prompt += (
-                    "\n\nYou have access to the following workflows which you can invoke "
-                    "when a user's request matches their purpose.\n"
-                    "To invoke a workflow, include a line in your response exactly in the format:\n"
-                    '/invoke-workflow <workflow_id> key1="value1" key2="value2"\n'
-                    "You may invoke one or more workflows \u2014 one per line."
-                )
-                system_prompt += "".join(tool_lines)
 
-        # Format the history block from prior turns
+        # Convert to OpenAI-compatible tool definitions
+        tools = _to_openai_tools(wf_tool_context) if wf_tool_context else []
+
+        # Build structured message list: system, conversation history, user
+        messages: list[dict] = [{"role": "system", "content": system_prompt}]
+
         conversation_history = request.memory.get("conversation_history", [])
-        if conversation_history:
-            history_lines: list[str] = []
-            for entry in conversation_history:
-                role = entry.get("role", "user")
-                content = entry.get("content", "")
-                label = "User" if role == "user" else agent_name
-                history_lines.append(f"{label}: {content}")
-            history_block = "\n".join(history_lines) + "\n"
-        else:
-            history_block = ""
+        for entry in conversation_history:
+            role = entry.get("role", "user")
+            content = entry.get("content", "")
+            if role in ("user", "assistant", "tool"):
+                msg: dict[str, object] = {"role": role, "content": content}
+                if role == "assistant" and "tool_calls" in entry:
+                    msg["tool_calls"] = entry["tool_calls"]
+                if role == "tool" and "tool_call_id" in entry:
+                    msg["tool_call_id"] = entry["tool_call_id"]
+                messages.append(msg)
+
+        messages.append({"role": "user", "content": user_message})
 
         try:
-            if history_block:
-                raw_text = transport.complete(
-                    f"{system_prompt}\n\n{history_block}"
-                    f"User: {user_message}\n{agent_name}:"
+            if tools and hasattr(transport, "complete_with_tools"):
+                # ── Native tool calling path ───────────────────────────────
+                response = transport.complete_with_tools(messages, tools)
+
+                if response.tool_name and response.tool_calls:
+                    # LLM chose to call a tool — return tool_calls for the
+                    # supervisor to execute (with HITL gating if needed)
+                    #
+                    # Restore original tool names (DeepSeek requires names
+                    # matching ^[a-zA-Z0-9_-]+$, so dots are replaced with
+                    # underscores during the send — reverse here).
+                    if os.environ.get("S1_DEBUG"):
+                        print(f"[S1_DEBUG] LLM returned tool_calls: {response.tool_calls}", file=sys.stderr)
+                    _restore_tool_names_in_response(response.tool_calls)
+                    if os.environ.get("S1_DEBUG"):
+                        print(f"[S1_DEBUG] After name restore: {response.tool_calls}", file=sys.stderr)
+                    return PromptResponse(
+                        output={
+                            "is_complete": False,
+                            "message": response.text or "",
+                            "confidence": 0.95,
+                        },
+                        tool_calls=response.tool_calls,
+                    )
+
+                # LLM returned a text response (no tool chosen)
+                return PromptResponse(
+                    output={
+                        "is_complete": True,
+                        "message": response.text.strip() if response.text else "",
+                        "confidence": 0.95,
+                    },
                 )
             else:
-                raw_text = transport.complete(
-                    f"{system_prompt}\n\n"
-                    f"User: {user_message}\n{agent_name}:"
+                # ── Fallback: text-only path (no tools available) ──────────
+                if conversation_history:
+                    raw_text = transport.complete(
+                        f"{system_prompt}\n\n"
+                        f"{'  '.join(f'{e.get("role","user")}: {e.get("content","")}' for e in conversation_history)}\n"
+                        f"User: {user_message}\n{agent_name}:"
+                    )
+                else:
+                    raw_text = transport.complete(
+                        f"{system_prompt}\n\n"
+                        f"User: {user_message}\n{agent_name}:"
+                    )
+                return PromptResponse(
+                    output={
+                        "is_complete": True,
+                        "message": raw_text.strip(),
+                        "confidence": 0.95,
+                    },
                 )
-            import time
-            return PromptResponse(
-                output={
-                    "is_complete": True,
-                    "message": raw_text.strip(),
-                    "confidence": 0.95,
-                },
-            )
         except Exception as exc:
             return S1Error(
                 type="conversational_llm_failure",

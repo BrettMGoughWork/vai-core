@@ -72,9 +72,39 @@ def _handle_result(result: dict, registry: ChannelRegistry) -> None:
         _waiting_agent_id = None
         return
 
+    # HITL pending state: show reply (LLM analysis) AND HITL prompt
+    if "reply" in result and "state" in result:
+        _waiting_agent_id = result.get("agent_id")
+        print(f"\n-- S5 Pending --------------------------------------------")
+        print(f"  state:    {result.get('state', 'unknown')}")
+        print(f"  agent_id: {_waiting_agent_id}")
+        reply_text = result['reply']
+        if isinstance(reply_text, str):
+            try:
+                reply_text.encode(sys.stdout.encoding or 'utf-8')
+            except UnicodeEncodeError:
+                reply_text = reply_text.encode('utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8', errors='replace')
+        print(f"  reply:    {reply_text}")
+        # Show confirmation prompt separately
+        prompt_text = result.get("prompt")
+        if prompt_text:
+            print(f"\n  +- HITL Request ----")
+            for line in prompt_text.split("\n"):
+                print(f"  | {line}")
+            print(f"  +--------------------")
+        print()
+        return
+
     if "reply" in result:
         print(f"\n-- S5 Response -------------------------------------------")
-        print(f"  reply:    {result['reply']}")
+        reply_text = result['reply']
+        # Handle Unicode characters that may not be encodable in cp1252
+        if isinstance(reply_text, str):
+            try:
+                reply_text.encode(sys.stdout.encoding or 'utf-8')
+            except UnicodeEncodeError:
+                reply_text = reply_text.encode('utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8', errors='replace')
+        print(f"  reply:    {reply_text}")
         if result.get("metadata"):
             print(f"  metadata: {result['metadata']}")
         _waiting_agent_id = None

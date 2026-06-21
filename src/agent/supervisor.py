@@ -404,7 +404,10 @@ class Supervisor:
                     _reason = "Agent produced conversational response via mock fallback"
 
                 # Sprint 8.5: Hallucination guard — detect claimed side-effects without directives
-                reply = self._apply_hallucination_guard(reply)
+                # When native tool_calls are present, the LLM chose a tool via
+                # function calling — the guard is not needed.
+                if not result.get("tool_calls"):
+                    reply = self._apply_hallucination_guard(reply)
 
                 # Sprint 9a: process /invoke-workflow directives
                 reply = self._handle_invoke_workflow(reply)
@@ -436,6 +439,7 @@ class Supervisor:
                             "Reply **yes** to proceed, or **no** / revise your"
                             " request to cancel."
                         )
+                        meta["tool_confirmation_prompt"] = confirmation_msg
                         reply = reply + confirmation_msg
                         return self._persist(state.with_(
                             lifecycle_state=LifecycleState.WAITING,
@@ -451,12 +455,17 @@ class Supervisor:
                         ))
 
                 # Sprint 9a: handle native tool_calls if the backend supports them
+                executed_primitives: list[dict] = []
                 for tc in result.get("tool_calls", []):
                     if isinstance(tc, dict):
                         func_name = (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "") or tc.get("name", "")
                         if func_name.startswith("workflow.execute."):
                             wf_id = func_name[len("workflow.execute."):]
-                            args = tc.get("arguments", tc.get("args", {}))
+                            func = tc.get("function", {})
+                            if isinstance(func, dict):
+                                args = func.get("arguments", tc.get("arguments", tc.get("args", {})))
+                            else:
+                                args = tc.get("arguments", tc.get("args", {}))
                             if isinstance(args, str):
                                 try:
                                     args = json.loads(args)
@@ -544,7 +553,11 @@ class Supervisor:
                                 reply += f"\n\n[Workflow {wf_id!r} not found: {exc}]"
                         elif func_name.startswith("primitive."):
                             prim_name = func_name[len("primitive."):]
-                            args = tc.get("arguments", tc.get("args", {}))
+                            func = tc.get("function", {})
+                            if isinstance(func, dict):
+                                args = func.get("arguments", tc.get("arguments", tc.get("args", {})))
+                            else:
+                                args = tc.get("arguments", tc.get("args", {}))
                             if isinstance(args, str):
                                     try:
                                         args = json.loads(args)
@@ -563,11 +576,83 @@ class Supervisor:
                                         result_str = str(prim_result.get("data", prim_result.get("result", prim_result)))
                                         if len(result_str) > 500:
                                             result_str = result_str[:500] + "..."
+                                        executed_primitives.append({
+                                            "tool_call_id": tc.get("id", f"prim_{prim_name}"),
+                                            "name": prim_name,
+                                            "result_str": result_str,
+                                        })
                                         reply += f"\n\n[Primitive {prim_name!r} → {result_str}]"
                                     else:
                                         reply += f"\n\n[Primitive {prim_name!r} returned no result]"
                             else:
                                     reply += f"\n\n[Primitive {prim_name!r} cannot execute (no inline executor)]"
+
+                # Conversational loop: feed primitive tool results back to LLM
+                if executed_primitives:
+                    conv_history = list(ctx.context.conversation_history)
+                    orig_tool_calls = result.get("tool_calls", [])
+
+                    # Assistant message with tool_calls that LLM originally chose
+                    initial_text = result.get("output", {}).get("message", "")
+                    assistant_msg: dict[str, object] = {
+                        "role": "assistant",
+                        "content": initial_text if initial_text else None,
+                        "tool_calls": [
+                            {
+                                "id": tc.get("id", ""),
+                                "type": "function",
+                                "function": {
+                                    "name": (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("name", "") or tc.get("name", ""),
+                                    "arguments": (tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}).get("arguments", "") or tc.get("arguments", "{}"),
+                                },
+                            }
+                            for tc in orig_tool_calls
+                            if any(
+                                tc.get("id", "") == pe["tool_call_id"]
+                                or pe["name"] in (
+                                    tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}
+                                ).get("name", "")
+                                for pe in executed_primitives
+                            )
+                        ],
+                    }
+                    conv_history.append(assistant_msg)
+
+                    # Tool result messages
+                    for pe in executed_primitives:
+                        conv_history.append({
+                            "role": "tool",
+                            "tool_call_id": pe["tool_call_id"],
+                            "content": pe["result_str"],
+                        })
+
+                    # Follow-up S1 call — LLM sees tool results and responds naturally
+                    follow_up_outcome = RouterOutcome(
+                        type="llm_call",
+                        payload={
+                            "prompt": {
+                                "message": "Based on the tool results, what's your response?",  # continuation nudge
+                                "agent_id": agent_meta.identity.agent_id,
+                                "agent_metadata": {
+                                    "name": agent_meta.identity.name,
+                                    "description": agent_meta.identity.description,
+                                    "persona": agent_meta.persona,
+                                    "skills": list(agent_meta.skills),
+                                    "workflows": list(agent_meta.workflows),
+                                },
+                            },
+                            "backend": "conversational",
+                            "memory": {"conversation_history": conv_history},
+                            "plan_context": {},
+                            "tool_context": [],  # No tools — we want a text response only
+                        },
+                    )
+                    follow_up_result = self._strategy_router.route(follow_up_outcome)
+                    if follow_up_result.get("error") is None:
+                        reply = follow_up_result["output"].get("message", reply)
+                    else:
+                        # Keep the raw primitive reply as fallback
+                        pass
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"
                 metadata["runtime_error"] = result["error"]
@@ -1448,7 +1533,11 @@ class Supervisor:
                     )
                     if func_name.startswith("primitive."):
                         prim_name = func_name[len("primitive."):]
-                        args = tc.get("arguments", tc.get("args", {}))
+                        func = tc.get("function", {})
+                        if isinstance(func, dict):
+                            args = func.get("arguments", tc.get("arguments", tc.get("args", {})))
+                        else:
+                            args = tc.get("arguments", tc.get("args", {}))
                         if isinstance(args, str):
                             try:
                                 args = json.loads(args)

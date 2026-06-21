@@ -127,7 +127,7 @@ def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
             "message": (
                 f"Primitive '{skill_name}' executed successfully"
                 if result.status == "success"
-                else f"Primitive '{skill_name}' failed"
+                else f"Primitive '{skill_name}' failed: {result.error}"
             ),
             "outputs": result.data if result.data is not None else {},
         }
@@ -210,6 +210,10 @@ class _S1Executor:
     ) -> CoreLLMResponse:
         if _llm_transport is None:
             return CoreLLMResponse(text="", tool_name=None, tool_args=None)
+        messages = [{"role": "user", "content": prompt}]
+        if hasattr(_llm_transport, "complete_with_tools"):
+            return _llm_transport.complete_with_tools(messages, tools)
+        # Fallback: text-only complete if tool-calling not available
         text = _llm_transport.complete(prompt)
         return CoreLLMResponse(text=text, tool_name=None, tool_args=None)
 

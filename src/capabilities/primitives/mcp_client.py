@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import shutil
 import threading
 from dataclasses import dataclass, field
@@ -32,6 +33,34 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.types import CallToolResult, ListToolsResult, Tool
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Environment variable resolution
+# ---------------------------------------------------------------------------
+
+
+def _resolve_env_var(val: str) -> str:
+    """Resolve environment variable references in *val*.
+
+    Supports both Unix-style (``$VAR``, ``${VAR}``) and Windows-style
+    (``%VAR%``) syntax on **all** platforms.
+
+    ``os.path.expandvars`` only expands ``%VAR%`` on Windows and ``$VAR`` on
+    Unix — it never handles both syntaxes.  This function does.
+    """
+    # 1. Windows-style %VAR% — handled natively by os.path.expandvars
+    val = os.path.expandvars(val)
+
+    # 2. Unix-style ${VAR} and $VAR — not expanded on Windows
+    def _replace_unix(match: re.Match) -> str:
+        name = (match.group(1) or match.group(2) or "").strip()
+        if not name:
+            return match.group(0)  # lone '$' or empty braces — leave unchanged
+        return os.environ.get(name, match.group(0))
+
+    val = re.sub(r"\$\{([^}]+)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)", _replace_unix, val)
+    return val
+
 
 # ---------------------------------------------------------------------------
 # Command resolution
@@ -155,9 +184,11 @@ class MCPServerConfig:
     def from_dict(cls, name: str, data: dict[str, Any]) -> MCPServerConfig:
         """Build from a parsed YAML dict."""
         env = dict(data.get("env", {}))
-        # Resolve ``${VAR}`` / ``$VAR`` placeholders from the OS environment
+        # Resolve ``${VAR}`` / ``$VAR`` / ``%VAR%`` placeholders from the OS
+        # environment on any platform (Windows expandvars only handles ``%VAR%``,
+        # Unix only ``$VAR`` — we need both).
         for key, val in env.items():
-            env[key] = os.path.expandvars(val)
+            env[key] = _resolve_env_var(val)
 
         command = data["command"]
         args = list(data.get("args", []))

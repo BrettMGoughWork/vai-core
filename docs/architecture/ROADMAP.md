@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-20 (Sprint 16 — added)  
+> **Last updated:** 2026-06-21 (Sprint 17 — added, Sprint 8 env-var fix)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -380,6 +380,23 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 16.3 | Add `custom/` to `.gitignore` so local experiments never pollute the repo |
 | 16.4 | Update boot sequence / `composition_root.py` to merge standard + custom artifacts with priority semantics (custom wins on conflict) |
 | 16.5 | Write a `docs/custom_workflows.md` guide explaining the overlay pattern for users who fork the repo |
+
+### Sprint 17 — LLM Provider Abstraction
+
+*Each LLM provider has unique quirks — tool name sanitisation (dots→underscores), `tool_choice` defaults, schema handling (e.g. `required` field injection), token limits, streaming vs non-streaming. These are currently patched ad-hoc across the codebase. This sprint builds a proper abstraction layer.*
+
+| Task | What |
+|------|------|
+| 17.1 | Audit all provider-specific workarounds — search for `tool_choice`, `required` field hacks, name sanitisation, `stop_reason` handling, and any `if provider == "deepseek"`-style branching |
+| 17.2 | Design an `LLMProviderAdapter` interface — a thin shim that translates provider-native schemas into a canonical S1 contract. Each provider implements one adapter; S1 client talks only to the adapter |
+| 17.3 | Adapter — **OpenAI-compatible** (covers OpenAI, DeepSeek, Together, Groq, etc.) |
+| 17.4 | Adapter — **Anthropic** (handles `stop_reason` vs `finish_reason`, tool_use content blocks) |
+| 17.5 | Adapter — **Gemini** (handles `functionCall` content parts, different error schema) |
+| 17.6 | Adapter — **Mistral** (handles `tool_calls` format differences) |
+| 17.7 | Move provider-specific config (tool_choice default, name sanitisation rules) into per-provider adapter config, not the S1 client |
+| 17.8 | Write integration tests — each adapter with its real provider (or recorded fixture), covering: tool call with params, tool call with empty args, no-tool response, error propagation |
+| 17.9 | Regression test — full suite passes with all providers |
+| 17.10 | Document adapter architecture in `docs/architecture/provider_adapters.md` |
 
 ---
 

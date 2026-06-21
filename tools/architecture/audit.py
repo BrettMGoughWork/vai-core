@@ -279,7 +279,7 @@ def find_invariant_violations(classes: list[dict]) -> list[dict]:
 
 # Allowed primitive module filenames
 VALID_PRIMITIVE_MODULES = {
-    "python.py", "cli.py", "mcp.py", "base.py", "types.py", "__init__.py",
+    "python.py", "cli.py", "mcp.py", "mcp_client.py", "base.py", "types.py", "__init__.py",
 }
 
 
