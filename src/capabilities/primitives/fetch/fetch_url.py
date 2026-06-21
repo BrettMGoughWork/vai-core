@@ -7,7 +7,7 @@ hydration, and search fallback — is hidden behind this single entry-point.
 
 Usage::
 
-    from src.strategy.types.fetch import fetch_url, FetchResult
+    from src.capabilities.primitives.fetch import fetch_url, FetchResult
 
     result = fetch_url("https://example.com", executor=my_executor)
     if result.ok:

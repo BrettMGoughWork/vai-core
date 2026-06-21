@@ -17,7 +17,7 @@ import pytest
 
 from playwright.sync_api import Error as PwError, TimeoutError as PwTimeoutError
 
-from src.capabilities.primitives.stdlib.http_stealth import (
+from src.capabilities.primitives.stdlib._http_stealth import (
     _build_headers,
     _build_viewport,
     _classify_pw_exception,
@@ -111,7 +111,7 @@ def _patch_playwright(
     mock_cm.__enter__.return_value = mock_pw
 
     patcher1 = patch(
-        "src.capabilities.primitives.stdlib.http_stealth.sync_playwright",
+        "src.capabilities.primitives.stdlib._http_stealth.sync_playwright",
         return_value=mock_cm,
     )
     patcher1.start()
@@ -119,7 +119,7 @@ def _patch_playwright(
     # Mock Stealth so apply_stealth_sync is a no-op
     mock_stealth = MagicMock()
     patcher2 = patch(
-        "src.capabilities.primitives.stdlib.http_stealth.Stealth",
+        "src.capabilities.primitives.stdlib._http_stealth.Stealth",
         return_value=mock_stealth,
     )
     patcher2.start()
@@ -388,7 +388,7 @@ class TestHttpStealthExecuteSuccess:
         try:
             fetch.execute({"url": "https://example.com"}, {})
             # Check BEFORE cleanup so the patch on Stealth is still active
-            from src.capabilities.primitives.stdlib.http_stealth import Stealth
+            from src.capabilities.primitives.stdlib._http_stealth import Stealth
 
             mock_stealth_instance = Stealth.return_value
             mock_stealth_instance.apply_stealth_sync.assert_called_once_with(page)
@@ -473,7 +473,7 @@ class TestHttpStealthExecuteSuccess:
     def test_missing_playwright(self) -> None:
         """When Playwright is not installed, return MissingDependencyError."""
         with patch(
-            "src.capabilities.primitives.stdlib.http_stealth._playwright_available",
+            "src.capabilities.primitives.stdlib._http_stealth._playwright_available",
             False,
         ):
             f = HttpStealthPrimitive()
@@ -487,7 +487,7 @@ class TestHttpStealthExecuteSuccess:
     def test_missing_stealth(self) -> None:
         """When playwright-stealth is not installed, return MissingDependencyError."""
         with patch(
-            "src.capabilities.primitives.stdlib.http_stealth._stealth_available",
+            "src.capabilities.primitives.stdlib._http_stealth._stealth_available",
             False,
         ):
             f = HttpStealthPrimitive()

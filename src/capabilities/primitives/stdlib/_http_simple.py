@@ -16,7 +16,7 @@ import httpx
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
-from src.strategy.types.fetch.errors import classify_exception
+from src.capabilities.primitives.fetch.errors import classify_exception
 from src.strategy.types.validation import deadcode_ignore
 
 

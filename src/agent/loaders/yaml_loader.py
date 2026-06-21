@@ -25,6 +25,8 @@ Single-file YAML format::
         provenance: built-in           # built-in | user-defined | system
         capabilities: [conversational, tool_use]
         persona: "Role description for agent-selection matching"
+        defer_to:                     # optional list of agents this agent can defer to
+          - specialist-agent
         inputs: [text, markdown]
         outputs: [text, json]
         constraints:
@@ -157,6 +159,7 @@ def _parse_entry(entry: dict) -> AgentMetadata:
         tools=entry.get("tools", []),
         workflows=entry.get("workflows", []),
         patterns=entry.get("patterns", []),
+        defer_to=entry.get("defer_to", []),
         inputs=entry.get("inputs", []),
         outputs=entry.get("outputs", []),
         constraints=constraints,

@@ -157,6 +157,10 @@ class AgentMetadata:
         Pattern instructions are injected into the LLM context, and the
         pattern's required primitives are automatically resolved — the
         agent does not need to list them explicitly in ``tools``.
+    defer_to:
+        Optional list of agent IDs this agent can defer/hand-off work to.
+        The deferral graph must be acyclic — validated at registration time.
+        If empty or omitted, the agent cannot defer.
     inputs:
         Input types the agent accepts.
     outputs:
@@ -171,6 +175,7 @@ class AgentMetadata:
     tools: List[str] = field(default_factory=list)
     workflows: List[str] = field(default_factory=list)
     patterns: List[str] = field(default_factory=list)
+    defer_to: List[str] = field(default_factory=list)
     inputs: List[str] = field(default_factory=list)
     outputs: List[str] = field(default_factory=list)
     constraints: AgentConstraints = field(default_factory=AgentConstraints)
@@ -184,6 +189,8 @@ class AgentMetadata:
             raise ValueError("workflows must be a list")
         if not isinstance(self.patterns, list):
             raise ValueError("patterns must be a list")
+        if not isinstance(self.defer_to, list):
+            raise ValueError("defer_to must be a list")
         if not isinstance(self.inputs, list):
             raise ValueError("inputs must be a list")
         if not isinstance(self.outputs, list):

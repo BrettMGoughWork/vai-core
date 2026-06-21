@@ -19,12 +19,12 @@ import pytest
 
 from src.capabilities.primitives.stdlib.search import SearchPrimitive
 from src.capabilities.primitives.types import PrimitiveResult
-from src.strategy.types.fetch.errors import FetchError, TimeoutError
-from src.strategy.types.fetch.fallback_router import select_fallback
-from src.strategy.types.fetch.mode_selector import FetchMode
-from src.strategy.types.fetch.request import FetchRequest
-from src.strategy.types.fetch.response import FetchResponse
-from src.strategy.types.fetch.taxonomy import classify_url, choose_fetch_mode
+from src.capabilities.primitives.fetch.errors import FetchError, TimeoutError
+from src.capabilities.primitives.fetch.fallback_router import select_fallback
+from src.capabilities.primitives.fetch.mode_selector import FetchMode
+from src.capabilities.primitives.fetch.request import FetchRequest
+from src.capabilities.primitives.fetch.response import FetchResponse
+from src.capabilities.primitives.fetch.taxonomy import classify_url, choose_fetch_mode
 
 
 # ── Helpers ────────────────────────────────────────────────────────────

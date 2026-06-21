@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.fetch.domain_policy import DomainPolicy
-from src.strategy.types.fetch.mode_selector import FetchMode
-from src.strategy.types.fetch.request import FetchRequest
-from src.strategy.types.fetch.response import FetchResponse
-from src.strategy.types.fetch.signal_extraction import (
+from src.capabilities.primitives.fetch.domain_policy import DomainPolicy
+from src.capabilities.primitives.fetch.mode_selector import FetchMode
+from src.capabilities.primitives.fetch.request import FetchRequest
+from src.capabilities.primitives.fetch.response import FetchResponse
+from src.capabilities.primitives.fetch.signal_extraction import (
     FetchSignals,
     _detect_akamai,
     _detect_blank_html,

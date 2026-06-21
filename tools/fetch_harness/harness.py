@@ -25,9 +25,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.capabilities.primitives.stdlib.http_simple import HttpSimpleFetchPrimitive
-from src.strategy.types.fetch import FetchRequest, FetchResponse
-from src.strategy.types.fetch.fetch_url import FetchResult, fetch_url
+from src.capabilities.primitives.fetch import FetchRequest, FetchResponse
+from src.capabilities.primitives.fetch.fetch_url import FetchResult, fetch_url
+from src.capabilities.primitives.stdlib._http_simple import HttpSimpleFetchPrimitive
 
 HERE = Path(__file__).resolve().parent
 SCENARIOS_PATH = HERE / "scenarios.json"
@@ -48,7 +48,7 @@ def _build_executor() -> Any:
     }
 
     try:
-        from src.capabilities.primitives.stdlib.http_hardened import (
+        from src.capabilities.primitives.stdlib._http_hardened import (
             HttpHardenedFetchPrimitive,
         )
         primitives["http_hardened"] = HttpHardenedFetchPrimitive()

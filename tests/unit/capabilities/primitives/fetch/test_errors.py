@@ -8,7 +8,7 @@ from dataclasses import asdict
 import httpx
 import pytest
 
-from src.strategy.types.fetch.errors import (
+from src.capabilities.primitives.fetch.errors import (
     ConnectionError,
     FetchError,
     HTTPError,

@@ -15,14 +15,14 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.fetch.errors import (
+from src.capabilities.primitives.fetch.errors import (
     ConnectionError,
     FetchError,
     HTTPError,
     ParseError,
     TimeoutError,
 )
-from src.strategy.types.fetch.fallback_router import (
+from src.capabilities.primitives.fetch.fallback_router import (
     FallbackSelection,
     _FALLBACK_CHAIN,
     _MODE_TIMEOUTS,

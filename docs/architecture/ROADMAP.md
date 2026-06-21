@@ -308,6 +308,42 @@ S1 Runtime  S2 Planner  S3 Capab.  S4 Platform     │
 | P3.4 | Pattern lifecycle — candidate → draft → published → deprecated (HITL approval gate) |
 | P3.5 | Pattern composition — can patterns reference other patterns? (keep out of scope initially) |
 
+### Sprint D1 — Agent Deferral
+
+**Goal:** Agents can declare a list of peer agents they are allowed to defer/hand-off work to. A delegating agent suspends, the delegate runs with its own persona and tools, and the delegating agent resumes with the delegate's response. The deferral graph must be acyclic — enforced at registration time.
+
+**Concept doc:** [docs/architecture/agent-deferral.md](./agent-deferral.md)
+
+**Files to create/modify:**
+- `src/agent/deferral/` — resolver, context bridge, depth guard
+- `src/agent/registry.py` — add `defer_to: List[str]` to `AgentMetadata`, acyclicity validator
+- `src/agent/supervisor.py` — `defer_to_agent()` method, suspend → delegate → resume flow
+- `src/agent/loaders/yaml_loader.py` — parse `defer_to:` from agent YAML
+- `src/agent/tool_orchestrator.py` — expose `defer_to` as a tool so LLMs can invoke it
+- `tests/unit/agent/deferral/` — cycle detection, hand-off/back, depth limit, context isolation
+
+| Task | What |
+|------|------|
+| D1.1 | Add `defer_to: List[str]` to `AgentMetadata` — optional list of peer agent IDs |
+| D1.2 | Acyclicity validator — walk deferral graph at registration, reject cycles with a clear error message listing the cycle path |
+| D1.3 | YAML loader — parse `defer_to:` from agent config files |
+| D1.4 | Deferral resolver — given an agent_id + prompt, resolve the delegate agent's metadata, validate it exists and is not the caller |
+| D1.5 | Context bridge — package the delegating agent's conversation context into a prompt for the delegate; inject the delegate's response back on resume |
+| D1.6 | Supervisor `defer_to_agent(target, prompt)` — suspend current agent, activate delegate, run delegate to completion, resume original with delegate response |
+| D1.7 | Depth guard — configurable max deferral chain depth (default: 3) to prevent runaway chains even with acyclic graphs |
+| D1.8 | Expose `defer_to` as a tool to the LLM — agent personas can instruct "when you detect a billing query, defer to billing-agent" |
+| D1.9 | Test: cycle detection rejects direct mutual deferral (A→B, B→A) |
+| D1.10 | Test: cycle detection rejects indirect cycle (A→B→C→A) |
+| D1.11 | Test: valid chain (A→B→C) registers without error |
+| D1.12 | Test: hand-off → delegate runs → hand-back → original agent sees delegate response |
+| D1.13 | Test: depth limit — chain of 4 defers with max_depth=3 raises DeferralDepthError |
+| D1.14 | Test: delegate agent runs with its own tools/persona, not the caller's |
+
+**⚠️ Concerns to watch during implementation:**
+- **Context blow-up** — each deferral appends the full delegate conversation to the caller's history. Consider summarising the delegate's response before handing back for longer chains.
+- **Tool isolation** — the delegate must have the tools it needs. If the delegating agent detects a capability mismatch, deferral is the correct path, but the delegate must actually have those tools.
+- **Infinite loops via workflow/pattern** — agent A defers to B, B runs a workflow that invokes agent A. Mitigated by the acyclicity check + depth guard, but workflow-level loops need a separate guard (out of scope for D1).
+
 ### Sprint 10 — Refactor: Stratum Isolation
 
 **Goal:** Enforce strict layer boundaries. S1 knows nothing of S2/S3/S4. S2 is pure (no I/O). S4 is generic. S5 is sole orchestrator.

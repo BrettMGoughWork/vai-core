@@ -20,14 +20,15 @@ conversation), S6 (workflow orchestration), or S4B (capability execution).
 
 Public API
 ----------
-- ``create_agent``  — instantiate runtime state for a registered agent
-- ``activate_agent`` — delegate to S5.2 to build activation context
-- ``run_agent_step`` — route message -> dispatch to Runtime/S6/S4B
-- ``suspend_agent`` — pause agent execution (timeout / external signal)
-- ``resume_agent`` — restore a suspended agent to RUNNING
-- ``cancel_agent`` — terminate agent execution (manual or system)
-- ``complete_agent`` — mark agent as completed with a final response
-- ``get_response`` — retrieve the final AgentResponse (if any)
+- ``create_agent``    — instantiate runtime state for a registered agent
+- ``activate_agent``  — delegate to S5.2 to build activation context
+- ``run_agent_step``  — route message -> dispatch to Runtime/S6/S4B
+- ``suspend_agent``   — pause agent execution (timeout / external signal)
+- ``resume_agent``    — restore a suspended agent to RUNNING
+- ``defer_to_agent``  — hand off work to a delegate agent (suspend→delegate→resume)
+- ``cancel_agent``    — terminate agent execution (manual or system)
+- ``complete_agent``  — mark agent as completed with a final response
+- ``get_response``    — retrieve the final AgentResponse (if any)
 - ``get_lifecycle_history`` — full audit trail of lifecycle events
 """
 
@@ -48,6 +49,7 @@ from src.agent.contracts import AgentMessage, AgentResponse
 from src.agent.guards import apply_hallucination_guard
 from src.agent.hitl_manager import HitlManager
 from src.agent.tool_orchestrator import ToolOrchestrator
+from src.agent.workflow_invoker import WorkflowInvoker
 from src.agent.workflow_invoker import (
     WorkflowInvoker,
     _freeze_wf_state,
@@ -477,6 +479,12 @@ class Supervisor:
                 tool_context, resolved_skills,
             )
 
+            # D1.8: inject defer_to synthetic tool when the agent can hand off
+            if agent_meta.defer_to:
+                tool_context.append(
+                    self._build_defer_to_tool(agent_meta.defer_to)
+                )
+
             outcome = RouterOutcome(
                 type="llm_call",
                 payload={
@@ -568,9 +576,49 @@ class Supervisor:
                             ),
                         ))
 
+                # D1.8: intercept defer_to tool calls — handle them in the
+                # Supervisor BEFORE ToolOrchestrator processes other tools.
+                # defer_to is a supervisor-level lifecycle action
+                # (suspend→delegate→resume), not a primitive.
+                tool_calls = result.get("tool_calls", [])
+                if tool_calls:
+                    _defer_calls = [
+                        tc for tc in tool_calls
+                        if isinstance(tc, dict) and tc.get("name", "") == "defer_to"
+                        or hasattr(tc, "name") and getattr(tc, "name", "") == "defer_to"
+                    ]
+                    if _defer_calls:
+                        for _tc in _defer_calls:
+                            _args = _tc.get("arguments", _tc.get("args", {}))
+                            if isinstance(_args, str):
+                                _args = json.loads(_args)
+                            _target = _args.get("target", "")
+                            _prompt = _args.get("prompt", "")
+                            if _target and _prompt:
+                                state = self.defer_to_agent(state, _target, _prompt)
+                                _dr = state.supervisor_metadata.get(
+                                    "deferral_result", {}
+                                )
+                                reply += (
+                                    f"\n\n[Deferred to {_target!r}: "
+                                    f"{_dr.get('response', '')[:500]}]"
+                                )
+                        # Remove defer_to calls so ToolOrchestrator doesn't see them
+                        tool_calls = [
+                            tc for tc in tool_calls
+                            if (
+                                isinstance(tc, dict)
+                                and tc.get("name", "") != "defer_to"
+                            )
+                            or (
+                                hasattr(tc, "name")
+                                and getattr(tc, "name", "") != "defer_to"
+                            )
+                        ]
+
                 # Sprint 9a/18.3: handle native tool_calls via ToolOrchestrator
                 reply = self._tool_orchestrator.execute_tool_plan(
-                    tool_calls=result.get("tool_calls", []),
+                    tool_calls=tool_calls,
                     reply=reply,
                     agent_meta=agent_meta,
                     tool_context=tool_context,
@@ -835,6 +883,231 @@ class Supervisor:
                 ),
             },
         ))
+
+    # ── 5b. defer_to_agent ──────────────────────────────────────────────
+
+    @staticmethod
+    def _build_defer_to_tool(defer_to_targets: List[str]) -> dict:
+        """Build a synthetic ``defer_to`` tool definition for the LLM tool context.
+
+        Only injected when the agent has a non-empty ``defer_to`` list.
+        The *target* parameter is constrained to an enum of allowed peer agents.
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": "defer_to",
+                "description": (
+                    "Hand off the current task to a specialist peer agent. "
+                    "Use this when another agent is better suited to handle "
+                    "the request. The peer agent will process the prompt "
+                    "independently and return its result."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target": {
+                            "type": "string",
+                            "description": "The agent ID of the peer to delegate to.",
+                            "enum": sorted(defer_to_targets),
+                        },
+                        "prompt": {
+                            "type": "string",
+                            "description": (
+                                "A self-contained instruction for the peer agent "
+                                "describing what to do. Include all necessary "
+                                "context — the peer does not see the current "
+                                "conversation history."
+                            ),
+                        },
+                    },
+                    "required": ["target", "prompt"],
+                },
+            },
+        }
+
+    def defer_to_agent(
+        self,
+        state: AgentState,
+        target_agent_id: str,
+        prompt: str,
+        *,
+        max_depth: int = 3,
+    ) -> AgentState:
+        """Hand off work from the calling agent to a delegate agent.
+
+        Full lifecycle: **suspend** the delegator → **create + activate +
+        run** the delegate to completion → inject delegate response →
+        **resume** the delegator.
+
+        The delegator must be in RUNNING or WAITING state (i.e. active).
+        After this call the delegator is in RUNNING state with the
+        delegate's response injected into ``supervisor_metadata`` as
+        ``deferral_result`` for consumption by the next
+        ``run_agent_step()``.
+
+        Parameters
+        ----------
+        state:
+            Current state of the delegating agent (must be active).
+        target_agent_id:
+            The agent to hand work off to.  Must be in the delegator's
+            ``defer_to`` list and the deferral graph must be acyclic
+            (enforced at registration time).
+        prompt:
+            Natural-language instructions describing what the delegate
+            should do.
+        max_depth:
+            Maximum deferral chain depth (default 3).  Each deferral
+            increments the chain depth counter stored in
+            ``supervisor_metadata["current_deferral_depth"]``.
+
+        Returns
+        -------
+        AgentState:
+            Updated delegator state in RUNNING with the delegate's
+            response available in ``supervisor_metadata["deferral_result"]``.
+
+        Raises
+        ------
+        AgentNotActiveError:
+            If the delegator is not in an active (RUNNING or WAITING) state.
+        DelegateNotAllowedError:
+            If *target_agent_id* is not in the delegator's ``defer_to`` list.
+        DelegateSelfReferentialError:
+            If the delegator attempts to defer to itself.
+        DeferralDepthError:
+            If the deferral chain would exceed *max_depth*.
+        SupervisorError:
+            If the delegate agent cannot be created, activated, or run.
+        """
+
+        from src.agent.deferral import (
+            ContextBridge,
+            DepthGuard,
+            DelegateNotAllowedError,
+            DelegateSelfReferentialError,
+            DeferralDepthError,
+            DeferralResolver,
+        )
+
+        self._require_not_terminal(state)
+
+        if not state.is_active():
+            raise AgentNotActiveError(
+                f"cannot defer from agent {state.agent_id!r} in "
+                f"state {state.lifecycle_state.value}; "
+                f"expected RUNNING or WAITING"
+            )
+
+        # ── 1. Resolve the delegate ─────────────────────────────────
+        resolver = DeferralResolver(self._registry)
+        delegate_meta = resolver.resolve(state.agent_id, target_agent_id)
+
+        # ── 2. Check depth guard ────────────────────────────────────
+        depth_guard = DepthGuard(max_depth=max_depth)
+        current_depth = state.supervisor_metadata.get(
+            "current_deferral_depth", 0
+        )
+        next_depth = depth_guard.get_next_depth(current_depth)
+
+        # ── 3. Suspend the delegator ────────────────────────────────
+        state = self.suspend_agent(
+            state,
+            reason=f"Deferring to {delegate_meta.identity.name} "
+                   f"({target_agent_id})",
+            details={
+                "deferral_target": target_agent_id,
+                "deferral_prompt": prompt[:200],
+            },
+        )
+
+        # ── 4. Build delegate prompt ────────────────────────────────
+        activation = state.activation_snapshot
+        conversation_history: list = (
+            activation.context.conversation_history
+            if activation and activation.context
+            else []
+        )
+        user_message = state.activation_snapshot.envelope.message.message if (
+            activation and activation.envelope and activation.envelope.message
+        ) else prompt
+
+        delegate_prompt = ContextBridge.build_delegate_prompt(
+            delegator_id=state.agent_id,
+            delegator_name=(
+                self._registry.get_agent(state.agent_id).identity.name
+            ),
+            user_message=user_message,
+            deferral_prompt=prompt,
+            conversation_history=conversation_history,
+        )
+
+        # ── 5. Create delegate ──────────────────────────────────────
+        delegate_state = self.create_agent(target_agent_id)
+        delegate_msg = AgentMessage(
+            message=delegate_prompt,
+            context={"origin": "deferral", "delegator_id": state.agent_id},
+        )
+
+        delegate_state = self.activate_agent(
+            delegate_state,
+            delegate_msg,
+            channel="system",
+            conversation_history=[],
+        )
+
+        # Wire depth into the delegate's metadata so it can defer further
+        meta = dict(delegate_state.supervisor_metadata)
+        meta["current_deferral_depth"] = next_depth
+        delegate_state = self._persist(
+            delegate_state.with_(supervisor_metadata=meta)
+        )
+
+        # ── 6. Run delegate to completion ───────────────────────────
+        delegate_state = self.run_agent_step(delegate_state)
+
+        # If the delegate is WAITING (e.g. for a sub-deferral), loop
+        # until terminal.  In D1 we only handle single-hop deferral;
+        # sub-deferrals (A→B→C) will work naturally via recursive
+        # defer_to_agent calls from within run_agent_step when the
+        # defer_to tool is exposed to the LLM.
+        max_iterations = 20
+        iterations = 0
+        while not delegate_state.is_terminal() and iterations < max_iterations:
+            delegate_state = self.resume_agent(delegate_state)
+            delegate_state = self.run_agent_step(delegate_state)
+            iterations += 1
+
+        # ── 7. Extract delegate response ────────────────────────────
+        delegate_response = self.get_response(delegate_state)
+        delegate_result_text = (
+            delegate_response.reply if delegate_response else "No response from delegate"
+        )
+        delegate_success = (
+            delegate_state.lifecycle_state == LifecycleState.COMPLETED
+        )
+
+        result_context = ContextBridge.build_delegate_result_context(
+            delegate_id=target_agent_id,
+            delegate_name=delegate_meta.identity.name,
+            response_text=delegate_result_text,
+            success=delegate_success,
+        )
+
+        # ── 8. Resume delegator with delegate result injected ───────
+        state = self.resume_agent(state)
+        meta = dict(state.supervisor_metadata)
+        meta["deferral_result"] = {
+            "delegate_id": target_agent_id,
+            "delegate_name": delegate_meta.identity.name,
+            "success": delegate_success,
+            "response": delegate_result_text,
+            "response_context": result_context,
+        }
+        state = self._persist(state.with_(supervisor_metadata=meta))
+
+        return state
 
     # ── 6. cancel_agent ────────────────────────────────────────────────
 

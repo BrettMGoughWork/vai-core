@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from urllib.parse import urlparse, unquote
 
-from src.strategy.types.fetch.mode_selector import FetchMode
+from .mode_selector import FetchMode
 
 # ── Taxonomy labels ─────────────────────────────────────────────────────
 
