@@ -35,11 +35,13 @@ S5 — Agent Runtime                                 │
     │  Routes: S1 (LLM), S2 (planner), S3 (skills)│
     │  Agent selects workflows as tools            │
     │                                              │
-    ├──────────┬──────────┬──────────┐             │
-    ▼          ▼          ▼          ▼             │
-S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
-  (LLM)     (pure)     (tools)    (durable exec)  │
-                                   ────────────────┘
+    ├──────────┬──────────┬──────────┬─────────┐    │
+    ▼          ▼          ▼          ▼         ▼    │
+S1 Runtime  S2 Planner  S3 Capab.  S4 Platform     │
+  (LLM)     (pure)     (tools,      (durable exec) │
+                       patterns,                    │
+                       workflows)                   │
+                                   ─────────────────┘
 ```
 
 ### Key Principles
@@ -80,7 +82,7 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 |-----------|------|--------|
 | S1 Runtime | LLM transport, provider abstraction (OpenAI, DeepSeek, etc.), config-driven model selection | ✅ |
 | S2 Planner | AgentPlanner, SubgoalPlanner, MemoryGovernance, goal decomposition → subgoals → segments | ✅ |
-| S3 Capabilities | SkillRunner, SkillRegistry, fetch/execute tools | ✅ |
+| S3 Capabilities | SkillRunner, SkillRegistry, fetch/execute tools, patterns (instructional composition) | ✅ |
 | S4 Platform | Queue, Worker, JobStore, supervision, retry, durability (in-memory) | ✅ |
 
 ### Sprint 2 — Agent Runtime (S5)
@@ -256,7 +258,57 @@ S1 Runtime  S2 Planner  S3 Skills  S4 Platform    │
 | 9a.7 | Test: agent calls non-existent workflow → graceful error (tool not found) | ✅ |
 | 9a.8 | Test: workflow tool appears/disappears based on registration state | ✅ |
 
-### Sprint 10 — Refactor: Stratum Isolation 
+### Sprint P1 — Patterns: Definition & Registry
+
+**Goal:** Introduce "patterns" as a first-class S3 capability type — instructional, LLM-readable templates that teach agents *how* to compose primitives to achieve goals (e.g. `reply_to_email`, `triage_inbox`). Patterns sit between tools (atomic execution) and workflows (deterministic step graphs) on the capability spectrum.
+
+**Files to create:**
+- `src/capabilities/patterns/__init__.py`
+- `src/capabilities/patterns/pattern_schema.py` — Pydantic `PatternDefinition` model
+- `src/capabilities/patterns/pattern_loader.py` — YAML loader for `config/patterns/*.yaml`
+- `src/capabilities/patterns/pattern_registry.py` — in-memory registry
+- `config/patterns/` — example patterns (reply-to-email, summarise-inbox, triage-inbox)
+
+| Task | What |
+|------|------|
+| P1.1 | Define `PatternDefinition` Pydantic model — pattern_id, name, description, primitives (required tools), instructions (natural-language guidance), examples, version |
+| P1.2 | Create YAML loader — scan `config/patterns/*.yaml`, validate via Pydantic |
+| P1.3 | Build `PatternRegistry` — in-memory, registered in `composition_root`, discoverable via S3 capability discovery |
+| P1.4 | Wire pattern registry into S3's `capability_discoverer` — patterns appear alongside primitives in discovery results |
+| P1.5 | Create example patterns: `reply_to_email` (gmail_read → compose → gmail_send), `summarise_inbox` (gmail_search → read → summarise), `triage_inbox` (gmail_search → categorize → flag) |
+
+### Sprint P2 — Patterns: Agent Integration
+
+**Goal:** Agents declare patterns as capabilities. Pattern instructions are injected into the LLM context. An agent that knows pattern-X gets its instructions even if the agent doesn't list the underlying primitives directly — the pattern acts as a capability gateway.
+
+**Files to modify:**
+- `src/agent/registry.py` — add `patterns: List[str]` to `AgentMetadata`
+- `src/agent/loaders/yaml_loader.py` — parse `patterns:` from agent YAML
+- `src/agent/tool_orchestrator.py` — inject pattern instructions into tool_context
+- `config/agents/` — add `patterns:` to relevant agent configs
+
+| Task | What |
+|------|------|
+| P2.1 | Add `patterns: List[str]` to `AgentMetadata` dataclass |
+| P2.2 | Update YAML agent loader to parse `patterns:` field from agent config |
+| P2.3 | Pattern-primitive resolution — when building tool context for an LLM call, resolve each agent pattern → its required primitives, include even if agent doesn't list them directly |
+| P2.4 | Inject pattern instructions into LLM tool_context — patterns appear as instructional context (not tool definitions) so the LLM can follow their guidance |
+| P2.5 | Test: agent with pattern but not underlying tool → LLM can still follow pattern instructions and call tools resolved by the pattern |
+| P2.6 | Test: pattern discovery — agents can discover available patterns via S3 capability discovery |
+
+### Sprint P3 — Patterns: Workflow & Learning Integration (Future)
+
+**Goal:** Make `apply_pattern` a first-class workflow step. Enable agents to author patterns (Y.8 Learning Subsystem).
+
+| Task | What |
+|------|------|
+| P3.1 | `apply_pattern` workflow step type — injects pattern instructions into an LLM call context within a workflow |
+| P3.2 | Pattern call as first-class step in workflow engine — `workflow_step.type == "apply_pattern"` |
+| P3.3 | Agent-authored patterns — agents create/repair pattern YAML files (per Y.8 Learning Subsystem) |
+| P3.4 | Pattern lifecycle — candidate → draft → published → deprecated (HITL approval gate) |
+| P3.5 | Pattern composition — can patterns reference other patterns? (keep out of scope initially) |
+
+### Sprint 10 — Refactor: Stratum Isolation
 
 **Goal:** Enforce strict layer boundaries. S1 knows nothing of S2/S3/S4. S2 is pure (no I/O). S4 is generic. S5 is sole orchestrator.
 
@@ -461,7 +513,11 @@ These are forward-looking capabilities that the architecture supports but are no
 - Audit trails for all agent actions
 - Policy enforcement at the S5 routing layer
 
-### Y.7 — Patterns (LLM-Level Reusable Instructions)
+### Y.7 — Patterns (LLM-Level Reusable Instructions) ✅ → Sprint P1–P3
+
+**Concept:** A "pattern" is a reusable, LLM-readable instruction template — like a workflow but expressed as natural-language/in-context instructions rather than executable step graphs. Patterns codify successful emergent behaviour that is too complex, non-deterministic, or context-sensitive to be expressed as a YAML workflow.
+
+**Now being implemented:** See Sprint P1–P3 above (between Sprint 9a and Sprint 10). P1 covers definition & registry, P2 covers agent integration, P3 covers workflow & learning integration.
 
 **Concept:** A "pattern" is a reusable, LLM-readable instruction template — like a workflow but expressed as natural-language/in-context instructions rather than executable step graphs. Patterns codify successful emergent behaviour that is too complex, non-deterministic, or context-sensitive to be expressed as a YAML workflow.
 
