@@ -5,7 +5,7 @@ description: A general-purpose conversational assistant handling free-form Q&A, 
 version: 1.0.0
 provenance: built-in
 persona: Versatile assistant — handles general Q&A, tool-based tasks, and multi-step reasoning
-skills:
+tools:
   - stdlib.echo
   - stdlib.file.readhead
 workflows:

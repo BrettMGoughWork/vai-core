@@ -144,7 +144,12 @@ class AgentMetadata:
         Used by the ``AgentSelectionStrategy`` when a workflow step specifies
         an ``agent_profile`` in its config.
     skills:
-        Explicit list of skill names the agent has access to.
+        [Deprecated] Legacy field — prefer ``tools``.
+    tools:
+        Explicit list of primitive tool names the agent has access to.
+        When populated, only matching tools are sent to the LLM.
+        Supports substring match and fnmatch globs (e.g. ``gmail_*``).
+        If empty or contains ``"*"``, all registered tools are available.
     workflows:
         Explicit list of workflow IDs the agent has access to.
     inputs:
@@ -158,6 +163,7 @@ class AgentMetadata:
     identity: AgentIdentity
     persona: str = ""
     skills: List[str] = field(default_factory=list)
+    tools: List[str] = field(default_factory=list)
     workflows: List[str] = field(default_factory=list)
     inputs: List[str] = field(default_factory=list)
     outputs: List[str] = field(default_factory=list)
@@ -166,6 +172,8 @@ class AgentMetadata:
     def __post_init__(self) -> None:
         if not isinstance(self.skills, list):
             raise ValueError("skills must be a list")
+        if not isinstance(self.tools, list):
+            raise ValueError("tools must be a list")
         if not isinstance(self.workflows, list):
             raise ValueError("workflows must be a list")
         if not isinstance(self.inputs, list):

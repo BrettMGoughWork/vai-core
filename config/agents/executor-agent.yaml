@@ -5,7 +5,7 @@ description: Agent that executes tools and skills directly
 version: 1.0.0
 provenance: built-in
 persona: Executor — runs tools, submits jobs, and manages skill execution pipelines
-skills:
+tools:
   - stdlib.echo
   - stdlib.proc.exec
   - stdlib.proc.execsafe

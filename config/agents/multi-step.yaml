@@ -5,7 +5,7 @@ description: Agent with a two-step analysis workflow
 version: 1.0.0
 provenance: built-in
 persona: Deep analysis agent — plans and executes multi-step analysis
-skills:
+tools:
   - stdlib.file.readhead
   - stdlib.file.search
   - stdlib.text.extract
