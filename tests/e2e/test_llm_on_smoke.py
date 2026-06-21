@@ -28,7 +28,7 @@ from src.strategy.planning.s1_contract.types import (
     PromptResponse,
     S1Error,
 )
-from src.strategy.planning.s1_contract.s1_client import call_s1_backend
+from src.runtime.llm.client import call_s1_backend
 from src.strategy.planning.s1_contract import s1_real_client
 from src.strategy.planning.s1_contract.s1_real_client import (
     S1RealLLMError,

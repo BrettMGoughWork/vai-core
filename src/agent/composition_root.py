@@ -20,6 +20,8 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
+from src.capabilities.patterns.pattern_loader import load_patterns_from_directory
+from src.capabilities.patterns.pattern_registry import PatternRegistry
 from src.capabilities.primitives.mcp import MCPPrimitive
 from src.capabilities.primitives.mcp_client import MCPClientManager
 from src.capabilities.primitives.stdlib import load_all_primitives as load_stdlib_primitives
@@ -64,6 +66,10 @@ for defn in load_workflows_from_yaml("config/workflows"):
 _primitive_registry = PrimitiveRegistry()
 _primitives_loaded = load_stdlib_primitives(_primitive_registry)
 _custom_primitives_loaded = load_custom_primitives(_primitive_registry)
+
+# ── Pattern registry (loaded from declarative YAML files) ──────────
+_pattern_registry = PatternRegistry()
+_patterns_loaded = load_patterns_from_directory(_pattern_registry, "config/patterns")
 
 # ── MCP client manager (manages MCP server subprocesses) ─────────────
 _mcp_client_manager = MCPClientManager("config/mcp_servers.yaml")
@@ -183,7 +189,7 @@ def _build_llm_transport():
 
 _llm_transport = _build_llm_transport()
 if _llm_transport is not None:
-    from src.strategy.planning.s1_contract.s1_client import set_llm_transport
+    from src.runtime.llm.client import set_llm_transport
 
     set_llm_transport(_llm_transport)
 
@@ -248,11 +254,13 @@ _shared_governance = MemoryGovernance(
 
 # ── Wired StrategyRouter → Supervisor ───────────────────────────────
 def _discover_capabilities() -> list[dict]:
-    """Return all primitives from the real registry as tool definitions."""
-    return [
-        {"name": p.name, "description": p.description}
-        for p in _primitive_registry.list()
-    ]
+    """Return all primitives and patterns from the real registries as capability definitions."""
+    capabilities: list[dict] = []
+    for p in _primitive_registry.list():
+        capabilities.append({"name": p.name, "description": p.description, "type": "tool"})
+    for p in _pattern_registry.list():
+        capabilities.append({"name": p.pattern_id, "description": p.description, "type": "pattern"})
+    return capabilities
 
 
 def _execute_plan_step(step_payload: dict[str, Any]) -> dict[str, Any]:
@@ -321,7 +329,7 @@ _strategy_router = StrategyRouter(
 )
 
 # ── Wired Supervisor ────────────────────────────────────────────────
-_workflow_engine = WorkflowEngine(wf_registry)
+_workflow_engine = WorkflowEngine(wf_registry, pattern_registry=_pattern_registry)
 _interaction_manager = UserInteractionManager(_workflow_engine)
 _workflow_tool_adapter = WorkflowToolAdapter(wf_registry)
 _primitive_tool_adapter = PrimitiveToolAdapter(_primitive_registry)
@@ -336,6 +344,7 @@ _supervisor = Supervisor(
     interaction_manager=_interaction_manager,
     workflow_tool_adapter=_workflow_tool_adapter,
     primitive_tool_adapter=_primitive_tool_adapter,
+    pattern_registry=_pattern_registry,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────
@@ -348,6 +357,7 @@ s5_adapter: GatewayAgentAdapter = SessionedAdapter(
 )
 s5_event_bus: EventBus = _event_bus
 
-# Exported for CLI introspection (e.g., /agent command, /agents list, /workflows list)
+# Exported for CLI introspection (e.g., /agent command, /agents list, /workflows list, /patterns list)
 agent_registry: AgentRegistry = _registry
 workflow_registry: WorkflowRegistry = wf_registry
+pattern_registry: PatternRegistry = _pattern_registry

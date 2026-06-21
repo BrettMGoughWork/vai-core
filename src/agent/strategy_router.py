@@ -24,7 +24,7 @@ from src.runtime.interfaces import (
     S1Error,
 )
 from src.strategy.memory.governance.memory_governance import MemoryGovernance
-from src.strategy.planning.s1_contract.s1_client import call_runtime_backend
+from src.runtime.llm.client import call_runtime_backend
 from src.strategy.types.subgoal import Subgoal
 
 

@@ -24,6 +24,8 @@ from src.agent.workflow.workflow_definition import (
     WorkflowDefinition,
     WorkflowStep,
 )
+from src.capabilities.patterns.pattern_registry import PatternRegistry
+from src.domain.patterns import PatternDefinition
 
 
 # ---------------------------------------------------------------------------
@@ -514,3 +516,126 @@ class TestEdgeCases:
 
         assert outcome.type == "failed"
         assert "unknown step type" in (outcome.error or "")
+
+
+# ===================================================================
+# 11. apply_pattern → resolves pattern and emits enriched llm_call
+# ===================================================================
+
+
+def _make_pattern_registry(
+    pattern_id: str = "reply_to_email",
+    name: str = "Reply to Email",
+    instructions: str = "Use gmail_read then gmail_send.",
+    primitives: list[str] | None = None,
+) -> PatternRegistry:
+    reg = PatternRegistry()
+    reg.register(PatternDefinition(
+        pattern_id=pattern_id,
+        name=name,
+        primitives=primitives or ["gmail_read", "gmail_send"],
+        instructions=instructions,
+    ))
+    return reg
+
+
+def _make_apply_pattern_step(
+    step_id: str,
+    pattern_id: str,
+    *,
+    label: str = "",
+    config_overrides: dict | None = None,
+    transitions: dict | None = None,
+) -> WorkflowStep:
+    config = {"pattern_id": pattern_id}
+    if config_overrides:
+        config.update(config_overrides)
+    return _make_step(
+        step_id,
+        "apply_pattern",
+        label=label or f"Apply pattern {pattern_id}",
+        config=config,
+        transitions=transitions or {"on_success": END_TARGET},
+    )
+
+
+class TestApplyPattern:
+    def test_emits_enriched_llm_call_outcome(self) -> None:
+        """apply_pattern step resolves pattern and emits llm_call with instructions."""
+        pattern_reg = _make_pattern_registry()
+        step = _make_apply_pattern_step("apply", "reply_to_email")
+        defn = _make_workflow(steps={"apply": step}, start_step="apply")
+        engine = WorkflowEngine(_make_registry(defn), pattern_registry=pattern_reg)
+        state = engine.start_workflow("test-wf")
+
+        new_state, outcome = engine.step(state)
+
+        assert outcome.type == "llm_call"
+        assert outcome.step_id == "apply"
+        assert "pattern_instructions" in outcome.config
+        instructions = outcome.config["pattern_instructions"]
+        assert len(instructions) == 1
+        assert instructions[0]["pattern_id"] == "reply_to_email"
+        assert instructions[0]["name"] == "Reply to Email"
+        assert instructions[0]["instructions"] == "Use gmail_read then gmail_send."
+        assert new_state.current_step_id is None  # transition to __end__
+
+    def test_missing_pattern_id_in_config_fails(self) -> None:
+        """apply_pattern without config.pattern_id returns failed outcome."""
+        pattern_reg = _make_pattern_registry()
+        step = _make_step("apply", "apply_pattern", config={})
+        defn = _make_workflow(steps={"apply": step}, start_step="apply")
+        engine = WorkflowEngine(_make_registry(defn), pattern_registry=pattern_reg)
+        state = engine.start_workflow("test-wf")
+
+        _new_state, outcome = engine.step(state)
+
+        assert outcome.type == "failed"
+        assert "missing" in (outcome.error or "").lower()
+
+    def test_pattern_not_in_registry_fails(self) -> None:
+        """apply_pattern with unknown pattern_id returns failed outcome."""
+        pattern_reg = _make_pattern_registry()
+        step = _make_apply_pattern_step("apply", "nonexistent_pattern")
+        defn = _make_workflow(steps={"apply": step}, start_step="apply")
+        engine = WorkflowEngine(_make_registry(defn), pattern_registry=pattern_reg)
+        state = engine.start_workflow("test-wf")
+
+        _new_state, outcome = engine.step(state)
+
+        assert outcome.type == "failed"
+        assert "not found" in (outcome.error or "").lower()
+
+    def test_no_pattern_registry_configured_fails(self) -> None:
+        """apply_pattern without a pattern_registry on the engine returns failed."""
+        step = _make_apply_pattern_step("apply", "reply_to_email")
+        defn = _make_workflow(steps={"apply": step}, start_step="apply")
+        engine = WorkflowEngine(_make_registry(defn))  # no pattern_registry
+        state = engine.start_workflow("test-wf")
+
+        _new_state, outcome = engine.step(state)
+
+        assert outcome.type == "failed"
+        assert "no pattern_registry" in (outcome.error or "").lower()
+
+    def test_on_failure_for_step_failure_respected(self) -> None:
+        """fail_step respects on_failure transitions (runtime error path)."""
+        step = _make_apply_pattern_step(
+            "apply", "reply_to_email",
+            transitions={"on_success": "next", "on_failure": "fallback"},
+        )
+        next_step = _make_step("next", transitions={"on_success": END_TARGET})
+        fallback = _make_step("fallback", transitions={"on_success": END_TARGET})
+        defn = _make_workflow(
+            steps={"apply": step, "next": next_step, "fallback": fallback},
+            start_step="apply",
+        )
+        pattern_reg = _make_pattern_registry()
+        engine = WorkflowEngine(_make_registry(defn), pattern_registry=pattern_reg)
+        state = engine.start_workflow("test-wf")
+
+        # Simulate runtime failure via fail_step → should follow on_failure
+        new_state, outcome = engine.fail_step(state, "apply", "runtime error")
+
+        assert outcome.type == "continue"
+        assert new_state.current_step_id == "fallback"

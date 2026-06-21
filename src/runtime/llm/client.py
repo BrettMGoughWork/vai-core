@@ -134,35 +134,36 @@ def _tool_matches_workflows(tool: dict, agent_workflows: list[str]) -> bool:
     return wf_id in agent_workflows or name in agent_workflows
 
 
-DEEPSEEK_SAFE_NAME_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
+_NON_SAFE_NAME_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
 
 
 def _sanitize_tool_name(name: str) -> str:
-    """Sanitize a tool name for LLM providers that reject dots.
+    """Sanitize a tool name for LLM providers.
 
-    DeepSeek requires tool names matching ``^[a-zA-Z0-9_-]+$``.
-    We replace any non-compliant character with ``_``.
+    Most providers require tool/function names matching ``^[a-zA-Z0-9_-]+$``
+    (OpenAI API spec).  We replace any non-compliant character with ``_``.
 
-    The mapping is tracked via ``_tool_name_map`` so the caller can reverse it.
+    Local ``name_map`` returned by ``_to_openai_tools`` allows reversal.
     """
-    return DEEPSEEK_SAFE_NAME_CHARS.sub("_", name)
+    return _NON_SAFE_NAME_CHARS.sub("_", name)
 
 
-# Global mapping: sanitized_name → original_name, populated by _to_openai_tools
-_tool_name_map: dict[str, str] = {}
+def _restore_tool_name(name: str, name_map: dict[str, str]) -> str:
+    """Reverse-map a sanitised tool name to its original form."""
+    return name_map.get(name, name)
 
 
-def _to_openai_tools(tool_context: list[dict]) -> list[dict]:
+def _to_openai_tools(tool_context: list[dict]) -> tuple[list[dict], dict[str, str]]:
     """Normalize tool definitions to OpenAI-compatible format.
 
     Supports both flat adapter format (``{name, description, input_schema}``)
     and OpenAI function-wrapper format (``{type: "function", function: {...}}``).
 
     **Name sanitisation**: tool names are sanitised to match ``^[a-zA-Z0-9_-]+$``
-    (required by DeepSeek). The original name is recorded in ``_tool_name_map``
-    for reverse mapping.
+    (the OpenAI API spec, supported by most providers).  Returns a
+    ``(tools, name_map)`` tuple where ``name_map`` is ``sanitised → original``.
     """
-    _tool_name_map.clear()
+    name_map: dict[str, str] = {}
     result: list[dict] = []
     for tool in tool_context:
         if tool.get("type") == "function":
@@ -179,11 +180,11 @@ def _to_openai_tools(tool_context: list[dict]) -> list[dict]:
             params = tool.get("input_schema", tool.get("parameters", {}))
         safe_name = _sanitize_tool_name(name)
         if safe_name != name:
-            _tool_name_map[safe_name] = name
+            name_map[safe_name] = name
 
         # Ensure at least one param is required when the schema has
-        # properties but no ``required`` list — prevents LLMs
-        # (especially DeepSeek) from calling tools with empty ``{}``.
+        # properties but no ``required`` list — prevents LLMs from
+        # calling tools with empty ``{}`` arguments.
         if isinstance(params, dict) and "properties" in params and "required" not in params:
             props = params.get("properties", {})
             if props:
@@ -200,16 +201,12 @@ def _to_openai_tools(tool_context: list[dict]) -> list[dict]:
                 "parameters": params,
             },
         })
-    return result
-
-
-def _restore_tool_name(name: str) -> str:
-    """Reverse-map a sanitised tool name to its original form."""
-    return _tool_name_map.get(name, name)
+    return result, name_map
 
 
 def _restore_tool_names_in_response(
     tool_calls: list[dict],
+    name_map: dict[str, str],
 ) -> list[dict]:
     """Restore original tool names in a list of tool_call dicts.
 
@@ -218,7 +215,7 @@ def _restore_tool_names_in_response(
     for tc in tool_calls:
         func = tc.get("function", {})
         if isinstance(func, dict) and "name" in func:
-            func["name"] = _restore_tool_name(func["name"])
+            func["name"] = _restore_tool_name(func["name"], name_map)
     return tool_calls
 
 
@@ -312,6 +309,19 @@ def call_s1_backend(
         if cap_lines:
             system_prompt += "".join(cap_lines)
 
+        # Inject agent capabilities — pattern instructions
+        agent_patterns = agent_metadata.get("patterns", [])
+        if agent_patterns:
+            pattern_lines = ["\nYou have received the following operational guidance (patterns):"]
+            for p in agent_patterns:
+                pid = p.get("pattern_id", "unknown")
+                pname = p.get("name", pid)
+                instr = p.get("instructions", "")
+                pattern_lines.append(f"\n--- Pattern: {pname} ({pid}) ---")
+                pattern_lines.append(instr)
+                pattern_lines.append(f"--- End Pattern: {pname} ---")
+            system_prompt += "\n".join(pattern_lines)
+
         # ── Build tool definitions and prepare for native function calling ──
         all_tool_context = request.tool_context or []
 
@@ -322,7 +332,7 @@ def call_s1_backend(
         ]
 
         # Convert to OpenAI-compatible tool definitions
-        tools = _to_openai_tools(wf_tool_context) if wf_tool_context else []
+        tools, tool_name_map = _to_openai_tools(wf_tool_context) if wf_tool_context else ([], {})
 
         # Build structured message list: system, conversation history, user
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
@@ -350,12 +360,11 @@ def call_s1_backend(
                     # LLM chose to call a tool — return tool_calls for the
                     # supervisor to execute (with HITL gating if needed)
                     #
-                    # Restore original tool names (DeepSeek requires names
-                    # matching ^[a-zA-Z0-9_-]+$, so dots are replaced with
-                    # underscores during the send — reverse here).
+                    # Restore original tool names (dots → underscores
+                    # mapping applied during send, reverse here).
                     if os.environ.get("S1_DEBUG"):
                         print(f"[S1_DEBUG] LLM returned tool_calls: {response.tool_calls}", file=sys.stderr)
-                    _restore_tool_names_in_response(response.tool_calls)
+                    _restore_tool_names_in_response(response.tool_calls, tool_name_map)
                     if os.environ.get("S1_DEBUG"):
                         print(f"[S1_DEBUG] After name restore: {response.tool_calls}", file=sys.stderr)
                     return PromptResponse(

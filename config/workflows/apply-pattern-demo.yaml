@@ -1,0 +1,19 @@
+# Apply Pattern Demo workflow
+# Demonstrates using an apply_pattern step to inject pattern instructions
+# into the LLM context during workflow execution.
+workflow_id: apply-pattern-demo
+name: "Apply Pattern Demo"
+description: "Demonstrate apply_pattern step type with reply_to_email pattern"
+version: "1.0.0"
+start_step: apply_reply_pattern
+steps:
+  apply_reply_pattern:
+    step_id: apply_reply_pattern
+    step_type: apply_pattern
+    label: "Load reply_to_email pattern guidance"
+    config:
+      pattern_id: reply_to_email
+      prompt: "{context.input}"
+    transitions:
+      on_success: __end__
+      on_failure: __end__
