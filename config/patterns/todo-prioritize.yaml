@@ -1,0 +1,51 @@
+pattern_id: todo_prioritize
+name: "Todo Prioritize"
+description: >
+  Reorder a flat todo list into dependency-respecting execution order.
+  Identifies which items can start immediately (no blocking deps), which
+  are blocked and by what, and suggests optimal parallel execution groups.
+  Useful when the agent wants to understand execution order without
+  running the full TodoWorker pipeline.
+primitives:
+  - stdlib.db.connect
+  - stdlib.db.query
+instructions: |
+  To prioritize a todo list:
+
+  1. **Connect to the database**. Use `stdlib.db.connect` with the
+     provided `db_path` if not already connected.
+
+  2. **Read the current state**. Query all todos and their dependencies:
+     ```sql
+     SELECT id, title, status FROM todos ORDER BY created_at;
+     SELECT todo_id, depends_on FROM todo_deps;
+     ```
+
+  3. **Build the dependency graph**. For each todo, determine:
+     - **Ready now**: status is `pending` and ALL `depends_on` items
+       have status `done`. These can start immediately.
+     - **Blocked**: status is `pending` but at least one dependency
+       is not `done`. Note WHICH dependencies are blocking.
+     - **In progress**: status is `in_progress` — already being worked on.
+     - **Done / Failed**: already completed or exhausted retries.
+
+  4. **Suggest execution groups**. Group ready items into parallel
+     batches — items with no inter-dependencies can run concurrently.
+     Items in different groups have dependency chains and must run
+     sequentially.
+
+  5. **Present the priority order** as a structured list:
+     - Group 1 (start now): items with no dependencies.
+     - Group 2 (after Group 1): items whose deps are all in Group 1.
+     - Group 3+: continue chaining.
+     - Blocked: items waiting on non-done dependencies (name them).
+
+  6. **Flag risks**:
+     - Circular dependencies (A depends on B, B depends on A).
+     - Orphan dependencies (depends_on references a non-existent todo id).
+     - Items with no clear path to completion.
+
+  **Use this pattern** before starting execution to give the user a
+  clear picture of what will happen and in what order. It is read-only
+  — it does NOT modify any todos.
+version: 1.0.0

@@ -12,7 +12,6 @@ Step types:
     sub_workflow   — Invoke another workflow
     user_input     — Await human input
     condition      — Branch logic based on context expression
-    planner_call   — Delegate to S2 Planner
     apply_pattern  — Apply pattern instructions as LLM guidance
 """
 
@@ -30,7 +29,6 @@ StepType = Literal[
     "sub_workflow",
     "user_input",
     "condition",
-    "planner_call",
     "apply_pattern",
 ]
 
@@ -40,7 +38,6 @@ VALID_STEP_TYPES: frozenset[str] = frozenset({
     "sub_workflow",
     "user_input",
     "condition",
-    "planner_call",
     "apply_pattern",
 })
 

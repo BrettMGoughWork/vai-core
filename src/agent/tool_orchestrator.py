@@ -150,7 +150,7 @@ class ToolOrchestrator:
                         if outcome.type == "waiting_for_input":
                             reply += f"\n\n[Workflow {wf_id!r} awaiting input: {outcome.prompt}]"
                             break
-                        if outcome.type in ("llm_call", "planner_call"):
+                        if outcome.type == "llm_call":
                             rendered = _render_context_templates(
                                 outcome.config,
                                 wf_state.context,

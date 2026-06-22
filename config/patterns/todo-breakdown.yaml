@@ -1,0 +1,77 @@
+pattern_id: todo_breakdown
+name: "Todo Breakdown"
+description: >
+  Decompose a user goal or task into a flat list of actionable todo items
+  with explicit dependencies. This is the entry point for todo-list-based
+  planning — the agent analyzes the goal, identifies independent subtasks,
+  and populates the `todos` and `todo_deps` tables in the SQLite database
+  provided via `db_path` in the context.
+primitives:
+  - stdlib.db.connect
+  - stdlib.db.execute
+  - stdlib.db.insert
+  - stdlib.db.query
+instructions: |
+  To break down a user goal into a todo list:
+
+  1. **Create the database if needed**. If not already connected, use
+     `stdlib.db.connect` with the provided `db_path`. Then ensure the
+     `todos` and `todo_deps` tables exist. If they don't, use
+     `stdlib.db.execute` to create them:
+     ```sql
+     CREATE TABLE IF NOT EXISTS todos (
+         id TEXT PRIMARY KEY,
+         title TEXT NOT NULL,
+         description TEXT NOT NULL DEFAULT '',
+         status TEXT NOT NULL DEFAULT 'pending'
+             CHECK(status IN ('pending','in_progress','done','blocked','failed')),
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         retries_remaining INTEGER NOT NULL DEFAULT 3,
+         last_error TEXT
+     );
+     CREATE TABLE IF NOT EXISTS todo_deps (
+         todo_id TEXT NOT NULL REFERENCES todos(id),
+         depends_on TEXT NOT NULL REFERENCES todos(id),
+         PRIMARY KEY (todo_id, depends_on)
+     );
+     ```
+
+  2. **Analyze the goal**. Identify every distinct, self-contained subtask
+     required to achieve it. Each subtask should be:
+     - Small enough to be completed in a single focused LLM interaction.
+     - Large enough to be meaningful — don't split trivial sub-actions.
+     - Named in **gerund form** (e.g., "Creating user authentication module",
+       "Writing integration tests for payment flow").
+
+  3. **Write descriptions that stand alone**. Each todo description must
+     contain enough detail that it can be executed without reading any
+     other todo. Include:
+     - What files/modules to create or modify.
+     - What the expected outcome looks like.
+     - Any constraints or requirements.
+
+  4. **Identify dependencies**. For each todo, ask: "Must anything else
+     finish before this can start?" Add `depends_on` entries using
+     `stdlib.db.insert` into `todo_deps`. Examples:
+     - "Writing auth routes" depends on "Creating user model".
+     - "Writing integration tests" depends on all implementation todos.
+
+  5. **Insert all todos**. Use `stdlib.db.insert` with `table: "todos"`.
+     Each row needs:
+     - `id`: descriptive kebab-case (e.g., `user-auth-module`, `payment-tests`).
+     - `title`: gerund-form name.
+     - `description`: full standalone description.
+
+  6. **Insert all dependencies**. Use `stdlib.db.insert` with
+     `table: "todo_deps"`. Each row needs `todo_id` and `depends_on`.
+
+  7. **Confirm the plan**. Use `stdlib.db.query` to read back the full
+     list and present it to the user as an ordered summary: how many items,
+     dependency chains, and which items can be started immediately
+     (no pending dependencies).
+
+  **Important**: Always create the tables BEFORE inserting. Use
+  `stdlib.db.execute` for DDL, `stdlib.db.insert` for row data.
+  Do NOT hard-code or guess the db_path — it is provided in context.
+version: 1.0.0
