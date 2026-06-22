@@ -9,3 +9,5 @@ tools:
   - "*"
 workflows:
   - "*"
+patterns:
+  - plan_with_todo
