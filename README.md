@@ -53,8 +53,8 @@ A workflow is a **deterministic directed step graph** — an explicit sequence o
 | `sub_workflow` | Call another workflow (composition) |
 | `user_input` | Pause for human input |
 | `condition` | Branch on runtime state |
-| `planner_call` | Delegate to the S2 task planner |
 | `apply_pattern` | Invoke a pattern by ID within the workflow |
+| `todo_execute` | Execute a todo-list item via the planner worker |
 
 Workflows are engine-driven: the runtime owns the state machine, persists instance state at every mutation, and guarantees exactly-once step transitions. They're ideal for repeatable, auditable processes.
 
@@ -71,6 +71,26 @@ An agent can optionally declare a list of peer agents it can **defer** to — ha
 This enables **specialisation** (a general support agent hands off billing queries to a billing specialist), **capability mismatch** (a chat assistant defers execution to a task-specific agent), and **task decomposition** (one agent breaks a complex request into sub-tasks for peers). The deferral graph is validated for acyclicity at registration time — no agent can defer, directly or indirectly, back to itself.
 
 See [Agent Deferral](docs/architecture/agent-deferral.md) for the full design.
+
+#### Todo-List Planner
+
+The **todo-list planner** replaces the monolithic S2 hierarchical planner with a flat, SQLite-based task list. It is a first-class capability — orchestrated through S4 machinery, not a workflow step or tool call.
+
+**Core components:**
+
+| Component | Role |
+|-----------|------|
+| `TodoStore` | SQLite table CRUD with dependency resolution — items block/unblock cascading as dependencies complete |
+| `TodoWorker` | S4-compatible worker with crash recovery, idempotency, and multi-cycle execution — picks up `in_progress` items after a crash |
+| `TodoOrchestrator` | First-class capability wrapping `TodoWorker` in the full S4 lifecycle — `run(db_path)` creates a job, enqueues it, and returns results |
+| `db_execute` | Stdlib primitive for executing SQL via the primitive registry |
+
+**Workflow path:** `todo-execute-item.yaml` drives each item through three composable patterns:
+1. **`todo-breakdown`** — decompose a large item into smaller, achievable sub-tasks
+2. **`todo-prioritize`** — reorder items based on dependency readiness and priority
+3. **`todo-self-check`** — verify the item's output meets acceptance criteria
+
+The worker loop iterates until all items are `done`, handling retries, error recovery, and dependency unblocking automatically. Patterns are intentionally small and bounded — the workflow breaks work into composable steps rather than relying on unbounded LLM cognition.
 
 ---
 
