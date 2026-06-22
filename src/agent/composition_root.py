@@ -120,6 +120,7 @@ if _mcp_primitive_count > 0:
 # ── Shared context injected into every primitive.execute() call ──────
 _PRIMITIVE_CONTEXT: dict[str, object] = {
     "mcpclient": _mcp_client_manager,
+    "workspace_path": os.getcwd(),
 }
 
 

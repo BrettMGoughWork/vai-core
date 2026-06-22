@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 
 from src.capabilities.primitives.base import PrimitiveBase
@@ -49,6 +50,9 @@ class TodoCreateBatchPrimitive(PrimitiveBase):
                 raise ValueError(f"items[{i}] must contain 'title' key")
 
     def execute(self, args: dict, context: dict) -> PrimitiveResult:
+        if "db_path" not in args:
+            workspace = context.get("workspace_path", os.getcwd())
+            args["db_path"] = os.path.join(workspace, "todo_plan.db")
         self.validate_args(args)
         db_path = args["db_path"]
         items = args["items"]
