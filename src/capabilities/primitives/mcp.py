@@ -22,6 +22,11 @@ class MCPPrimitive(PrimitiveBase):
 
     __match_args__ = ("name",)
 
+    # Default input schema (overridden per-instance from MCP tools/list).
+    # Every MCP tool exposes its own JSON Schema, so the meaningful
+    # schema lives on the instance, not the class.
+    input_schema: dict[str, Any] = {"type": "object", "properties": {}}
+
     def __init__(
         self,
         *,

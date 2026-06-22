@@ -20,6 +20,11 @@ class CLIPrimitive(PrimitiveBase):
     """A primitive backed by an external CLI command."""
 
     __match_args__ = ("name",)
+    input_schema = {
+        "type": "object",
+        "properties": {},
+        "description": "Accepts arbitrary key-value pairs that are passed as CLI arguments.",
+    }
 
     def __init__(self, *, name: str, description: str, command: str) -> None:
         super().__init__(

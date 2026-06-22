@@ -1,0 +1,48 @@
+# Todo Execute Item — per-item workflow for TodoWorker
+#
+# Started by TodoWorker for each pending todo item. The workflow
+# executes a single llm_call step that:
+#   1. Receives the todo's title, description, dependencies, and db_path
+#      as workflow context (injected by TodoWorker on start).
+#   2. The LLM uses any available tools to accomplish the task.
+#   3. On success → __end__ (TodoWorker marks the item done).
+#   4. On failure → __end__ (TodoWorker handles retry via TodoStore).
+#
+# This workflow is intentionally SIMPLE — one llm_call step. The
+# TodoWorker handles iteration, retry logic, tool dispatch, and
+# status tracking (done / failed / retries-exhausted).
+workflow_id: todo-execute-item
+name: "Todo Execute Item"
+description: "Execute a single todo-list item using LLM with available tools"
+version: "1.0.0"
+start_step: execute_todo
+
+steps:
+  execute_todo:
+    step_id: execute_todo
+    step_type: llm_call
+    label: "Execute the todo item"
+    description: >
+      The LLM receives the todo's title, description, and dependency
+      context as template-rendered prompt text. It should use any
+      available tools to complete the task and provide a summary of
+      what was accomplished.
+    config:
+      message: |
+        You are executing a task from a todo list.
+
+        **Task ID**: {context.todo_id}
+        **Task Title**: {context.todo_title}
+        **Task Description**:
+        {context.todo_description}
+
+        **Dependencies** (already completed): {context.deps}
+
+        Execute this task to completion. Use any available tools as needed.
+        When finished, provide a concise summary of what was accomplished.
+
+        If you encounter an error or the task cannot be completed, explain
+        what went wrong so the system can handle retries.
+    transitions:
+      on_success: __end__
+      on_failure: __end__

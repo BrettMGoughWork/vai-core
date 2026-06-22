@@ -18,6 +18,14 @@ class FileSearchPrimitive(PrimitiveBase):
     name = "stdlib.file.search"
     description = "Search a file for lines matching a regex pattern"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file to search"},
+            "pattern": {"type": "string", "description": "Regular expression pattern to match against each line"},
+        },
+        "required": ["path", "pattern"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

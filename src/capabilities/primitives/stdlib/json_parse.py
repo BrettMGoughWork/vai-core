@@ -16,6 +16,16 @@ class JsonParsePrimitive(PrimitiveBase):
     name = "stdlib.json.parse"
     description = "Parse a JSON string into a Python object"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "Raw JSON string to parse",
+            },
+        },
+        "required": ["text"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -458,6 +458,7 @@ class Supervisor:
                     tool_context=tool_context,
                     conversation_history=ctx.context.conversation_history,
                     user_request=input_text,
+                    pattern_instructions=self._get_pattern_instructions(agent_meta),
                 )
 
             # LLM conversation path — route via StrategyRouter
@@ -511,7 +512,7 @@ class Supervisor:
             )
             result = self._strategy_router.route(outcome)
 
-            reply: str = "I'm not sure how to respond."
+            reply: str = ""
             metadata: Dict[str, Any] = {
                 "correlation_id": state.correlation_id,
                 "trace_id": state.trace_id,
@@ -522,6 +523,14 @@ class Supervisor:
             _reason = "Agent produced conversational response via Runtime route"
             if result.get("error") is None:
                 reply = result["output"].get("message") or reply
+                # When the LLM returns tool_calls without a text message,
+                # generate a meaningful placeholder instead of leaving it empty.
+                if not reply and not result.get("tool_calls"):
+                    reply = (
+                        "I received your request but I'm not sure how to"
+                        " help with that. Could you rephrase or provide"
+                        " more details?"
+                    )
                 if result.get("runtime_fallback"):
                     metadata["runtime_fallback"] = True
                     metadata["runtime_error"] = result["runtime_error"]
@@ -625,6 +634,7 @@ class Supervisor:
                     conversation_history=ctx.context.conversation_history,
                     result=result,
                     user_request=input_text,
+                    pattern_instructions=self._get_pattern_instructions(agent_meta),
                 )
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"

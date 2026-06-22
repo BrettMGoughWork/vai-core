@@ -17,6 +17,13 @@ class FileExistsPrimitive(PrimitiveBase):
     name = "stdlib.file.exists"
     description = "Check if a file or directory exists at the given path"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to check for existence"},
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

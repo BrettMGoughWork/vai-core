@@ -16,6 +16,16 @@ class TomlParsePrimitive(PrimitiveBase):
     name = "stdlib.toml.parse"
     description = "Parse a TOML string into a Python object"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "TOML text to parse",
+            },
+        },
+        "required": ["text"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

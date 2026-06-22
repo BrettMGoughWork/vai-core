@@ -16,6 +16,10 @@ class DbListTablesPrimitive(PrimitiveBase):
     name = "stdlib.db.listtables"
     description = "List all tables in the database"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {},
+    }
 
     def __init__(self) -> None:
         super().__init__(

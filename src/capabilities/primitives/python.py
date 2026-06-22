@@ -21,6 +21,11 @@ class PythonPrimitive(PrimitiveBase):
     """A primitive backed by a Python callable."""
 
     __match_args__ = ("name",)
+    input_schema = {
+        "type": "object",
+        "properties": {},
+        "description": "Accepts arguments matching the wrapped callable's signature.",
+    }
 
     def __init__(self, *, name: str, description: str, func: Callable[..., Any]) -> None:
         super().__init__(

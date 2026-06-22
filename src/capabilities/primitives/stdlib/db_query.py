@@ -17,6 +17,20 @@ class DbQueryPrimitive(PrimitiveBase):
     name = "stdlib.db.query"
     description = "Execute a read-only SQL SELECT query"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "SQL SELECT query to execute against the open database connection",
+            },
+            "params": {
+                "type": "array",
+                "description": "Query parameters for parameterized queries",
+            },
+        },
+        "required": ["query"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

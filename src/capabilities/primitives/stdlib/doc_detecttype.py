@@ -18,6 +18,16 @@ class DocDetectTypePrimitive(PrimitiveBase):
     name = "stdlib.doc.detecttype"
     description = "Detect document type from a file path or content"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the file to detect the type of",
+            },
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

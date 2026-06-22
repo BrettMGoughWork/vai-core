@@ -16,6 +16,21 @@ class TextJoinPrimitive(PrimitiveBase):
     name = "stdlib.text.join"
     description = "Join a list of strings with a delimiter"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "parts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of strings to join together",
+            },
+            "delimiter": {
+                "type": "string",
+                "description": "String to insert between parts (default: empty)",
+            },
+        },
+        "required": ["parts"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -17,6 +17,13 @@ class FileDeletePrimitive(PrimitiveBase):
     name = "stdlib.file.delete"
     description = "Delete a file at the given path"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file or empty directory to delete"},
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

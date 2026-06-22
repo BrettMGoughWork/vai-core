@@ -396,19 +396,88 @@ S1 Runtime  S2 Planner  S3 Capab.  S4 Platform     │
 | 12.6 | Test: register → discover → execute cycle |
 | 12.7 | I would like to test both a cli tool registered, and a basic MCP tool registered with both working, discoverable, and callable
 
-### Sprint 12a — SQL Structured Data Skill
+### Sprint 12a — Todo-List Planner (replaces SQL Structured Data Skill)
 
-**Goal:** A built-in skill that lets agents store, query, and manage structured data using SQLite — enabling todo lists, state tracking, batch processing, and persistent session artifacts without external infrastructure.
+**Goal:** A first-class composite capability that replaces the monolithic S2 hierarchical planner with a flat, SQLite-backed todo list. The list *is* the source of truth — no drift, no separate memory, no rerun machinery. Built from the same composable pieces as the rest of the system: S4 workers for durability, workflows for execution structure, patterns for LLM guidance, and stdlib db primitives for persistence.
+
+**Scope:** This is *not* a skill — it is a composite capability woven from S3, S4, S5. The S4 worker owns the iteration loop; workflows stay acyclic. Once this is stable, a future refactor will unstitch S2 from the system (massive simplification).
+
+**Architecture:**
+
+```
+/src/capabilities/planner/           ← orchestration & machinery (NEW)
+  __init__.py
+  todo_store.py                      ← SQLite wrapper: schema, CRUD, dependency resolution
+  todo_worker.py                     ← S4 worker: polls job queue, iterates todos, dispatches, updates
+  todo_orchestrator.py               ← Submits todo-list jobs to S4, manages lifecycle
+
+/src/capabilities/primitives/stdlib/
+  db_execute.py                      ← NEW: DDL executor (CREATE TABLE, DROP, ALTER, CREATE INDEX)
+  db_connect.py / db_query.py / ...  ← Existing: reused as-is
+
+/config/workflows/
+  todo-execute-item.yaml             ← NEW: acyclic per-item execution workflow
+
+/config/patterns/
+  todo-breakdown.yaml                ← NEW: LLM guidance for decomposing goals into todo items
+  todo-prioritize.yaml               ← NEW: LLM guidance for dependency-aware ordering
+  todo-self-check.yaml               ← NEW: LLM guidance for verifying completed items
+```
+
+**How the loop works (no workflow extension needed):**
+
+```
+S5 submits job "execute this todo list" → S4 queue
+  └─ TodoWorker picks up job
+       ├─ connect to SQLite (stdlib.db.connect)
+       ├─ ensure tables exist (stdlib.db.execute)
+       ├─ WHILE ready todos remain:
+       │    ├─ pick next pending todo (respecting todo_deps)
+       │    ├─ mark it in_progress
+       │    ├─ run workflow "todo-execute-item" (per-item, acyclic)
+       │    ├─ on success → mark done
+       │    ├─ on failure → decrement retries or mark failed
+       │    └─ continue
+       └─ mark job complete
+```
+
+The worker leverages existing S4 machinery: `ToolRetryWrapper`, `CrashRecovery`, `PanicGuard`, `DegradedMode`. On crash, it reloads the job, reads current list state from SQLite, and resumes — no replay needed.
+
+**Data model (SQLite):**
+
+```sql
+CREATE TABLE todos (
+    id TEXT PRIMARY KEY,          -- kebab-case, e.g. "create-auth-module"
+    title TEXT NOT NULL,          -- gerund form, e.g. "Creating auth module"
+    description TEXT,             -- enough detail to execute without referring back
+    status TEXT DEFAULT 'pending', -- pending | in_progress | done | failed | blocked
+    retries_remaining INT DEFAULT 3,
+    created_at TEXT,
+    updated_at TEXT
+);
+
+CREATE TABLE todo_deps (
+    todo_id TEXT REFERENCES todos(id),
+    depends_on TEXT REFERENCES todos(id),
+    PRIMARY KEY (todo_id, depends_on)
+);
+```
 
 | Task | What |
 |------|------|
-| 12a.1 | Define `db-store` skill interface — `query(sql, params)` and `execute(sql, params)` actions with structured JSON input/output schemas |
-| 12a.2 | Implement SQLite store wrapper — handles connection lifecycle, parameterized queries, result-set serialization |
-| 12a.3 | Register `db-store` as a built-in capability skill (available to all agents by default) |
-| 12a.4 | Skill instructions — tell agents how to use SQL for tracking progress, storing intermediate results, managing state |
-| 12a.5 | Test: agent stores and retrieves structured data across multiple turns |
-| 12a.6 | Test: concurrent skill calls to different tables do not interfere |
-| 12a.7 | Test: skill returns clear error on invalid SQL (malformed query, missing table) |
+| 12a.1 | **`stdlib.db.execute` primitive** — DDL executor (CREATE TABLE, DROP, ALTER, CREATE INDEX). Security: DDL only (no DML — INSERT/UPDATE/DELETE use their own primitives). Follows existing `db_connect` context pattern. Tests: creates table, rejects DML, rejects invalid SQL, works with existing connection context. |
+| 12a.2 | **`TodoStore`** — SQLite wrapper in `/src/capabilities/planner/todo_store.py`. Creates/manages `todos` and `todo_deps` tables. Provides: `ensure_tables()`, `add_todo(id, title, description)`, `get_next_pending()` (topological — respects deps, picks in_progress items first on resume), `mark_done(id)`, `mark_failed(id)`, `mark_blocked(id, reason)`, `add_dep(todo_id, depends_on)`. Pure data layer — no S4 or agent knowledge. |
+| 12a.3 | **`TodoWorker`** — S4-compatible worker in `/src/capabilities/planner/todo_worker.py`. Signature: `WorkExecutor` compatible (receives `(payload, execution_context, resume_token, **kwargs) → dict`). Loop: SQLite connect → ensure tables → while ready todos → pick next → run per-item workflow → update status → repeat. On crash: reloads job from JobStore, reads current todo state, resumes. Respects `retries_remaining` per item. Unit tests with mock workflow/submitter. |
+| 12a.4 | **`TodoOrchestrator`** — Job lifecycle manager in `/src/capabilities/planner/todo_orchestrator.py`. `submit_plan(todo_items: list[dict]) → job_id`: creates SQLite DB, populates todos, submits S4 job. `get_status(job_id) → JobState`: polls job status. `get_results(job_id) → list[todo]`: returns final list state. Called by S5 when an agent decides to use the planner. |
+| 12a.5 | **Workflow: `todo-execute-item`** — Acyclic per-item execution workflow (`config/workflows/todo-execute-item.yaml`). Steps: `llm_call` (execute the todo description with agent's tools/context) → `condition` (on_success → `tool_execute` mark done via stdlib.db.update; on_failure → mark failed, include error). Has `retry_policy` (max 3 retries with backoff). Sub-workflow of the worker loop. |
+| 12a.6 | **Pattern: `todo-breakdown`** — LLM guidance for decomposing a user goal into flat todo items with dependencies. Instructs the agent to: identify independent subtasks, write gerund-form titles, include enough description detail per item, express dependencies via `depends_on`, estimate ordering. Registered in `config/patterns/todo-breakdown.yaml`. |
+| 12a.7 | **Pattern: `todo-prioritize`** — LLM guidance for dependency-aware ordering. Instructs the agent to: resolve dependency chains, identify parallel-ready items, suggest what to tackle first when multiple items are unblocked. |
+| 12a.8 | **Pattern: `todo-self-check`** — LLM guidance for verifying completed items. Instructs the agent to: compare result against description, re-read the item description, mark as done only if fully satisfied, add follow-up todo if partial. |
+| 12a.9 | **Integration test: full pipeline** — Agent receives goal → applies `todo-breakdown` pattern → populates todos via stdlib db primitives → S5 submits to `TodoOrchestrator` → S4 worker iterates → each item dispatched via `todo-execute-item` workflow → results update list → job completes. Verify: all items marked done, dependency order respected, failed items retried. |
+| 12a.10 | **Integration test: crash recovery** — Worker crashes mid-iteration → job reloaded from JobStore → worker reads current todo state → resumes from in_progress item → completes remaining items. Verify: no duplicate execution, no lost state, final list correct. |
+| 12a.11 | **Unit test: dependency resolution** — `TodoStore.get_next_pending()` returns items in topological order, skips items whose deps are not done, returns in_progress items first (resume case). |
+| 12a.12 | **Remove `planner_call` from workflows** — The todo-list planner is a first-class capability invoked directly by S5, not a workflow step type. Remove `planner_call` from `StepType`/`OutcomeType` in `workflow_definition.py` and `engine.py`, remove `_handle_planner_call()`, remove the `planner_call` route from `StrategyRouter._route()` and the entire `_route_to_planner()` method, and remove `planner_call` handling from `ToolOrchestrator`. Any existing workflow YAML files using `planner_call` steps are migrated or deleted. |
+| 12a.13 | **Future: unstitch S2** — Once stable, create a follow-up task to remove the hierarchical planner (`SubgoalPlanner`, `Plan`, `PlanSegment`, `MemoryGovernance` drift/repair) and route all planning through the todo-list planner. This is *not* part of 12a — it is a separate, later sprint. |
 
 ### Sprint 13 — Hardening & Resilience
 

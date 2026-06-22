@@ -26,6 +26,37 @@ class ProcExecSafePrimitive(PrimitiveBase):
     name = "stdlib.proc.execsafe"
     description = "Execute a command with safety constraints"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "command": {
+                "oneOf": [
+                    {"type": "string", "description": "Shell command as a string"},
+                    {"type": "array", "items": {"type": "string"}, "description": "Command as tokenized list"},
+                ],
+                "description": "The command to execute safely",
+            },
+            "allowed_commands": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Explicit allowlist of command names — bypasses safety blocklist",
+            },
+            "blocked_commands": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Additional commands to block beyond the default blocklist",
+            },
+            "timeout": {
+                "type": "integer",
+                "description": "Timeout in seconds (default: 30)",
+            },
+            "cwd": {
+                "type": "string",
+                "description": "Working directory for the command (default: current directory)",
+            },
+        },
+        "required": ["command"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

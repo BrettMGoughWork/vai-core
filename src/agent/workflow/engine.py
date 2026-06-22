@@ -95,7 +95,6 @@ OutcomeType = Literal[
     "tool_execute",
     "sub_workflow",
     "waiting_for_input",
-    "planner_call",
     "continue",
     "completed",
     "failed",
@@ -282,7 +281,7 @@ class WorkflowEngine:
         """Record a step result.
 
         Called by the Supervisor when an ``llm_call``, ``tool_execute``,
-        or ``planner_call`` step completes successfully.
+        or ``sub_workflow`` step completes successfully.
 
         The caller (Supervisor) must call ``step()`` afterwards to
         evaluate the next step — this method stores the result only.
@@ -589,24 +588,6 @@ def _handle_apply_pattern(
     )
 
 
-def _handle_planner_call(
-    engine: WorkflowEngine,
-    state: WorkflowExecutionState,
-    step: Any,
-    defn: Any,
-) -> Tuple[WorkflowExecutionState, StepOutcome]:
-    """Emit a planner_call outcome for the supervisor to route to S2."""
-    return engine._advance(
-        state,
-        step,
-        StepOutcome(
-            type="planner_call",
-            step_id=step.step_id,
-            config=step.config,
-        ),
-    )
-
-
 def _handle_user_input(
     engine: WorkflowEngine,
     state: WorkflowExecutionState,
@@ -672,7 +653,6 @@ _STEP_HANDLERS = {
     "sub_workflow": _handle_sub_workflow,
     "user_input": _handle_user_input,
     "condition": _handle_condition,
-    "planner_call": _handle_planner_call,
     "apply_pattern": _handle_apply_pattern,
 }
 

@@ -17,6 +17,13 @@ class FileListdirPrimitive(PrimitiveBase):
     name = "stdlib.file.list"
     description = "List entries in a directory"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the directory to list"},
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

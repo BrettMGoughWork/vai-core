@@ -5,7 +5,6 @@ R.5 — Strategy Router
 Routes workflow outcomes to the correct execution layer:
 
 - ``llm_call``       → S1 Runtime (direct LLM call with mock fallback)
-- ``planner_call``   → S2 Planner (plan generation, submitted as S4 jobs)
 - ``tool_call``      → S3 via S4 job (capability execution)
 
 The StrategyRouter replaces direct ``call_runtime_backend()`` calls in
@@ -16,16 +15,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
-from uuid import uuid4
 
 from src.runtime.interfaces import (
     PromptRequest,
     PromptResponse,
     S1Error,
 )
-from src.strategy.memory.governance.memory_governance import MemoryGovernance
 from src.runtime.llm.client import call_runtime_backend
-from src.strategy.types.subgoal import Subgoal
+from src.strategy.memory.governance.memory_governance import MemoryGovernance
 
 
 @dataclass(frozen=True)
@@ -35,11 +32,10 @@ class RouterOutcome:
     Fields
     ------
     type:
-        One of ``"llm_call"``, ``"planner_call"``, ``"tool_call"``.
+        One of ``"llm_call"``, ``"tool_call"``.
     payload:
         Data required by the target layer.  Keys differ by route:
         - ``llm_call``:  ``prompt``, ``backend``, ``memory``, ``plan_context``, ``tool_context``
-        - ``planner_call``: ``goal``, ``context``, ``params``
         - ``tool_call``: ``skill_name``, ``arguments``
     step_id:
         Optional workflow step identifier for result correlation.
@@ -61,42 +57,27 @@ class StrategyRouter:
     call_runtime:
         Callable wrapping ``call_runtime_backend``.  Defaults to the real
         function so the router works out-of-the-box.
-    planner:
-        Optional callable for plan generation (S2).  When None,
-        ``_route_to_planner`` raises ``NotImplementedError``.
-    capability_discoverer:
-        Optional callable for skill discovery (S3).  When None,
-        ``_route_to_capabilities`` raises ``NotImplementedError``.
     submit_s4_job:
-        Optional callable to submit a job to S4.  Required for planner
-        and capability routes.  When None, those routes raise
-        ``NotImplementedError``.
+        Optional callable to submit a job to S4.  Required for capability
+        routes.  When None, those routes raise ``NotImplementedError``.
     governance:
         Shared ``MemoryGovernance`` instance for cross-store consistency.
-        When set, a subgoal is created via ``governance.put_subgoal()``
-        before calling the planner.  When ``None``, the planner is called
-        without subgoal creation (backwards-compatible mode).
+        When set, governance state is injected into LLM memory payloads.
     """
 
     def __init__(
         self,
         *,
         call_runtime: Callable[..., Any] = call_runtime_backend,
-        planner: Optional[Callable[..., Any]] = None,
-        capability_discoverer: Optional[Callable[[], list]] = None,
         submit_s4_job: Optional[Callable[[Any], Any]] = None,
         skill_executor: Optional[Any] = None,
         validation_pipeline: Optional[Any] = None,
-        step_executor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
-        governance: Optional[MemoryGovernance] = None,
+        governance: Optional["MemoryGovernance"] = None,
     ) -> None:
         self._call_runtime = call_runtime
-        self._planner = planner
-        self._capability_discoverer = capability_discoverer
         self._submit_s4_job = submit_s4_job
         self._skill_executor = skill_executor
         self._validation_pipeline = validation_pipeline
-        self._step_executor = step_executor
         self._governance = governance
 
     # ------------------------------------------------------------------
@@ -119,13 +100,11 @@ class StrategyRouter:
         t = outcome.type
         if t == "llm_call":
             return self._route_to_llm(outcome)
-        if t == "planner_call":
-            return self._route_to_planner(outcome)
         if t == "tool_call":
             return self._route_to_capabilities(outcome)
         raise ValueError(
             f"Unknown route type: {t!r}. "
-            f"Expected one of: llm_call, planner_call, tool_call"
+            f"Expected one of: llm_call, tool_call"
         )
 
     # ------------------------------------------------------------------
@@ -208,101 +187,6 @@ class StrategyRouter:
             "output": {"message": f"[Runtime unavailable: {error_msg}]"},
             "error": error_msg,
             "runtime_error": True,
-        }
-
-    def _route_to_planner(self, outcome: RouterOutcome) -> Dict[str, Any]:
-        """Generate a plan via S2, then execute each plan step inline.
-
-        If a ``step_executor`` is configured, steps are executed
-        synchronously and their results collected.  Otherwise falls
-        back to submitting each step as an S4 job.
-
-        Requires ``planner``, ``capability_discoverer``, and either
-        ``step_executor`` or ``submit_s4_job`` to be configured.
-        """
-        if self._planner is None or self._capability_discoverer is None:
-            raise NotImplementedError(
-                "planner and capability_discoverer must be configured "
-                "before routing planner outcomes"
-            )
-
-        # 1. Discover available skills
-        available = self._capability_discoverer()
-
-        # 2. Get goal from outcome
-        goal = outcome.payload.get("goal", "")
-
-        # 3. Create subgoal in shared governance (if configured)
-        if self._governance is not None:
-            subgoal = Subgoal(
-                subgoal_id=f"sg-{uuid4().hex[:16]}",
-                goal=goal,
-                context=outcome.payload.get("context", {}),
-                metadata={},
-            )
-            self._governance.put_subgoal(subgoal)
-            subgoal_id = subgoal.subgoal_id
-        else:
-            subgoal_id = f"sg-{hash(goal) & 0xFFFFFFFF:08x}"
-
-        # 4. Call S2 planner with governance context
-        plan = self._planner(
-            goal=goal,
-            subgoal_id=subgoal_id,
-            governance=self._governance,
-            capabilities=available,
-        )
-
-        # 5. Execute each plan step (inline via step_executor, or submit as S4 job)
-        steps = getattr(plan, "steps", [])
-        step_results: list[Dict[str, Any]] = []
-        job_ids: list[str] = []
-
-        for step in steps:
-            step_payload = {
-                "type": "plan_step",
-                "plan_id": getattr(plan, "plan_id", ""),
-                "step_id": getattr(step, "id", ""),
-                "skill_ref": getattr(step, "skill_ref", ""),
-                "inputs": getattr(step, "inputs", {}),
-                "description": getattr(step, "description", ""),
-            }
-
-            if self._step_executor is not None:
-                result = self._step_executor(step_payload)
-                step_results.append(result)
-            elif self._submit_s4_job is not None:
-                job = self._submit_s4_job(step_payload)
-                job_ids.append(getattr(job, "job_id", str(job)))
-            else:
-                raise NotImplementedError(
-                    "step_executor or submit_s4_job must be configured "
-                    "before routing planner outcomes"
-                )
-
-        # Build a readable summary from step results
-        lines: list[str] = []
-        for sr in step_results:
-            status = sr.get("status", "unknown")
-            msg = sr.get("message", "")
-            sid = sr.get("step_id", "")
-            lines.append(f"  [{status}] {sid}: {msg}")
-        plan_summary = f"Plan {getattr(plan, 'plan_id', '')}: {len(steps)} steps\n" + "\n".join(lines)
-
-        return {
-            "output": {
-                "message": plan_summary,
-                "plan_id": getattr(plan, "plan_id", ""),
-                "intent": getattr(plan, "intent", ""),
-                "reasoning_summary": getattr(plan, "reasoning_summary", ""),
-                "steps": step_results,
-            },
-            "metadata": {
-                "plan_id": getattr(plan, "plan_id", ""),
-                "step_count": len(steps),
-                "job_ids": job_ids or None,
-            },
-            "error": None,
         }
 
     def _route_to_capabilities(self, outcome: RouterOutcome) -> Dict[str, Any]:

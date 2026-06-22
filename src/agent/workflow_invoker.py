@@ -372,33 +372,6 @@ class WorkflowInvoker:
                     },
                 ))
 
-            # ── Planner call → route via StrategyRouter → resume ──
-            if outcome.type == "planner_call":
-                rendered_config = _render_context_templates(
-                    outcome.config,
-                    wf_state.context,
-                    wf_state.step_results,
-                )
-                router_outcome = RouterOutcome(
-                    type="planner_call",
-                    payload={
-                        "goal": rendered_config.get("goal", ""),
-                        "context": wf_state.context,
-                    },
-                    step_id=outcome.step_id,
-                )
-                result = self._strategy_router.route(router_outcome)
-                if result.get("error") is None:
-                    wf_state, _ = engine.resume_with_result(
-                        wf_state, outcome.step_id, result["output"],
-                    )
-                else:
-                    wf_state, _ = engine.fail_step(
-                        wf_state, outcome.step_id, result["error"],
-                    )
-                wf_store.save(wf_state)
-                continue
-
             # ── Sub-workflow → start and loop ──────────────────────
             if outcome.type == "sub_workflow":
                 sub_id = outcome.workflow_id or ""
@@ -460,7 +433,7 @@ class WorkflowInvoker:
 
         Each matching line starts a fresh workflow via
         ``self._workflow_engine``, runs **all non-blocking steps**
-        (``llm_call``, ``planner_call``, ``sub_workflow``, ``tool_execute``)
+        (``llm_call``, ``sub_workflow``, ``tool_execute``)
         inline, and **waits** if the workflow reaches ``waiting_for_input``
         or terminates.  Results are appended to *reply* so the caller sees
         both the LLM's original text and the workflow outcomes.
@@ -537,7 +510,7 @@ class WorkflowInvoker:
                     hitl_input = outcome.prompt or "Awaiting your input."
                     break
 
-                if outcome.type in ("llm_call", "planner_call"):
+                if outcome.type == "llm_call":
                     rendered_config = _render_context_templates(
                         outcome.config,
                         wf_state.context,

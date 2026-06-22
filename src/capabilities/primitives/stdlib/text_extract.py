@@ -17,6 +17,27 @@ class TextExtractPrimitive(PrimitiveBase):
     name = "stdlib.text.extract"
     description = "Extract substrings from text using a regex pattern"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "The text to search within",
+            },
+            "pattern": {
+                "type": "string",
+                "description": "Python regex pattern to match (e.g. r'\\d+')",
+            },
+            "flags": {
+                "type": "integer",
+                "description": "Regex flags as bitmask (e.g. re.IGNORECASE=2, re.DOTALL=16)",
+            },
+            "group": {
+                "description": "Capture group index (int) or name (str) to return (default: full match)",
+            },
+        },
+        "required": ["text", "pattern"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

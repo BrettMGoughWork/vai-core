@@ -1,0 +1,66 @@
+pattern_id: todo_breakdown
+name: "Todo Breakdown"
+description: >
+  Decompose a user goal or task into a flat list of actionable todo items
+  with explicit dependencies. This is the entry point for todo-list-based
+  planning — the agent analyzes the goal, identifies independent subtasks,
+  and populates the plan using the `stdlib.todo.*` primitives.
+primitives:
+  - stdlib.todo.create_batch
+  - stdlib.todo.add_dependency
+  - stdlib.todo.list
+  - stdlib.todo.status_summary
+instructions: |
+  To break down a user goal into a todo list:
+
+  1. **Analyze the goal**. Identify every distinct, self-contained subtask
+     required to achieve it. Each subtask should be:
+     - Small enough to be completed in a single focused LLM interaction.
+     - Large enough to be meaningful — don't split trivial sub-actions.
+     - Named in **gerund form** (e.g., "Creating user authentication module",
+       "Writing integration tests for payment flow").
+
+  2. **Write descriptions that stand alone**. Each todo description must
+     contain enough detail that it can be executed without reading any
+     other todo. Include:
+     - What files/modules to create or modify.
+     - What the expected outcome looks like.
+     - Any constraints or requirements.
+
+  3. **Identify dependencies**. For each todo, ask: "Must anything else
+     finish before this can start?" Include these in the `depends_on`
+     list for each item. Examples:
+     - "Writing auth routes" depends on "Creating user model".
+     - "Writing integration tests" depends on all implementation todos.
+
+  4. **Create the plan**. Use `stdlib.todo.create_batch` with:
+     - `db_path`: the database path from context.
+     - `items`: a list of dicts, each with:
+       - `id`: descriptive kebab-case (e.g., `user-auth-module`, `payment-tests`).
+       - `title`: gerund-form name.
+       - `description`: full standalone description.
+       - `depends_on` (optional): list of todo IDs this item depends on.
+
+     Example:
+     ```json
+     {
+       "db_path": "<from context>",
+       "items": [
+         {"id": "design-db", "title": "Designing the database schema",
+          "description": "Define tables, relations, and indexes for the payments module."},
+         {"id": "write-models", "title": "Writing ORM models",
+          "description": "Implement SQLAlchemy models matching the schema.",
+          "depends_on": ["design-db"]}
+       ]
+     }
+     ```
+
+  5. **Confirm the plan**. Use `stdlib.todo.list` to read back the plan
+     and `stdlib.todo.status_summary` for counts. Present it to the user:
+     how many items, dependency chains, and which items can be started
+     immediately (no pending dependencies).
+
+  **Important**: Do NOT write raw SQL. Use the `stdlib.todo.*` primitives
+  exclusively. They handle table creation, schema, and constraints automatically.
+  Do NOT hard-code or guess the db_path — it is provided in context.
+version: 1.0.0

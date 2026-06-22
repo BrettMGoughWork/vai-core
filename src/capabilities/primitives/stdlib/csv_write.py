@@ -17,6 +17,21 @@ class CsvWritePrimitive(PrimitiveBase):
     name = "stdlib.csv.write"
     description = "Write rows of data to a CSV file"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the CSV file to write",
+            },
+            "rows": {
+                "type": "array",
+                "items": {"type": "array"},
+                "description": "List of rows, where each row is a list of values",
+            },
+        },
+        "required": ["path", "rows"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

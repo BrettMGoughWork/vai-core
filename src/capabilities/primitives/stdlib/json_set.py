@@ -17,6 +17,23 @@ class JsonSetPrimitive(PrimitiveBase):
     name = "stdlib.json.set"
     description = "Set a key on a JSON object, returning the modified object"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "obj": {
+                "type": "object",
+                "description": "The JSON object (dict) to modify",
+            },
+            "key": {
+                "type": "string",
+                "description": "The key to set",
+            },
+            "value": {
+                "description": "The value to assign (any JSON-serializable type)",
+            },
+        },
+        "required": ["obj", "key", "value"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

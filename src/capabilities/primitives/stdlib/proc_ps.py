@@ -16,6 +16,19 @@ class ProcPsPrimitive(PrimitiveBase):
     name = "stdlib.proc.ps"
     description = "List running processes"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "name_filter": {
+                "type": "string",
+                "description": "Optional filter — only return processes whose name contains this substring",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of processes to return (default: 50)",
+            },
+        },
+    }
 
     def __init__(self) -> None:
         super().__init__(

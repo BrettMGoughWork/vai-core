@@ -17,6 +17,14 @@ class FileReadheadPrimitive(PrimitiveBase):
     name = "stdlib.file.readhead"
     description = "Read first N lines of a file as UTF-8 string"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file to read"},
+            "lines": {"type": "integer", "description": "Number of lines to read from the start of the file", "minimum": 1},
+        },
+        "required": ["path", "lines"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

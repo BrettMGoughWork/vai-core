@@ -19,6 +19,24 @@ class NetHttpGetPrimitive(PrimitiveBase):
     name = "stdlib.net.get"
     description = "HTTP GET request returning status code, body, and headers"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "URL to send the GET request to",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Timeout in seconds (default: 10)",
+            },
+            "headers": {
+                "type": "object",
+                "description": "Additional HTTP headers as key-value pairs",
+            },
+        },
+        "required": ["url"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -41,6 +41,22 @@ class FetchPrimitive(PrimitiveBase):
         "Use this for ALL web fetching — it will pick the best approach."
     )
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "The URL to fetch."},
+            "timeout": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Request timeout in seconds.",
+            },
+            "headers": {
+                "type": "object",
+                "description": "Optional HTTP headers as key-value pairs.",
+            },
+        },
+        "required": ["url"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

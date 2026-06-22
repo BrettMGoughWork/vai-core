@@ -79,6 +79,7 @@ class ToolOrchestrator:
         *,
         wf_max_iterations: int | None = None,
         user_request: str = "",
+        pattern_instructions: list[dict] | None = None,
     ) -> str:
         """Execute *tool_calls* and run follow-up LLM if primitives executed.
 
@@ -93,6 +94,11 @@ class ToolOrchestrator:
             user_request: The original user message, carried through to the
                 follow-up LLM so it doesn't lose context about *why* it
                 executed the tools.
+            pattern_instructions: Optional pattern instruction dicts
+                (``{pattern_id, name, instructions}``) to inject into
+                follow-up LLM agent metadata so the model continues
+                following pattern guidance (e.g. the ``plan_with_todo``
+                iteration loop).
 
         Returns:
             Updated reply string incorporating tool execution results
@@ -150,7 +156,7 @@ class ToolOrchestrator:
                         if outcome.type == "waiting_for_input":
                             reply += f"\n\n[Workflow {wf_id!r} awaiting input: {outcome.prompt}]"
                             break
-                        if outcome.type in ("llm_call", "planner_call"):
+                        if outcome.type == "llm_call":
                             rendered = _render_context_templates(
                                 outcome.config,
                                 wf_state.context,
@@ -251,8 +257,22 @@ class ToolOrchestrator:
         # The follow-up LLM may request MORE tool calls (e.g. gmail_send
         # after gmail_read).  Loop with a bounded depth so multi-step
         # requests ("read X, analyze, and reply") complete fully.
-        _DEFAULT_MAX_FOLLOW_UP_DEPTH = 3
+        #
+        # Two-tier depth control:
+        #   1. _MAX_STALL_ROUNDS (3) — break after N consecutive rounds
+        #      with no *new* successful tool calls (progress-based reset).
+        #      A round that produces at least one new successful call
+        #      resets the stall counter.
+        #   2. _MAX_TOTAL_ROUNDS (10) — hard ceiling that resets when a
+        #      round produces successful *new* tool calls, so multi-step
+        #      workflows ("plan → write → test → run") aren't cut short.
+        #      The _MAX_STALL_ROUNDS guard still catches true runaway
+        #      loops (LLM repeating the same failed calls).
+        _MAX_TOTAL_ROUNDS = 10
+        _MAX_STALL_ROUNDS = 3
         _follow_up_loop = 0
+        _stall_rounds = 0
+        _attempted_calls: set[tuple[str, str]] = set()  # (func_name, args_str) — all calls ever attempted
         while executed_primitives and self._strategy_router is not None:
             reply, fu_tool_calls = self._run_follow_up_llm(
                 executed_primitives=executed_primitives,
@@ -262,15 +282,23 @@ class ToolOrchestrator:
                 conversation_history=conversation_history,
                 result=result,
                 user_request=user_request,
+                pattern_instructions=pattern_instructions,
             )
             if not fu_tool_calls:
                 break  # LLM produced a text reply — work is done
             _follow_up_loop += 1
-            if _follow_up_loop > _DEFAULT_MAX_FOLLOW_UP_DEPTH:
+            if _follow_up_loop > _MAX_TOTAL_ROUNDS:
                 reply += "\n\n[Tool execution depth limit reached]"
+                break
+            if _stall_rounds >= _MAX_STALL_ROUNDS:
+                reply += (
+                    f"\n\n[Tool execution halted — no new progress in"
+                    f" {_MAX_STALL_ROUNDS} consecutive rounds]"
+                )
                 break
             # Execute follow-up tool_calls and loop back to interpret results
             executed_primitives = []
+            _round_had_new_success = False
             for tc in fu_tool_calls:
                 if not isinstance(tc, dict):
                     continue
@@ -281,6 +309,10 @@ class ToolOrchestrator:
                 if func_name.startswith("primitive."):
                     prim_name = func_name[len("primitive."):]
                     args = _extract_args(tc)
+                    args_str = json.dumps(args, sort_keys=True)
+                    call_sig = (func_name, args_str)
+                    is_new_call = call_sig not in _attempted_calls
+                    _attempted_calls.add(call_sig)
                     if self._inline_tool_executor is not None:
                         try:
                             prim_result = self._inline_tool_executor({
@@ -300,6 +332,10 @@ class ToolOrchestrator:
                                 "result_str": result_str,
                             })
                             reply += f"\n\n[Primitive {prim_name!r} \u2192 {result_str}]"
+                            # Mark round as productive if this was a new
+                            # call that succeeded (not an error)
+                            if is_new_call and prim_result.get("status") != "error":
+                                _round_had_new_success = True
                         else:
                             reply += f"\n\n[Primitive {prim_name!r} returned no result]"
                     else:
@@ -310,6 +346,16 @@ class ToolOrchestrator:
             # which tools were requested
             result = dict(result)
             result["tool_calls"] = fu_tool_calls
+            # Progress tracking: reset both counters when this round
+            # produced at least one new successful tool call.
+            # _follow_up_loop resets so multi-step workflows
+            # (plan→write→test→run) don't hit the 10-round ceiling.
+            # _stall_rounds still catches LLM repeating the same errors.
+            if _round_had_new_success:
+                _follow_up_loop = 0
+                _stall_rounds = 0
+            else:
+                _stall_rounds += 1
 
         return reply
 
@@ -323,6 +369,7 @@ class ToolOrchestrator:
         conversation_history: list[dict],
         result: dict[str, Any],
         user_request: str = "",
+        pattern_instructions: list[dict] | None = None,
     ) -> tuple[str, list[dict]]:
         """Build conversation history with tool results and call LLM for follow-up.
         
@@ -384,8 +431,19 @@ class ToolOrchestrator:
             " request now (produce your final response and take any"
             " remaining action such as drafting or sending).\n"
             "- If you still need more information or need to take"
-            " another action, request more tool calls.\n"
-            "Do NOT re-request a tool that has already produced results above."
+            " another action, request more tool calls.\n\n"
+            "IMPORTANT:\n"
+            "- Do NOT re-request a tool that has already produced"
+            " results above.  Use the results you already have.\n"
+            "- If a tool returned an error (especially IntegrityError"
+            " or UNIQUE constraint), assume the data already exists"
+            " and proceed.  Do NOT retry the same operation.\n"
+            "- When presenting a plan to the user, produce a text"
+            " reply — do NOT loop on list/status tools.  The user"
+            " will confirm the plan in their next message.\n"
+            "- Each follow-up iteration is a fresh decision point."
+            "  Default to completing the request with a text reply"
+            " unless you genuinely need new information."
         ) if user_request else "Based on the tool results, what's your response?"
 
         follow_up_outcome = RouterOutcome(
@@ -400,6 +458,7 @@ class ToolOrchestrator:
                         "persona": agent_meta.persona,
                         "tools": list(agent_meta.tools),
                         "workflows": list(agent_meta.workflows),
+                        "patterns": pattern_instructions or [],
                     },
                 },
                 "backend": "conversational",

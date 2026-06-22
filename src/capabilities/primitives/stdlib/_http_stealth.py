@@ -175,6 +175,39 @@ class HttpStealthPrimitive(PrimitiveBase):
         "human-like timing, and anti-bot evasion"
     )
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "URL to load in the stealth browser",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Timeout in seconds (must be positive)",
+            },
+            "headers": {
+                "type": "object",
+                "description": "Additional HTTP headers as key-value pairs",
+            },
+            "wait_until": {
+                "type": "string",
+                "enum": ["load", "domcontentloaded", "networkidle"],
+                "description": "When to consider the page loaded",
+            },
+            "wait_ms": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Additional wait time in milliseconds after page load",
+            },
+            "rate_limit_ms": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Minimum delay between requests in milliseconds",
+            },
+        },
+        "required": ["url"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

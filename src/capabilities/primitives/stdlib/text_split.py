@@ -16,6 +16,24 @@ class TextSplitPrimitive(PrimitiveBase):
     name = "stdlib.text.split"
     description = "Split a string into a list by a delimiter"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "The string to split",
+            },
+            "delimiter": {
+                "type": "string",
+                "description": "Delimiter to split on (default: space)",
+            },
+            "maxsplit": {
+                "type": "integer",
+                "description": "Maximum number of splits (default: unlimited)",
+            },
+        },
+        "required": ["text"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

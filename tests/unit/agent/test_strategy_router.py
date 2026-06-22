@@ -167,12 +167,6 @@ class TestStrategyRouter:
         with pytest.raises(ValueError, match="Unknown route type"):
             router.route(outcome)
 
-    def test_route_planner_raises_not_implemented(self) -> None:
-        router = StrategyRouter()
-        outcome = RouterOutcome(type="planner_call", payload={"goal": "test"})
-        with pytest.raises(NotImplementedError):
-            router.route(outcome)
-
     def test_route_tool_raises_not_implemented(self) -> None:
         """No skill_executor and no submit_s4_job → NotImplementedError."""
         router = StrategyRouter()
@@ -279,54 +273,6 @@ class TestRouterOutcome:
         assert a == b
 
 
-class TestStrategyRouterStepExecutor:
-    """StrategyRouter with step_executor for plan step execution."""
-
-    def test_planner_executes_steps_inline(self) -> None:
-        """Plan steps are executed inline via step_executor."""
-        executed: list[str] = []
-
-        def _executor(payload: dict) -> dict:
-            executed.append(payload["step_id"])
-            return {"status": "success", "message": f"done {payload['step_id']}", "step_id": payload["step_id"]}
-
-        router = StrategyRouter(
-            planner=lambda **kw: type(
-                "Plan", (), {
-                    "steps": [
-                        type("Step", (), {"id": "s1", "skill_ref": "tool_a", "inputs": {}, "description": "Step 1"})(),
-                        type("Step", (), {"id": "s2", "skill_ref": "tool_b", "inputs": {}, "description": "Step 2"})(),
-                    ],
-                    "plan_id": "p1", "intent": "test", "reasoning_summary": "",
-                }
-            )(),
-            capability_discoverer=lambda: [],
-            step_executor=_executor,
-        )
-        outcome = RouterOutcome(type="planner_call", payload={"goal": "test"})
-        result = router.route(outcome)
-
-        assert result["error"] is None
-        assert executed == ["s1", "s2"]
-        assert len(result["output"]["steps"]) == 2
-        assert result["output"]["steps"][0]["message"] == "done s1"
-        assert result["output"]["steps"][1]["message"] == "done s2"
-        assert result["metadata"]["step_count"] == 2
-
-    def test_planner_with_no_steps(self) -> None:
-        """Empty plan steps produce empty results without calling executor."""
-        router = StrategyRouter(
-            planner=lambda **kw: type("Plan", (), {"steps": [], "plan_id": "p1"})(),
-            capability_discoverer=lambda: [],
-            step_executor=lambda p: {"status": "ok"},
-        )
-        outcome = RouterOutcome(type="planner_call", payload={"goal": "test"})
-        result = router.route(outcome)
-        assert result["error"] is None
-        assert result["output"]["steps"] == []
-        assert result["metadata"]["step_count"] == 0
-
-
 class TestStrategyRouterWithEdgeCases:
     """Edge cases for StrategyRouter."""
 
@@ -349,30 +295,3 @@ class TestStrategyRouterWithEdgeCases:
         result = router.route(outcome)
         assert result["error"] is None
         # output is empty dict — caller handles fallback text
-
-    def test_planner_configured_raises_on_missing_s4(self) -> None:
-        """Planner route raises when no executor or s4 submitter configured."""
-        router = StrategyRouter(
-            planner=lambda **kw: type("Plan", (), {"steps": [], "plan_id": "p1"})(),
-            capability_discoverer=lambda: [],
-        )
-        outcome = RouterOutcome(type="planner_call", payload={"goal": "test"})
-        # 0 steps → succeeds with empty results (no executor needed)
-        result = router.route(outcome)
-        assert result["error"] is None
-        assert result["output"]["steps"] == []
-
-    def test_planner_raises_when_steps_no_executor(self) -> None:
-        """Planner route raises when steps exist but no executor configured."""
-        router = StrategyRouter(
-            planner=lambda **kw: type(
-                "Plan", (), {
-                    "steps": [type("Step", (), {"id": "s1", "skill_ref": "test", "inputs": {}, "description": ""})()],
-                    "plan_id": "p1",
-                }
-            )(),
-            capability_discoverer=lambda: [],
-        )
-        outcome = RouterOutcome(type="planner_call", payload={"goal": "test"})
-        with pytest.raises(NotImplementedError, match="step_executor"):
-            router.route(outcome)

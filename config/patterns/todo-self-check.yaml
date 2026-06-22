@@ -1,0 +1,61 @@
+pattern_id: todo_self_check
+name: "Todo Self-Check"
+description: >
+  Verify that a completed todo item actually satisfies its stated goal.
+  After the TodoWorker marks an item `done`, this pattern guides the LLM
+  to re-read the item description, compare it against what was actually
+  accomplished, and either confirm completion or flag gaps that need
+  follow-up work.
+primitives:
+  - stdlib.todo.list
+  - stdlib.todo.create
+  - stdlib.todo.add_dependency
+  - stdlib.todo.mark_done
+  - stdlib.todo.mark_failed
+instructions: |
+  To self-check a completed todo item:
+
+  1. **Re-read the item description**. Use `stdlib.todo.list` with the
+     provided `db_path`. Find the item by its `id` to get its title,
+     description, and current status.
+
+  2. **Compare against the output**. The workflow result text describes
+     what was actually done. Compare it point-by-point against the
+     description's requirements:
+     - Did the output address EVERY requirement in the description?
+     - Are there any files or changes that were mentioned in the
+       description but not created/modified?
+     - Does the output summary sound complete, or does it hedge or
+       mention unfinished work?
+
+  3. **Verdict** — one of three outcomes:
+
+     a. **Fully satisfied** — all requirements met, output is conclusive.
+        The `done` status is correct. No action needed.
+
+     b. **Partially satisfied** — the main work is done but a minor
+        piece is missing. Add a follow-up todo with `stdlib.todo.create`:
+        ```json
+        {"db_path": "...", "id": "<original>-followup", "title": "...", "description": "..."}
+        ```
+        Then wire the dependency with `stdlib.todo.add_dependency`:
+        ```json
+        {"db_path": "...", "todo_id": "<original>-followup", "depends_on": "<original>"}
+        ```
+
+     c. **Not satisfied** — the output doesn't match the description,
+        or the work failed silently. Use `stdlib.todo.mark_failed` to
+        reset the item for retry:
+        ```json
+        {"db_path": "...", "id": "<todo_id>", "error": "Output didn't meet requirements: ..."}
+        ```
+
+  4. **Report your verdict** clearly. For each check:
+     - What the todo asked for.
+     - What was actually done.
+     - Your assessment and any action taken.
+
+  **When to use**: After the TodoWorker marks items done, or when a
+  user asks "did that actually work?" — run this pattern against
+  recently completed items for quality assurance.
+version: 1.0.0

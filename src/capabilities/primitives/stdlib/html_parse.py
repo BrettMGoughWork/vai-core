@@ -16,6 +16,16 @@ class HtmlParsePrimitive(PrimitiveBase):
     name = "stdlib.html.parse"
     description = "Parse HTML text into a navigable BeautifulSoup object (as dict)"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "Raw HTML text to parse",
+            },
+        },
+        "required": ["text"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

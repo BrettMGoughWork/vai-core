@@ -18,6 +18,15 @@ class EchoPrimitive(PrimitiveBase):
     name = "stdlib.echo"
     description = "Return input unchanged"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "value": {
+                "description": "Any JSON-serializable value to echo back",
+            },
+        },
+        "required": ["value"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

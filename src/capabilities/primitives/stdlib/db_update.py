@@ -17,6 +17,24 @@ class DbUpdatePrimitive(PrimitiveBase):
     name = "stdlib.db.update"
     description = "Update rows in a database table"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "table": {
+                "type": "string",
+                "description": "Name of the table to update rows in",
+            },
+            "set": {
+                "type": "object",
+                "description": "Column-value pairs to set (e.g., {'status': 'done'})",
+            },
+            "where": {
+                "type": "object",
+                "description": "WHERE clause as key-value pairs (e.g., {'id': 5})",
+            },
+        },
+        "required": ["table", "set", "where"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

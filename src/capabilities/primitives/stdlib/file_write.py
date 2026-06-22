@@ -17,6 +17,14 @@ class FileWritePrimitive(PrimitiveBase):
     name = "stdlib.file.write"
     description = "Write UTF-8 string content to a file"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file to write"},
+            "content": {"type": "string", "description": "UTF-8 string content to write to the file"},
+        },
+        "required": ["path", "content"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

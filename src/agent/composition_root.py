@@ -11,6 +11,7 @@ and capability (``src.capabilities.*``).
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, List
 
 # Load .env into the process environment BEFORE any module-level init that
@@ -30,7 +31,7 @@ from src.capabilities.primitives.custom import load_all_primitives as load_custo
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 
 # ── Infrastructure imports (adapter→infrastructure: allowed) ─────────
-from src.runtime.llm.types import CoreLLMResponse, RuntimeConfig
+from src.runtime.llm.types import RuntimeConfig
 
 # ── Adapter imports (adapter→adapter: allowed) ────────────────────────
 from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
@@ -40,7 +41,6 @@ from src.agent import load_agents_from_directory
 from src.agent.registry import AgentRegistry
 from src.agent.strategy_router import StrategyRouter
 from src.agent.supervisor import Supervisor
-from src.agent.wiring.composition import wire_planner
 from src.agent.workflow import (
     EventBus,
     InMemoryJobQueue,
@@ -118,9 +118,26 @@ if _mcp_primitive_count > 0:
 # The PluginLoader is retained for backward-compatible plugin YAML loading
 # but will be migrated to a pure primitive-based model in a future sprint.
 
+# ── Search config (injected into primitive context for stdlib.search) ────
+_search_config = None
+try:
+    import yaml as _yaml
+    _config_path = Path("config/config.yaml")
+    if _config_path.exists():
+        with open(_config_path, "r") as _f:
+            _raw_config = _yaml.safe_load(_f) or {}
+        _search_raw = _raw_config.get("search")
+        if _search_raw:
+            from src.domain.types.config import SearchConfig
+            _search_config = SearchConfig.from_yaml(_search_raw)
+except Exception:
+    pass  # Search is optional — primitives handle missing config gracefully
+
 # ── Shared context injected into every primitive.execute() call ──────
 _PRIMITIVE_CONTEXT: dict[str, object] = {
     "mcpclient": _mcp_client_manager,
+    "workspace_path": os.getcwd(),
+    "search_config": _search_config,
 }
 
 
@@ -207,43 +224,9 @@ if _llm_transport is not None:
 # ── S1 Executor (S5 → S1 protocol adapter) ──────────────────────────
 
 
-class _S1Executor:
-    """Minimal S1Executor wrapping the LLM transport."""
-
-    def complete(
-        self,
-        prompt: str,
-        context: dict[str, object] | None = None,
-    ) -> CoreLLMResponse:
-        if _llm_transport is None:
-            return CoreLLMResponse(text="", tool_name=None, tool_args=None)
-        text = _llm_transport.complete(prompt)
-        return CoreLLMResponse(text=text, tool_name=None, tool_args=None)
-
-    def complete_with_tools(
-        self,
-        prompt: str,
-        tools: list[dict[str, object]],
-        context: dict[str, object] | None = None,
-    ) -> CoreLLMResponse:
-        if _llm_transport is None:
-            return CoreLLMResponse(text="", tool_name=None, tool_args=None)
-        messages = [{"role": "user", "content": prompt}]
-        if hasattr(_llm_transport, "complete_with_tools"):
-            return _llm_transport.complete_with_tools(messages, tools)
-        # Fallback: text-only complete if tool-calling not available
-        text = _llm_transport.complete(prompt)
-        return CoreLLMResponse(text=text, tool_name=None, tool_args=None)
-
-
-# ── Wired S2 Planner ────────────────────────────────────────────────
-_s1_executor = _S1Executor()
-_wired_planner = wire_planner(s1_executor=_s1_executor)
-
-
 # ── Shared MemoryGovernance ──────────────────────────────────────────
-# Created once at the composition root so StrategyRouter, planner, and
-# any other component share the same memory stores and governance layer.
+# Created once at the composition root so StrategyRouter and any other
+# component share the same memory stores.
 from src.strategy.memory.segment_memory import SegmentMemory
 from src.strategy.memory.subgoal_memory import SubgoalMemory
 from src.strategy.memory.plan_memory import PlanMemory
@@ -263,78 +246,11 @@ _shared_governance = MemoryGovernance(
 
 
 # ── Wired StrategyRouter → Supervisor ───────────────────────────────
-def _discover_capabilities() -> list[dict]:
-    """Return all primitives and patterns from the real registries as capability definitions."""
-    capabilities: list[dict] = []
-    for p in _primitive_registry.list():
-        capabilities.append({"name": p.name, "description": p.description, "type": "tool"})
-    for p in _pattern_registry.list():
-        capabilities.append({"name": p.pattern_id, "description": p.description, "type": "pattern"})
-    return capabilities
-
-
-def _execute_plan_step(step_payload: dict[str, Any]) -> dict[str, Any]:
-    """Execute a single plan step inline.
-
-    Routes the step to the appropriate handler based on ``skill_ref``:
-    - registered stdlib primitive → ``PrimitiveRegistry``
-    - ``llm_call`` / ``llm``     → S1 LLM transport
-    - anything else               → unknown skill result
-    """
-    step_id = step_payload.get("step_id", "")
-    skill_ref = step_payload.get("skill_ref", "")
-    inputs = step_payload.get("inputs", {})
-    description = step_payload.get("description", "")
-
-    # Look up real primitives from the registry
-    primitive = _primitive_registry.get(skill_ref)
-    if primitive is not None:
-        try:
-            result = primitive.execute(inputs, context=_PRIMITIVE_CONTEXT)
-            return {
-                "status": result.status,
-                "message": (
-                    f"Primitive '{skill_ref}' executed successfully"
-                    if result.status == "success"
-                    else f"Primitive '{skill_ref}' failed: {result.error}"
-                ),
-                "step_id": step_id,
-                "outputs": result.data if result.data is not None else {},
-            }
-        except Exception as exc:
-            return {
-                "status": "error",
-                "message": f"Primitive '{skill_ref}' raised: {exc}",
-                "step_id": step_id,
-                "outputs": {},
-            }
-
-    if skill_ref in ("llm_call", "llm"):
-        prompt = description or inputs.get("prompt", f"Execute step: {step_id}")
-        response = _s1_executor.complete(prompt)
-        return {
-            "status": "success",
-            "message": response.text or f"LLM responded to step '{step_id}'",
-            "step_id": step_id,
-            "outputs": {"response": response.text},
-        }
-
-    return {
-        "status": "unknown",
-        "message": f"No handler for skill_ref='{skill_ref}' (step '{step_id}')",
-        "step_id": step_id,
-        "outputs": {},
-    }
-
-
 state_store = MemoryAgentStateStore()
 _job_queue = InMemoryJobQueue()
 
 _strategy_router = StrategyRouter(
-    planner=_wired_planner.plan,
-    capability_discoverer=_discover_capabilities,
     submit_s4_job=_job_queue.submit,
-    step_executor=_execute_plan_step,
     governance=_shared_governance,
 )
 

@@ -18,6 +18,21 @@ class ProcKillPrimitive(PrimitiveBase):
     name = "stdlib.proc.kill"
     description = "Kill a process by PID"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "pid": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "description": "Process ID to kill (must be positive)",
+            },
+            "signal": {
+                "type": "integer",
+                "description": "Signal number to send (e.g. 9 for SIGKILL, 15 for SIGTERM)",
+            },
+        },
+        "required": ["pid"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -17,6 +17,32 @@ class SysUUIDPrimitive(PrimitiveBase):
     name = "stdlib.sys.uuid"
     description = "Generate a UUID"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "version": {
+                "type": "integer",
+                "description": "UUID version: 1 (MAC+time), 3 (MD5 hash), 4 (random, default), 5 (SHA-1 hash)",
+                "enum": [1, 3, 4, 5],
+                "default": 4,
+            },
+            "format": {
+                "type": "string",
+                "description": "Output format: 'standard', 'hex', 'urn', or 'bytes'",
+                "enum": ["standard", "hex", "urn", "bytes"],
+                "default": "standard",
+            },
+            "namespace": {
+                "type": "string",
+                "description": "Namespace UUID string — required for v3/v5",
+            },
+            "name": {
+                "type": "string",
+                "description": "Name string to hash — required for v3/v5",
+            },
+        },
+        "required": [],
+    }
 
     def __init__(self) -> None:
         super().__init__(
