@@ -36,6 +36,16 @@ class DbExecutePrimitive(PrimitiveBase):
     name = "stdlib.db.execute"
     description = "Execute a DDL statement (CREATE TABLE, DROP, ALTER, CREATE INDEX, etc.)"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "DDL statement to execute (CREATE TABLE, DROP, ALTER, CREATE INDEX, etc.)",
+            },
+        },
+        "required": ["query"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

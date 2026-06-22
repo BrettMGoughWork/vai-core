@@ -17,6 +17,26 @@ class NetTcpCheckPrimitive(PrimitiveBase):
     name = "stdlib.net.tcp"
     description = "Check whether a TCP port on a host is open"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "host": {
+                "type": "string",
+                "description": "Hostname or IP address to connect to",
+            },
+            "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "TCP port number to check",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Connection timeout in seconds (default: 5)",
+            },
+        },
+        "required": ["host", "port"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

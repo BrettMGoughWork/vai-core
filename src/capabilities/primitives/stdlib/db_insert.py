@@ -17,6 +17,23 @@ class DbInsertPrimitive(PrimitiveBase):
     name = "stdlib.db.insert"
     description = "Insert rows into a database table"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "table": {
+                "type": "string",
+                "description": "Name of the table to insert rows into",
+            },
+            "rows": {
+                "type": "array",
+                "description": "List of row objects (dicts) to insert",
+                "items": {
+                    "type": "object",
+                },
+            },
+        },
+        "required": ["table", "rows"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

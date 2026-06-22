@@ -122,6 +122,33 @@ class HttpHardenedFetchPrimitive(PrimitiveBase):
         "persistent cookie jar"
     )
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "URL to send the GET request to",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Timeout in seconds (must be positive)",
+            },
+            "headers": {
+                "type": "object",
+                "description": "Additional HTTP headers as key-value pairs",
+            },
+            "max_retries": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Maximum number of retries (0 = no retries)",
+            },
+            "backoff_base_ms": {
+                "type": "number",
+                "description": "Base backoff time in milliseconds (must be positive)",
+            },
+        },
+        "required": ["url"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -13,9 +13,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
+from src.agent.planner.todo_worker import TodoWorker
 from src.agent.strategy_router import StrategyRouter
 from src.agent.workflow.engine import WorkflowEngine
-from src.capabilities.planner.todo_worker import TodoWorker
 from src.gateway.normalization import ChannelMessage
 from src.platform.queue.queue import Queue
 from src.platform.runtime.control_plane import ControlPlane

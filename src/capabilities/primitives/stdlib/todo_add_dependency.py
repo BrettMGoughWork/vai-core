@@ -22,6 +22,18 @@ class TodoAddDependencyPrimitive(PrimitiveBase):
     name = "stdlib.todo.add_dependency"
     description = "Add a dependency: one todo must complete before another can start"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+            "todo_id": {"type": "string", "description": "The todo item that depends on another"},
+            "depends_on": {"type": "string", "description": "The todo item ID that must complete first"},
+        },
+        "required": ["todo_id", "depends_on"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

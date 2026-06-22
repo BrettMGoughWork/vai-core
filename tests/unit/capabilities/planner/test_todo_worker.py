@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.capabilities.planner.todo_store import TodoStore
-from src.capabilities.planner.todo_worker import TodoWorker
+from src.agent.planner.todo_worker import TodoWorker
 from src.gateway.normalization import ChannelMessage
 from src.platform.runtime.execution_context import ExecutionContext
 

@@ -17,6 +17,24 @@ class GzipCompressPrimitive(PrimitiveBase):
     name = "stdlib.gzip.compress"
     description = "Gzip compress a file or string data"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "file": {
+                "type": "string",
+                "description": "Path to a file to gzip-compress",
+            },
+            "data": {
+                "type": "string",
+                "description": "Text content to gzip-compress",
+            },
+            "output": {
+                "type": "string",
+                "description": "Output path for the compressed file (optional)",
+            },
+        },
+        "anyOf": [{"required": ["file"]}, {"required": ["data"]}],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -36,6 +36,20 @@ class SearchPrimitive(PrimitiveBase):
     name = "stdlib.search"
     description = "Execute a web search and return normalised results (title, url, snippet)"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Search query string",
+            },
+            "max_results": {
+                "type": "integer",
+                "description": "Maximum number of results to return (optional, defaults to provider config)",
+            },
+        },
+        "required": ["query"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

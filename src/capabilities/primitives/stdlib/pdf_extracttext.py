@@ -18,6 +18,16 @@ class PdfExtracttextPrimitive(PrimitiveBase):
     name = "stdlib.pdf.extracttext"
     description = "Extract text from a PDF file"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the PDF file to extract text from",
+            },
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

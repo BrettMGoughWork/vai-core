@@ -40,6 +40,13 @@ class HitlManager:
         "update", "remove",
     })
 
+    # Primitives whose side effects are purely local (e.g. todo DB writes)
+    # and don't need HITL confirmation.  These are name-prefix matched
+    # against the primitive name *after* stripping the "primitive." prefix.
+    _SAFE_PRIMITIVE_PREFIXES: "frozenset[str]" = frozenset({
+        "stdlib.todo.",
+    })
+
     def __init__(
         self,
         inline_tool_executor: Optional[Callable[[dict[str, Any]], dict[str, Any] | None]] = None,
@@ -52,8 +59,9 @@ class HitlManager:
         """Check if user input is an affirmative confirmation."""
         return bool(self._AFFIRMATIVE_RE.fullmatch(text.strip()))
 
-    @staticmethod
+    @classmethod
     def has_side_effect_tool_calls(
+        cls,
         tool_calls: list[dict],
     ) -> list[dict]:
         """Return side-effect ``primitive.*`` tool calls from *tool_calls*.
@@ -61,6 +69,10 @@ class HitlManager:
         Uses a name-based heuristic: if the primitive name (last dot-segment)
         starts with any action in ``_SIDE_EFFECT_ACTIONS``, it is
         classified as a side-effect operation.
+
+        Primitives whose full name (after the ``primitive.`` prefix) starts
+        with a prefix in ``_SAFE_PRIMITIVE_PREFIXES`` are excluded — they
+        are safe, local-only operations (e.g. stdlib.todo.*).
 
         Returns the subset of calls that need confirmation.
         """
@@ -79,8 +91,15 @@ class HitlManager:
             )
             if not func_name.startswith("primitive."):
                 continue
+            prim_name = func_name[len("primitive."):]
+            # Skip primitives that are safe (no HITL confirmation needed)
+            if any(
+                prim_name.startswith(p)
+                for p in cls._SAFE_PRIMITIVE_PREFIXES
+            ):
+                continue
             # Extract the last segment for action heuristics
-            last_segment = func_name.rsplit(".", 1)[-1].lower()
+            last_segment = prim_name.rsplit(".", 1)[-1].lower()
             # Check if it starts with any side-effect word
             for action in side_effects:
                 if last_segment.startswith(action):
@@ -129,6 +148,7 @@ class HitlManager:
         tool_context: list[dict] | None = None,
         conversation_history: list[dict] | None = None,
         user_request: str = "",
+        pattern_instructions: list[dict] | None = None,
     ) -> AgentState:
         """Execute or cancel pending primitive tool_calls based on user input.
 
@@ -198,6 +218,7 @@ class HitlManager:
                     conversation_history=list(conversation_history or []),
                     user_request=user_request,
                     tool_calls=tool_calls,
+                    pattern_instructions=pattern_instructions,
                 )
                 if fu_reply:
                     reply = fu_reply
@@ -249,6 +270,7 @@ class HitlManager:
         conversation_history: list[dict],
         user_request: str,
         tool_calls: list[dict],
+        pattern_instructions: list[dict] | None = None,
     ) -> str | None:
         """Call the LLM to generate a natural-language response after
         HITL-confirmed tool execution.
@@ -300,10 +322,12 @@ class HitlManager:
             "The user confirmed this action. "
             "Summarize what was done in a natural, helpful tone. "
             "Do NOT re-request any tools \u2014 the work is done."
+            " Produce a text reply only."
         ) if user_request else (
             "Based on the tool results shown above, what's your response? "
             "The user confirmed this action. "
             "Summarize what was done in a natural, helpful tone."
+            " Produce a text reply only."
         )
 
         follow_up_outcome = RouterOutcome(
@@ -318,6 +342,7 @@ class HitlManager:
                         "persona": agent_meta.persona,
                         "tools": list(agent_meta.tools),
                         "workflows": list(agent_meta.workflows),
+                        "patterns": pattern_instructions or [],
                     },
                 },
                 "backend": "conversational",

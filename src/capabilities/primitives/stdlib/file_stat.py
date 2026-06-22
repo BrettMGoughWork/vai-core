@@ -18,6 +18,13 @@ class FileStatPrimitive(PrimitiveBase):
     name = "stdlib.file.stat"
     description = "Get file metadata: size, modified, created timestamps"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file or directory to stat"},
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

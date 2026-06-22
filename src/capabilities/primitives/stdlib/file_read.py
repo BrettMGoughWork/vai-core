@@ -17,6 +17,13 @@ class FileReadPrimitive(PrimitiveBase):
     name = "stdlib.file.read"
     description = "Read file content as UTF-8 string"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file to read"},
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

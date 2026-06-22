@@ -19,6 +19,32 @@ class NetHttpPostPrimitive(PrimitiveBase):
     name = "stdlib.net.post"
     description = "HTTP POST request returning status code, body, and headers"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "URL to send the POST request to",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Timeout in seconds (default: 10)",
+            },
+            "headers": {
+                "type": "object",
+                "description": "Additional HTTP headers as key-value pairs",
+            },
+            "json": {
+                "type": "object",
+                "description": "JSON body to send with the POST request",
+            },
+            "data": {
+                "type": "string",
+                "description": "Raw string data to send as the request body",
+            },
+        },
+        "required": ["url"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

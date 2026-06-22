@@ -17,6 +17,20 @@ class HtmlSelectPrimitive(PrimitiveBase):
     name = "stdlib.html.select"
     description = "Select elements from HTML using a CSS selector"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "html": {
+                "type": "string",
+                "description": "HTML text to query",
+            },
+            "selector": {
+                "type": "string",
+                "description": "CSS selector (e.g. 'div.content', '.class-name', '#id')",
+            },
+        },
+        "required": ["html", "selector"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

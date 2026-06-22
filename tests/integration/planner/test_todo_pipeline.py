@@ -20,7 +20,7 @@ from src.agent.strategy_router import StrategyRouter
 from src.agent.workflow.engine import WorkflowEngine
 from src.agent.workflow.loader import load_workflows_from_yaml
 from src.agent.workflow.registry import WorkflowRegistry
-from src.capabilities.planner.todo_orchestrator import TodoOrchestrator
+from src.agent.planner.todo_orchestrator import TodoOrchestrator
 from src.capabilities.planner.todo_store import TodoStore
 from src.platform.queue.queue import InMemoryQueue
 from src.platform.runtime.control_plane import ControlPlane

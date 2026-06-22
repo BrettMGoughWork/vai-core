@@ -283,11 +283,18 @@ def call_s1_backend(
         if explicit_system_prompt:
             system_prompt = explicit_system_prompt
         else:
+            try:
+                workspace_dir = os.getcwd()
+            except OSError:
+                workspace_dir = os.path.expanduser("~")
             system_prompt = (
                 f"You are {agent_name}, an AI assistant in the VAI platform.\n"
                 f"Role: {persona}\n"
-                f"Description: {description}\n\n"
+                f"Description: {description}\n"
+                f"Workspace directory: {workspace_dir}\n\n"
                 "Respond conversationally. Be concise, helpful, and accurate."
+                "\nWhen creating or reading files via stdlib.file.* primitives,"
+                " use paths relative to the workspace directory unless an absolute path is required."
             )
 
         # Inject agent capabilities — available workflows

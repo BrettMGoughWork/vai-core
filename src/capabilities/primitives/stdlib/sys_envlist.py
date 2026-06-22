@@ -17,6 +17,16 @@ class SysEnvListPrimitive(PrimitiveBase):
     name = "stdlib.sys.envlist"
     description = "List all environment variables"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "prefix": {
+                "type": "string",
+                "description": "Optional prefix to filter environment variables (e.g. 'VAI_' returns only VAI_* vars)",
+            },
+        },
+        "required": [],
+    }
 
     def __init__(self) -> None:
         super().__init__(

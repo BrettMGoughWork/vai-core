@@ -20,6 +20,16 @@ class TodoStatusSummaryPrimitive(PrimitiveBase):
     name = "stdlib.todo.status_summary"
     description = "Get a high-level summary of todo list progress"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+        },
+        "required": [],
+    }
 
     def __init__(self) -> None:
         super().__init__(

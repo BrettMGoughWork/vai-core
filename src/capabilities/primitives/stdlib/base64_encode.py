@@ -18,6 +18,20 @@ class Base64EncodePrimitive(PrimitiveBase):
     name = "stdlib.base64.encode"
     description = "Base64 encode a string or file"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "data": {
+                "type": "string",
+                "description": "Text content to base64-encode",
+            },
+            "file": {
+                "type": "string",
+                "description": "Path to a file whose bytes will be base64-encoded",
+            },
+        },
+        "anyOf": [{"required": ["data"]}, {"required": ["file"]}],
+    }
 
     def __init__(self) -> None:
         super().__init__(

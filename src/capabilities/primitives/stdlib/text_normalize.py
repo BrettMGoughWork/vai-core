@@ -17,6 +17,24 @@ class TextNormalizePrimitive(PrimitiveBase):
     name = "stdlib.text.normalize"
     description = "Normalize whitespace and casing in text"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "The text to normalize",
+            },
+            "lowercase": {
+                "type": "boolean",
+                "description": "Convert text to lowercase (default: false)",
+            },
+            "strip_punctuation": {
+                "type": "boolean",
+                "description": "Remove punctuation characters (default: false)",
+            },
+        },
+        "required": ["text"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

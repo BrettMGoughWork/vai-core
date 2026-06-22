@@ -17,6 +17,20 @@ class SysEnvGetPrimitive(PrimitiveBase):
     name = "stdlib.sys.envget"
     description = "Get an environment variable value"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "key": {
+                "type": "string",
+                "description": "Name of the environment variable to retrieve (e.g. 'HOME', 'PATH', 'CWD')",
+            },
+            "default": {
+                "type": "string",
+                "description": "Default value to return if the variable is not set",
+            },
+        },
+        "required": ["key"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -17,6 +17,16 @@ class CsvReadPrimitive(PrimitiveBase):
     name = "stdlib.csv.read"
     description = "Read a CSV file into a list of rows"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the CSV file to read",
+            },
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

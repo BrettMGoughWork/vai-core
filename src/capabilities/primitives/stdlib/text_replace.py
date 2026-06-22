@@ -16,6 +16,28 @@ class TextReplacePrimitive(PrimitiveBase):
     name = "stdlib.text.replace"
     description = "Replace substrings in text"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "The source text to perform replacements on",
+            },
+            "old": {
+                "type": "string",
+                "description": "Substring to search for and replace",
+            },
+            "new": {
+                "type": "string",
+                "description": "Replacement string",
+            },
+            "count": {
+                "type": "integer",
+                "description": "Maximum number of replacements (default: replace all)",
+            },
+        },
+        "required": ["text", "old", "new"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

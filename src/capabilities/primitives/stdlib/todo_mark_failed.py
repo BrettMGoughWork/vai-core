@@ -20,6 +20,18 @@ class TodoMarkFailedPrimitive(PrimitiveBase):
     name = "stdlib.todo.mark_failed"
     description = "Mark a todo item as failed (auto-retries if retries remain)"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+            "id": {"type": "string", "description": "The todo item ID to mark as failed"},
+            "error": {"type": "string", "description": "Error message describing what went wrong (optional)"},
+        },
+        "required": ["id"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

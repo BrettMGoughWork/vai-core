@@ -17,6 +17,14 @@ class FileAppendPrimitive(PrimitiveBase):
     name = "stdlib.file.append"
     description = "Append UTF-8 string content to a file"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file to append to"},
+            "content": {"type": "string", "description": "UTF-8 string content to append to the file"},
+        },
+        "required": ["path", "content"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

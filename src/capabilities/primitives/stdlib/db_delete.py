@@ -17,6 +17,20 @@ class DbDeletePrimitive(PrimitiveBase):
     name = "stdlib.db.delete"
     description = "Delete rows from a database table"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "table": {
+                "type": "string",
+                "description": "Name of the table to delete rows from",
+            },
+            "where": {
+                "type": "object",
+                "description": "WHERE clause as key-value pairs (e.g., {'id': 5})",
+            },
+        },
+        "required": ["table"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

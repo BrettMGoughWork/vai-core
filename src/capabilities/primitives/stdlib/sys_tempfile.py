@@ -18,6 +18,28 @@ class SysTempFilePrimitive(PrimitiveBase):
     name = "stdlib.sys.tempfile"
     description = "Create a temporary file and return its path"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "suffix": {
+                "type": "string",
+                "description": "File suffix/extension (e.g. '.txt', '.json')",
+            },
+            "prefix": {
+                "type": "string",
+                "description": "Filename prefix (default: 'vai_')",
+            },
+            "directory": {
+                "type": "string",
+                "description": "Directory to create the file in (default: system temp dir)",
+            },
+            "content": {
+                "type": "string",
+                "description": "Initial text content to write to the temp file",
+            },
+        },
+        "required": [],
+    }
 
     def __init__(self) -> None:
         super().__init__(

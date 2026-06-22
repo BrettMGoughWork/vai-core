@@ -18,6 +18,17 @@ class TodoMarkDonePrimitive(PrimitiveBase):
     name = "stdlib.todo.mark_done"
     description = "Mark a todo item as successfully completed"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+            "id": {"type": "string", "description": "The todo item ID to mark as done"},
+        },
+        "required": ["id"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

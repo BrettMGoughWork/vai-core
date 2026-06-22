@@ -18,6 +18,20 @@ class TodoCreatePrimitive(PrimitiveBase):
     name = "stdlib.todo.create"
     description = "Create a single todo item in the plan"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+            "id": {"type": "string", "description": "Unique kebab-case identifier for the todo"},
+            "title": {"type": "string", "description": "Short gerund-form title describing the work"},
+            "description": {"type": "string", "description": "Detailed description of what needs to be done"},
+            "retries_remaining": {"type": "integer", "description": "Number of retry attempts allowed (default 3)"},
+        },
+        "required": ["id", "title"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

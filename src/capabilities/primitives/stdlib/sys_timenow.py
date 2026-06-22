@@ -17,6 +17,21 @@ class SysTimeNowPrimitive(PrimitiveBase):
     name = "stdlib.sys.timenow"
     description = "Get the current system time"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "format": {
+                "type": "string",
+                "description": "Output format: 'iso8601' (default), 'unix', 'unix_ms', 'readable', or a Python strftime pattern",
+                "enum": ["iso8601", "unix", "unix_ms", "readable"],
+            },
+            "timezone": {
+                "type": "string",
+                "description": "IANA timezone name (e.g. 'America/New_York', 'Europe/London') — defaults to UTC",
+            },
+        },
+        "required": [],
+    }
 
     def __init__(self) -> None:
         super().__init__(

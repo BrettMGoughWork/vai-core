@@ -17,6 +17,16 @@ class DbDescribeTablePrimitive(PrimitiveBase):
     name = "stdlib.db.describetable"
     description = "Describe the schema of a database table"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "table": {
+                "type": "string",
+                "description": "Name of the table to describe",
+            },
+        },
+        "required": ["table"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -17,6 +17,24 @@ class GzipDecompressPrimitive(PrimitiveBase):
     name = "stdlib.gzip.decompress"
     description = "Gzip decompress a file or base64-encoded data"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "file": {
+                "type": "string",
+                "description": "Path to a gzip file to decompress",
+            },
+            "data": {
+                "type": "string",
+                "description": "Base64-encoded gzip data to decompress",
+            },
+            "output": {
+                "type": "string",
+                "description": "Output path for decompressed content (optional)",
+            },
+        },
+        "anyOf": [{"required": ["file"]}, {"required": ["data"]}],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -16,6 +16,13 @@ class FileGlobPrimitive(PrimitiveBase):
     name = "stdlib.file.glob"
     description = "Find files matching a glob pattern"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "pattern": {"type": "string", "description": "Glob pattern to match (e.g. '**/*.py', 'src/**/*.ts'). Supports recursive matching with **."},
+        },
+        "required": ["pattern"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

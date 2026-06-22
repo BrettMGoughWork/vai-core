@@ -18,6 +18,16 @@ class DbConnectPrimitive(PrimitiveBase):
     name = "stdlib.db.connect"
     description = "Connect to a SQLite database file"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the SQLite database file",
+            },
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

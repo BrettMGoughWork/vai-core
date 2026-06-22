@@ -18,6 +18,16 @@ class Base64DecodePrimitive(PrimitiveBase):
     name = "stdlib.base64.decode"
     description = "Base64 decode a string to its original content"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "data": {
+                "type": "string",
+                "description": "Base64-encoded string to decode",
+            },
+        },
+        "required": ["data"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

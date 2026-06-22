@@ -19,6 +19,20 @@ class ZipExtractPrimitive(PrimitiveBase):
     name = "stdlib.zip.extract"
     description = "Extract a zip archive"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "archive": {
+                "type": "string",
+                "description": "Path to the zip archive to extract",
+            },
+            "destination": {
+                "type": "string",
+                "description": "Directory to extract files into (default: same directory as archive)",
+            },
+        },
+        "required": ["archive"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

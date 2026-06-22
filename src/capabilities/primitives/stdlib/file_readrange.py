@@ -17,6 +17,15 @@ class FileReadrangePrimitive(PrimitiveBase):
     name = "stdlib.file.readrange"
     description = "Read byte range from a file as UTF-8 string"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Absolute path to the file to read from"},
+            "start": {"type": "integer", "description": "Starting byte offset (0-indexed, inclusive)", "minimum": 0},
+            "end": {"type": "integer", "description": "Ending byte offset (exclusive, must be greater than start)"},
+        },
+        "required": ["path", "start", "end"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

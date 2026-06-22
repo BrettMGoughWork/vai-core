@@ -18,7 +18,7 @@ from src.agent.workflow.engine import (
     WorkflowExecutionState,
 )
 from src.capabilities.planner.todo_store import TodoStore
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 logger = logging.getLogger(__name__)
 

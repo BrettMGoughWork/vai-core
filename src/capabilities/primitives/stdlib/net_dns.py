@@ -17,6 +17,16 @@ class NetDnsLookupPrimitive(PrimitiveBase):
     name = "stdlib.net.dns"
     description = "Resolve a hostname to IP addresses"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "hostname": {
+                "type": "string",
+                "description": "Hostname to resolve (e.g. 'github.com')",
+            },
+        },
+        "required": ["hostname"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

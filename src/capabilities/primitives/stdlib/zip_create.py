@@ -19,6 +19,21 @@ class ZipCreatePrimitive(PrimitiveBase):
     name = "stdlib.zip.create"
     description = "Create a zip archive"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "archive": {
+                "type": "string",
+                "description": "Path for the output zip archive",
+            },
+            "sources": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of file/directory paths to include in the archive",
+            },
+        },
+        "required": ["archive", "sources"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

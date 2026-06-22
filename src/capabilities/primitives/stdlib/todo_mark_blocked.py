@@ -23,6 +23,18 @@ class TodoMarkBlockedPrimitive(PrimitiveBase):
     name = "stdlib.todo.mark_blocked"
     description = "Mark a todo item as blocked with an optional reason"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+            "id": {"type": "string", "description": "The todo item ID to mark as blocked"},
+            "reason": {"type": "string", "description": "Why this item is blocked (optional)"},
+        },
+        "required": ["id"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

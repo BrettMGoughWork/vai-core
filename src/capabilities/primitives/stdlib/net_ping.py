@@ -21,6 +21,26 @@ class NetPingPrimitive(PrimitiveBase):
     name = "stdlib.net.ping"
     description = "Check TCP reachability of a host and port"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "host": {
+                "type": "string",
+                "description": "Hostname or IP address to ping",
+            },
+            "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "TCP port number to connect to",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Connection timeout in seconds (default: 5)",
+            },
+        },
+        "required": ["host", "port"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

@@ -14,6 +14,20 @@ class JsonGetPrimitive(PrimitiveBase):
     name = "stdlib.json.get"
     description = "Get a key from a JSON object"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "obj": {
+                "type": "object",
+                "description": "The JSON object (dict) to read from",
+            },
+            "key": {
+                "type": "string",
+                "description": "The key to retrieve from the object",
+            },
+        },
+        "required": ["obj", "key"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

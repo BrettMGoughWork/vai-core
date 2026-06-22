@@ -19,6 +19,16 @@ class DocExtractMetadataPrimitive(PrimitiveBase):
     name = "stdlib.doc.extractmetadata"
     description = "Extract file metadata (size, timestamps, permissions)"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the file to extract metadata from",
+            },
+        },
+        "required": ["path"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

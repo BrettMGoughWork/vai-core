@@ -22,6 +22,16 @@ class TodoGetNextPrimitive(PrimitiveBase):
     name = "stdlib.todo.get_next"
     description = "Get the next pending todo that is ready to execute (dependencies satisfied)"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+        },
+        "required": [],
+    }
 
     def __init__(self) -> None:
         super().__init__(

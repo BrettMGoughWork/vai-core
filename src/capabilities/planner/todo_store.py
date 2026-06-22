@@ -147,7 +147,7 @@ class TodoStore:
         with self._conn:
             for item in items:
                 self._conn.execute(
-                    """INSERT INTO todos (id, title, description, status,
+                    """INSERT OR IGNORE INTO todos (id, title, description, status,
                        retries_remaining, created_at, updated_at)
                        VALUES (?, ?, ?, 'pending', ?, ?, ?)""",
                     (

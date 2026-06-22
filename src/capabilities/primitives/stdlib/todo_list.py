@@ -18,6 +18,16 @@ class TodoListPrimitive(PrimitiveBase):
     name = "stdlib.todo.list"
     description = "List all todo items with statuses and dependencies"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+        },
+        "required": [],
+    }
 
     def __init__(self) -> None:
         super().__init__(

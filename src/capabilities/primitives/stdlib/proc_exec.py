@@ -20,6 +20,20 @@ class ProcExecPrimitive(PrimitiveBase):
         "Execute a shell command and return stdout, stderr, and exit code"
     )
     primitive_type = PrimitiveType.CLI
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "cmd": {
+                "type": "string",
+                "description": "The shell command to execute (e.g. 'pytest test_hello.py' or 'python hello.py')",
+            },
+            "timeout": {
+                "type": "integer",
+                "description": "Timeout in seconds before the command is killed (optional)",
+            },
+        },
+        "required": ["cmd"],
+    }
 
     def __init__(self) -> None:
         super().__init__(

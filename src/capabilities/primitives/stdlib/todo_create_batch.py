@@ -23,6 +23,35 @@ class TodoCreateBatchPrimitive(PrimitiveBase):
     name = "stdlib.todo.create_batch"
     description = "Create multiple todo items with dependencies in one batch"
     primitive_type = PrimitiveType.PYTHON
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "db_path": {
+                "type": "string",
+                "description": "Path to the SQLite todo-plan database (defaults to <workspace>/todo_plan.db)",
+            },
+            "items": {
+                "type": "array",
+                "description": "List of todo item dicts to create",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "description": "Unique kebab-case identifier for the todo"},
+                        "title": {"type": "string", "description": "Short gerund-form title describing the work"},
+                        "description": {"type": "string", "description": "Detailed description of what needs to be done"},
+                        "retries_remaining": {"type": "integer", "description": "Number of retry attempts allowed (default 3)"},
+                        "depends_on": {
+                            "type": "array",
+                            "description": "List of todo IDs that must complete before this one can start",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["id", "title"],
+                },
+            },
+        },
+        "required": ["items"],
+    }
 
     def __init__(self) -> None:
         super().__init__(
