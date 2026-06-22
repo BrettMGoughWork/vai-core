@@ -263,9 +263,11 @@ class ToolOrchestrator:
         #      with no *new* successful tool calls (progress-based reset).
         #      A round that produces at least one new successful call
         #      resets the stall counter.
-        #   2. _MAX_TOTAL_ROUNDS (10) — absolute hard ceiling that catches
-        #      runaway loops even if the LLM is making "progress" each
-        #      round (e.g. forever calling get_next on empty todos).
+        #   2. _MAX_TOTAL_ROUNDS (10) — hard ceiling that resets when a
+        #      round produces successful *new* tool calls, so multi-step
+        #      workflows ("plan → write → test → run") aren't cut short.
+        #      The _MAX_STALL_ROUNDS guard still catches true runaway
+        #      loops (LLM repeating the same failed calls).
         _MAX_TOTAL_ROUNDS = 10
         _MAX_STALL_ROUNDS = 3
         _follow_up_loop = 0
@@ -344,9 +346,13 @@ class ToolOrchestrator:
             # which tools were requested
             result = dict(result)
             result["tool_calls"] = fu_tool_calls
-            # Progress tracking: reset stall counter if this round
-            # produced at least one new successful tool call
+            # Progress tracking: reset both counters when this round
+            # produced at least one new successful tool call.
+            # _follow_up_loop resets so multi-step workflows
+            # (plan→write→test→run) don't hit the 10-round ceiling.
+            # _stall_rounds still catches LLM repeating the same errors.
             if _round_had_new_success:
+                _follow_up_loop = 0
                 _stall_rounds = 0
             else:
                 _stall_rounds += 1

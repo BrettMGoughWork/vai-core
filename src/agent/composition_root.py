@@ -11,6 +11,7 @@ and capability (``src.capabilities.*``).
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, List
 
 # Load .env into the process environment BEFORE any module-level init that
@@ -117,10 +118,26 @@ if _mcp_primitive_count > 0:
 # The PluginLoader is retained for backward-compatible plugin YAML loading
 # but will be migrated to a pure primitive-based model in a future sprint.
 
+# ── Search config (injected into primitive context for stdlib.search) ────
+_search_config = None
+try:
+    import yaml as _yaml
+    _config_path = Path("config/config.yaml")
+    if _config_path.exists():
+        with open(_config_path, "r") as _f:
+            _raw_config = _yaml.safe_load(_f) or {}
+        _search_raw = _raw_config.get("search")
+        if _search_raw:
+            from src.domain.types.config import SearchConfig
+            _search_config = SearchConfig.from_yaml(_search_raw)
+except Exception:
+    pass  # Search is optional — primitives handle missing config gracefully
+
 # ── Shared context injected into every primitive.execute() call ──────
 _PRIMITIVE_CONTEXT: dict[str, object] = {
     "mcpclient": _mcp_client_manager,
     "workspace_path": os.getcwd(),
+    "search_config": _search_config,
 }
 
 
