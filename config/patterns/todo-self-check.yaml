@@ -7,18 +7,17 @@ description: >
   accomplished, and either confirm completion or flag gaps that need
   follow-up work.
 primitives:
-  - stdlib.db.connect
-  - stdlib.db.query
-  - stdlib.db.insert
-  - stdlib.db.update
+  - stdlib.todo.list
+  - stdlib.todo.create
+  - stdlib.todo.add_dependency
+  - stdlib.todo.mark_done
+  - stdlib.todo.mark_failed
 instructions: |
   To self-check a completed todo item:
 
-  1. **Re-read the item description**. Use `stdlib.db.query` to fetch
-     the todo by its `id`:
-     ```sql
-     SELECT id, title, description, status FROM todos WHERE id = '<todo_id>';
-     ```
+  1. **Re-read the item description**. Use `stdlib.todo.list` with the
+     provided `db_path`. Find the item by its `id` to get its title,
+     description, and current status.
 
   2. **Compare against the output**. The workflow result text describes
      what was actually done. Compare it point-by-point against the
@@ -35,18 +34,20 @@ instructions: |
         The `done` status is correct. No action needed.
 
      b. **Partially satisfied** — the main work is done but a minor
-        piece is missing. Add a follow-up todo with `stdlib.db.insert`:
+        piece is missing. Add a follow-up todo with `stdlib.todo.create`:
         ```json
-        {"table": "todos", "row": {"id": "<original>-followup", "title": "...", "description": "..."}}
+        {"db_path": "...", "id": "<original>-followup", "title": "...", "description": "..."}
         ```
-        Then mark the follow-up as depending on the original via
-        `stdlib.db.insert` into `todo_deps`.
+        Then wire the dependency with `stdlib.todo.add_dependency`:
+        ```json
+        {"db_path": "...", "todo_id": "<original>-followup", "depends_on": "<original>"}
+        ```
 
      c. **Not satisfied** — the output doesn't match the description,
-        or the work failed silently. Use `stdlib.db.update` to reset the
-        status to `pending` so the TodoWorker will retry it:
+        or the work failed silently. Use `stdlib.todo.mark_failed` to
+        reset the item for retry:
         ```json
-        {"table": "todos", "set": {"status": "pending"}, "where": {"id": "<todo_id>"}}
+        {"db_path": "...", "id": "<todo_id>", "error": "Output didn't meet requirements: ..."}
         ```
 
   4. **Report your verdict** clearly. For each check:

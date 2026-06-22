@@ -1,0 +1,89 @@
+pattern_id: plan_with_todo
+name: Plan with Todo
+description: >-
+  The complete todo-list planning lifecycle: break down a goal into actionable
+  items, present the plan to the user, execute items one at a time via the
+  TodoWorker loop, verify completion, and handle errors. This is the primary
+  pattern agents use to plan and carry out multi-step work.
+primitives:
+  - stdlib.todo.create_batch
+  - stdlib.todo.add_dependency
+  - stdlib.todo.list
+  - stdlib.todo.get_next
+  - stdlib.todo.mark_done
+  - stdlib.todo.mark_failed
+  - stdlib.todo.mark_blocked
+  - stdlib.todo.status_summary
+instructions: |
+  To plan and execute a multi-step task using the todo list:
+
+  ## Phase 1: Breakdown
+
+  Use `stdlib.todo.create_batch` to populate the plan. Each item must have:
+  - `id`: kebab-case, descriptive (e.g., "create-user-schema", "write-auth-tests").
+  - `title`: gerund form, human-readable.
+  - `description`: standalone detail — someone can execute this item without
+    reading any other item.
+  - `depends_on` (optional): list of item IDs that must finish first.
+
+  Keep items small enough to be completed in ONE focused LLM response, but
+  large enough to be meaningful. Aim for 3-10 items per plan.
+
+  ## Phase 2: Present
+
+  After creating the plan, ALWAYS present it to the user:
+  1. Use `stdlib.todo.list` to read back all items.
+  2. Use `stdlib.todo.status_summary` for progress counts.
+  3. Summarize: total items, dependency chains, which items are ready now.
+  4. Ask the user to confirm before executing.
+
+  ## Phase 3: Execute (Iterate)
+
+  Loop until complete or blocked:
+  1. Use `stdlib.todo.get_next` to get the next unblocked pending item.
+  2. If `next` is `null` and `is_complete` is false, report blocked items
+     (use `stdlib.todo.list` to find blocked items and their dependencies).
+     Ask the user how to proceed.
+  3. If `next` is `null` and `is_complete` is true, the plan is done.
+  4. Execute the item: follow its description exactly. Make tool calls,
+     edit files, run commands — whatever is needed.
+  5. On success: call `stdlib.todo.mark_done` with the item `id`.
+  6. On failure: call `stdlib.todo.mark_failed` with the `id` and an
+     `error` message describing what went wrong.
+     - If `retries_remaining` > 0, the item will be retried.
+     - If `retries_exhausted` is returned, report to the user and ask
+       whether to create a follow-up or skip.
+  7. If an item depends on work you cannot do yet (missing information,
+     external dependency), use `stdlib.todo.mark_blocked` with a reason.
+
+  After each item completes (or fails), briefly report progress:
+  "Done: X/Y items. Next: <item title>"
+
+  ## Phase 4: Verify
+
+  When all items are done (or the plan is otherwise complete):
+  1. Use `stdlib.todo.status_summary` to confirm 100% completion.
+  2. Review the plan against the original goal — did we miss anything?
+  3. If gaps exist, add follow-up items with `stdlib.todo.create` and
+     `stdlib.todo.add_dependency`, then continue executing.
+  4. Present a final summary: what was accomplished, any failed items,
+     and what (if anything) remains.
+
+  ## Error Handling
+
+  - **Retry on transient errors**: failed items with remaining retries
+    will be re-offered by `get_next` automatically.
+  - **Persistent failures**: after `retries_exhausted`, stop and ask
+    the user. Don't silently abandon work.
+  - **Blocked items**: if blocked, tell the user what's blocking and why.
+    The plan cannot proceed until the block is resolved.
+
+  ## Tips
+
+  - Prefer `create_batch` for the initial plan (one call = all items + deps).
+    Use `create` + `add_dependency` only for adding items mid-execution.
+  - Don't write raw SQL — the `stdlib.todo.*` primitives handle everything.
+  - The `db_path` value comes from context — never hard-code it.
+  - If the user interrupts, save progress and let them resume later.
+    The todo list IS the durable plan state.
+version: 1.0.0
