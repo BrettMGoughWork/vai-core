@@ -17,9 +17,18 @@ from typing import Any, List
 # Load .env into the process environment BEFORE any module-level init that
 # depends on env vars (e.g. MCP client config resolution expands ${VAR}
 # placeholders via os.path.expandvars).
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv(override=True)
+# Walk up the directory tree from this file's location to find the project-root
+# .env file, rather than relying on the current working directory (which may
+# differ when the server is started from a different directory, e.g. systemd).
+_env_path = find_dotenv(usecwd=False, raise_error_if_not_found=False)
+if not _env_path:
+    # Fallback: resolve .env relative to the project root (this file is in
+    # src/agent/; project root is two levels up).
+    _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    _env_path = str(_env_path)
+load_dotenv(dotenv_path=_env_path, override=True)
 
 from src.capabilities.patterns.pattern_loader import load_patterns_from_directory
 from src.capabilities.patterns.pattern_registry import PatternRegistry
