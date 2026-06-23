@@ -149,8 +149,19 @@ def _sanitize_tool_name(name: str) -> str:
 
 
 def _restore_tool_name(name: str, name_map: dict[str, str]) -> str:
-    """Reverse-map a sanitised tool name to its original form."""
-    return name_map.get(name, name)
+    """Reverse-map a sanitised tool name to its original form.
+
+    Tries an exact lookup first.  If the LLM returned a name that's not
+    in the map (e.g. because the provider re-mixed dots and underscores),
+    falls back to re-sanitising the name with the same dots→underscores
+    transform used by ``_to_openai_tools`` before trying again.
+    """
+    if name in name_map:
+        return name_map[name]
+    # Providers like DeepSeek sometimes return names with mixed dots/underscores
+    # that don't exactly match the sanitised key.  Re-sanitise and retry.
+    retry = name.replace(".", "_")
+    return name_map.get(retry, name)
 
 
 def _to_openai_tools(tool_context: list[dict]) -> tuple[list[dict], dict[str, str]]:
@@ -210,12 +221,17 @@ def _restore_tool_names_in_response(
 ) -> list[dict]:
     """Restore original tool names in a list of tool_call dicts.
 
-    Mutates and returns the same list (in-place update of ``function.name``).
+    Mutates and returns the same list (in-place update of both
+    ``function.name`` and top-level ``name`` — the orchestrator reads
+    both paths).
     """
     for tc in tool_calls:
         func = tc.get("function", {})
         if isinstance(func, dict) and "name" in func:
             func["name"] = _restore_tool_name(func["name"], name_map)
+        # Some providers (and the orchestrator) use tc["name"] directly
+        if "name" in tc:
+            tc["name"] = _restore_tool_name(tc["name"], name_map)
     return tool_calls
 
 
