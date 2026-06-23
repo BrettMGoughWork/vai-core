@@ -227,7 +227,7 @@ def validate_input(
 
     When *schema* is ``None`` only basic type and size checks are performed.
 
-    Schema format (same shape as :mod:`~src.platform.config.config_system`)::
+    Schema format (same shape as :mod:`~src.config.config_system`)::
 
         {
             "type": dict,                          # expected Python type

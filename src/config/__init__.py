@@ -6,6 +6,22 @@ Supports defaults → config file → environment variables → runtime override
 
 from __future__ import annotations
 
-from src.config.config_system import Config, load_config
+from src.config.config_system import (
+    Config,
+    ConfigError,
+    ConfigValidationError,
+    S4Config,
+    UnknownKeyError,
+    ValidationError,
+    load_config,
+)
 
-__all__ = ["Config", "load_config"]
+__all__ = [
+    "Config",
+    "ConfigError",
+    "ConfigValidationError",
+    "S4Config",
+    "UnknownKeyError",
+    "ValidationError",
+    "load_config",
+]
