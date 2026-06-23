@@ -23,8 +23,8 @@ from __future__ import annotations
 from typing import List, Optional, Protocol, runtime_checkable
 
 from src.capabilities.contracts import DiscoveredSkill
-from src.strategy.memory.governance.memory_governance import MemoryGovernance
-from src.strategy.planning.models.plan import Plan
+from src.agent.memory.governance.memory_governance import MemoryGovernance
+from src.agent.types.plan import Plan
 
 
 @runtime_checkable

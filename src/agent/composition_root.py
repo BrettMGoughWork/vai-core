@@ -227,11 +227,11 @@ if _llm_transport is not None:
 # ── Shared MemoryGovernance ──────────────────────────────────────────
 # Created once at the composition root so StrategyRouter and any other
 # component share the same memory stores.
-from src.strategy.memory.segment_memory import SegmentMemory
-from src.strategy.memory.subgoal_memory import SubgoalMemory
-from src.strategy.memory.plan_memory import PlanMemory
-from src.strategy.memory.drift_memory import DriftMemory
-from src.strategy.memory.governance.memory_governance import MemoryGovernance
+from src.agent.memory.segment_memory import SegmentMemory
+from src.agent.memory.subgoal_memory import SubgoalMemory
+from src.agent.memory.plan_memory import PlanMemory
+from src.agent.memory.drift_memory import DriftMemory
+from src.agent.memory.governance.memory_governance import MemoryGovernance
 
 _segment_memory = SegmentMemory()
 _subgoal_memory = SubgoalMemory()

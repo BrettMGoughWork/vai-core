@@ -5,7 +5,7 @@ from typing import Any, Dict
 from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
 from src.strategy.planning.safety.purity_validation import validate_pure_structure
 from src.strategy.types.errors import ValidationError
-from src.strategy.types.hashing import stable_hash
+from src.agent.memory.types.hashing import stable_hash
 
 
 @dataclass(frozen=True)

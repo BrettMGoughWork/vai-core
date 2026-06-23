@@ -22,7 +22,7 @@ from src.runtime.interfaces import (
     S1Error,
 )
 from src.runtime.llm.client import call_runtime_backend
-from src.strategy.memory.governance.memory_governance import MemoryGovernance
+from src.agent.memory.governance.memory_governance import MemoryGovernance
 
 
 @dataclass(frozen=True)
