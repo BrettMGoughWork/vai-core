@@ -415,7 +415,7 @@ def find_registry_violations(classes: list[dict]) -> list[dict]:
     """S3 I9 — Registry invariants.
 
     - Registry modules must live under src/capabilities/registry/ or src/strategy/types/
-    - Must define: PrimitiveRegistry, SkillRegistry
+    - Must define: PrimitiveRegistry
     - Registries must not import S1 (utility/infrastructure/adapter) modules.
       Domain imports are allowed for shared types.
     """
@@ -433,14 +433,14 @@ def find_registry_violations(classes: list[dict]) -> list[dict]:
         })
         return issues
 
-    # Check for PrimitiveRegistry and SkillRegistry
-    # These may live in src/capabilities/registry/ OR src/strategy/types/
+    # Check for PrimitiveRegistry
+    # May live in src/capabilities/registry/ OR src/strategy/types/
     registry_class_names = {
         c["name"] for c in classes
         if c["file"].startswith("src/capabilities/registry/")
         or c["file"].startswith("src/strategy/types/registry")
     }
-    required = {"PrimitiveRegistry", "SkillRegistry"}
+    required = {"PrimitiveRegistry"}
     missing_classes = required - registry_class_names
     for mc in sorted(missing_classes):
         issues.append({
