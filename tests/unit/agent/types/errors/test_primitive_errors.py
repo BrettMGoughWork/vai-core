@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.errors import (
+from src.agent.types.errors import (
     ALL_PRIMITIVE_ERROR_TYPES,
     PrimitiveContractError,
     PrimitiveDependencyError,
@@ -23,7 +23,7 @@ from src.strategy.types.errors import (
     RecoveryAction,
     map_error_to_recovery,
 )
-from src.strategy.types.errors.AgentError import AgentError
+from src.agent.types.errors.AgentError import AgentError
 
 
 # ---------------------------------------------------------------------------

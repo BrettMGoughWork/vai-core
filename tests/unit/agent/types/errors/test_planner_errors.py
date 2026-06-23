@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.strategy.types.errors.planner_errors import (
+from src.agent.types.errors.planner_errors import (
     ALL_PLANNER_ERROR_TYPES,
     PlanAmbiguous,
     PlanDegraded,
@@ -16,7 +16,7 @@ from src.strategy.types.errors.planner_errors import (
     PlannerError,
     PlanUnsafe,
 )
-from src.strategy.types.errors.recovery import RecoveryAction, map_error_to_recovery
+from src.agent.types.errors.recovery import RecoveryAction, map_error_to_recovery
 
 
 # ===========================================================================
@@ -319,7 +319,7 @@ class TestPlannerErrorRecoveryMapping:
 
 class TestPlannerErrorExports:
     def test_importable_from_package(self):
-        from src.strategy.types.errors import (
+        from src.agent.types.errors import (
             PlannerError,
             PlanInvalid,
             PlanAmbiguous,

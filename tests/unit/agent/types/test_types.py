@@ -1,10 +1,10 @@
-﻿"""Tests for src.strategy.types — CognitiveStepOutcome and StepResult."""
+﻿"""Tests for src.agent.types — CognitiveStepOutcome and StepResult."""
 import pytest
 from dataclasses import FrozenInstanceError
 
-from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
-from src.strategy.types.step_result import StepResult
-from src.strategy.types.errors.ValidationError import ValidationError
+from src.agent.types.cognitive_step_outcome import CognitiveStepOutcome
+from src.agent.types.step_result import StepResult
+from src.agent.types.errors.ValidationError import ValidationError
 
 
 # ── CognitiveStepOutcome ──────────────────────────────────────────────────────
