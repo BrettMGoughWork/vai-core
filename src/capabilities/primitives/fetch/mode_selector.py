@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 from urllib.parse import urlparse
 
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 from .request import FetchRequest
 

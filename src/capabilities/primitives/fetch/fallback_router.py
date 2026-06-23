@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 from .errors import FetchError
 from .mode_selector import FetchMode

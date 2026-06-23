@@ -26,7 +26,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 from .domain_policy import interpret_domain_policy
 from .mode_selector import FetchMode, ModeHistory, select_initial_mode

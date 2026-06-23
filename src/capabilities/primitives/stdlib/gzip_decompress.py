@@ -84,7 +84,7 @@ class GzipDecompressPrimitive(PrimitiveBase):
                 )
             else:
                 import base64
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
                 try:
                     compressed = base64.b64decode(args["data"])
                 except Exception:

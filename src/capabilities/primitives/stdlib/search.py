@@ -26,7 +26,7 @@ from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 from src.capabilities.search.provider_registry import ProviderRegistry, RegistryError
 from src.capabilities.search.providers._base import SearchResult
 from src.domain.types.config import SearchConfig, SearchProviderConfig
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 
 @deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")

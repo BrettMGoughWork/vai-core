@@ -6,7 +6,7 @@ or LLM-based decision making.
 """
 
 from .AgentError import AgentError
-from src.strategy.types.validation.deadcode_markers import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 
 @deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")

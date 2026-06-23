@@ -33,7 +33,7 @@ except ImportError:  # pragma: no cover
 
 try:
     from playwright_stealth import Stealth
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
     _stealth_available = True
 except ImportError:  # pragma: no cover

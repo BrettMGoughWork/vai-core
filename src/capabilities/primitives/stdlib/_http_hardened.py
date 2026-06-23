@@ -18,7 +18,7 @@ _curl_cffi_available: bool
 try:
     from curl_cffi.requests import Session
     from curl_cffi.requests.exceptions import (
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
         ConnectTimeout,
         ConnectionError as CurlConnectionError,
         DNSError,

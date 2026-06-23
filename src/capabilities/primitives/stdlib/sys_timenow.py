@@ -58,7 +58,7 @@ class SysTimeNowPrimitive(PrimitiveBase):
         now = time.time()
         if tz:
             import zoneinfo
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
             try:
                 dt = datetime.fromtimestamp(now, tz=zoneinfo.ZoneInfo(tz))
             except Exception:

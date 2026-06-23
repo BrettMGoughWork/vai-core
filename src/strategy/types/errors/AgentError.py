@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from src.strategy.types.validation.deadcode_markers import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 
 """

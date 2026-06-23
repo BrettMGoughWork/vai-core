@@ -62,5 +62,3 @@ src.strategy.types.json_pure
 src.strategy.types.plan_segment
 src.strategy.types.step_result
 src.strategy.types.subgoal
-src.strategy.types.validation
-src.strategy.types.validation.deadcode_markers
