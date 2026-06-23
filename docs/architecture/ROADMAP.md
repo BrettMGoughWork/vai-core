@@ -479,6 +479,98 @@ CREATE TABLE todo_deps (
 | 12a.12 | **Remove `planner_call` from workflows** — The todo-list planner is a first-class capability invoked directly by S5, not a workflow step type. Remove `planner_call` from `StepType`/`OutcomeType` in `workflow_definition.py` and `engine.py`, remove `_handle_planner_call()`, remove the `planner_call` route from `StrategyRouter._route()` and the entire `_route_to_planner()` method, and remove `planner_call` handling from `ToolOrchestrator`. Any existing workflow YAML files using `planner_call` steps are migrated or deleted. |
 | 12a.13 | **Future: unstitch S2** — Once stable, create a follow-up task to remove the hierarchical planner (`SubgoalPlanner`, `Plan`, `PlanSegment`, `MemoryGovernance` drift/repair) and route all planning through the todo-list planner. This is *not* part of 12a — it is a separate, later sprint. |
 
+### Sprint 12b — Sub-Goal Planner (Two-Level Planning)
+
+**Goal:** Evolve the flat todo-list planner from Sprint 12a into a **two-level planning system**. Instead of decomposing a request directly into granular tasks, the agent first decomposes into coarse **sub-goals** — major milestones on the journey to satisfying the request. Each sub-goal is then executed via a dynamic inner loop: reflect on the sub-goal, plan the *next* task needed, execute it, assess progress, and repeat until the sub-goal is complete. This replaces the single-shot `llm_call` per item with a **nested sequential refinement loop** (ReAct pattern) — no fan-out/fan-in required for V1.
+
+#### Architecture
+
+```
+User Request
+    │
+    ▼
+[Sub-Goal 1] ──→ reflect → plan-next-task → execute → assess → loop until complete
+    │
+    ▼
+[Sub-Goal 2] ──→ reflect → plan-next-task → execute → assess → loop until complete
+    │
+    ▼
+Done
+```
+
+The **outer loop** (sub-goal iteration) reuses the existing `TodoWorker` / `get_next_pending()` / `has_work_remaining()` machinery from Sprint 12a. The **inner loop** (task-level refinement per sub-goal) is new — a multi-step workflow that replaces the single `llm_call` step with a reflect-then-act cycle.
+
+#### Schema Changes
+
+| Task | What |
+|------|------|
+| 12b.1 | **Extend `todos` table** — Add `type TEXT DEFAULT 'task'` and `parent_goal_id TEXT` columns. The `type` column discriminates: `'goal'` items are sub-goals (coarse), `'task'` items are dynamically-discovered tasks within a sub-goal. `parent_goal_id` links tasks to their owning sub-goal. This keeps a single flat table — simplest migration, existing primitives mostly work. Add migration SQL and update `TodoStore.create_tables()` to the new schema. |
+| 12b.2 | **Add `goal_id` column to `todo_deps`** — Add `goal_id TEXT REFERENCES todos(id)` so dependency queries can scope within a single sub-goal. The `get_next_pending` query gains a `goal_id` filter parameter. |
+| 12b.3 | **Update `TodoStore` API** — Add `add_goal()`, `get_goals()`, `get_goal_tasks(goal_id)`, `get_next_pending_for_goal(goal_id)` methods. Update `add_todo()` to accept optional `type` and `parent_goal_id`. Existing callers (passing only task-level items) continue to work unchanged. |
+
+#### New Patterns (LLM Guidance)
+
+| Task | What |
+|------|------|
+| 12b.4 | **Pattern: `subgoal-breakdown`** — Replaces `todo-breakdown` for the initial decomposition. The agent analyzes the user request and identifies 3–7 coarse sub-goals (milestones, not micro-tasks). Each sub-goal has a clear completion criterion: a concrete, verifiable condition that unambiguously signals "this sub-goal is done." Sub-goals are added to the `todos` table with `type='goal'`. Dependencies between sub-goals are expressed via the existing `todo_deps` mechanism. Registered in `config/patterns/subgoal-breakdown.yaml`. |
+| 12b.5 | **Pattern: `subgoal-execute`** — The inner-loop guidance for executing ONE sub-goal. This pattern drives the ReAct cycle:
+1. **Anchor**: Re-state the sub-goal and its completion criterion. Read the list of already-completed tasks for this sub-goal.
+2. **Reflect (adviser persona)**: Switch to a "rubber-duck adviser" tone — honest, constructive, not adversarial. Ask: "What is the single most impactful next task toward this sub-goal?" The adviser must NOT suggest the task is done unless the completion criterion is met. If no meaningful task remains AND the criterion is met, signal completion.
+3. **Plan**: Create one task in the `todos` table with `type='task'` and `parent_goal_id` pointing to the current sub-goal. The task must be small enough to complete in one LLM response but large enough to be meaningful.
+4. **Execute**: Run the task via the existing `todo-execute-item` workflow (single `llm_call`).
+5. **Assess**: The self-check pattern (`todo-self-check`) gates completion — compare the task output against the task description. If unsatisfied, retry or create follow-up.
+6. **Loop or Complete**: If the sub-goal's completion criterion is met, mark the sub-goal `done`. Otherwise, return to step 1 with accumulated progress context.
+Registered in `config/patterns/subgoal-execute.yaml`. |
+| 12b.6 | **Pattern: `adviser-reflect`** — The rubber-duck persona prompt. A lightweight system-prompt switch within the same agent (NOT a separate sub-agent for V1). The prompt instructs the LLM to: (a) re-read the sub-goal and its completion criterion, (b) review what tasks have been completed and their outcomes, (c) honestly assess whether the sub-goal is done — erring on the side of "not done" when uncertain, (d) if not done, suggest the single most impactful next task with a concrete description of what it should accomplish. The adviser MUST NOT suggest a task that duplicates already-completed work. Registered in `config/patterns/adviser-reflect.yaml`. |
+
+#### Workflow Changes
+
+| Task | What |
+|------|------|
+| 12b.7 | **New workflow: `subgoal-execute-loop`** — A multi-step cyclic workflow that implements the inner loop for one sub-goal. Steps: `anchor_subgoal` (llm_call — restate goal + progress) → `adviser_reflect` (llm_call with adviser persona) → `condition` (branch: if "complete" → `mark_subgoal_done` tool_execute → `__end__`; if "next_task" → `create_next_task` tool_execute → `execute_task` sub_workflow → `assess_task` llm_call → loop back to `anchor_subgoal`). The loop is bounded by a `max_iterations` guard (default 10). Registered in `config/workflows/subgoal-execute-loop.yaml`. |
+| 12b.8 | **Update `todo-execute-item` workflow** — Now used for individual TASK execution within the sub-goal inner loop. Receives the task's title, description, and the parent sub-goal context (for anchoring). The prompt is extended to include "You are working toward sub-goal: {context.parent_goal_title} — {context.parent_goal_description}." This keeps task execution anchored to the larger goal. |
+
+#### Worker & Orchestrator Changes
+
+| Task | What |
+|------|------|
+| 12b.9 | **Update `TodoWorker`** — Distinguish goal items from task items at `get_next_pending()` time. When the next pending item has `type='goal'`, dispatch the `subgoal-execute-loop` workflow instead of `todo-execute-item`. When the item has `type='task'`, use the existing single-shot workflow. The worker's existing retry logic, crash recovery, and `cognitive_state` persistence (db_path) continue to work unchanged — the inner loop is just a different workflow, bounded by the same execution cycle timeout. |
+| 12b.10 | **Update `TodoOrchestrator`** — No structural changes needed — the orchestrator submits jobs and the worker handles the rest. Add a `max_iterations_per_goal` configuration parameter (default 10) injected into the worker for the inner-loop guard. |
+
+#### Guardrails (Risk Mitigation)
+
+| Risk | Mitigation |
+|------|------------|
+| **Infinite inner loop** — agent never declares sub-goal done | Hard cap: `subgoal-execute-loop` workflow has `max_iterations` (default 10). After exhausting iterations, the sub-goal is marked `failed` with reason "exceeded max iterations." The outer loop continues to the next sub-goal. The `_StepFailedError` mechanism from 12a handles this naturally. |
+| **Hallucinated completion** — agent claims sub-goal done without satisfying the criterion | Two gates: (1) The `adviser-reflect` pattern requires the completion criterion to be explicitly verified — the adviser must cite evidence, not just assert. (2) `todo-self-check` runs against the sub-goal itself after the inner loop signals completion, comparing the accumulated task outputs against the sub-goal's stated criterion. If either gate fails, the sub-goal stays in_progress. |
+| **Context window bloat** — accumulated conversation across many inner-loop iterations | **Progress compaction**: After each task completes, `subgoal-execute-loop` summarizes the task outcome into a one-line "progress entry" stored in the sub-goal's description field (appended). The adviser sees the compacted progress, not the full conversation history. The `anchor_subgoal` step reads this compacted state. Tasks are also stored as individual rows for traceability but the LLM context only sees the summary. |
+| **Task drift** — inner loop loses sight of the sub-goal | Every inner-loop iteration begins with `anchor_subgoal` — restating the sub-goal title, description, and completion criterion. The task execution prompt also includes the parent sub-goal context. This is triple-anchored: (1) adviser prompt, (2) task creation prompt, (3) task execution prompt. |
+| **Over-decomposition** — creating 50 micro-tasks for one sub-goal | `adviser-reflect` guidance: "Suggest the single most impactful next task — a meaningful unit of work, not every micro-step. If the remaining work is trivial, consider whether the sub-goal is actually done." The `max_iterations` cap is a backstop. |
+| **Dependency deadlock** — task depends on another task within the same sub-goal but both are pending | The sub-goal inner loop is intentionally sequential (one task at a time). If a task discovers it needs prerequisite work, it can add a follow-up task with a dependency via `add_dep()`. The `get_next_pending_for_goal()` respects deps within the sub-goal. This is the same dependency resolution as 12a, scoped to one sub-goal. |
+
+#### Testing
+
+| Task | What |
+|------|------|
+| 12b.11 | **Unit test: schema migration** — Verify `TodoStore` creates tables with new `type` and `parent_goal_id` columns. Existing tests with task-only items pass unchanged. New tests: `add_goal()`, `get_goals()`, `get_next_pending_for_goal()` with interleaved goals and tasks, task dependency resolution within a goal. |
+| 12b.12 | **Unit test: inner loop boundedness** — Simulate `subgoal-execute-loop` with a mock that never signals completion. Verify the workflow stops at `max_iterations` (10) and marks the sub-goal `failed`. Verify the outer loop continues to the next sub-goal. |
+| 12b.13 | **Unit test: adviser persona** — Verify the `adviser-reflect` pattern prompt includes: (a) re-read sub-goal, (b) review progress, (c) completion criterion check, (d) suggest next task. Verify it explicitly forbids duplicating completed work. |
+| 12b.14 | **Unit test: progress compaction** — Verify that after N inner-loop iterations, the sub-goal's description contains compacted progress entries (not raw conversation). Verify the adviser prompt receives the compacted text, not the full history. |
+| 12b.15 | **Unit test: self-check gating** — Sub-goal signals completion but `todo-self-check` finds the completion criterion unmet → sub-goal stays `in_progress`, inner loop continues. Sub-goal signals completion and criterion is met → sub-goal marked `done`. |
+| 12b.16 | **Integration test: two-level pipeline** — Agent receives a multi-faceted request → applies `subgoal-breakdown` pattern → populates 3 sub-goals with completion criteria → S5 submits to `TodoOrchestrator` → worker iterates sub-goals → for each sub-goal, inner loop reflects, plans tasks, executes, assesses → all sub-goals complete → job done. Verify: correct sub-goal ordering, task-level dependency resolution, inner loop boundedness, progress compaction, self-check gating. |
+| 12b.17 | **Integration test: crash recovery with inner loop** — Worker crashes mid-inner-loop (e.g., after task 2 of 4 within a sub-goal). Job reloaded from JobStore → worker reads cognitive_state (db_path) → resumes sub-goal from in_progress → inner loop restarts with compacted progress → completes remaining tasks → advances to next sub-goal. Verify: no duplicate task execution, no lost progress, final sub-goal states correct. |
+
+#### V2 Considerations
+
+The following are explicitly deferred to a future sprint — they are NOT part of 12b:
+
+| Concern | Why Deferred | What V2 Would Require |
+|---------|-------------|----------------------|
+| **Fan-out / parallel task execution** | The sequential inner loop is sufficient for V1. Parallelism requires: (a) a task-graph executor that can dispatch independent tasks concurrently, (b) result merging/conflict resolution when parallel tasks touch the same files, (c) an `ExecutionStage` that supports concurrent worker slots. This is a significant infrastructure investment — the S4 worker model is currently single-threaded per job. | Multi-slot S4 workers, task parallelism detector (identifies tasks with no mutual deps within a sub-goal), merge conflict resolution. |
+| **Separate adviser sub-agent** | For V1, the adviser is a prompt switch within the same agent — zero coordination overhead. A separate agent requires: (a) inter-agent message passing, (b) context transfer (the adviser needs to see the sub-goal + progress), (c) the S4 event substrate to support agent-to-agent communication. The value-add (independent reasoning without polluting the main agent's context) is real but the complexity cost is high for V1. | Inter-agent communication via S4 events, agent spawning from workflows, context snapshot/restore for handoff. |
+| **Sub-goal replanning** | The agent cannot currently modify sub-goals mid-execution (e.g., "this sub-goal was wrong, we need a different approach"). V1 treats sub-goals as fixed once planned. Dynamic replanning requires: (a) the ability to insert/remove/reorder sub-goals in the outer list, (b) the adviser to detect when the current approach is futile, (c) a replanning trigger that pauses the inner loop and invokes `subgoal-breakdown` again scoped to the remaining work. | Sub-goal modification primitives (`update_goal`, `delete_goal`, `insert_goal`), replanning trigger detection, partial-plan resumption. |
+| **Cross-sub-goal learning** | Lessons learned in sub-goal 1 aren't automatically applied to sub-goal 2. V2 could: (a) append "lessons learned" to the cognitive_state after each sub-goal completes, (b) inject those lessons into the adviser context for subsequent sub-goals. This requires the learning subsystem (Y.8) or a simpler cross-sub-goal note-passing mechanism. | Cognitive_state enrichment with per-sub-goal post-mortems, adviser prompt injection of prior sub-goal lessons. |
+
 ### Sprint 13 — Hardening & Resilience
 
 **Goal:** Production-grade resilience, health monitoring, and self-healing.
@@ -779,7 +871,8 @@ Learning Subsystem (async observer)
 | 4 | 7–9 | Operations + Human-in-the-Loop + Agent Selection |
 | 5 | 10 | Stratum Isolation Refactor |
 | 6 | 11–12 | Durable Execution + Real Skills |
-| 6a | 12a | SQL Structured Data Skill |
+| 6a | 12a | SQL Structured Data Skill (Flat Todo-List Planner) |
+| 6b | 12b | Sub-Goal Planner (Two-Level Planning) |
 | 7 | 13 | Resilience & Self-Healing |
 | 8 | 14 | Observability & DX |
 | 9 | 15 | Polish & Production Readiness |

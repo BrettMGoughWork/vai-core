@@ -52,6 +52,9 @@ from src.agent.workflow import (
 from src.agent.workflow.loader import load_workflows_from_yaml
 from src.agent.workflow.primitive_tool_adapter import PrimitiveToolAdapter
 from src.agent.workflow.workflow_tool_adapter import WorkflowToolAdapter
+from src.agent.planner.todo_orchestrator import TodoOrchestrator
+from src.platform.runtime.control_plane import ControlPlane
+from src.platform.runtime.job_store.job_store import InMemoryJobStore
 
 # ── Agent registry (loaded from declarative YAML) ─────────────────────
 _registry = AgentRegistry()
@@ -259,6 +262,19 @@ _workflow_engine = WorkflowEngine(wf_registry, pattern_registry=_pattern_registr
 _interaction_manager = UserInteractionManager(_workflow_engine)
 _workflow_tool_adapter = WorkflowToolAdapter(wf_registry)
 _primitive_tool_adapter = PrimitiveToolAdapter(_primitive_registry)
+
+# ── ControlPlane + TodoOrchestrator (Sprint 12b — first-class capability) ──
+_control_plane = ControlPlane(job_store=InMemoryJobStore())
+_todo_orchestrator = TodoOrchestrator(
+    workflow_engine=_workflow_engine,
+    strategy_router=_strategy_router,
+    inline_tool_executor=_execute_tool_inline,
+    queue=_job_queue,
+    control_plane=_control_plane,
+    timeout_seconds=300,
+    max_iterations_per_goal=10,
+)
+
 _supervisor = Supervisor(
     registry=_registry,
     store=state_store,
@@ -271,6 +287,7 @@ _supervisor = Supervisor(
     workflow_tool_adapter=_workflow_tool_adapter,
     primitive_tool_adapter=_primitive_tool_adapter,
     pattern_registry=_pattern_registry,
+    todo_orchestrator=_todo_orchestrator,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────

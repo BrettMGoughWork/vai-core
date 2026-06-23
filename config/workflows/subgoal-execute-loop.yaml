@@ -1,0 +1,184 @@
+# Sub-Goal Execute Loop — single-iteration inner ReAct loop workflow
+#
+# The TodoWorker calls this workflow once per iteration of the inner
+# loop.  Each invocation:
+#   1. Anchors the sub-goal context (so the LLM never loses sight of the goal).
+#   2. Runs the adviser reflection to assess progress and recommend a next task.
+#   3. Creates the recommended task as a todo entry (parented to this goal).
+#   4. Executes that task (via sub_workflow → todo-execute-item).
+#   5. Assesses the task outcome.
+#
+# The TodoWorker handles the outer loop (iteration counting, progress
+# compaction, completion-gate checking) by parsing the adviser's output
+# for the COMPLETE: YES/NO signal.
+#
+# This is intentionally LINEAR — no cycles in the workflow graph.
+# The worker controls the loop, the workflow is a single pass.
+workflow_id: subgoal-execute-loop
+name: "Sub-Goal Execute Loop"
+description: "One iteration of the inner ReAct loop: reflect → plan next task → execute → assess"
+version: "1.0.0"
+start_step: anchor_and_reflect
+
+steps:
+  # ── Step 1: Anchor + Adviser Reflection ──────────────────────────────
+  anchor_and_reflect:
+    step_id: anchor_and_reflect
+    step_type: llm_call
+    label: "Adviser reflection — assess progress, recommend next task"
+    description: >
+      The adviser persona reflects on progress toward the sub-goal,
+      identifies gaps, and recommends the single next concrete task.
+      Output is parsed by the TodoWorker for the COMPLETE: YES/NO gate.
+    config:
+      message: |
+        You are acting as a **constructive adviser** — a senior colleague
+        doing a rubber-duck session.  Your tone is warm, direct, and
+        focused on making progress, not on winning arguments.
+
+        ## Sub-Goal Context
+
+        **Goal**: {context.goal_title}
+        **Description**: {context.goal_description}
+        **Completion Criterion**: {context.completion_criterion}
+
+        ## Progress So Far
+
+        {context.progress_log}
+
+        ## Current State
+
+        {context.state_context}
+
+        ## Your Task
+
+        Reflect on where we are and recommend the **single most impactful
+        next step** toward the completion criterion.
+
+        ### 1. Progress Assessment (2-3 sentences)
+        What has been accomplished so far?  Be specific — mention concrete
+        outputs, not vague praise.
+
+        ### 2. Gap Analysis (2-3 sentences)
+        What still stands between us and the completion criterion?
+
+        ### 3. Recommended Next Task
+        Propose exactly ONE concrete, actionable task.  Include:
+        - Task title
+        - Task description (what to do, which files, expected output)
+        - Why this task is the right next step
+
+        ### 4. Completion Judgment
+
+        **COMPLETE: <YES or NO>**
+
+        - YES only if the completion criterion is **fully, verifiably
+          satisfied** — every condition met, no loose ends.
+        - NO otherwise, even if we are "almost there."
+
+        ## Guardrails
+
+        - One task at a time.  Do NOT propose a multi-step plan.
+        - Evidence over intuition.  Base judgment on the progress log
+          and state context.
+        - Be specific about file paths and expected outputs.
+        - When in doubt, err toward incompleteness — say NO and propose
+          a verification task.
+    transitions:
+      on_success: create_next_task
+      on_failure: __end__
+
+  # ── Step 2: Create the task in the todo store ────────────────────────
+  create_next_task:
+    step_id: create_next_task
+    step_type: llm_call
+    label: "Create the recommended task as a todo entry"
+    description: >
+      Parses the adviser's recommendation into a concrete todo item and
+      inserts it into the plan via tool calls.  The task is parented to
+      the current sub-goal.
+    config:
+      message: |
+        Based on the adviser's reflection above, create a single task
+        entry in the todo plan.
+
+        **Goal ID**: {context.goal_id}
+        **Adviser Output** (previous step):
+        {step_results.anchor_and_reflect}
+
+        ## Instructions
+
+        1. Extract the recommended task from the adviser output.
+        2. Give it a descriptive kebab-case ID prefixed with the goal id
+           (e.g., ``{context.goal_id}-01``, ``{context.goal_id}-02``).
+        3. Use ``stdlib.todo.create`` to add the task with:
+           - ``type``: ``"task"``
+           - ``parent_goal_id``: ``"{context.goal_id}"``
+           - ``title``: gerund form
+           - ``description``: full standalone detail including expected output
+        4. Report the task ID you created — the next step will execute it.
+
+        Do NOT execute the task here.  Just create the todo entry and
+        report its ID.
+    transitions:
+      on_success: execute_next_task
+      on_failure: __end__
+
+  # ── Step 3: Execute the task ─────────────────────────────────────────
+  execute_next_task:
+    step_id: execute_next_task
+    step_type: sub_workflow
+    label: "Execute the next task"
+    description: >
+      Delegates to the todo-execute-item workflow to execute the task
+      created in the previous step.  The TodoWorker handles the
+      sub_workflow outcome by starting the child workflow and resuming
+      with the result.
+    config:
+      workflow_id: todo-execute-item
+      context:
+        todo_id: "{context.next_task_id}"
+        todo_title: "{context.next_task_title}"
+        todo_description: "{context.next_task_description}"
+        parent_goal_id: "{context.goal_id}"
+        db_path: "{context.db_path}"
+    transitions:
+      on_success: assess_task_outcome
+      on_failure: assess_task_outcome
+
+  # ── Step 4: Assess task outcome ──────────────────────────────────────
+  assess_task_outcome:
+    step_id: assess_task_outcome
+    step_type: llm_call
+    label: "Assess task outcome and prepare progress summary"
+    description: >
+      The final step in the iteration.  Summarises the task's outcome
+      in one line for progress compaction.  The TodoWorker appends this
+      to the goal's description before the next iteration.
+    config:
+      message: |
+        The task has been executed.  Review the result and produce a
+        **one-line progress summary** for the parent sub-goal.
+
+        **Goal**: {context.goal_title}
+        **Task executed**: {context.next_task_title}
+        **Task result** (from sub_workflow):
+        {step_results.execute_next_task}
+
+        ## Instructions
+
+        Output exactly ONE line (max 120 chars) summarising what was
+        accomplished.  This line will be appended to the sub-goal's
+        progress log.  Format:
+
+        ```
+        [task: {context.next_task_id}] <concise outcome — files created/modified, tests passing, etc.>
+        ```
+
+        If the task failed, say so clearly:
+        ```
+        [task: {context.next_task_id}] FAILED: <reason>
+        ```
+    transitions:
+      on_success: __end__
+      on_failure: __end__

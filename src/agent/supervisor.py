@@ -48,6 +48,7 @@ from src.agent.activation import (
 from src.agent.contracts import AgentMessage, AgentResponse
 from src.agent.guards import apply_hallucination_guard
 from src.agent.hitl_manager import HitlManager
+from src.agent.planner.todo_orchestrator import TodoOrchestrator
 from src.agent.tool_orchestrator import ToolOrchestrator
 from src.agent.workflow_invoker import WorkflowInvoker
 from src.agent.workflow_invoker import (
@@ -125,6 +126,7 @@ class Supervisor:
         workflow_tool_adapter: Optional[Any] = None,
         primitive_tool_adapter: Optional[Any] = None,
         pattern_registry: Optional[PatternRegistry] = None,
+        todo_orchestrator: Optional[TodoOrchestrator] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -142,6 +144,7 @@ class Supervisor:
         self._workflow_tool_adapter = workflow_tool_adapter
         self._primitive_tool_adapter = primitive_tool_adapter
         self._pattern_registry = pattern_registry
+        self._todo_orchestrator = todo_orchestrator
         self._hitl = HitlManager(
             inline_tool_executor=inline_tool_executor,
             strategy_router=strategy_router,
@@ -636,6 +639,32 @@ class Supervisor:
                     user_request=input_text,
                     pattern_instructions=self._get_pattern_instructions(agent_meta),
                 )
+
+                # Sprint 12b: if primitive.stdlib.todo.create_* was called,
+                # auto-invoke TodoOrchestrator as a first-class capability
+                # to process created goals through the two-level inner loop.
+                if self._todo_orchestrator is not None:
+                    _todo_create_calls = [
+                        tc for tc in tool_calls
+                        if isinstance(tc, dict) and (
+                            tc.get("name", "").startswith("primitive.stdlib.todo.create_")
+                            or tc.get("function", {}).get("name", "").startswith("primitive.stdlib.todo.create_")
+                        )
+                    ]
+                    if _todo_create_calls:
+                        _first = _todo_create_calls[0]
+                        _args = _first.get("arguments") or _first.get("function", {}).get("arguments", {})
+                        if isinstance(_args, str):
+                            try:
+                                _args = json.loads(_args)
+                            except json.JSONDecodeError:
+                                _args = {}
+                        db_path = _args.get("db_path", "todo_plan.db")
+                        try:
+                            orch_result = self._todo_orchestrator.run(db_path)
+                            reply += f"\n\n[Plan executed: {orch_result.get('output', 'Done.')}]"
+                        except Exception as exc:
+                            reply += f"\n\n[Plan execution failed: {exc}]"
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"
                 metadata["runtime_error"] = result["error"]
