@@ -6,10 +6,8 @@ or runtime environment issues.
 """
 
 from .AgentError import AgentError
-from src.domain._markers import deadcode_ignore
 
 
-@deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")
 class SystemError(AgentError):
     """
     Error raised when system-level operations fail.

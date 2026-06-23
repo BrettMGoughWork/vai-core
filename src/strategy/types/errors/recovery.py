@@ -9,7 +9,6 @@ The actual execution of recovery actions is handled by Phase 2.3 (Recovery Execu
 from enum import Enum
 
 from .AgentError import AgentError
-from src.domain._markers import deadcode_ignore
 from .primitive_errors import (
     PrimitiveError,
     PrimitiveExecutionError,

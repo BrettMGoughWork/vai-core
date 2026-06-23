@@ -9,21 +9,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from src.domain._markers import deadcode_ignore
-
-
-"""
-Error Types Layer - Strongly typed error taxonomy for agent runtime.
-
-This module defines a deterministic, closed error taxonomy used across
-the planner, mapper, executor, and state manager. Each error type represents
-a distinct class of failures with explicit recovery semantics.
-"""
-
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any
-
 
 @dataclass
 class AgentError:
@@ -54,7 +39,6 @@ class AgentError:
         }
 
 
-@deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")
 class PlanningError(AgentError):
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(
@@ -85,7 +69,6 @@ class PlanningError(AgentError):
     """
 
 
-@deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")
 class MappingError(AgentError):
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(
@@ -116,7 +99,6 @@ class MappingError(AgentError):
     """
 
 
-@deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")
 class ExecutionError(AgentError):
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(
@@ -147,7 +129,6 @@ class ExecutionError(AgentError):
     """
 
 
-@deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")
 class StateError(AgentError):
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(
@@ -178,7 +159,6 @@ class StateError(AgentError):
     """
 
 
-@deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")
 class GovernanceError(AgentError, Exception):
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(
@@ -239,7 +219,6 @@ class ConfidenceError(AgentError):
     """
 
 
-@deadcode_ignore(reason="Defined as part of closed error taxonomy, used via type field")
 class SemanticError(AgentError):
     """SemanticError: misalignment in interpretation or meaning."""
     def __init__(self, message: str, details: dict[str, Any] | None = None):
