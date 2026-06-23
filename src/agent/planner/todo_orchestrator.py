@@ -48,6 +48,8 @@ class TodoOrchestrator:
         control_plane: The ``ControlPlane`` for job lifecycle management.
         tool_context: Optional list of OpenAI tool schemas for LLM calls.
         timeout_seconds: Maximum seconds per execution cycle (default 300).
+        max_iterations_per_goal: Maximum iterations per sub-goal to prevent infinite
+            loops (default 30).
     """
 
     def __init__(
@@ -60,6 +62,7 @@ class TodoOrchestrator:
         control_plane: ControlPlane,
         tool_context: Optional[list[dict]] = None,
         timeout_seconds: int = 300,
+        max_iterations_per_goal: int = 30,
     ) -> None:
         self._control_plane = control_plane
         self._queue = queue
@@ -69,6 +72,7 @@ class TodoOrchestrator:
             strategy_router=strategy_router,
             inline_tool_executor=inline_tool_executor,
             tool_context=tool_context,
+            max_iterations_per_goal=max_iterations_per_goal,
         )
         self._worker = Worker(
             executor=_todo_worker,

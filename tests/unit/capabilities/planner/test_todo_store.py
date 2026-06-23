@@ -1,4 +1,4 @@
-"""Unit tests for TodoStore dependency resolution (Sprint 12a.10).
+"""Unit tests for TodoStore dependency resolution (Sprint 12a.10 / 12b.11).
 
 Covers:
 - get_next_pending() topological ordering
@@ -7,6 +7,9 @@ Covers:
 - Retry mechanics (mark_failed with retries remaining vs exhausted)
 - has_work_remaining(), is_complete(), get_status_counts()
 - add_todos_batch() with dependencies
+- Sub-goal operations: add_goal(), get_goals(), get_goal_tasks(),
+  get_next_pending_for_goal(), append_progress()
+- Two-level planning: goals interleaved with tasks in get_next_pending()
 """
 from __future__ import annotations
 
@@ -388,3 +391,194 @@ class TestAddTodosBatch:
         item = store.get("a")
         assert item is not None
         assert item.retries_remaining == 5
+
+
+# =========================================================================
+# Sub-goal operations (Sprint 12b.11)
+# =========================================================================
+
+
+class TestAddGoal:
+    """add_goal() inserts type='goal' items with completion_criterion."""
+
+    def test_add_goal_creates_goal_type(self, store: TodoStore) -> None:
+        store.add_goal("auth", "Auth Module", "Implement auth",
+                       completion_criterion="All auth tests pass")
+        item = store.get("auth")
+        assert item is not None
+        assert item.type == "goal"
+        assert item.completion_criterion == "All auth tests pass"
+
+    def test_add_goal_default_criterion_empty(self, store: TodoStore) -> None:
+        store.add_goal("setup", "Setup", "Initial setup")
+        item = store.get("setup")
+        assert item is not None
+        assert item.type == "goal"
+        assert item.completion_criterion == ""
+
+    def test_add_goal_appears_in_get_goals(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_goal("g2", "Goal 2")
+        goals = store.get_goals()
+        assert len(goals) == 2
+        assert goals[0].id == "g1"
+        assert goals[1].id == "g2"
+
+    def test_goal_not_in_get_goals_for_tasks(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_todo("t1", "Task 1", type="task")
+        goals = store.get_goals()
+        assert len(goals) == 1
+        assert goals[0].id == "g1"
+
+
+class TestGetGoalTasks:
+    """get_goal_tasks() returns tasks parented to a specific goal."""
+
+    def test_get_goal_tasks_empty(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        tasks = store.get_goal_tasks("g1")
+        assert tasks == []
+
+    def test_get_goal_tasks_returns_only_this_goal(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_goal("g2", "Goal 2")
+        store.add_todo("g1-task1", "G1 Task 1", type="task", parent_goal_id="g1")
+        store.add_todo("g1-task2", "G1 Task 2", type="task", parent_goal_id="g1")
+        store.add_todo("g2-task1", "G2 Task 1", type="task", parent_goal_id="g2")
+
+        g1_tasks = store.get_goal_tasks("g1")
+        assert len(g1_tasks) == 2
+        assert all(t.parent_goal_id == "g1" for t in g1_tasks)
+
+        g2_tasks = store.get_goal_tasks("g2")
+        assert len(g2_tasks) == 1
+        assert g2_tasks[0].id == "g2-task1"
+
+    def test_get_goal_tasks_non_existent_goal(self, store: TodoStore) -> None:
+        tasks = store.get_goal_tasks("no-such-goal")
+        assert tasks == []
+
+
+class TestGetNextPendingForGoal:
+    """get_next_pending_for_goal() returns the next ready task within a goal."""
+
+    def test_returns_none_for_empty_goal(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        assert store.get_next_pending_for_goal("g1") is None
+
+    def test_returns_first_pending_task(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_todo("g1-t1", "Task 1", type="task", parent_goal_id="g1")
+        store.add_todo("g1-t2", "Task 2", type="task", parent_goal_id="g1")
+        item = store.get_next_pending_for_goal("g1")
+        assert item is not None
+        assert item.id == "g1-t1"
+
+    def test_in_progress_returned_first(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_todo("g1-t1", "Task 1", type="task", parent_goal_id="g1")
+        store.add_todo("g1-t2", "Task 2", type="task", parent_goal_id="g1")
+        store.mark_in_progress("g1-t2")
+        item = store.get_next_pending_for_goal("g1")
+        assert item is not None
+        assert item.id == "g1-t2"
+
+    def test_skips_blocked_task(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_todo("g1-t1", "Task 1", type="task", parent_goal_id="g1")
+        store.add_todo("g1-t2", "Task 2", type="task", parent_goal_id="g1")
+        store.add_dep("g1-t2", "g1-t1")
+        item = store.get_next_pending_for_goal("g1")
+        assert item is not None
+        assert item.id == "g1-t1"
+
+    def test_returns_blocked_after_dep_done(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_todo("g1-t1", "Task 1", type="task", parent_goal_id="g1")
+        store.add_todo("g1-t2", "Task 2", type="task", parent_goal_id="g1")
+        store.add_dep("g1-t2", "g1-t1")
+        store.mark_done("g1-t1")
+        item = store.get_next_pending_for_goal("g1")
+        assert item is not None
+        assert item.id == "g1-t2"
+
+
+class TestAppendProgress:
+    """append_progress() appends progress entries to a goal's description."""
+
+    def test_appends_line_to_description(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1", "Initial description")
+        store.append_progress("g1", "Created auth middleware")
+        item = store.get("g1")
+        assert item is not None
+        assert "Initial description" in item.description
+        assert "Created auth middleware" in item.description
+
+    def test_multiple_progress_entries_accumulate(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1", "Base")
+        store.append_progress("g1", "Step 1 done")
+        store.append_progress("g1", "Step 2 done")
+        item = store.get("g1")
+        assert item is not None
+        assert "Step 1 done" in item.description
+        assert "Step 2 done" in item.description
+
+    def test_progress_includes_timestamp(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1", "Base")
+        store.append_progress("g1", "A task done")
+        item = store.get("g1")
+        assert item is not None
+        assert "[progress]" in item.description
+
+
+# =========================================================================
+# Two-level planning: goals before tasks in get_next_pending() (12b.11)
+# =========================================================================
+
+
+class TestTwoLevelGetNextPending:
+    """get_next_pending() returns goals before tasks when both are ready."""
+
+    def test_goal_returned_before_ready_tasks(self, store: TodoStore) -> None:
+        """Goals have priority over tasks so the system processes one sub-goal
+        at a time rather than interleaving."""
+        store.add_goal("g1", "Goal 1")
+        store.add_todo("t1", "Task 1")
+        item = store.get_next_pending()
+        assert item is not None
+        assert item.type == "goal"
+        assert item.id == "g1"
+
+    def test_task_returned_after_goal_done(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_todo("t1", "Independent task", type="task")
+        store.mark_done("g1")
+        item = store.get_next_pending()
+        assert item is not None
+        assert item.type == "task"
+        assert item.id == "t1"
+
+    def test_in_progress_goal_before_everything(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_goal("g2", "Goal 2")
+        store.add_todo("t1", "Task 1")
+        store.mark_in_progress("g2")
+        item = store.get_next_pending()
+        assert item is not None
+        assert item.id == "g2"
+
+    def test_multiple_goals_oldest_first(self, store: TodoStore) -> None:
+        store.add_goal("g2", "Goal 2")
+        store.add_goal("g1", "Goal 1")
+        item = store.get_next_pending()
+        assert item is not None
+        assert item.id == "g2"
+
+    def test_blocked_goal_skipped_for_next_ready_goal(self, store: TodoStore) -> None:
+        store.add_goal("g1", "Goal 1")
+        store.add_goal("g2", "Goal 2")
+        store.add_dep("g2", "g1")
+        item = store.get_next_pending()
+        assert item is not None
+        assert item.id == "g1"

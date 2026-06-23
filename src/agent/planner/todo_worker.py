@@ -1,7 +1,10 @@
-"""TodoWorker — S4-compatible WorkExecutor for processing todo lists (Sprint 12a.3).
+"""TodoWorker — S4-compatible WorkExecutor for processing todo lists (Sprint 12a.3 / 12b.9).
 
-Each ``__call__`` invocation processes ONE todo item from the list. This lets
-the S4 ExecutionStage's multi-cycle loop handle iteration and checkpointing.
+Each ``__call__`` invocation processes ONE todo item from the list.  For
+``type='task'`` items this is a single workflow run (as in Sprint 12a).
+For ``type='goal'`` items the worker enters an *inner ReAct loop*:
+reflect → plan next task → execute → assess → repeat until the
+completion criterion is met (or ``max_iterations_per_goal`` is hit).
 """
 
 from __future__ import annotations
@@ -24,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 # Per-item workflow ID — registered in the workflow registry.
 _TODO_EXECUTE_ITEM_WORKFLOW = "todo-execute-item"
+# Inner ReAct loop workflow for sub-goals.
+_SUBGOAL_EXECUTE_LOOP_WORKFLOW = "subgoal-execute-loop"
+
+# Default maximum iterations per sub-goal (guardrail against infinite loops).
+_DEFAULT_MAX_ITERATIONS_PER_GOAL = 30
 
 # ── Context-template rendering ────────────────────────────────────────────
 
@@ -90,11 +98,13 @@ class TodoWorker:
         inline_tool_executor: Callable[[dict], Optional[dict]],
         *,
         tool_context: Optional[list[dict]] = None,
+        max_iterations_per_goal: int = _DEFAULT_MAX_ITERATIONS_PER_GOAL,
     ) -> None:
         self._engine = workflow_engine
         self._strategy_router = strategy_router
         self._inline_tool = inline_tool_executor
         self._tool_context = tool_context or []
+        self._max_iterations_per_goal = max_iterations_per_goal
 
     @deadcode_ignore
     def __call__(
@@ -105,6 +115,11 @@ class TodoWorker:
         **kwargs: Any,
     ) -> dict:
         """Process ONE todo item.
+
+        For ``type='task'`` items: runs ``todo-execute-item`` once and
+        returns.  For ``type='goal'`` items: enters the inner ReAct
+        loop that dynamically decomposes and executes tasks until the
+        completion criterion is met.
 
         Returns:
             ``{"done": True, "output": str}`` when all items are processed.
@@ -117,8 +132,6 @@ class TodoWorker:
             payload = payload.model_dump()
 
         # 1. Determine db_path from cognitive_state (resume) or payload (fresh).
-        # execution_context may be a dict (from ExecutionStage's .to_dict())
-        # or an ExecutionContext object (from direct calls / tests).
         cognitive_state: dict = {}
         if execution_context is not None:
             if isinstance(execution_context, dict):
@@ -159,11 +172,13 @@ class TodoWorker:
                 result_text = (
                     f"Todo list complete.  {done}/{total} done, {failed} failed."
                 )
-            else:
-                # Mark in_progress (no-op if already in_progress from crash resume).
+            elif item.type == "goal":
+                # Sub-goal: enter the inner ReAct loop.
                 store.mark_in_progress(item.id)
-
-                # 3. Run the per-item workflow.
+                result_text = self._run_goal_inner_loop(item, store)
+            else:
+                # Task: single-shot execution (Sprint 12a behavior).
+                store.mark_in_progress(item.id)
                 result_text = self._run_item_workflow(item, store, conn)
                 store.mark_done(item.id)
 
@@ -204,6 +219,154 @@ class TodoWorker:
             "cognitive_state": {"db_path": db_path},
         }
 
+    # ── goal inner loop ───────────────────────────────────────────────────
+
+    def _run_goal_inner_loop(
+        self,
+        goal: Any,
+        store: TodoStore,
+    ) -> str:
+        """Inner ReAct loop for a sub-goal.
+
+        Iterates up to ``max_iterations_per_goal`` times.  Each iteration:
+        1. Runs ``subgoal-execute-loop`` workflow (anchor → adviser →
+           create_task → execute_task → assess).
+        2. Parses the adviser's output for ``COMPLETE: YES/NO``.
+        3. Appends the task outcome to the goal's description (progress
+           compaction).
+        4. If COMPLETE → mark goal done and return.
+        5. If max iterations reached → mark goal failed and return.
+
+        Returns a human-readable summary string.
+        """
+        db_path = store._conn.execute(
+            "PRAGMA database_list"
+        ).fetchone()["file"]
+
+        # Build the initial progress log from the goal's description.
+        progress_parts: list[str] = [f"Goal: {goal.title}\n"]
+
+        for iteration in range(1, self._max_iterations_per_goal + 1):
+            logger.info(
+                "Goal '%s' — inner loop iteration %d/%d",
+                goal.id, iteration, self._max_iterations_per_goal,
+            )
+
+            # Run one iteration of the subgoal-execute-loop workflow.
+            progress_text = "\n".join(progress_parts)
+            iter_context = {
+                "goal_id": goal.id,
+                "goal_title": goal.title,
+                "goal_description": goal.description,
+                "completion_criterion": goal.completion_criterion or "",
+                "progress_log": progress_text,
+                "state_context": "",
+                "db_path": db_path,
+            }
+
+            try:
+                iter_result, adviser_output = self._run_subgoal_iteration(
+                    iter_context, store,
+                )
+            except _StepFailedError:
+                # A step within the iteration failed — let the outer handler
+                # decide retry.  Return the failure so the goal gets retried.
+                raise
+
+            # Append progress.
+            if iter_result:
+                progress_parts.append(iter_result)
+                store.append_progress(goal.id, iter_result)
+
+            # Parse the adviser output for the COMPLETE signal.
+            is_complete = self._parse_complete_signal(adviser_output)
+
+            if is_complete:
+                logger.info(
+                    "Goal '%s' — adviser reports COMPLETE after %d iteration(s).",
+                    goal.id, iteration,
+                )
+                store.mark_done(goal.id)
+                return (
+                    f"Goal completed in {iteration} iteration(s). "
+                    f"Last adviser: {adviser_output[:200]}"
+                )
+
+        # Max iterations exhausted.
+        reason = (
+            f"Max iterations ({self._max_iterations_per_goal}) reached "
+            f"for goal '{goal.id}'.  Last iteration output: "
+            f"{progress_parts[-1] if len(progress_parts) > 1 else 'none'}"
+        )
+        logger.warning("Goal '%s' — %s", goal.id, reason)
+        store.mark_failed(goal.id, reason)
+        raise _StepFailedError(reason)
+
+    def _run_subgoal_iteration(
+        self,
+        context: dict,
+        store: TodoStore,
+    ) -> tuple[str | None, str]:
+        """Run one iteration of ``subgoal-execute-loop``.
+
+        Returns:
+            ``(progress_summary, adviser_output)`` where
+            ``progress_summary`` is the one-line task outcome from the
+            assess step (or None if the iteration failed early) and
+            ``adviser_output`` is the raw output from the adviser step
+            (used for COMPLETE parsing).
+        """
+        wf_state = self._engine.start_workflow(
+            _SUBGOAL_EXECUTE_LOOP_WORKFLOW,
+            context=context,
+        )
+
+        adviser_output = ""
+        progress_summary: str | None = None
+
+        while True:
+            wf_state, outcome = self._engine.step(wf_state)
+
+            if outcome.type == "completed":
+                # Collect outputs from key steps.
+                adviser_output = str(
+                    wf_state.step_results.get("anchor_and_reflect", "")
+                )
+                progress_summary = str(
+                    wf_state.step_results.get("assess_task_outcome", "")
+                )
+                return progress_summary, adviser_output
+
+            if outcome.type == "failed":
+                error = outcome.error or wf_state.error or "Unknown workflow failure"
+                raise _StepFailedError(error)
+
+            if outcome.type == "continue":
+                continue
+
+            if outcome.type == "llm_call":
+                wf_state = self._dispatch_llm_call(wf_state, outcome)
+                # Capture adviser output when the anchor_and_reflect step completes.
+                if outcome.step_id == "anchor_and_reflect":
+                    adviser_output = str(
+                        wf_state.step_results.get("anchor_and_reflect", "")
+                    )
+                continue
+
+            if outcome.type == "tool_execute":
+                wf_state = self._dispatch_tool_execute(wf_state, outcome)
+                continue
+
+            if outcome.type == "sub_workflow":
+                wf_state = self._dispatch_sub_workflow(wf_state, outcome)
+                continue
+
+            if outcome.type == "waiting_for_input":
+                raise _StepFailedError(
+                    f"Workflow step '{outcome.step_id}' requested user_input — "
+                    f"not supported in subgoal-execute-loop."
+                )
+
     # ── per-item workflow dispatch ──────────────────────────────────────
 
     def _run_item_workflow(
@@ -212,31 +375,50 @@ class TodoWorker:
         store: TodoStore,
         conn: sqlite3.Connection,
     ) -> str:
-        """Run the ``todo-execute-item`` workflow for a single todo.
+        """Run the ``todo-execute-item`` workflow for a single task.
 
         Starts the workflow with ``item`` in the initial context, then
         dispatches ``llm_call`` and ``tool_execute`` outcomes until the
-        workflow completes or fails.
+        workflow completes or fails.  Includes parent-goal context if
+        this task belongs to a sub-goal.
         """
+        context: dict = {
+            "todo_id": item.id,
+            "todo_title": item.title,
+            "todo_description": item.description,
+            "deps": item.depends_on,
+            "db_path": conn.execute("PRAGMA database_list").fetchone()["file"],
+        }
+
+        # If this task has a parent goal, enrich the context.
+        if item.parent_goal_id:
+            parent = store.get(item.parent_goal_id)
+            if parent is not None:
+                context["parent_goal_id"] = parent.id
+                context["parent_goal_title"] = parent.title
+                context["parent_goal_criterion"] = parent.completion_criterion or ""
+                context["progress_log"] = parent.description
+
         wf_state = self._engine.start_workflow(
             _TODO_EXECUTE_ITEM_WORKFLOW,
-            context={
-                "todo_id": item.id,
-                "todo_title": item.title,
-                "todo_description": item.description,
-                "deps": item.depends_on,
-                "db_path": conn.execute("PRAGMA database_list").fetchone()["file"],
-            },
+            context=context,
         )
 
+        return self._run_workflow_to_completion(wf_state)
+
+    def _run_workflow_to_completion(
+        self,
+        wf_state: WorkflowExecutionState,
+    ) -> str:
+        """Run a workflow to completion, dispatching all outcome types.
+
+        Used for ``todo-execute-item`` and child workflows started by
+        ``sub_workflow`` steps.  Returns the final result text.
+        """
         while True:
             wf_state, outcome = self._engine.step(wf_state)
 
             if outcome.type == "completed":
-                # Detect completion-via-failure: when a step's on_failure
-                # transition points to __end__, the engine returns "completed"
-                # but the step_results record the error.  Treat that as a
-                # failure so the todo gets retried instead of marked done.
                 for _step_id, _result in wf_state.step_results.items():
                     if isinstance(_result, dict) and _result.get("status") in (
                         "failed",
@@ -265,16 +447,14 @@ class TodoWorker:
                 wf_state = self._dispatch_tool_execute(wf_state, outcome)
                 continue
 
+            if outcome.type == "sub_workflow":
+                wf_state = self._dispatch_sub_workflow(wf_state, outcome)
+                continue
+
             if outcome.type == "waiting_for_input":
                 raise _StepFailedError(
                     f"Workflow step '{outcome.step_id}' requested user_input — "
                     "not supported in todo-execute-item."
-                )
-
-            if outcome.type in ("sub_workflow",):
-                raise _StepFailedError(
-                    f"Outcome '{outcome.type}' not yet supported in "
-                    f"todo-execute-item (step '{outcome.step_id}')."
                 )
 
     # ── outcome dispatchers ─────────────────────────────────────────────
@@ -343,6 +523,77 @@ class TodoWorker:
                 f"Tool '{config.get('tool_name', '?')}' not available inline.",
             )
         return wf_state
+
+    def _dispatch_sub_workflow(
+        self,
+        wf_state: WorkflowExecutionState,
+        outcome: StepOutcome,
+    ) -> WorkflowExecutionState:
+        """Dispatch a ``sub_workflow`` outcome.
+
+        Starts the child workflow, runs it to completion, then resumes
+        the parent workflow with the child's result as the step result.
+        """
+        child_wf_id = outcome.workflow_id
+        if child_wf_id is None:
+            wf_state, _ = self._engine.fail_step(
+                wf_state, outcome.step_id,
+                "sub_workflow outcome missing workflow_id",
+            )
+            return wf_state
+
+        # Build child context from the step config's ``context`` dict,
+        # with template rendering applied.
+        child_config = outcome.config or {}
+        child_context_raw = child_config.get("context", {})
+        child_context = _render_context_templates(
+            child_context_raw,
+            wf_state.context,
+            wf_state.step_results,
+        )
+
+        logger.debug(
+            "Starting child workflow '%s' from step '%s'",
+            child_wf_id, outcome.step_id,
+        )
+
+        try:
+            child_state = self._engine.start_workflow(
+                child_wf_id, context=child_context,
+            )
+            child_result = self._run_workflow_to_completion(child_state)
+        except _StepFailedError as e:
+            wf_state, _ = self._engine.fail_step(
+                wf_state, outcome.step_id, str(e),
+            )
+            return wf_state
+
+        wf_state, _ = self._engine.resume_with_result(
+            wf_state, outcome.step_id, child_result,
+        )
+        return wf_state
+
+    # ── adviser output parsing ──────────────────────────────────────────
+
+    @staticmethod
+    def _parse_complete_signal(adviser_output: str) -> bool:
+        """Parse the adviser's output for the COMPLETE signal.
+
+        Looks for ``COMPLETE: YES`` (case-insensitive, whitespace-tolerant).
+        Any other value (``NO``, missing, ambiguous) is treated as NOT complete.
+
+        Returns ``True`` only when the adviser **explicitly and verifiably**
+        signals completion.
+        """
+        if not adviser_output:
+            return False
+        # Match "COMPLETE: YES" with flexible whitespace and case.
+        match = re.search(
+            r"COMPLETE\s*:\s*YES",
+            adviser_output,
+            re.IGNORECASE,
+        )
+        return match is not None
 
 
 # ── internal error type ──────────────────────────────────────────────────

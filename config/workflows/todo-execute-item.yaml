@@ -2,8 +2,8 @@
 #
 # Started by TodoWorker for each pending todo item. The workflow
 # executes a single llm_call step that:
-#   1. Receives the todo's title, description, dependencies, and db_path
-#      as workflow context (injected by TodoWorker on start).
+#   1. Receives the todo's title, description, dependencies, parent goal
+#      context (if applicable), and db_path as workflow context.
 #   2. The LLM uses any available tools to accomplish the task.
 #   3. On success → __end__ (TodoWorker marks the item done).
 #   4. On failure → __end__ (TodoWorker handles retry via TodoStore).
@@ -36,10 +36,21 @@ steps:
         **Task Description**:
         {context.todo_description}
 
+        #if {context.parent_goal_id}
+        **Parent Goal**: {context.parent_goal_id} — {context.parent_goal_title}
+        **Goal Completion Criterion**: {context.parent_goal_criterion}
+        **Progress So Far Toward Goal**: {context.progress_log}
+        #endif
+
         **Dependencies** (already completed): {context.deps}
 
         Execute this task to completion. Use any available tools as needed.
         When finished, provide a concise summary of what was accomplished.
+
+        #if {context.parent_goal_id}
+        Remember: this task is one step toward the parent goal above.
+        Stay scoped to THIS task only.  Do not try to solve the whole goal.
+        #endif
 
         If you encounter an error or the task cannot be completed, explain
         what went wrong so the system can handle retries.

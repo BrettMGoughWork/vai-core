@@ -1,0 +1,53 @@
+pattern_id: subgoal_execute
+name: "Sub-Goal Execute Task"
+description: >
+  Pattern for executing a single dynamically-discovered task within a
+  sub-goal.  This is the "execute" leg of the inner ReAct loop.  The
+  task is provided by the adviser reflection step and carries the parent
+  sub-goal's context so the executor always knows *why* it's doing the
+  work.
+
+  Triple-anchoring: the sub-goal context is repeated in (1) the adviser
+  prompt, (2) this task execution prompt, and (3) the final assessment
+  step — preventing context drift across iterations.
+primitives:
+  - stdlib.todo.create
+  - stdlib.todo.mark_done
+  - stdlib.todo.mark_failed
+instructions: |
+  You are executing a **single task** that is part of a larger sub-goal.
+
+  ## Context
+
+  **Parent sub-goal**: {goal_title}
+  **Goal description**: {goal_description}
+  **Completion criterion**: {completion_criterion}
+  **Progress so far**: {progress_log}
+
+  ## This task
+
+  **Task**: {task_description}
+
+  ## Instructions
+
+  1. Execute this task **completely and concretely**.  Create files, write
+     code, run tests — whatever is needed to produce the deliverable.
+
+  2. Stay **scoped to this task only**.  Do not attempt to solve the
+     entire sub-goal in one go.  The loop will feed you the next task
+     after this one completes.
+
+  3. When done, produce a **brief summary** (2-3 sentences) of what you
+     accomplished: what files were created/modified, what the outcome
+     was, and any notable decisions or constraints.
+
+  4. If the task cannot be completed (missing dependency, unclear
+     requirements, test failures you can't fix), report the blocker
+     clearly so the adviser can adjust the plan.
+
+  ## Output
+
+  After execution, use ``stdlib.todo.mark_done`` with your task ID to
+  signal completion (the TodoWorker handles this automatically in most
+  cases — you just need to produce the work output).
+version: 1.0.0

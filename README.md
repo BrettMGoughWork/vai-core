@@ -72,25 +72,66 @@ This enables **specialisation** (a general support agent hands off billing queri
 
 See [Agent Deferral](docs/architecture/agent-deferral.md) for the full design.
 
-#### Todo-List Planner
+#### Sub-Goal Planner (Two-Level Planning)
 
-The **todo-list planner** replaces the monolithic S2 hierarchical planner with a flat, SQLite-based task list. It is a first-class capability — orchestrated through S4 machinery, not a workflow step or tool call.
+The **sub-goal planner** is a two-level planning architecture that decomposes complex requests into *sub-goals* (coarse milestones) and then iteratively breaks each sub-goal into *tasks* (concrete actions). It is a **first-class capability** — automatically invoked by the S5 Supervisor when the LLM creates goals, not a tool the LLM calls directly.
+
+**How it works (end-to-end):**
+
+```
+User Request
+    │
+    ▼
+┌─ S5 Supervisor ──────────────────────────────────────────┐
+│  1. LLM creates sub-goals via stdlib.todo.create_batch    │
+│  2. ToolOrchestrator executes the primitive inline        │
+│  3. Supervisor detects create_* call → auto-invokes       │
+│     TodoOrchestrator.run(db_path)                         │
+└──────────────────────────────────┬───────────────────────┘
+                                   │
+                                   ▼
+┌─ TodoOrchestrator (S4 Job) ──────────────────────────────┐
+│  For each sub-goal (respecting dependencies):             │
+│                                                           │
+│  ┌─ Inner Loop (Two-Level) ───────────────────────────┐  │
+│  │  anchor → reflect → create task → execute → assess │  │
+│  │  Loop until sub-goal criterion met (max 10 iter)   │  │
+│  └────────────────────────────────────────────────────┘  │
+│                                                           │
+│  ✓ Sub-goal 1 complete → advance to Sub-goal 2            │
+│  ✓ Sub-goal 2 complete → advance to Sub-goal 3            │
+│  ...                                                      │
+└───────────────────────────────────────────────────────────┘
+```
 
 **Core components:**
 
 | Component | Role |
 |-----------|------|
-| `TodoStore` | SQLite table CRUD with dependency resolution — items block/unblock cascading as dependencies complete |
-| `TodoWorker` | S4-compatible worker with crash recovery, idempotency, and multi-cycle execution — picks up `in_progress` items after a crash |
-| `TodoOrchestrator` | First-class capability wrapping `TodoWorker` in the full S4 lifecycle — `run(db_path)` creates a job, enqueues it, and returns results |
-| `db_execute` | Stdlib primitive for executing SQL via the primitive registry |
+| `TodoStore` | SQLite table CRUD with dependency resolution, goal/task type distinction, parent-goal scoping, and progress compaction |
+| `TodoWorker` | S4-compatible worker — dispatches `subgoal-execute-loop` for goals vs `todo-execute-item` for tasks. Crash recovery and idempotency built in |
+| `TodoOrchestrator` | First-class capability — `run(db_path)` creates a job, enqueues it, runs the full S4 pipeline, and returns results |
+| `stdlib.todo.create_batch` | Primary entry point — the LLM calls this primitive to create sub-goals; the Supervisor auto-detects this and invokes the orchestrator |
+| `stdlib.todo.create_goal` | Single-goal variant — create one sub-goal at a time |
 
-**Workflow path:** `todo-execute-item.yaml` drives each item through three composable patterns:
-1. **`todo-breakdown`** — decompose a large item into smaller, achievable sub-tasks
-2. **`todo-prioritize`** — reorder items based on dependency readiness and priority
-3. **`todo-self-check`** — verify the item's output meets acceptance criteria
+**Workflows:**
 
-The worker loop iterates until all items are `done`, handling retries, error recovery, and dependency unblocking automatically. Patterns are intentionally small and bounded — the workflow breaks work into composable steps rather than relying on unbounded LLM cognition.
+| Workflow | Purpose |
+|----------|---------|
+| `subgoal-execute-loop` | Two-level inner loop for one sub-goal: anchor → adviser-reflect → create task → execute → assess → repeat until done |
+| `todo-execute-item` | Single-task execution with parent-goal context anchoring |
+| `todo-self-check` | Gate: verify sub-goal output meets the completion criterion before marking `done` |
+
+**Guardrails:**
+
+| Risk | Mitigation |
+|------|------------|
+| Infinite inner loop | Hard cap: `max_iterations_per_goal` (default 10) — sub-goal marked `failed` if exceeded |
+| Hallucinated completion | Dual gate: adviser must cite evidence + `todo-self-check` verifies criterion |
+| Context window bloat | Progress compaction: task outcomes summarized into the sub-goal's description, not raw conversation |
+| Task drift | Triple-anchored: adviser prompt, task creation prompt, and task execution prompt all include the parent sub-goal context |
+| Over-decomposition | Adviser guidance: "suggest the single most impactful next task — a meaningful unit of work, not every micro-step" |
+| Dependency deadlock | Same dependency resolution as the flat planner, scoped within each sub-goal |
 
 ---
 

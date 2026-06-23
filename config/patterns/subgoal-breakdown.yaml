@@ -1,0 +1,76 @@
+pattern_id: subgoal_breakdown
+name: "Sub-Goal Breakdown"
+description: >
+  Decompose a user request into coarse-grained sub-goals — major milestones
+  on the journey to satisfying the request. Unlike task-level breakdown
+  (``todo_breakdown``), this operates at a higher level: each sub-goal is
+  a self-contained deliverable that the inner ReAct loop can dynamically
+  decompose into tasks.
+
+  Sub-goals are inserted with ``type='goal'`` and include a verifiable
+  ``completion_criterion`` that the adviser can use to judge when the
+  sub-goal is truly done.
+primitives:
+  - stdlib.todo.create_goal
+  - stdlib.todo.add_dependency
+  - stdlib.todo.list
+  - stdlib.todo.status_summary
+instructions: |
+  To break down a user request into sub-goals:
+
+  1. **Analyze the request holistically**.  Identify 3-7 coarse milestones
+     that must be achieved.  Each sub-goal should be:
+     - A meaningful, self-contained deliverable (e.g. "Authentication
+       Module", "Database Schema & Migrations", "API Integration Tests").
+     - Ordered so that foundational work comes first.
+     - Named in **gerund form** or as a concise noun phrase.
+
+  2. **Write a completion criterion** for every sub-goal.  This must be a
+     *verifiable, concrete condition* — not a vague aspiration.  The
+     adviser will check against this criterion in every iteration.
+     Examples:
+     - Good: "All 12 auth endpoints return correct HTTP status codes and
+       the test suite passes with zero failures."
+     - Bad:  "Authentication works."
+
+  3. **Write descriptions that stand alone**.  Each sub-goal description
+     must contain enough detail that the ReAct loop can understand what
+     needs to be accomplished WITHOUT referring to other sub-goals.
+     Include:
+     - The scope of the sub-goal (what's in, what's out).
+     - Key files/modules involved.
+     - The completion criterion repeated for clarity.
+
+  4. **Identify inter-goal dependencies**.  Sub-goals often build on each
+     other.  Use ``stdlib.todo.add_dependency`` to declare that goal B
+     depends on goal A.  The scheduler will ensure goal A completes before
+     goal B starts.
+
+  5. **Insert each sub-goal** with ``stdlib.todo.create_goal``:
+     ```json
+     {
+       "db_path": "<from context>",
+       "items": [
+         {
+           "id": "auth-foundation",
+           "title": "Authentication Foundation",
+           "description": "Implement JWT-based auth: user model, password
+             hashing, token issuance and validation middleware.",
+           "completion_criterion": "All auth endpoints pass their
+             integration tests. Token refresh works. Invalid tokens are
+             rejected with 401.",
+           "depends_on": []
+         }
+       ]
+     }
+     ```
+
+  6. **Present the plan**.  Use ``stdlib.todo.list`` to read back the
+     sub-goals and ``stdlib.todo.status_summary`` for counts.  Confirm
+     with the user before execution begins.
+
+  **Important**: Do NOT pre-decompose sub-goals into tasks here.  The
+  inner ReAct loop handles task-level decomposition dynamically during
+  execution.  Your job is only to define the coarse milestones and their
+  completion criteria.
+version: 1.0.0
