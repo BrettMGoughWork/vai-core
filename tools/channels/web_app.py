@@ -11,10 +11,9 @@ Usage::
 
 Then::
 
-    curl -X POST http://localhost:8000/api/ingress \
+    curl -X POST http://localhost:8000/run \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-key-001" \
-        -d '{"input": "deploy the app", "sender": "alice", "metadata": {"env": "staging"}}'
+        -d '{"input": "deploy the app"}'
 
     curl http://localhost:8000/health
 """
@@ -26,33 +25,30 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
 
-from src.agent.adapters.gateway_adapter import AgentGatewayAdapter
-from src.agent.adapters.memory_agent_state_store import MemoryAgentStateStore
-from src.agent.registry import AgentIdentity, AgentMetadata, AgentRegistry
-from src.agent.supervisor import Supervisor
+from starlette.responses import FileResponse
+
+from src.agent.composition_root import (
+    agent_registry,
+    pattern_registry,
+    s5_adapter,
+    state_store,
+    workflow_registry,
+)
 from src.gateway.channels.registry import ChannelRegistry
 from src.gateway.channels.web import WebChannel, WebRequest, register_web_channel
+from src.gateway.channels.web_simple import mount_ui
 from src.gateway.entrypoint import submit_channel_input
 
 # ---------------------------------------------------------------------------
-# S5 Supervisor wiring
+# S5 Supervisor wiring — uses the shared composition root
 # ---------------------------------------------------------------------------
-
-_agent_registry = AgentRegistry()
-_agent_registry.register_agent(AgentMetadata(
-    identity=AgentIdentity(
-        agent_id="default-agent",
-        name="Default Agent",
-        description="Default conversational agent",
-    ),
-    capabilities=["conversation"],
-))
-
-_agent_store = MemoryAgentStateStore()
-_supervisor = Supervisor(registry=_agent_registry, store=_agent_store)
-_s5_adapter = AgentGatewayAdapter(_supervisor)
+# The composition_root already loads agents from config/agents/, builds the
+# real LLM transport, and wires the full S5 pipeline (workflow engine,
+# tool adapters, strategy router, todo orchestrator, etc.).
+#
+# We reuse ``s5_adapter`` directly — this is the same adapter the CLI
+# channel and production transport app use.
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -63,6 +59,10 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(message)s",
 )
 logger = logging.getLogger("web_channel")
+
+# Session-scoped agent selection (mirrors CLI's ``/agent <id>``).
+# Defaults to the system default agent; changed at runtime via /agent.
+_current_agent_id: str = "default-agent"
 
 # ---------------------------------------------------------------------------
 # Application setup
@@ -99,6 +99,122 @@ async def health() -> dict[str, Any]:
     }
 
 
+@app.post("/run")
+async def run(payload: dict[str, Any]) -> dict[str, Any]:
+    """Accept a JSON payload, normalise it, and hand off to S5.
+
+    This is the primary endpoint used by the PWA web UI.
+
+    Slash commands (mirroring the CLI channel):
+      ``/agent``          — show current agent
+      ``/agent <id>``     — switch to a different agent
+      ``/agents``         — list all registered agents
+      ``/workflow <id>``  — show a specific workflow
+      ``/workflows``      — list all registered workflows
+      ``/patterns``       — list all registered patterns
+    """
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload must be a JSON object")
+
+    text: str = payload.get("input", "")
+    global _current_agent_id
+
+    # ── Slash commands ──────────────────────────────────────────────────
+    if text.startswith("/"):
+        cmd = text.strip().lower()
+
+        if cmd == "/agents":
+            return {
+                "output": _format_agents_list(),
+                "reply": _format_agents_list(),
+                "type": "slash_command",
+            }
+
+        if cmd == "/agent":
+            return {
+                "output": _format_current_agent(),
+                "reply": _format_current_agent(),
+                "type": "slash_command",
+            }
+
+        if cmd.startswith("/agent "):
+            agent_id = cmd[7:].strip()
+            if not agent_registry.has_agent(agent_id):
+                return {
+                    "output": f"Unknown agent: {agent_id!r}\nUse /agents to see available agents.",
+                    "reply": f"Unknown agent: {agent_id!r}\nUse /agents to see available agents.",
+                    "type": "slash_command",
+                    "error": True,
+                }
+            _current_agent_id = agent_id
+            return {
+                "output": _format_current_agent(),
+                "reply": _format_current_agent(),
+                "type": "slash_command",
+            }
+
+        if cmd == "/workflows":
+            return {
+                "output": _format_workflows_list(),
+                "reply": _format_workflows_list(),
+                "type": "slash_command",
+            }
+
+        if cmd.startswith("/workflow "):
+            wf_id = cmd[10:].strip()
+            wf = workflow_registry.get(wf_id)
+            if wf is None:
+                return {
+                    "output": f"Unknown workflow: {wf_id!r}\nUse /workflows to see available workflows.",
+                    "reply": f"Unknown workflow: {wf_id!r}\nUse /workflows to see available workflows.",
+                    "type": "slash_command",
+                    "error": True,
+                }
+            return {
+                "output": _format_workflow_detail(wf),
+                "reply": _format_workflow_detail(wf),
+                "type": "slash_command",
+            }
+
+        if cmd == "/patterns":
+            return {
+                "output": _format_patterns_list(),
+                "reply": _format_patterns_list(),
+                "type": "slash_command",
+            }
+
+        # Unknown slash command — fall through to S5 as regular input
+        # so the agent can explain what commands are available.
+
+    # ── Regular input → S5 pipeline ────────────────────────────────────
+    result = submit_channel_input(registry, "web", payload, adapter=s5_adapter, agent_id=_current_agent_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    return {
+        "output": result.get("reply", ""),
+        "metadata": result.get("metadata", {}),
+        "agent_id": result.get("agent_id", _current_agent_id),
+        "reply": result.get("reply", ""),
+    }
+
+
+@app.get("/jobs/{job_id}")
+async def get_job(job_id: str) -> dict[str, Any]:
+    """Poll job status — used by the PWA for async responses."""
+    agent_state = state_store.load(job_id)
+    if agent_state is None:
+        raise HTTPException(status_code=404, detail="not found")
+
+    return {
+        "job_id": job_id,
+        "state": agent_state.lifecycle_state.value,
+        "output": getattr(agent_state, "last_reply", None),
+        "result": getattr(agent_state, "last_metadata", None),
+    }
+
+
 @app.post("/api/ingress")
 async def api_ingress(
     body: WebRequest,
@@ -116,7 +232,7 @@ async def api_ingress(
     if body.metadata:
         raw["metadata"] = body.metadata
 
-    result = submit_channel_input(registry, "web", raw, adapter=_s5_adapter)
+    result = submit_channel_input(registry, "web", raw, adapter=s5_adapter, agent_id=_current_agent_id)
 
     if "error" in result:
         raise HTTPException(status_code=503, detail=result["error"])
@@ -161,229 +277,92 @@ async def api_inspect() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Root page — professional demo UI
+# Root page — PWA Web UI (Sprint 13)
 # ---------------------------------------------------------------------------
 
 
-@app.get("/", include_in_schema=False)
-async def root() -> HTMLResponse:
-    return HTMLResponse(
-        content=_ROOT_PAGE,
-        headers={"content-type": "text/html; charset=utf-8"},
+@app.get("/")
+async def root():
+    """Serve the PWA shell (index.html)."""
+    from pathlib import Path as _Path
+
+    ui_index = (
+        _Path(__file__).resolve().parent.parent.parent
+        / "src" / "gateway" / "channels" / "web_simple" / "ui" / "index.html"
     )
+    return FileResponse(str(ui_index))
 
 
-_ROOT_PAGE = r"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VAI — Web Channel (Gateway → S5)</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #0d1117; color: #e6edf3; line-height: 1.6; padding: 2rem 1rem;
-  }
-  .container { max-width: 960px; margin: 0 auto; }
+mount_ui(app)
 
-  /* Header */
-  header { margin-bottom: 2.5rem; }
-  header h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; }
-  header p { color: #8b949e; font-size: 0.9rem; margin-top: 0.25rem; }
-  header .badge {
-    display: inline-block; background: #1f6feb; color: #fff;
-    font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.6rem;
-    border-radius: 999px; text-transform: uppercase;
-  }
 
-  /* Cards */
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
-  .card {
-    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-    padding: 1.25rem 1.5rem;
-  }
-  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: #f0f6fc; }
-  .card.full { grid-column: 1 / -1; }
+# ---------------------------------------------------------------------------
+# Slash-command formatters
+# ---------------------------------------------------------------------------
 
-  /* Form elements */
-  label { display: block; font-size: 0.8rem; font-weight: 500; color: #8b949e; margin-bottom: 0.3rem; }
-  input, textarea {
-    width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem;
-    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
-    color: #e6edf3; font-size: 0.875rem; font-family: inherit;
-  }
-  input:focus, textarea:focus { outline: none; border-color: #1f6feb; box-shadow: 0 0 0 2px rgba(31,111,235,0.3); }
-  textarea { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 0.8rem; resize: vertical; min-height: 60px; }
-  .row { display: flex; gap: 0.75rem; }
-  .row > * { flex: 1; }
 
-  /* Buttons */
-  button {
-    padding: 0.5rem 1.25rem; border: none; border-radius: 6px;
-    font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: background 0.15s;
-    background: #238636; color: #fff;
-  }
-  button:hover { background: #2ea043; }
-  button.secondary { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
-  button.secondary:hover { background: #30363d; }
-  button:disabled { opacity: 0.5; cursor: default; }
+def _format_current_agent() -> str:
+    """Return a human-readable summary of the currently selected agent."""
+    lines = [
+        f"**Current agent:** `{_current_agent_id}`",
+    ]
+    if agent_registry.has_agent(_current_agent_id):
+        meta = agent_registry.get_agent(_current_agent_id)
+        ident = meta.identity
+        lines.append(f"- Name: {ident.name}")
+        lines.append(f"- Description: {ident.description}")
+        if meta.persona:
+            lines.append(f"- Persona: {meta.persona}")
+        tools = meta.tools or []
+        if tools and tools != ["*"]:
+            lines.append(f"- Tools: {', '.join(tools)}")
+    return "\n".join(lines)
 
-  /* Output */
-  .output {
-    margin-top: 0.75rem; padding: 0.75rem 1rem;
-    background: #0d1117; border: 1px solid #21262d; border-radius: 6px;
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.8rem; white-space: pre-wrap; word-break: break-all;
-    max-height: 240px; overflow: auto; display: none;
-  }
-  .output.visible { display: block; }
-  .output.error { border-color: #da3633; color: #ff7b72; }
-  .output.success { border-color: #238636; }
 
-  /* Status row */
-  .status-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
-  .status-item {
-    flex: 1; min-width: 120px; padding: 0.75rem 1rem;
-    background: #0d1117; border: 1px solid #21262d; border-radius: 6px; text-align: center;
-  }
-  .status-item .value { font-size: 1.3rem; font-weight: 600; }
-  .status-item .label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.04em; }
-  .status-item.up .value { color: #3fb950; }
-  .status-item.down .value { color: #da3633; }
+def _format_agents_list() -> str:
+    """Return a human-readable list of all registered agents."""
+    lines = [f"**Registered agents** ({agent_registry.agent_count}):"]
+    for meta in agent_registry.list_agents():
+        ident = meta.identity
+        marker = " ▶" if ident.agent_id == _current_agent_id else ""
+        lines.append(f"- `{ident.agent_id}`{marker} — {ident.name}")
+        if meta.persona:
+            lines.append(f"  _Persona: {meta.persona}_")
+    return "\n".join(lines)
 
-  /* Navigation */
-  .nav-links { margin-top: 2rem; text-align: center; font-size: 0.85rem; }
-  .nav-links a { color: #58a6ff; text-decoration: none; }
-  .nav-links a:hover { text-decoration: underline; }
-  .nav-links .sep { color: #30363d; margin: 0 0.5rem; }
-</style>
-</head>
-<body>
-<div class="container">
 
-  <header>
-    <h1>VAI · Web Channel (Gateway → S5)</h1>
-    <p>Interact with the Gateway → S5 Supervisor handoff &nbsp;<span class="badge">demo</span></p>
-  </header>
+def _format_workflows_list() -> str:
+    """Return a human-readable list of all registered workflows."""
+    defs = workflow_registry.list()
+    lines = [f"**Registered workflows** ({len(defs)}):"]
+    for wf in defs:
+        desc = f" — {wf.description}" if wf.description else ""
+        lines.append(f"- `{wf.workflow_id}`{desc}")
+    return "\n".join(lines)
 
-  <!-- Status bar -->
-  <div class="status-row" id="statusBar">
-    <div class="status-item" id="healthIndicator"><div class="value">…</div><div class="label">Service</div></div>
-    <div class="status-item"><div class="value" id="channelCount">—</div><div class="label">Registered Channels</div></div>
-  </div>
 
-  <!-- Tool grid -->
-  <div class="grid">
+def _format_workflow_detail(wf) -> str:
+    """Return a human-readable detail view for a single workflow."""
+    lines = [
+        f"**Workflow:** `{wf.workflow_id}`",
+        f"- Description: {wf.description or '(none)'}",
+    ]
+    if hasattr(wf, "steps") and wf.steps:
+        lines.append("- Steps:")
+        for i, step in enumerate(wf.steps, 1):
+            step_name = getattr(step, "name", f"step-{i}")
+            lines.append(f"  {i}. {step_name}")
+    return "\n".join(lines)
 
-    <!-- Ingress card -->
-    <div class="card">
-        <h2>⬇  Ingress — Submit to S5</h2>
-      <p style="font-size:0.8rem;color:#8b949e;margin-bottom:1rem;">
-          HTTP JSON → ChannelMessage → S5 Supervisor
-      </p>
-      <label for="ingressInput">Input text</label>
-      <input type="text" id="ingressInput" placeholder="e.g. deploy the app" value="deploy the app">
-      <div class="row">
-        <div>
-          <label for="ingressSender">Sender (optional)</label>
-          <input type="text" id="ingressSender" placeholder="alice" value="alice">
-        </div>
-        <div>
-          <label for="ingressAuth">Authorization</label>
-          <input type="text" id="ingressAuth" placeholder="Bearer …" value="Bearer demo-key-001">
-        </div>
-      </div>
-        <button id="ingressBtn">Submit to S5</button>
-      <div class="output" id="ingressOutput"></div>
-    </div>
 
-      <!-- Inspect card -->
-      <div class="card full">
-        <h2>🔍  Registered Channels</h2>
-        <p style="font-size:0.8rem;color:#8b949e;margin-bottom:1rem;">
-          Query <code>GET /api/inspect</code> to see what channels are wired.
-        </p>
-        <button id="inspectBtn" class="secondary">Refresh</button>
-        <div class="output" id="inspectOutput"></div>
-      </div>
-
-  </div>
-
-  <div class="nav-links">
-    <a href="/docs">OpenAPI Docs</a>
-    <span class="sep">·</span>
-    <a href="/health">Health (JSON)</a>
-    <span class="sep">·</span>
-    <a href="/api/inspect">Inspect (JSON)</a>
-  </div>
-
-</div>
-
-<script>
-const BASE = '';
-
-async function api(url, method, body, auth) {
-  const hdrs = { 'Content-Type': 'application/json' };
-  if (auth) hdrs['Authorization'] = auth;
-  const res = await fetch(BASE + url, { method, headers: hdrs, body: body ? JSON.stringify(body) : undefined });
-  const data = await res.json();
-  return { ok: res.ok, status: res.status, data };
-}
-
-function show(el, data, ok) {
-  el.textContent = JSON.stringify(data, null, 2);
-  el.className = 'output visible' + (ok ? ' success' : ' error');
-}
-
-// --- Ingress ---
-document.getElementById('ingressBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('ingressBtn'); btn.disabled = true;
-  try {
-    const input = document.getElementById('ingressInput').value;
-    const sender = document.getElementById('ingressSender').value || undefined;
-    const auth = document.getElementById('ingressAuth').value || undefined;
-    const body = { input };
-    if (sender) body.sender = sender;
-    const { ok, data } = await api('/api/ingress', 'POST', body, auth);
-    show(document.getElementById('ingressOutput'), data, ok);
-  } finally { btn.disabled = false; }
-});
-
-// --- Inspect ---
-document.getElementById('inspectBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('inspectBtn'); btn.disabled = true;
-  try {
-    const { ok, data } = await api('/api/inspect', 'GET');
-    show(document.getElementById('inspectOutput'), data, ok);
-  } finally { btn.disabled = false; }
-});
-
-// --- Startup health check ---
-(async function init() {
-  try {
-    const { ok, data } = await api('/health', 'GET');
-    const ind = document.getElementById('healthIndicator');
-    ind.className = 'status-item' + (ok ? ' up' : ' down');
-    ind.querySelector('.value').textContent = ok ? 'Up' : 'Down';
-    document.getElementById('channelCount').textContent =
-      (data.channels && data.channels.length) || 0;
-    // auto-show inspect
-    const { ok: iok, data: idata } = await api('/api/inspect', 'GET');
-    show(document.getElementById('inspectOutput'), idata, iok);
-  } catch (e) {
-    const ind = document.getElementById('healthIndicator');
-    ind.className = 'status-item down';
-    ind.querySelector('.value').textContent = 'Error';
-  }
-})();
-</script>
-
-</body>
-</html>
-"""
+def _format_patterns_list() -> str:
+    """Return a human-readable list of all registered patterns."""
+    patterns = pattern_registry.list()
+    lines = [f"**Registered patterns** ({len(patterns)}):"]
+    for p in patterns:
+        desc = f" — {p.description}" if p.description else ""
+        lines.append(f"- `{p.pattern_id}`{desc}")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -410,19 +389,17 @@ def _truncate(text: str, max_len: int = 60) -> str:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 PORT = 8000
 
 
 def main() -> None:
-    print(f"  VAI — Web Channel (Gateway → S5)  v0.2.0")
-    print(f"  ──────────────────────────────────────────")
+    print(f"  VAI - Web Channel PWA  (Sprint 13)")
+    print(f"  -----------------------------")
     print(f"  Listening on http://{HOST}:{PORT}")
     print(f"  API docs   http://{HOST}:{PORT}/docs")
     print(f"  Health     http://{HOST}:{PORT}/health")
-    print(f"  Ingress    POST /api/ingress  (WebRequest JSON body)")
-    print(f"  Egress     POST /api/egress   (outbound payload)")
-    print(f"  Inspect    GET  /api/inspect")
+    print(f"  Chat UI    http://{HOST}:{PORT}/  (PWA)")
     print(f"\n  Channels: {registry.names}")
     print()
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")

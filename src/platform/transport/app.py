@@ -21,6 +21,7 @@ from src.agent.composition_root import (
 )
 from src.gateway.channels.registry import ChannelRegistry
 from src.gateway.channels.web import register_web_channel
+from src.gateway.channels.web_simple import mount_ui
 
 # Module-level adapter so gateway stays lightweight
 app = FastAPI(title="Stratum-4 Gateway", version="0.1.0")
@@ -28,6 +29,9 @@ app = FastAPI(title="Stratum-4 Gateway", version="0.1.0")
 # Module-level channel registry (created once, not per-request)
 _channel_registry = ChannelRegistry()
 register_web_channel(_channel_registry)
+
+# Mount the Web Channel UI (PWA) — serves index.html at "/" and static assets at "/static"
+mount_ui(app)
 
 
 @app.post("/run")

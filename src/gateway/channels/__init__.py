@@ -17,7 +17,7 @@ from src.gateway.channels.tui import (
     TUIStatusBar,
     register_tui_channel,
 )
-from src.gateway.channels.web import (
+from src.gateway.channels.web_simple import (
     WebChannel,
     WebRequest,
     WebResponse,

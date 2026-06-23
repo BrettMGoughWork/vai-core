@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VAI">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <title>VAI — Virtual AI Assistant</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <h1>VAI</h1>
+      <span id="status" class="status-dot" title="Connected"></span>
+    </header>
+
+    <!-- Chat Messages -->
+    <main id="chat" aria-live="polite" aria-label="Chat messages">
+      <div id="messages">
+        <div class="empty-state">
+          <div class="empty-icon">🤖</div>
+          <p>Ask VAI anything. Start a conversation below.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Loading indicator -->
+    <div id="loading" class="loading hidden">
+      <div class="typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <footer id="input-bar">
+      <div class="input-wrapper">
+        <textarea
+          id="user-input"
+          placeholder="Type your message…"
+          rows="1"
+          aria-label="Message input"
+        ></textarea>
+        <button id="send-btn" aria-label="Send message" title="Send (Enter)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter to send · Shift+Enter for newline</div>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
