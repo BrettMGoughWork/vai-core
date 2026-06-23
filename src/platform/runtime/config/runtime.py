@@ -101,6 +101,21 @@ class WebChannelConfig:
 
 
 @dataclass
+class WebUIConfig:
+    """Configuration for the Web Channel UI (PWA frontend).
+
+    Attributes:
+        enabled: Whether the web UI is served at ``/`` and ``/static``.
+        ui_dir:  Optional custom directory for UI assets.  When ``None``
+                 (the default) the bundled UI under
+                 ``src/gateway/channels/web_simple/ui/`` is used.
+    """
+
+    enabled: bool = True
+    ui_dir: str = ""
+
+
+@dataclass
 class WebhookChannelConfig:
     """Configuration for the Webhook channel adapter.
 

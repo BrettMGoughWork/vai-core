@@ -280,18 +280,24 @@ class TestBackendRouting:
         assert isinstance(resp, PromptResponse)
         assert "drift_detected" in resp.output
 
-    def test_real_llm_stubbed(self):
-        """backend='real_llm' → S1Error from kill-switch (real LLM disabled by default)."""
+    def test_real_llm_stubbed(self, monkeypatch):
+        """backend='real_llm' → S1Error from kill-switch (real LLM disabled)."""
+        from src.runtime.llm import s1_real_client
+
         req = _make_valid_request()
+        monkeypatch.setattr(s1_real_client, "ENABLE_REAL_LLM", False)
         resp = call_s1_backend(req, backend="real_llm")
         # Kill-switch is active → returns structured S1Error, not a live call
         assert isinstance(resp, S1Error)
-        assert resp.type == "s1_provider_failure"
-        assert "No LLM transport" in resp.message or "s1_provider_failure" in resp.type
+        assert resp.type == "real_llm_disabled"
+        assert "Kill-switch active" in resp.message
 
-    def test_real_llm_deterministic(self):
+    def test_real_llm_deterministic(self, monkeypatch):
         """The real_llm stub is also deterministic."""
+        from src.runtime.llm import s1_real_client
+
         req = _make_valid_request()
+        monkeypatch.setattr(s1_real_client, "ENABLE_REAL_LLM", False)
         r1 = call_s1_backend(req, backend="real_llm")
         r2 = call_s1_backend(req, backend="real_llm")
         assert r1.to_dict() == r2.to_dict()

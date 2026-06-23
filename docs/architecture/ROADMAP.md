@@ -1,7 +1,7 @@
 # Roadmap v2 — Sprint-Based Planning
 
 > **Status:** Living document  
-> **Last updated:** 2026-06-21 (Sprint 17 — added, Sprint 8 env-var fix)  
+> **Last updated:** 2026-06-23 (Sprint 13 — Web Channel UI added, v0.9.0 tagged)  
 > **Previous:** `ROADMAP.md` (stratum-based, superseded)  
 > **Architecture reference:** [docs/architecture/ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -571,108 +571,189 @@ The following are explicitly deferred to a future sprint — they are NOT part o
 | **Sub-goal replanning** | The agent cannot currently modify sub-goals mid-execution (e.g., "this sub-goal was wrong, we need a different approach"). V1 treats sub-goals as fixed once planned. Dynamic replanning requires: (a) the ability to insert/remove/reorder sub-goals in the outer list, (b) the adviser to detect when the current approach is futile, (c) a replanning trigger that pauses the inner loop and invokes `subgoal-breakdown` again scoped to the remaining work. | Sub-goal modification primitives (`update_goal`, `delete_goal`, `insert_goal`), replanning trigger detection, partial-plan resumption. |
 | **Cross-sub-goal learning** | Lessons learned in sub-goal 1 aren't automatically applied to sub-goal 2. V2 could: (a) append "lessons learned" to the cognitive_state after each sub-goal completes, (b) inject those lessons into the adviser context for subsequent sub-goals. This requires the learning subsystem (Y.8) or a simpler cross-sub-goal note-passing mechanism. | Cognitive_state enrichment with per-sub-goal post-mortems, adviser prompt injection of prior sub-goal lessons. |
 
-### Sprint 13 — Hardening & Resilience
+### Sprint 13 — Web Channel UI (PWA)
+
+**Goal:** Add a production web UI channel served by the gateway, making VAI accessible from any device with a browser — phone, tablet, or desktop. The UI is a Progressive Web App (PWA): installable to the home screen via a manifest, works offline for the UI shell via a service worker, and communicates with the gateway via the existing `POST /run` endpoint.
+
+**Architecture:** Channels graduate from single `.py` files to self-contained packages under `src/gateway/channels/`. The `web_simple` channel package contains both the adapter (pure logic, currently `web.py`) and a vanilla-JS PWA frontend. Later, `web_framework` can add a React/Vue SPA — same channel, fancier UI. Every channel — `cli`, `telegram`, `whatsapp`, `tui`, `native_app` — gets the same package treatment. The gateway stays thin: it imports and mounts what each channel package exports.
+
+```
+src/gateway/channels/
+├── web_simple/              ← THIS SPRINT
+│   ├── __init__.py
+│   ├── adapter.py           ← was web.py (pure logic, no change)
+│   └── ui/                  ← NEW: vanilla-JS PWA frontend
+│       ├── static/
+│       │   ├── app.js
+│       │   ├── style.css
+│       │   ├── manifest.json
+│       │   ├── sw.js
+│       │   └── icons/
+│       └── index.html
+├── web_framework/           ← future: React/Vue SPA
+├── web.py                   ← eventually absorbed into web_simple/adapter.py
+├── cli/                     ← future: cli.py → cli/adapter.py
+├── telegram/                ← future
+├── whatsapp/                ← future
+├── tui/                     ← future
+├── native_app/              ← future (Flutter/React Native protocol)
+├── ...
+└── registry.py              ← ChannelRegistry (unchanged)
+```
+
+```
+Phone browser ──HTTPS──▶ Gateway (:8000)
+                           ├── GET  /          → static/index.html (PWA shell)
+                           ├── GET  /static/*  → StaticFiles (CSS, JS, icons)
+                           ├── POST /run       → existing S5 pipeline
+                           └── GET  /jobs/{id} → existing job poller
+```
+
+| Task | What |
+|------|------|
+| 13.1 | **Create `src/gateway/channels/web_simple/` package** — Convert `web.py` → `web_simple/__init__.py` + `web_simple/adapter.py`. Re-export `register_web_channel` and `WebChannel` from `__init__.py` so existing imports (`from src.gateway.channels.web import ...`) don't break (add a re-export shim in `web.py`). Create `web_simple/ui/` directory with `static/` and `index.html`. |
+| 13.2 | **PWA manifest** — `web_simple/ui/static/manifest.json` with app name "VAI", icons (192×192 + 512×512), `display: standalone`, `theme_color` + `background_color`. |
+| 13.3 | **Service worker** — `web_simple/ui/static/sw.js` with cache-first strategy for static assets, network-first for API calls. Offline fallback page. |
+| 13.4 | **Chat UI HTML** — `web_simple/ui/index.html`: single-page chat interface with message list (scrollable, auto-scroll), input field with send button, loading indicator. Dark theme matching the CLI channel aesthetic. Message bubbles: user (right-aligned, accent color), assistant (left-aligned, dark). |
+| 13.5 | **Chat UI JavaScript** — `web_simple/ui/static/app.js`: vanilla JS (no framework) with: (a) submit message → `POST /run` with JSON `{"input": "..."}`, (b) poll `GET /jobs/{job_id}` for response, (c) render markdown-ish responses, (d) localStorage for chat history persistence, (e) Enter to send, Shift+Enter for newline. |
+| 13.6 | **Gateway route: `GET /`** — Mount the web channel UI in `app.py`. The `web_simple` package exports a `mount_ui(app: FastAPI)` function that mounts `StaticFiles` at `/static` and serves the PWA shell at `/`. The existing `POST /run` and `GET /jobs/{job_id}` routes are unchanged. |
+| 13.7 | **Mobile-responsive CSS** — `web_simple/ui/static/style.css`: flexbox/grid layout that works on 320px–4K screens. Full-height on mobile (no browser chrome when standalone). Safe area insets for notched phones. Touch-friendly input (min 44px tap targets). |
+| 13.8 | **Configuration** — `WebUIConfig` dataclass in `src/platform/runtime/config/runtime.py`: `enabled: bool = True`, `ui_dir: str = "src/gateway/channels/web_simple/ui"`. Gateway reads config and conditionally mounts the UI. |
+| 13.9 | **Integration test: end-to-end web channel** — Start gateway with UI mounted → GET `/` returns 200 + HTML → POST `/run` with a chat message → poll `/jobs/{id}` → response delivered. Verify PWA manifest is served with correct MIME type. Verify static assets are cached. |
+| 13.10 | **Integration test: CLI + web coexistence** — Start gateway (web channel) + CLI channel simultaneously → send message via web → send message via CLI → both return correct responses. Verify no cross-channel interference. |
+| 13.11 | **Documentation** — Update README with "Web Channel UI" section: screenshot, how to launch (`python -m src.platform.transport.app` or uvicorn), how to install as PWA on iOS/Android, architecture diagram showing browser → gateway → S5 flow. |
+
+#### Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **Vanilla JS, no framework** | Single-page chat UI doesn't need React/Vue/Svelte. Zero build step, zero node_modules, zero toolchain. The JS is ~300 lines. |
+| **PWA, not native app** | Instant deployment (just refresh the page), no app store, works on every device with a browser. "Add to Home Screen" gives native feel. |
+| **Polling `/jobs/{job_id}`, not SSE** | V1 uses the existing job poller — zero new infrastructure. SSE or WebSocket streaming is a V2 enhancement. Polling every 500ms is imperceptible for LLM response latency (typically 2–30s). |
+| **`src/gateway/channels/web_simple/`, not `src/platform/web/`** | Channels are self-contained packages — adapter + UI colocated. The gateway just imports and mounts. `web_framework` can sit alongside later as a sibling package. |
+| **Same origin, no CORS** | The UI is served BY the gateway, so it hits the gateway's own `/run` endpoint — no cross-origin requests, no CORS configuration needed. This is the simplest possible web architecture. |
+
+#### Guardrails
+
+| Risk | Mitigation |
+|------|-----------|
+| **Phone keyboard covers input** | `visualViewport` API to adjust layout when keyboard appears. `position: sticky` on input bar with bottom padding equal to keyboard height. |
+| **Chat history loss on refresh** | localStorage persistence — message array JSON-serialized. Restored on page load. "Clear history" button in settings. |
+| **Polling overwhelms server** | Client-side exponential backoff: start 500ms, max 5s, reset on new message. Server-side: `/jobs/{id}` is a lightweight state store lookup (no DB query). |
+| **Stale PWA cache** | Service worker uses "cache, then network, then update cache" strategy for static assets. Version hash in manifest triggers SW update. "New version available" toast. |
+| **CLI + web job isolation** | Each request gets a unique `correlation_id` via the existing S4 ingress pipeline. Job state is keyed by job_id — no cross-talk. |
+
+#### V2 Considerations (deferred)
+
+| Concern | What V2 Would Require |
+|---------|----------------------|
+| **Streaming responses** | SSE endpoint (`GET /stream/{job_id}`) that pushes partial LLM responses as they're generated. Requires token-level streaming from S1 through S4 to the gateway. The polling approach in V1 is sufficient for complete responses but doesn't show "typing" indicators. |
+| **Multi-session support** | Currently one chat session per browser. V2 could add session management (new chat, switch between chats, named sessions) with server-side persistence via the existing JobStore. |
+| **File upload / image support** | Drag-and-drop file upload with preview. The gateway would accept multipart form data, store files in a temp directory, and pass file paths in the S4 payload. The existing `POST /run` JSON contract would need to be extended or a new multipart endpoint added. |
+| **WebSocket upgrade** | Replace polling with a persistent WebSocket connection for bidirectional streaming. The `WebSocketChannel` logic already exists in `src/gateway/channels/ws.py` — it needs a FastAPI `WebSocket` route and the S4 pipeline to support WS as a first-class transport. |
+
+### Sprint 14 — Hardening & Resilience
 
 **Goal:** Production-grade resilience, health monitoring, and self-healing.
 
 | Task | What |
 |------|------|
-| 13.1 | Classify loop health — healthy, stalled, poisoned |
-| 13.2 | Detect stalled loops → auto-abort |
-| 13.3 | Auto-downgrade behaviour on failure |
-| 13.4 | Global watchdog for agent loops |
-| 13.5 | Auto-scaling hooks |
-| 13.6 | Panic reporting |
-| 13.7 | Recovery drills |
-| 13.8 | Document failure modes |
+| 14.1 | Classify loop health — healthy, stalled, poisoned |
+| 14.2 | Detect stalled loops → auto-abort |
+| 14.3 | Auto-downgrade behaviour on failure |
+| 14.4 | Global watchdog for agent loops |
+| 14.5 | Auto-scaling hooks |
+| 14.6 | Panic reporting |
+| 14.7 | Recovery drills |
+| 14.8 | Document failure modes |
 
-### Sprint 14 — Observability & DX
+### Sprint 15 — Observability & DX
 
 **Goal:** Structured logging, metrics, tracing, and developer tooling.
 
 | Task | What |
 |------|------|
-| 14.1 | Structured logging (correlation_id through every layer) |
-| 14.2 | Metrics exporter (workflow duration, failure rate, LLM latency) |
-| 14.3 | Tracing spans (per step, per workflow, per agent invocation) |
-| 14.4 | Flamegraph timings |
-| 14.5 | Local dev CLI improvements |
-| 14.6 | Replay tooling for debugging |
-| 14.7 | Config inspector |
-| 14.8 | Skill inspector |
-| 14.9 | Agent inspector |
-| 14.10 | End-to-end smoke tests |
+| 15.1 | Structured logging (correlation_id through every layer) |
+| 15.2 | Metrics exporter (workflow duration, failure rate, LLM latency) |
+| 15.3 | Tracing spans (per step, per workflow, per agent invocation) |
+| 15.4 | Flamegraph timings |
+| 15.5 | Local dev CLI improvements |
+| 15.6 | Replay tooling for debugging |
+| 15.7 | Config inspector |
+| 15.8 | Skill inspector |
+| 15.9 | Agent inspector |
+| 15.10 | End-to-end smoke tests |
 
-### Sprint 15 — Polish & Production Readiness
+### Sprint 16 — Polish & Production Readiness
 
 | Task | What |
 |------|------|
-| 15.1 | Security review of skills |
-| 15.2 | Security review of fetch stack |
-| 15.3 | LLM prompt hardening |
-| 15.4 | Config profiles — dev, prod, paranoid |
-| 15.5 | Backward-compatible APIs |
-| 15.6 | Performance tuning |
-| 15.7 | Load testing |
-| 15.8 | Graceful degradation strategy |
-| 15.9 | Disaster recovery story |
-| 15.10 | Architecture doc for future contributors |
+| 16.1 | Security review of skills |
+| 16.2 | Security review of fetch stack |
+| 16.3 | LLM prompt hardening |
+| 16.4 | Config profiles — dev, prod, paranoid |
+| 16.5 | Backward-compatible APIs |
+| 16.6 | Performance tuning |
+| 16.7 | Load testing |
+| 16.8 | Graceful degradation strategy |
+| 16.9 | Disaster recovery story |
+| 16.10 | Architecture doc for future contributors |
 
-### Sprint 16 — Local Custom Overlay (Personal Workspace Isolation)
+### Sprint 17 — Local Custom Overlay (Personal Workspace Isolation)
 
 *Keep the repo clean of opinionated/experimental/test content by adding gitignored "custom" subfolders across all configurable namespaces.*
 
 | Task | What |
 |------|------|
-| 16.1 | Add `custom/` subfolder to `config/workflows/`, `config/agents/`, and update loaders to scan both the standard dir and the `custom/` sibling |
-| 16.2 | Add `custom/` subfolder to `plugins/` (for MCP, skills, primitives, etc.) and update `PluginLoader` to scan both |
-| 16.3 | Add `custom/` to `.gitignore` so local experiments never pollute the repo |
-| 16.4 | Update boot sequence / `composition_root.py` to merge standard + custom artifacts with priority semantics (custom wins on conflict) |
-| 16.5 | Write a `docs/custom_workflows.md` guide explaining the overlay pattern for users who fork the repo |
+| 17.1 | Add `custom/` subfolder to `config/workflows/`, `config/agents/`, and update loaders to scan both the standard dir and the `custom/` sibling |
+| 17.2 | Add `custom/` subfolder to `plugins/` (for MCP, skills, primitives, etc.) and update `PluginLoader` to scan both |
+| 17.3 | Add `custom/` to `.gitignore` so local experiments never pollute the repo |
+| 17.4 | Update boot sequence / `composition_root.py` to merge standard + custom artifacts with priority semantics (custom wins on conflict) |
+| 17.5 | Write a `docs/custom_workflows.md` guide explaining the overlay pattern for users who fork the repo |
 
-### Sprint 17 — LLM Provider Abstraction
+### Sprint 18 — LLM Provider Abstraction
 
 *Each LLM provider has unique quirks — tool name sanitisation (dots→underscores), `tool_choice` defaults, schema handling (e.g. `required` field injection), token limits, streaming vs non-streaming. These are currently patched ad-hoc across the codebase. This sprint builds a proper abstraction layer.*
 
 | Task | What |
 |------|------|
-| 17.1 | Audit all provider-specific workarounds — search for `tool_choice`, `required` field hacks, name sanitisation, `stop_reason` handling, and any `if provider == "deepseek"`-style branching |
-| 17.2 | Design an `LLMProviderAdapter` interface — a thin shim that translates provider-native schemas into a canonical S1 contract. Each provider implements one adapter; S1 client talks only to the adapter |
-| 17.3 | Adapter — **OpenAI-compatible** (covers OpenAI, DeepSeek, Together, Groq, etc.) |
-| 17.4 | Adapter — **Anthropic** (handles `stop_reason` vs `finish_reason`, tool_use content blocks) |
-| 17.5 | Adapter — **Gemini** (handles `functionCall` content parts, different error schema) |
-| 17.6 | Adapter — **Mistral** (handles `tool_calls` format differences) |
-| 17.7 | Move provider-specific config (tool_choice default, name sanitisation rules) into per-provider adapter config, not the S1 client |
-| 17.8 | Write integration tests — each adapter with its real provider (or recorded fixture), covering: tool call with params, tool call with empty args, no-tool response, error propagation |
-| 17.9 | Regression test — full suite passes with all providers |
-| 17.10 | Document adapter architecture in `docs/architecture/provider_adapters.md` |
+| 18.1 | Audit all provider-specific workarounds — search for `tool_choice`, `required` field hacks, name sanitisation, `stop_reason` handling, and any `if provider == "deepseek"`-style branching |
+| 18.2 | Design an `LLMProviderAdapter` interface — a thin shim that translates provider-native schemas into a canonical S1 contract. Each provider implements one adapter; S1 client talks only to the adapter |
+| 18.3 | Adapter — **OpenAI-compatible** (covers OpenAI, DeepSeek, Together, Groq, etc.) |
+| 18.4 | Adapter — **Anthropic** (handles `stop_reason` vs `finish_reason`, tool_use content blocks) |
+| 18.5 | Adapter — **Gemini** (handles `functionCall` content parts, different error schema) |
+| 18.6 | Adapter — **Mistral** (handles `tool_calls` format differences) |
+| 18.7 | Move provider-specific config (tool_choice default, name sanitisation rules) into per-provider adapter config, not the S1 client |
+| 18.8 | Write integration tests — each adapter with its real provider (or recorded fixture), covering: tool call with params, tool call with empty args, no-tool response, error propagation |
+| 18.9 | Regression test — full suite passes with all providers |
+| 18.10 | Document adapter architecture in `docs/architecture/provider_adapters.md` |
 
-### Sprint 18 — Supervisor Refactor (Breakup)
+### Sprint 19 — Supervisor Refactor (Breakup)
 
 *`src/agent/supervisor.py` currently mixes 5+ concerns in a single 600+ line file: agent orchestration and routing, HITL confirmation state machine, hallucination guard, workflow invocation (`/invoke-workflow`), tool execution and follow-up (phase 2), and AgentState management. This sprint breaks each concern into its own module, leaving `supervisor.py` as a thin orchestrator. Separation of concerns makes testing easier — each module gets isolated tests — and reduces cognitive load when editing any single concern.*
 
 | Task | What |
 |------|------|
-| 18.1 | Extract **hallucination guard** to `src/agent/guards/hallucination_guard.py` — move `_ACTION_CLAIM_RE`, `_apply_hallucination_guard()` and any related regex helpers. Keep the `_AFFIRMATIVE_RE` in the HITL module (18.2) since it's about confirmation, not hallucination detection | ✅ |
-| 18.2 | Extract **HITL confirmation** to `src/agent/hitl_manager.py` — move `_AFFIRMATIVE_RE`, `_run_confirmed_skills()`, `_has_side_effect_tool_calls()`, `_format_hitl_prompt()`, and the `WAITING` state transitions. The HITL manager owns the lifecycle: pending → confirmed → execute → done | ✅ |
-| 18.3 | Extract **tool orchestrator** to `src/agent/tool_orchestrator.py` — move phase-1 tool execution loop, phase-2 follow-up LLM call (including the `tool_context` assembly), and primitive-result collection. The supervisor should just call `orchestrator.execute_tool_plan(tool_calls)` and get back `(reply, metadata_deltas)` | ✅ |
-| 18.4 | Extract **workflow invoker** to `src/agent/workflow_invoker.py` — move `_handle_invoke_workflow()` and any `/invoke-workflow` directive parsing. Returns structured workflow execution results that the supervisor inserts into the response | ✅ |
-| 18.5 | Slim `supervisor.py` to core orchestration: `_process_input()` → route → HITL check → tool orchestration → guard → workflow invocation. Each step delegates to the appropriate module. The state machine (`_ACTIVATED → _WAITING → _PROCESSING → _IDLE`) stays in the supervisor since it governs the overall flow | ✅ |
-| 18.6 | Write isolated unit tests for each extracted module — hallucination guard (known action phrases, `/invoke-workflow` exemptions, safe replies), HITL manager (affirmation regex matches, side-effect detection, state transitions), tool orchestrator (tool call execution, follow-up with/without tools, error propagation), workflow invoker (directive parsing, execution results) | ✅ |
-| 18.7 | Full integration test — CLI session covering: search → read → HITL confirm → delete → follow-up reply with tool call → hallucination guard on tool-less claim | ✅ |
+| 19.1 | Extract **hallucination guard** to `src/agent/guards/hallucination_guard.py` — move `_ACTION_CLAIM_RE`, `_apply_hallucination_guard()` and any related regex helpers. Keep the `_AFFIRMATIVE_RE` in the HITL module (19.2) since it's about confirmation, not hallucination detection | ✅ |
+| 19.2 | Extract **HITL confirmation** to `src/agent/hitl_manager.py` — move `_AFFIRMATIVE_RE`, `_run_confirmed_skills()`, `_has_side_effect_tool_calls()`, `_format_hitl_prompt()`, and the `WAITING` state transitions. The HITL manager owns the lifecycle: pending → confirmed → execute → done | ✅ |
+| 19.3 | Extract **tool orchestrator** to `src/agent/tool_orchestrator.py` — move phase-1 tool execution loop, phase-2 follow-up LLM call (including the `tool_context` assembly), and primitive-result collection. The supervisor should just call `orchestrator.execute_tool_plan(tool_calls)` and get back `(reply, metadata_deltas)` | ✅ |
+| 19.4 | Extract **workflow invoker** to `src/agent/workflow_invoker.py` — move `_handle_invoke_workflow()` and any `/invoke-workflow` directive parsing. Returns structured workflow execution results that the supervisor inserts into the response | ✅ |
+| 19.5 | Slim `supervisor.py` to core orchestration: `_process_input()` → route → HITL check → tool orchestration → guard → workflow invocation. Each step delegates to the appropriate module. The state machine (`_ACTIVATED → _WAITING → _PROCESSING → _IDLE`) stays in the supervisor since it governs the overall flow | ✅ |
+| 19.6 | Write isolated unit tests for each extracted module — hallucination guard (known action phrases, `/invoke-workflow` exemptions, safe replies), HITL manager (affirmation regex matches, side-effect detection, state transitions), tool orchestrator (tool call execution, follow-up with/without tools, error propagation), workflow invoker (directive parsing, execution results) | ✅ |
+| 19.7 | Full integration test — CLI session covering: search → read → HITL confirm → delete → follow-up reply with tool call → hallucination guard on tool-less claim | ✅ |
 
-### Sprint 19 — Conversation Quality & Prompt Engineering
+### Sprint 20 — Conversation Quality & Prompt Engineering
 
-*Sprint 18 fixes the supervisor's orchestration. Sprint 19 fixes what the LLM actually *says*. The biggest UX improvements will come from prompt quality, not routing code — system prompts that teach better error recovery, conversation history that doesn't drown the LLM in noise, and error handling that recovers gracefully instead of repeating the same non-answer.*
+*Sprint 19 fixes the supervisor's orchestration. Sprint 20 fixes what the LLM actually *says*. The biggest UX improvements will come from prompt quality, not routing code — system prompts that teach better error recovery, conversation history that doesn't drown the LLM in noise, and error handling that recovers gracefully instead of repeating the same non-answer.*
 
 | Task | What |
 |------|------|
-| 19.1 | **System prompt audit** — Review all agent personas in `config/agents/*.yaml`. Ensure each prompt explicitly teaches: (a) graceful error recovery ("if a tool 404s, tell the user and offer alternatives, don't keep retrying"), (b) tool selection guidance ("prefer search → read → act flow"), (c) when to ask clarifying questions vs. infer |
-| 19.2 | **Sliding-window conversation history** — Replace flat list in `SessionedAdapter` with a smarter strategy: keep full recent N turns, summarize older turns into a compressed memory slot. Prevents the LLM from losing track in long sessions |
-| 19.3 | **Error recovery prompt pattern** — When a tool call fails, inject structured guidance into the prompt (not just raw `[Primitive ... → {error}]`). E.g., "The tool failed. You may: (a) retry with modified params, (b) explain the issue and suggest alternatives, (c) ask the user what to do next." |
-| 19.4 | **Conversation-state anchoring** — After each side-effect tool call (delete, send, update), inject a plain-English summary into history so the LLM can recall what happened without parsing tool output. E.g., "Action taken: deleted email from Google (security alert)" |
-| 19.5 | **Regression test suite** — Record real CLI sessions (good and bad), replay them as regression tests. Ensure the fixes from Sprint 17 (this sprint) don't regress. Each test asserts: no annotation leakage, hallucination guard fires correctly, follow-up tools are available, error recovery is graceful |
-| 19.6 | **Field-testing & tuning** — Run 10+ real conversation flows through the CLI: search → read → reply (with HITL), search → delete (with HITL), multi-turn with agent switching, error cases (bad search, already-deleted message). Tune prompts based on observed failures. Document findings in `docs/operations/conversation_quality.md` |
+| 20.1 | **System prompt audit** — Review all agent personas in `config/agents/*.yaml`. Ensure each prompt explicitly teaches: (a) graceful error recovery ("if a tool 404s, tell the user and offer alternatives, don't keep retrying"), (b) tool selection guidance ("prefer search → read → act flow"), (c) when to ask clarifying questions vs. infer |
+| 20.2 | **Sliding-window conversation history** — Replace flat list in `SessionedAdapter` with a smarter strategy: keep full recent N turns, summarize older turns into a compressed memory slot. Prevents the LLM from losing track in long sessions |
+| 20.3 | **Error recovery prompt pattern** — When a tool call fails, inject structured guidance into the prompt (not just raw `[Primitive ... → {error}]`). E.g., "The tool failed. You may: (a) retry with modified params, (b) explain the issue and suggest alternatives, (c) ask the user what to do next." |
+| 20.4 | **Conversation-state anchoring** — After each side-effect tool call (delete, send, update), inject a plain-English summary into history so the LLM can recall what happened without parsing tool output. E.g., "Action taken: deleted email from Google (security alert)" |
+| 20.5 | **Regression test suite** — Record real CLI sessions (good and bad), replay them as regression tests. Ensure the fixes from Sprint 17 (this sprint) don't regress. Each test asserts: no annotation leakage, hallucination guard fires correctly, follow-up tools are available, error recovery is graceful |
+| 20.6 | **Field-testing & tuning** — Run 10+ real conversation flows through the CLI: search → read → reply (with HITL), search → delete (with HITL), multi-turn with agent switching, error cases (bad search, already-deleted message). Tune prompts based on observed failures. Document findings in `docs/operations/conversation_quality.md` |
 
 ---
 
@@ -873,6 +954,7 @@ Learning Subsystem (async observer)
 | 6 | 11–12 | Durable Execution + Real Skills |
 | 6a | 12a | SQL Structured Data Skill (Flat Todo-List Planner) |
 | 6b | 12b | Sub-Goal Planner (Two-Level Planning) |
-| 7 | 13 | Resilience & Self-Healing |
-| 8 | 14 | Observability & DX |
-| 9 | 15 | Polish & Production Readiness |
+| 7 | 13 | Web Channel UI (PWA) — phone/tablet/desktop |
+| 8 | 14 | Resilience & Self-Healing |
+| 9 | 15 | Observability & DX |
+| 10 | 16 | Polish & Production Readiness |

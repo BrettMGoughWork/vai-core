@@ -163,6 +163,60 @@ The platform layer (S4) provides durable execution:
 
 ---
 
+## Web Channel UI (PWA)
+
+The gateway ships with a **Progressive Web App (PWA)** frontend served at `/`. It provides a mobile-friendly chat interface that talks directly to the gateway's own API endpoints — zero CORS, zero external dependencies.
+
+### Access
+
+Start the gateway and open `http://localhost:8000/` in a browser:
+
+```bash
+python -m src.platform.transport.app
+```
+
+### Features
+
+| Feature | Details |
+|---------|---------|
+| **Chat interface** | Send prompts via `POST /run`, poll results via `GET /jobs/{id}` with exponential backoff |
+| **PWA** | Installable on mobile/home screen via `manifest.json` — `display: standalone`, themed with `#0d1117` |
+| **Offline-ready** | Service worker caches static assets (cache-first) and API calls (network-first) with a 503 fallback |
+| **Markdown rendering** | Code blocks, inline code, bold, links — rendered client-side with XSS-safe escaping |
+| **Chat persistence** | Conversation history stored in `localStorage`, survives page reloads |
+| **Mobile-first** | `visualViewport` keyboard-aware layout, safe area insets, responsive breakpoints down to 320px |
+| **Dark theme** | CSS-variable-driven dark theme, consistent with the terminal aesthetic |
+
+### Architecture
+
+```
+Browser (PWA)
+    │
+    ├── GET  /                   → index.html (the chat shell)
+    ├── GET  /static/*           → StaticFiles (JS, CSS, icons, manifest, service worker)
+    ├── POST /run                → Gateway → S5 Supervisor → response
+    └── GET  /jobs/{job_id}      → Poll agent state
+```
+
+The UI and the API are served from the **same origin** by the same FastAPI process. The web channel adapter handles normalization, and `mount_ui()` mounts the static assets — no separate frontend build step required.
+
+### Configuration
+
+```python
+from src.platform.runtime.config.runtime import WebUIConfig
+
+WebUIConfig(
+    enabled=True,        # Serve the web UI at / and /static
+    ui_dir="",           # Custom UI directory (empty = use bundled UI)
+)
+```
+
+### Package location
+
+`src/gateway/channels/web_simple/` — a self-contained channel package colocating the web adapter logic with its PWA frontend assets. `src/gateway/channels/web.py` remains as a backward-compatible re-export shim.
+
+---
+
 ## Documentation
 
 - [Architecture](docs/architecture/ARCHITECTURE.md) — strata, boundaries, data flow
