@@ -14,7 +14,7 @@ from typing import Dict, List
 
 from src.capabilities.discovery.providers import get_embedding_provider
 from src.capabilities.discovery.providers.base import EmbeddingProvider
-from src.strategy.state.config import EmbeddingConfig
+from src.domain.types.config import EmbeddingConfig
 
 
 class SkillEmbedder:

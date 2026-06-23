@@ -1,4 +1,13 @@
-"""Find dead modules under src/strategy/ — modules NOT imported from outside src/strategy/."""
+"""Find dead modules under src/strategy/ — modules NOT imported from outside src/strategy/.
+
+Architecture: S2 (strategy) is isolated.  Only these touchpoints are allowed to import
+from it; imports from anywhere else are stratum violations and do NOT count as liveness
+evidence:
+  - src/agent/              (S5 → S2 bridge)
+  - src/platform/executors/ (S4 → S2 executor bridge)
+  - src/runtime/llm/        (S1 → S2 s1_contract bridge)
+  - tests/                  (tests may import anything)
+"""
 import ast
 from pathlib import Path
 from collections import defaultdict
@@ -39,9 +48,25 @@ def main():
         mod = "src." + py_to_module(py, repo / "src")
         strategy_modules.add(mod)
 
-    # 2. Walk ALL .py files outside src/strategy/ for strategy imports
+    # 2. Walk ALL .py files outside src/strategy/ for strategy imports.
+    #    Only count imports from ALLOWED touchpoints; everything else is a stratum
+    #    violation (e.g. src/capabilities/ importing strategy types) and must NOT
+    #    keep strategy modules alive.
+    import sys
+    include_tests = "--include-tests" in sys.argv
+
+    ALLOWED_IMPORTER_DIRS = [
+        "src/agent/",
+        "src/platform/executors/",
+        "src/runtime/llm/",
+    ]
+    if include_tests:
+        ALLOWED_IMPORTER_DIRS.append("tests/")
+    ALLOWED_IMPORTER_DIRS = tuple(ALLOWED_IMPORTER_DIRS)
+
     external_imports: dict[str, set[str]] = defaultdict(set)  # module -> importers
     directly_live: set[str] = set()
+    ignored_importers: dict[str, set[str]] = defaultdict(set)  # violation -> strategy modules
 
     for py in sorted(repo.rglob("*.py")):
         if ".venv" in py.parts:
@@ -51,6 +76,12 @@ def main():
         # Skip files inside src/strategy/
         if importer.startswith("src.strategy."):
             continue
+
+        # Only count imports from allowed touchpoints (stratum-bridge files).
+        # Use path-based matching because the importer module name may not map
+        # neatly to the allowed dirs (e.g. standalone scripts, __init__ quirks).
+        rel_path = py.relative_to(repo).as_posix()
+        allowed = any(rel_path.startswith(d) for d in ALLOWED_IMPORTER_DIRS)
 
         try:
             text = py.read_text(encoding="utf-8")
@@ -74,12 +105,18 @@ def main():
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name in strategy_modules:
-                        directly_live.add(alias.name)
-                        external_imports[alias.name].add(importer)
+                        if allowed:
+                            directly_live.add(alias.name)
+                            external_imports[alias.name].add(importer)
+                        else:
+                            ignored_importers[importer].add(alias.name)
             elif isinstance(node, ast.ImportFrom):
                 if node.module and node.module in strategy_modules:
-                    directly_live.add(node.module)
-                    external_imports[node.module].add(importer)
+                    if allowed:
+                        directly_live.add(node.module)
+                        external_imports[node.module].add(importer)
+                    else:
+                        ignored_importers[importer].add(node.module)
 
     # 3. Build intra-strategy import graph: importer -> imported strategy modules
     intra_deps: dict[str, set[str]] = defaultdict(set)  # importer -> modules it imports from strategy
@@ -128,12 +165,13 @@ def main():
 
     # 5. Report
     print("=" * 70)
-    print(f"  src/strategy/ dead-code analysis")
+    print(f"  src/strategy/ dead-code analysis  (architecture-filtered)")
+    print(f"  Allowed importers: {', '.join(ALLOWED_IMPORTER_DIRS)}")
     print(f"  {len(strategy_modules)} total modules")
     print(f"  {len(alive)} live  |  {len(dead)} dead")
     print("=" * 70)
 
-    print("\n=== LIVE (directly or transitively imported from outside) ===\n")
+    print("\n=== LIVE (directly or transitively imported from ALLOWED sources) ===\n")
     for m in sorted(alive):
         ext = external_imports.get(m, set())
         marker = "(direct external)" if m in directly_live else "(transitive)"
@@ -146,14 +184,29 @@ def main():
     for m in sorted(dead):
         print(f"  {m}")
 
+    print(f"\n=== IGNORED IMPORTERS (stratum violations, not counted as liveness) ===\n")
+    for importer in sorted(ignored_importers):
+        mods = sorted(ignored_importers[importer])
+        short = ", ".join(m.removeprefix("src.strategy.") for m in mods[:4])
+        if len(mods) > 4:
+            short += f", ... (+{len(mods) - 4} more)"
+        print(f"  {importer}  ->  {short}")
+
     # 6. Write list files
     (repo / "tools" / "scripts").mkdir(parents=True, exist_ok=True)
     live_path = repo / "tools" / "scripts" / "strategy_live.txt"
     dead_path = repo / "tools" / "scripts" / "strategy_dead.txt"
+    ignored_path = repo / "tools" / "scripts" / "strategy_ignored_importers.txt"
     live_path.write_text("\n".join(sorted(alive)))
     dead_path.write_text("\n".join(sorted(dead)))
+    ignored_lines = []
+    for importer in sorted(ignored_importers):
+        for mod in sorted(ignored_importers[importer]):
+            ignored_lines.append(f"{importer}  ->  {mod}")
+    ignored_path.write_text("\n".join(ignored_lines))
     print(f"\nWrote {live_path}")
     print(f"Wrote {dead_path}")
+    print(f"Wrote {ignored_path}")
 
 
 if __name__ == "__main__":
