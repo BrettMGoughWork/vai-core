@@ -20,15 +20,15 @@ from typing import Any
 
 import pytest
 
-from src.strategy.memory.drift_memory import DriftMemory
-from src.strategy.memory.drift_memory_types import DriftEvent
-from src.strategy.memory.governance.governance_errors import MemoryGovernanceError
-from src.strategy.memory.governance.memory_governance import MemoryGovernance
-from src.strategy.memory.plan_memory import PlanMemory
-from src.strategy.memory.segment_memory import SegmentMemory
-from src.strategy.memory.subgoal_memory import SubgoalMemory
-from src.strategy.types.plan_segment import PlanSegment
-from src.strategy.types.subgoal import Subgoal, SubgoalLifecycleState
+from src.agent.memory.drift_memory import DriftMemory
+from src.agent.memory.drift_memory_types import DriftEvent
+from src.agent.memory.governance.governance_errors import MemoryGovernanceError
+from src.agent.memory.governance.memory_governance import MemoryGovernance
+from src.agent.memory.plan_memory import PlanMemory
+from src.agent.memory.segment_memory import SegmentMemory
+from src.agent.memory.subgoal_memory import SubgoalMemory
+from src.agent.memory.types.plan_segment import PlanSegment
+from src.agent.memory.types.subgoal import Subgoal, SubgoalLifecycleState
 
 
 # ======================================================================

@@ -72,22 +72,30 @@ SCHEMA: Dict[str, Any] = {
             },
         },
     },
+    "auth": {
+        "type": dict,
+        "fields": {
+            "enabled": {"type": bool, "default": False},
+            "token": {"type": str, "default": ""},
+        },
+    },
+    "rate_limit": {
+        "type": dict,
+        "fields": {
+            "enabled": {"type": bool, "default": False},
+            "maxrequestsper_minute": {"type": int, "default": 60},
+        },
+    },
 }
 
 ENV_PREFIX = "S4"
 
 # Pre‑computed env‑var → (section, field) mapping
 _ENV_MAP: Dict[str, Tuple[str, str]] = {}
-for _section, _section_def in SCHEMA["fields"].items() if "fields" in SCHEMA else SCHEMA.items():
-    # SCHEMA is a flat top‑level dict of sections, each with "fields"
-    pass
-
-# Actually build the env map properly:
-_ENV_MAP = {}
 for _sec_name, _sec_def in SCHEMA.items():
     _fields = _sec_def.get("fields", {})
     for _field_name in _fields:
-        _env_key = f"{ENV_PREFIX}{_sec_name.upper()}{_field_name.upper()}"
+        _env_key = f"{ENV_PREFIX}{_sec_name.upper().replace('_', '')}{_field_name.upper()}"
         _ENV_MAP[_env_key] = (_sec_name, _field_name)
 
 
@@ -106,6 +114,9 @@ class UnknownKeyError(ConfigError):
 
 class ValidationError(ConfigError):
     """Raised when a configuration value fails validation."""
+
+
+ConfigValidationError = ValidationError  # Backward-compat alias from src.platform.config
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +368,9 @@ class Config:
 
     def __repr__(self) -> str:
         return f"Config({self._data!r})"
+
+
+S4Config = Config  # Backward-compat alias from src.platform.config
 
 
 def _deep_freeze(value: Any) -> Any:

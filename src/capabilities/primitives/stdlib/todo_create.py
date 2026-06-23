@@ -8,7 +8,7 @@ import sqlite3
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 from src.capabilities.planner.todo_store import TodoStore
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
 
 
 @deadcode_ignore(reason="Dynamically registered primitive, used on demand by LLM/planner")

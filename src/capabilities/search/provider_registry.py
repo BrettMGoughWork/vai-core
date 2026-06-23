@@ -15,7 +15,7 @@ from typing import Type
 from src.capabilities.search.providers._base import SearchProvider
 from src.capabilities.search.providers.duckduckgo import DuckDuckGoProvider
 from src.capabilities.search.providers.tavily import TavilyProvider
-from src.strategy.state.config import SearchConfig, ProviderConfig
+from src.domain.types.config import SearchConfig, ProviderConfig
 
 
 class RegistryError(Exception):

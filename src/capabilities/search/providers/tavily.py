@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 from src.capabilities.search.providers._base import SearchProviderError, SearchResult
-from src.strategy.state.config import ProviderConfig
+from src.domain.types.config import ProviderConfig
 
 
 class TavilyProvider:

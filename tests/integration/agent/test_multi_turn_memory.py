@@ -39,11 +39,11 @@ from src.gateway.channels.registry import ChannelRegistry
 from src.gateway.channels.cli import register_cli_channel
 from src.gateway.entrypoint import submit_channel_input
 from src.runtime.interfaces import PromptRequest, PromptResponse
-from src.strategy.memory.drift_memory import DriftMemory
-from src.strategy.memory.governance.memory_governance import MemoryGovernance
-from src.strategy.memory.plan_memory import PlanMemory
-from src.strategy.memory.segment_memory import SegmentMemory
-from src.strategy.memory.subgoal_memory import SubgoalMemory
+from src.agent.memory.drift_memory import DriftMemory
+from src.agent.memory.governance.memory_governance import MemoryGovernance
+from src.agent.memory.plan_memory import PlanMemory
+from src.agent.memory.segment_memory import SegmentMemory
+from src.agent.memory.subgoal_memory import SubgoalMemory
 
 
 # ══════════════════════════════════════════════════════════════════════════════

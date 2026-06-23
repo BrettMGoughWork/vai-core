@@ -65,7 +65,7 @@ class ProcPsPrimitive(PrimitiveBase):
                         processes.append({"pid": parts[-1].strip(), "name": parts[-2].strip()})
             else:
                 import subprocess
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
                 result = subprocess.run(
                     ["ps", "-eo", "pid,comm,args", "--no-headers"],
                     capture_output=True, text=True, timeout=10,

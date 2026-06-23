@@ -37,7 +37,7 @@ def add_deadcode_ignore(filepath: Path) -> bool:
             modified = True
 
     if not has_import and modified:
-        import_stmt = 'from src.strategy.types.validation import deadcode_ignore\n'
+        import_stmt = 'from src.domain._markers import deadcode_ignore\n'
         # Find the last import statement position
         insert_pos = 0
         for i, line in enumerate(lines):

@@ -1,4 +1,4 @@
-"""Update all deadcode_ignore imports from src.strategy.types.validation to src.runtime._markers."""
+"""Update all deadcode_ignore imports from src.strategy.types.validation to src.domain._markers."""
 
 import ast
 import re
@@ -17,10 +17,8 @@ OBSOLETE_NAMES = {"deadcode_ignore"}
 
 def _import_contains(names_str: str) -> bool:
     """Check if the import names include any of the obsolete names."""
-    # Parse just the names part
     for name_part in names_str.split(","):
         name_part = name_part.strip()
-        # Handle 'as' aliases
         base = name_part.split(" as ")[0].strip()
         if base in OBSOLETE_NAMES:
             return True
@@ -35,7 +33,7 @@ def _strip_names(names_str: str, names_to_remove: set[str]) -> str | None:
         name_part = name_part.strip()
         base = (name_part.split(" as ")[0]).strip()
         if base in names_to_remove:
-            continue  # skip this name
+            continue
         all_removed = False
         remaining.append(name_part)
     if all_removed:
@@ -56,12 +54,9 @@ def update_file(path: Path) -> bool:
         if m:
             names_str = m.group(1)
             if _import_contains(names_str):
-                # Remove deadcode_ignore from this import
                 new_names = _strip_names(names_str, OBSOLETE_NAMES)
                 if new_names is None:
-                    # All names removed — skip this line entirely
                     continue
-                # Replace with remaining names
                 indent = line[: len(line) - len(line.lstrip())]
                 new_lines.append(f"{indent}from src.strategy.types.validation import {new_names}\n")
                 need_new_import = True
@@ -71,15 +66,13 @@ def update_file(path: Path) -> bool:
             new_lines.append(line)
 
     if need_new_import:
-        # Add the new import line right after the import block
         insert_pos = 0
         for i, line in enumerate(new_lines):
             if line.strip().startswith("from ") or line.strip().startswith("import "):
                 insert_pos = i + 1
             elif line.strip() and not line.strip().startswith("#"):
                 break
-        # Insert after last import
-        new_lines.insert(insert_pos, "from src.runtime._markers import deadcode_ignore\n")
+        new_lines.insert(insert_pos, "from src.domain._markers import deadcode_ignore\n")
 
     result = "".join(new_lines)
     if result != original:

@@ -11,7 +11,7 @@ import signal
 import sys
 from typing import Optional
 
-from src.platform.config.config_system import S4Config, load_config
+from src.config import S4Config, load_config
 from src.platform.runtime.worker_entrypoint import run_worker_pool
 
 

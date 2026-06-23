@@ -17,7 +17,7 @@ from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
 _playwright_available: bool
 try:
     from playwright.sync_api import (
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
         Error as PwError,
         TimeoutError as PwTimeoutError,
         sync_playwright,

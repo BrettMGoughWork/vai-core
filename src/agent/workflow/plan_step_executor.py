@@ -15,9 +15,9 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from src.agent.interfaces.s3_executor import S3SkillExecutor
-from src.strategy.planning.models.plan import Plan
-from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
-from src.strategy.types.step_result import StepResult
+from src.agent.types.plan import Plan
+from src.agent.types.cognitive_step_outcome import CognitiveStepOutcome
+from src.agent.types.step_result import StepResult
 
 
 class PlanStepExecutor:

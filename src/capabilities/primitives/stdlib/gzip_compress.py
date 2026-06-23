@@ -98,7 +98,7 @@ class GzipCompressPrimitive(PrimitiveBase):
                     )
                 else:
                     import base64
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
                     return PrimitiveResult(
                         status="success",
                         data={

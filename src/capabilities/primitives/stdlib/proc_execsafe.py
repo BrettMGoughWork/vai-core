@@ -118,7 +118,7 @@ class ProcExecSafePrimitive(PrimitiveBase):
 
         # Delegate to proc.exec (which expects 'cmd', not 'command')
         from src.capabilities.primitives.stdlib.proc_exec import ProcExecPrimitive
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
         exec_primitive = ProcExecPrimitive()
         # proc.exec only uses 'cmd' and 'timeout'; cwd is not supported by proc.exec
         exec_args: dict[str, Any] = {"cmd": command if isinstance(command, str) else subprocess.list2cmdline(command)}

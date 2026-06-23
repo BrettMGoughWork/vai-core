@@ -24,11 +24,11 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from src.strategy.planning.s1_contract import s1_real_client
-from src.strategy.planning.s1_contract.types import PromptRequest
+from src.runtime.llm import s1_real_client
+from src.domain.interfaces.contract import PromptRequest
 from src.runtime.llm.client import call_s1_backend
-from src.strategy.planning.s1_contract.s1_prompt_builder import build_llm_prompt
-from src.strategy.planning.s1_contract.s1_response_validator import validate_llm_response
+from src.runtime.llm.s1_prompt_builder import build_llm_prompt
+from src.runtime.llm.s1_response_validator import validate_llm_response
 
 
 def test_llm_prompt_response_minimal():

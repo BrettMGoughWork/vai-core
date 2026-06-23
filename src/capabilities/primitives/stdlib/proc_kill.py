@@ -62,7 +62,7 @@ class ProcKillPrimitive(PrimitiveBase):
             if sys.platform == "win32":
                 # On Windows, use TerminateProcess via ctypes
                 import ctypes
-from src.strategy.types.validation import deadcode_ignore
+from src.domain._markers import deadcode_ignore
                 kernel32 = ctypes.windll.kernel32
                 handle = kernel32.OpenProcess(1, False, pid)  # PROCESS_TERMINATE
                 if not handle:

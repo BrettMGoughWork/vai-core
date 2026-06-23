@@ -20,14 +20,16 @@ from __future__ import annotations
 
 # ── LLM Backend Contract (S1 contract, owned by Runtime) ──────────────────
 
-from src.runtime.interfaces.contract import (
+from src.domain.interfaces.contract import (
     PromptRequest as PromptRequest,
     PromptResponse as PromptResponse,
     ToolCallRequest as ToolCallRequest,
     ToolCallResult as ToolCallResult,
     S1Error as S1Error,
-    LLMBackendError as LLMBackendError,
 )
+
+LLMBackendError = S1Error
+"""Runtime alias — S1Error is the canonical LLM-backend error type."""
 
 
 # ── Safe Failure ──────────────────────────────────────────────────────────

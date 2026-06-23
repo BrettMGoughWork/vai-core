@@ -171,8 +171,7 @@ STRATUM_RULES: list[tuple[str, str]] = [
     ("strategy\\state\\config", "domain"),
     ("strategy/state", "infrastructure"),       # strategy/state/* (except config — matched above)
     ("strategy\\state", "infrastructure"),
-    # Governance & platform services
-    ("governance", "infrastructure"),
+    # Platform services
     ("platform/transport", "infrastructure"),
     ("platform\\transport", "infrastructure"),
     ("platform/telemetry", "infrastructure"),
