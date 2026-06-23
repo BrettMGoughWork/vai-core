@@ -17,8 +17,8 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Union
 
-from src.strategy.planning.s1_contract.types import PromptResponse, S1Error
-from src.strategy.planning.s1_contract.validators import validate_prompt_response
+from src.domain.interfaces.contract import PromptResponse, S1Error
+from src.runtime.llm.s1_validators import validate_prompt_response
 
 
 # ──────────────────────────────────────────────────────────────────────────────

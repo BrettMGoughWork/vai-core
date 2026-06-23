@@ -20,8 +20,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List
 
-from src.strategy.planning.s1_contract.types import PromptRequest, PromptResponse
-from src.strategy.planning.s1_contract.s1_simulation_fixtures import (
+from src.domain.interfaces.contract import PromptRequest, PromptResponse
+from src.runtime.llm.s1_simulation_fixtures import (
     DEFAULT_DRIFT_OUTPUT,
     DEFAULT_REPAIR_OUTPUT,
     DEFAULT_REFLECTION_OUTPUT,

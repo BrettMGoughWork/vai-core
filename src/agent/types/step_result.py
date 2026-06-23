@@ -2,9 +2,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict
 
-from src.strategy.types.cognitive_step_outcome import CognitiveStepOutcome
-from src.strategy.planning.safety.purity_validation import validate_pure_structure
-from src.strategy.types.errors import ValidationError
+from src.agent.types.cognitive_step_outcome import CognitiveStepOutcome
+from src.agent.types.purity_validation import validate_pure_structure
+from src.agent.types.errors import ValidationError
 from src.agent.memory.types.hashing import stable_hash
 
 

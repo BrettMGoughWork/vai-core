@@ -18,8 +18,8 @@ from typing import Optional
 
 import yaml
 
-from src.strategy.planning.s1_contract.s1_prompt_builder import build_llm_prompt
-from src.strategy.planning.s1_contract.types import PromptRequest
+from src.runtime.llm.s1_prompt_builder import build_llm_prompt
+from src.domain.interfaces.contract import PromptRequest
 
 
 # ══════════════════════════════════════════════════════════════════════════════

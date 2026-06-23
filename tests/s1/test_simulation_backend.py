@@ -18,8 +18,8 @@ import json
 
 import pytest
 
-from src.strategy.planning.s1_contract.types import PromptRequest, PromptResponse, S1Error
-from src.strategy.planning.s1_contract.s1_simulation_backend import (
+from src.domain.interfaces.contract import PromptRequest, PromptResponse, S1Error
+from src.runtime.llm.s1_simulation_backend import (
     simulate_prompt_response,
     _detect_missing_fields,
     _detect_malformed_shapes,
@@ -28,7 +28,7 @@ from src.strategy.planning.s1_contract.s1_simulation_backend import (
     _compute_plan_shaping,
 )
 from src.runtime.llm.client import call_s1_backend
-from src.strategy.planning.s1_contract.validators import (
+from src.runtime.llm.s1_validators import (
     validate_prompt_response,
     validate_prompt_response_detailed,
 )

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from src.strategy.planning.s1_contract.types import (
+from src.domain.interfaces.contract import (
     PromptRequest,
     PromptResponse,
     ToolCallRequest,

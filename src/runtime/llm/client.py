@@ -25,10 +25,10 @@ import re
 import sys
 from typing import Optional, Union
 
-from src.strategy.planning.s1_contract.types import PromptRequest, PromptResponse, S1Error
-from src.strategy.planning.s1_contract.s1_simulation_backend import simulate_prompt_response
-from src.strategy.planning.s1_contract.s1_response_validator import validate_llm_response
-from src.strategy.planning.s1_contract.s1_simulation_fixtures import (
+from src.domain.interfaces.contract import PromptRequest, PromptResponse, S1Error
+from src.runtime.llm.s1_simulation_backend import simulate_prompt_response
+from src.runtime.llm.s1_response_validator import validate_llm_response
+from src.runtime.llm.s1_simulation_fixtures import (
     DEFAULT_DRIFT_OUTPUT,
     DEFAULT_REPAIR_OUTPUT,
     DEFAULT_REFLECTION_OUTPUT,
@@ -421,7 +421,7 @@ def call_s1_backend(
     # ── real_llm path ────────────────────────────────────────────────────
 
     # 1. Kill‑switch — check before any network call
-    from src.strategy.planning.s1_contract.s1_real_client import ENABLE_REAL_LLM
+    from src.runtime.llm.s1_real_client import ENABLE_REAL_LLM
 
     if not ENABLE_REAL_LLM:
         return S1Error(
@@ -435,7 +435,7 @@ def call_s1_backend(
 
     # 2. Call the real LLM (may raise S1RealLLMError)
     try:
-        from src.strategy.planning.s1_contract.s1_real_client import call_llm
+        from src.runtime.llm.s1_real_client import call_llm
         raw_text = call_llm(request)
     except Exception as exc:
         return S1Error(

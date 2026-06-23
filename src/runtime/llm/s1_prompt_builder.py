@@ -21,7 +21,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List
 
-from src.strategy.planning.s1_contract.types import PromptRequest
+from src.domain.interfaces.contract import PromptRequest
 
 
 # ──────────────────────────────────────────────────────────────────────────────

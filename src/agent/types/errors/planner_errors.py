@@ -38,7 +38,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from src.strategy.types.errors.AgentError import AgentError
+from src.agent.types.errors.AgentError import AgentError
 
 
 # ---------------------------------------------------------------------------
