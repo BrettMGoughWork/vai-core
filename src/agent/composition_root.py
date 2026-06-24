@@ -244,17 +244,70 @@ from src.agent.memory.subgoal_memory import SubgoalMemory
 from src.agent.memory.plan_memory import PlanMemory
 from src.agent.memory.drift_memory import DriftMemory
 from src.agent.memory.governance.memory_governance import MemoryGovernance
+from src.agent.memory.compaction import CompactionConfig, CompactionOrchestrator
 
 _segment_memory = SegmentMemory()
 _subgoal_memory = SubgoalMemory()
 _plan_memory = PlanMemory()
 _drift_memory = DriftMemory()
+
+# ── EvictionOrchestrator ──────────────────────────────────────────────
+from src.agent.memory.eviction.eviction_orchestrator import EvictionOrchestrator
+
+_eviction_orchestrator = EvictionOrchestrator(
+    segment_memory=_segment_memory,
+    subgoal_memory=_subgoal_memory,
+    plan_memory=_plan_memory,
+    drift_memory=_drift_memory,
+)
+
+
+def _wire_eviction_orchestrator() -> None:
+    """Late-bind eviction orchestrator into client.py and MemoryGovernance.
+
+    Called after MemoryGovernance is constructed so we can inject the
+    eviction orchestrator into both.
+    """
+    from src.runtime.llm.client import set_eviction_orchestrator
+    set_eviction_orchestrator(_eviction_orchestrator)
+
+
+# ── CompactionOrchestrator ─────────────────────────────────────────────
+_compaction_config = CompactionConfig()
+try:
+    import yaml as _comp_yaml
+    _comp_path = Path("config/config.yaml")
+    if _comp_path.exists():
+        with open(_comp_path, "r") as _f:
+            _comp_raw = _comp_yaml.safe_load(_f) or {}
+        _compaction_cfg_raw = _comp_raw.get("compaction", {})
+        if _compaction_cfg_raw:
+            _compaction_config = CompactionConfig.from_dict(_compaction_cfg_raw)
+except Exception:
+    pass  # compaction config is optional — defaults are safe
+
+_llm_complete = getattr(_llm_transport, "complete", None) if _llm_transport else None
+_compaction_orchestrator = CompactionOrchestrator(
+    llm_complete=_llm_complete,
+    config=_compaction_config,
+    subgoal_memory=_subgoal_memory,
+) if _llm_complete else None
+
+if _compaction_orchestrator is not None:
+    from src.runtime.llm.client import set_compaction_orchestrator
+    set_compaction_orchestrator(_compaction_orchestrator)
+
 _shared_governance = MemoryGovernance(
     subgoal_memory=_subgoal_memory,
     segment_memory=_segment_memory,
     plan_memory=_plan_memory,
     drift_memory=_drift_memory,
+    eviction_orchestrator=_eviction_orchestrator,
+    compaction_orchestrator=_compaction_orchestrator,
 )
+
+# Late-bind eviction orchestrator into client.py (avoids circular imports)
+_wire_eviction_orchestrator()
 
 
 # ── Wired StrategyRouter → Supervisor ───────────────────────────────

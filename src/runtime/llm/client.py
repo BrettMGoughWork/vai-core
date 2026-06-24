@@ -28,6 +28,7 @@ from typing import Optional, Union
 from src.domain.interfaces.contract import PromptRequest, PromptResponse, S1Error
 from src.runtime.llm.s1_simulation_backend import simulate_prompt_response
 from src.runtime.llm.s1_response_validator import validate_llm_response
+from src.runtime.llm.token_counter import count_tokens_in_messages, count_tokens_in_tools, get_context_limit
 from src.runtime.llm.s1_simulation_fixtures import (
     DEFAULT_DRIFT_OUTPUT,
     DEFAULT_REPAIR_OUTPUT,
@@ -113,6 +114,33 @@ def set_llm_transport(transport: object | None) -> None:
     """Inject an S1 LLM transport from the composition root (S5)."""
     global _llm_transport
     _llm_transport = transport
+
+
+# ── DI slot: CompactionOrchestrator (set by the composition root) ─────
+# Avoids circular imports — agent/ imports client.py, so client.py cannot
+# import agent/.
+
+_compaction_orchestrator: object | None = None
+"""Module-level DI slot for the CompactionOrchestrator."""
+
+
+def set_compaction_orchestrator(orchestrator: object | None) -> None:
+    """Inject the CompactionOrchestrator from the composition root."""
+    global _compaction_orchestrator
+    _compaction_orchestrator = orchestrator
+
+
+# ── DI slot: EvictionOrchestrator (set by the composition root) ────────
+# Same pattern as CompactionOrchestrator above — avoids circular imports.
+
+_eviction_orchestrator: object | None = None
+"""Module-level DI slot for the EvictionOrchestrator."""
+
+
+def set_eviction_orchestrator(orchestrator: object | None) -> None:
+    """Inject the EvictionOrchestrator from the composition root."""
+    global _eviction_orchestrator
+    _eviction_orchestrator = orchestrator
 
 
 def _tool_matches_workflows(tool: dict, agent_workflows: list[str]) -> bool:
@@ -357,10 +385,44 @@ def call_s1_backend(
         # Convert to OpenAI-compatible tool definitions
         tools, tool_name_map = _to_openai_tools(wf_tool_context) if wf_tool_context else ([], {})
 
+        # ── Token counting & model resolution (needed by compaction below) ─
+        conversation_history = request.memory.get("conversation_history", [])
+        model_name = _resolve_model(request.prompt) if request.prompt else ""
+        output_budget = request.prompt.get("max_tokens", 4096) if request.prompt else 4096
+
+        # Pre-count tokens for compaction trigger if orchestrator is active
+        # (the full count is re-done after compaction + message building below).
+        pre_count = count_tokens_in_messages(conversation_history) if conversation_history else 0
+        context_limit = get_context_limit(model_name, output_budget=output_budget)
+        pre_pressure = (pre_count / context_limit) if context_limit else 0.0
+
+        # ── Compaction pass — compress older turns before building messages ─
+        if _compaction_orchestrator is not None and conversation_history:
+            try:
+                result = _compaction_orchestrator.compact_if_needed(
+                    conversation_history=conversation_history,
+                    model=model_name,
+                    max_tokens=output_budget,
+                    context_pressure=pre_pressure,
+                )
+                # Trigger eviction for subgoals whose episodes were compacted
+                if (
+                    result is not None
+                    and getattr(result, "triggered", False)
+                    and not getattr(result, "rolled_back", False)
+                    and _eviction_orchestrator is not None
+                ):
+                    compacted_ids = getattr(result, "compacted_subgoal_ids", set())
+                    if compacted_ids:
+                        _eviction_orchestrator.on_episode_compacted(
+                            compacted_subgoal_ids=compacted_ids,
+                        )
+            except Exception:
+                pass  # compaction failure should never crash the LLM call
+
         # Build structured message list: system, conversation history, user
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
-        conversation_history = request.memory.get("conversation_history", [])
         for entry in conversation_history:
             role = entry.get("role", "user")
             content = entry.get("content", "")
@@ -373,6 +435,11 @@ def call_s1_backend(
                 messages.append(msg)
 
         messages.append({"role": "user", "content": user_message})
+
+        # ── Token counting for context-pressure tracking ────────
+        input_tokens = count_tokens_in_messages(messages) + count_tokens_in_tools(tools)
+        context_limit = get_context_limit(model_name, output_budget=output_budget)
+        context_pressure = (input_tokens / context_limit) if context_limit else 0.0
 
         try:
             if tools and hasattr(transport, "complete_with_tools"):
@@ -397,6 +464,8 @@ def call_s1_backend(
                             "confidence": 0.95,
                         },
                         tool_calls=response.tool_calls,
+                        input_tokens=input_tokens,
+                        context_pressure=context_pressure,
                     )
 
                 # LLM returned a text response (no tool chosen)
@@ -406,6 +475,8 @@ def call_s1_backend(
                         "message": response.text.strip() if response.text else "",
                         "confidence": 0.95,
                     },
+                    input_tokens=input_tokens,
+                    context_pressure=context_pressure,
                 )
             else:
                 # ── Fallback: text-only path (no tools available) ──────────
@@ -426,6 +497,8 @@ def call_s1_backend(
                         "message": raw_text.strip(),
                         "confidence": 0.95,
                     },
+                    input_tokens=input_tokens,
+                    context_pressure=context_pressure,
                 )
         except Exception as exc:
             return S1Error(

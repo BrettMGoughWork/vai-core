@@ -33,6 +33,18 @@ logging:
 telemetry:
   enabled: true
 
+# ── Phase 1 — Conversation Compaction ───────────────────────────────────
+# Controls when older conversation turns are summarised into a compact
+# summary to reduce context-window pressure.
+compaction:
+  enabled: true
+  context_pressure_threshold: 0.8
+  turn_count_threshold: 10
+  keep_recent_turns: 4
+  summary_style: structured
+  min_tokens_for_compaction: 2000
+  tool_output_threshold: 10000
+
 # ── PHASE 3.13.1 — Search Provider Configuration ──────────────────────────
 # Keeping this config in the runtime ensures the LLM NEVER sees the
 # provider name, API key, or endpoint.  The LLM only receives normalised
