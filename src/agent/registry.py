@@ -175,6 +175,7 @@ class AgentMetadata:
     tools: List[str] = field(default_factory=list)
     workflows: List[str] = field(default_factory=list)
     patterns: List[str] = field(default_factory=list)
+    councils: List[str] = field(default_factory=list)
     defer_to: List[str] = field(default_factory=list)
     inputs: List[str] = field(default_factory=list)
     outputs: List[str] = field(default_factory=list)
@@ -189,6 +190,8 @@ class AgentMetadata:
             raise ValueError("workflows must be a list")
         if not isinstance(self.patterns, list):
             raise ValueError("patterns must be a list")
+        if not isinstance(self.councils, list):
+            raise ValueError("councils must be a list")
         if not isinstance(self.defer_to, list):
             raise ValueError("defer_to must be a list")
         if not isinstance(self.inputs, list):

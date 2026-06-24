@@ -19,7 +19,12 @@ from __future__ import annotations
 
 from src.agent.deferral.context_bridge import ContextBridge, build_delegate_prompt
 from src.agent.deferral.depth_guard import DepthGuard, DeferralDepthError
-from src.agent.deferral.resolver import DeferralResolver, resolve_delegate
+from src.agent.deferral.resolver import (
+    DelegateNotAllowedError,
+    DelegateSelfReferentialError,
+    DeferralResolver,
+    resolve_delegate,
+)
 from src.agent.deferral.validator import (
     DeferralCycleError,
     DeferralGraphError,
@@ -29,6 +34,8 @@ from src.agent.deferral.validator import (
 __all__ = [
     "build_delegate_prompt",
     "ContextBridge",
+    "DelegateNotAllowedError",
+    "DelegateSelfReferentialError",
     "DeferralCycleError",
     "DeferralDepthError",
     "DeferralGraphError",

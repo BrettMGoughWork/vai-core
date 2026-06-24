@@ -66,7 +66,7 @@ from src.agent.interfaces.agent_state_store import AgentStateStore
 from src.agent.job_interface import JobDispatchResult, dispatch_route
 from src.agent.registry import AgentRegistry, AgentNotFoundError
 from src.agent.registry import AgentRegistry, AgentNotFoundError  # noqa: F811
-from src.agent.router import DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
+from src.agent.router import DEST_COUNCIL, DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
 from src.agent.selection import AgentSelectionStrategy
 from src.agent.workflow import WorkflowEngine, WorkflowInstanceStore, WorkflowRegistry
 from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
@@ -127,6 +127,8 @@ class Supervisor:
         primitive_tool_adapter: Optional[Any] = None,
         pattern_registry: Optional[PatternRegistry] = None,
         todo_orchestrator: Optional[TodoOrchestrator] = None,
+        council_registry: Optional[Any] = None,
+        council_orchestrator: Optional[Any] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -145,6 +147,8 @@ class Supervisor:
         self._primitive_tool_adapter = primitive_tool_adapter
         self._pattern_registry = pattern_registry
         self._todo_orchestrator = todo_orchestrator
+        self._council_registry = council_registry
+        self._council_orchestrator = council_orchestrator
         self._hitl = HitlManager(
             inline_tool_executor=inline_tool_executor,
             strategy_router=strategy_router,
@@ -166,6 +170,7 @@ class Supervisor:
             registry=registry,
             workflow_tool_adapter=workflow_tool_adapter,
             primitive_tool_adapter=primitive_tool_adapter,
+            council_orchestrator=council_orchestrator,
         )
     
     @staticmethod
@@ -245,6 +250,28 @@ class Supervisor:
                     "pattern_id": pattern.pattern_id,
                     "name": pattern.name,
                     "instructions": pattern.instructions,
+                })
+        return result
+
+    def _get_council_instructions(self, agent_meta) -> list[dict]:
+        """Return council metadata for councils listed by the agent.
+
+        Each entry includes council_id, name, description, member
+        agent IDs, and the arbitrator — injected so the agent knows
+        which councils it can deliberate with and how to invoke them.
+        """
+        if not self._council_registry:
+            return []
+        result: list[dict] = []
+        for cid in agent_meta.councils:
+            council = self._council_registry.get(cid)
+            if council:
+                result.append({
+                    "council_id": council.council_id,
+                    "name": council.name,
+                    "description": council.description,
+                    "members": list(council.member_agent_ids),
+                    "arbitrator": council.arbitrator_agent_id,
                 })
         return result
 
@@ -489,6 +516,18 @@ class Supervisor:
                     self._build_defer_to_tool(agent_meta.defer_to)
                 )
 
+            # C1: inject convene_council synthetic tool when the agent
+            # has councils available for deliberation.
+            if agent_meta.councils and self._council_registry:
+                available = [
+                    cid for cid in agent_meta.councils
+                    if self._council_registry.has_council(cid)
+                ]
+                if available:
+                    tool_context.append(
+                        self._build_convene_council_tool(available)
+                    )
+
             outcome = RouterOutcome(
                 type="llm_call",
                 payload={
@@ -501,8 +540,9 @@ class Supervisor:
                             "persona": agent_meta.persona,
                             "tools": list(agent_meta.tools),
                             "workflows": list(agent_meta.workflows),
-                                "patterns": self._get_pattern_instructions(agent_meta),
-                        },
+                            "patterns": self._get_pattern_instructions(agent_meta),
+                            "councils": self._get_council_instructions(agent_meta),
+                },
                     },
                     "backend": "conversational",
                     "memory": {
@@ -625,6 +665,57 @@ class Supervisor:
                             or (
                                 hasattr(tc, "name")
                                 and getattr(tc, "name", "") != "defer_to"
+                            )
+                        ]
+
+                # C1: intercept convene_council tool calls — run council
+                # deliberation and inject the outcome back into the
+                # conversation so the calling agent can continue its work.
+                # Uses the (potentially defer_to-filtered) tool_calls list.
+                if tool_calls:
+                    _council_calls = [
+                        tc for tc in tool_calls
+                        if isinstance(tc, dict) and tc.get("name", "") == "convene_council"
+                        or hasattr(tc, "name") and getattr(tc, "name", "") == "convene_council"
+                    ]
+                    if _council_calls:
+                        for _tc in _council_calls:
+                            _args = _tc.get("arguments", _tc.get("args", {}))
+                            if isinstance(_args, str):
+                                _args = json.loads(_args)
+                            _cid = _args.get("council_id", "")
+                            _problem = _args.get("problem", "")
+                            if _cid and _problem and self._council_registry:
+                                _council_def = self._council_registry.get(_cid)
+                                if _council_def and self._council_orchestrator:
+                                    try:
+                                        _outcome = self._council_orchestrator.deliberate(
+                                            council_def=_council_def,
+                                            problem=_problem,
+                                            calling_agent_state=state,
+                                        )
+                                        reply += (
+                                            f"\n\n**Council {_council_def.name} deliberation**\n"
+                                            f"Decision: {_outcome.decision}\n"
+                                            f"Confidence: {_outcome.confidence:.1%}"
+                                        )
+                                        if _outcome.dissent_notes:
+                                            reply += f"\nDissent: {_outcome.dissent_notes}"
+                                    except Exception as _exc:
+                                        reply += (
+                                            f"\n\n[Council deliberation failed: {_exc}]"
+                                        )
+                        # Remove convene_council calls so ToolOrchestrator
+                        # doesn't see them
+                        tool_calls = [
+                            tc for tc in tool_calls
+                            if (
+                                isinstance(tc, dict)
+                                and tc.get("name", "") != "convene_council"
+                            )
+                            or (
+                                hasattr(tc, "name")
+                                and getattr(tc, "name", "") != "convene_council"
                             )
                         ]
 
@@ -824,6 +915,108 @@ class Supervisor:
                 state, engine, wf_state, route, meta, new_errors, persist=self._persist,
             )
 
+        if route.destination == DEST_COUNCIL:
+            council_id = route.payload.get("council_id", "")
+            problem = route.payload.get("problem", input_text)
+
+            if self._council_registry is None:
+                new_errors.append({
+                    "type": "council_not_configured",
+                    "message": "Council route matched but no council registry configured",
+                })
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.COMPLETED,
+                    route_result=route,
+                    errors=new_errors,
+                    supervisor_metadata=meta,
+                    _reason="Council registry not configured",
+                    _details={"route_destination": route.destination},
+                ))
+
+            council_def = self._council_registry.get(council_id)
+            if council_def is None:
+                new_errors.append({
+                    "type": "council_not_found",
+                    "message": f"Council {council_id!r} not found in registry",
+                })
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.COMPLETED,
+                    route_result=route,
+                    errors=new_errors,
+                    supervisor_metadata=meta,
+                    _reason=f"Council {council_id!r} not found",
+                    _details={
+                        "route_destination": route.destination,
+                        "council_id": council_id,
+                    },
+                ))
+
+            if self._council_orchestrator is None:
+                new_errors.append({
+                    "type": "council_orchestrator_not_configured",
+                    "message": "Council route matched but no council orchestrator configured",
+                })
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.COMPLETED,
+                    route_result=route,
+                    errors=new_errors,
+                    supervisor_metadata=meta,
+                    _reason="Council orchestrator not configured",
+                    _details={"route_destination": route.destination},
+                ))
+
+            try:
+                council_outcome = self._council_orchestrator.deliberate(
+                    council_def=council_def,
+                    problem=problem,
+                    calling_agent_state=state,
+                )
+                reply = (
+                    f"**Council {council_def.name} deliberation complete**\n\n"
+                    f"**Decision:** {council_outcome.decision}\n\n"
+                    f"**Confidence:** {council_outcome.confidence:.1%}\n\n"
+                )
+                if council_outcome.dissent_notes:
+                    reply += f"**Dissent:** {council_outcome.dissent_notes}\n\n"
+
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.COMPLETED,
+                    route_result=route,
+                    final_response=AgentResponse(
+                        reply=reply,
+                        metadata={
+                            "correlation_id": state.correlation_id,
+                            "trace_id": state.trace_id,
+                            "agent_id": state.agent_id,
+                            "council_id": council_id,
+                            "council_outcome": {
+                                "decision": council_outcome.decision,
+                                "confidence": council_outcome.confidence,
+                                "member_count": len(council_outcome.member_analyses),
+                            },
+                        },
+                    ),
+                    supervisor_metadata=meta,
+                    _reason="Council deliberation completed",
+                    _details={"council_id": council_id},
+                ))
+            except Exception as exc:
+                new_errors.append({
+                    "type": "council_deliberation_error",
+                    "message": f"Council deliberation failed: {exc}",
+                })
+                return self._persist(state.with_(
+                    lifecycle_state=LifecycleState.FAILED,
+                    route_result=route,
+                    errors=new_errors,
+                    supervisor_metadata=meta,
+                    _reason=str(exc),
+                    _details={
+                        "route_destination": route.destination,
+                        "council_id": council_id,
+                    },
+                ))
+
         # Fallback: completed with no output
         return self._persist(state.with_(
             lifecycle_state=LifecycleState.COMPLETED,
@@ -965,6 +1158,51 @@ class Supervisor:
             },
         }
 
+    # ── 5c. convene_council tool ─────────────────────────────────────────
+
+    @staticmethod
+    def _build_convene_council_tool(available_councils: List[str]) -> dict:
+        """Build a synthetic ``convene_council`` tool definition.
+
+        Only injected when the agent has councils available and the
+        council registry is configured.  The *council_id* parameter is
+        constrained to an enum of the agent's registered councils.
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": "convene_council",
+                "description": (
+                    "Convene a council of specialist agents to deliberate "
+                    "on a difficult or high-stakes decision. Each council "
+                    "member analyses the problem from their perspective, "
+                    "challenges other members' reasoning, and an impartial "
+                    "arbitrator synthesises a final decision. Use this when "
+                    "you need diverse perspectives on a complex problem."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "council_id": {
+                            "type": "string",
+                            "description": "The ID of the council to convene.",
+                            "enum": sorted(available_councils),
+                        },
+                        "problem": {
+                            "type": "string",
+                            "description": (
+                                "The problem or decision to put before the "
+                                "council. Be specific and include relevant "
+                                "context so members can provide meaningful "
+                                "analysis."
+                            ),
+                        },
+                    },
+                    "required": ["council_id", "problem"],
+                },
+            },
+        }
+
     def defer_to_agent(
         self,
         state: AgentState,
@@ -972,6 +1210,7 @@ class Supervisor:
         prompt: str,
         *,
         max_depth: int = 3,
+        skip_authorization: bool = False,
     ) -> AgentState:
         """Hand off work from the calling agent to a delegate agent.
 
@@ -991,8 +1230,9 @@ class Supervisor:
             Current state of the delegating agent (must be active).
         target_agent_id:
             The agent to hand work off to.  Must be in the delegator's
-            ``defer_to`` list and the deferral graph must be acyclic
-            (enforced at registration time).
+            ``defer_to`` list (unless *skip_authorization* is True) and
+            the deferral graph must be acyclic (enforced at registration
+            time).
         prompt:
             Natural-language instructions describing what the delegate
             should do.
@@ -1000,6 +1240,9 @@ class Supervisor:
             Maximum deferral chain depth (default 3).  Each deferral
             increments the chain depth counter stored in
             ``supervisor_metadata["current_deferral_depth"]``.
+        skip_authorization:
+            Bypass the ``defer_to``-list check.  Used by the council
+            orchestrator to invoke member agents systemically.
 
         Returns
         -------
@@ -1012,7 +1255,8 @@ class Supervisor:
         AgentNotActiveError:
             If the delegator is not in an active (RUNNING or WAITING) state.
         DelegateNotAllowedError:
-            If *target_agent_id* is not in the delegator's ``defer_to`` list.
+            If *target_agent_id* is not in the delegator's ``defer_to`` list
+            and *skip_authorization* is False.
         DelegateSelfReferentialError:
             If the delegator attempts to defer to itself.
         DeferralDepthError:
@@ -1041,7 +1285,12 @@ class Supervisor:
 
         # ── 1. Resolve the delegate ─────────────────────────────────
         resolver = DeferralResolver(self._registry)
-        delegate_meta = resolver.resolve(state.agent_id, target_agent_id)
+        if skip_authorization:
+            # Bypass the defer_to-list check: lookup the target directly
+            # via the registry so we still get metadata (name, etc.).
+            delegate_meta = self._registry.get_agent(target_agent_id)
+        else:
+            delegate_meta = resolver.resolve(state.agent_id, target_agent_id)
 
         # ── 2. Check depth guard ────────────────────────────────────
         depth_guard = DepthGuard(max_depth=max_depth)

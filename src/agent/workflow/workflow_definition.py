@@ -7,12 +7,13 @@ directed graph of steps that share context.  Validation catches graph
 errors (cycles, orphan steps, missing transitions) at load time.
 
 Step types:
-    llm_call       — Call Runtime with a prompt
-    tool_execute   — Submit job to S4b Platform
-    sub_workflow   — Invoke another workflow
-    user_input     — Await human input
-    condition      — Branch logic based on context expression
-    apply_pattern  — Apply pattern instructions as LLM guidance
+    llm_call           — Call Runtime with a prompt
+    tool_execute       — Submit job to S4b Platform
+    sub_workflow       — Invoke another workflow
+    user_input         — Await human input
+    condition          — Branch logic based on context expression
+    apply_pattern      — Apply pattern instructions as LLM guidance
+    council_deliberate — Invoke a multi-agent council for arbitration
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ StepType = Literal[
     "user_input",
     "condition",
     "apply_pattern",
+    "council_deliberate",
 ]
 
 VALID_STEP_TYPES: frozenset[str] = frozenset({
@@ -39,6 +41,7 @@ VALID_STEP_TYPES: frozenset[str] = frozenset({
     "user_input",
     "condition",
     "apply_pattern",
+    "council_deliberate",
 })
 
 # Reserved transition target (means "workflow complete")

@@ -11,3 +11,6 @@ workflows:
   - "*"
 patterns:
   - plan_with_todo
+councils:
+  - general-nominal
+  - dev-squad

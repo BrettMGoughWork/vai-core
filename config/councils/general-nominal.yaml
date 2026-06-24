@@ -1,0 +1,14 @@
+# config/councils/general-nominal.yaml
+council_id: general-nominal
+name: "General Nominal Council"
+description: >
+  Universal council for ambiguous decisions.  Three distinct perspectives
+  (strategic, critical, risk-aware) plus a balanced adjudicator.
+arbitrator_agent_id: balanced-adjudicator
+member_agent_ids:
+  - strategist
+  - critic
+  - risk-assessor
+max_analysis_tokens: 2000
+max_counter_tokens: 1500
+require_consensus: false
