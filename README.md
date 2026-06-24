@@ -2,7 +2,11 @@
 
 A lightweight, Python-first LLM agent runtime. It gives LLMs structured jobs — deterministic execution, strict capability boundaries, and durable infrastructure — so you can safely build experimental concepts on top.
 
-This is the baseline. On top of it we're exploring **emergent patterns** (LLM-interpreted capability composition that self-codifies from successful behaviour), **council-based post-mortems** (multi-agent retrospective analysis after failures), and **Bayesian-evolutionary adaptive layers** for self-improvement.
+This is the baseline. Once it hits a stable level, this project will lean into more experimental concepts, such as:
+- council-based decision making and post-mortems
+- dev squad orchestration
+- emergent patterns
+- self-improvement
 
 *Note: this project is in early development.*
 
@@ -23,6 +27,30 @@ Commands:
 - `/workflows` — full list of workflows
 - `/workflow <id>` — explicitly invoke a workflow
 - Ctrl+C to exit
+
+---
+
+## Channels
+
+Some basic channels have been created (MVP for now):
+
+### cli (mentioned above)
+
+### simple web:
+
+-- very basic web interface (PWA) used to test
+-- sits on the same api surface as the gateway
+-- listens on 0.0.0.0:8000 (edit this in the web_app code)
+
+```bash
+python -m tools.channels.web_app
+``` 
+
+### future:
+-- whatsapp, telegram webhooks (requires some cert setup, https, etc)
+-- web SPA
+-- native flutter app (my preference) with basic chat
+-- tui
 
 ---
 
@@ -60,7 +88,7 @@ Workflows are engine-driven: the runtime owns the state machine, persists instan
 
 ### Agents
 
-An agent is a **persona plus a capability set** — it has a system prompt (persona), and declares which tools, patterns, and workflows it can use. When a user sends a message, the strategy router selects the best agent for the intent, injects the agent's persona and capabilities into the LLM context, and hands off execution.
+An agent is a **persona plus a capability set** — it has a system prompt (persona), and declares which tools, patterns, and workflows it can use. Agents are selected manually, or via deferal, or via an explicit workflow step, which injects the agent's persona and capabilities into the LLM context, and hands off execution.
 
 Agents can also select and invoke workflows as tools — the agent decides which workflow fits the user's intent, and the workflow engine takes over from there.
 
@@ -217,10 +245,23 @@ WebUIConfig(
 
 ---
 
+## Memory Governance
+
+Long-running sessions present a challenge: conversation history accumulates, memory stores grow, and context windows fill up. The system uses a three-layer approach to keep agents coherent:
+
+- **Governance layer** — validation, consistency checks, and normalisation over the four memory stores (subgoal, segment, plan, drift).
+- **Compaction pipeline** — LLM-based conversation history summarisation that fires on context pressure, turn count, or subgoal completion. Includes staleness detection and net-reduction rollback.
+- **Eviction pipeline** — removes stale or completed entries from memory stores when buffers overflow or episodes wrap up.
+
+See [Memory Governance](docs/architecture/MEMORY_GOVERNANCE.md) for the full design and configuration options.
+
+---
+
 ## Documentation
 
 - [Architecture](docs/architecture/ARCHITECTURE.md) — strata, boundaries, data flow
 - [Roadmap](docs/architecture/ROADMAP.md) — sprint-based planning, Y-horizon experimental features
+- [Memory Governance](docs/architecture/MEMORY_GOVERNANCE.md) — compaction, eviction, store validation
 - [Contracts](docs/contracts/) — interface boundaries between strata
 - [Lifecycle](docs/architecture/LIFECYCLE.md) — boot sequence, shutdown, state management
 - [Observability](docs/architecture/OBSERVABILITY.md) — metrics, tracing, dashboards
