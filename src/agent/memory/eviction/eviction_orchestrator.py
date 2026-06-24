@@ -107,14 +107,31 @@ class EvictionOrchestrator:
 
         self._remove_drift_by_decisions(report.evicted_drift_events, drift_events)
 
-    def on_episode_compacted(self) -> None:
-        """
-        Placeholder for summary-replacement eviction after episode compaction.
+    def on_episode_compacted(
+        self,
+        compacted_subgoal_ids: set[str],
+        now: Optional[int] = None,
+    ) -> None:
+        """Evict records for subgoals whose conversation turns were compacted.
 
-        This will be wired when the SummaryMetadata pipeline is integrated
-        with the episode lifecycle. No-op for now.
+        Called *after* a compaction pass completes.  Subgoals that were
+        summarised no longer need their detailed segment / plan / drift
+        records, so this triggers ``on_subgoal_completed`` for each
+        compacted subgoal.
+
+        This is *not* the same as the ``on_subgoal_completed`` call that
+        fires immediately when a subgoal transitions to CLOSED (in
+        ``MemoryGovernance``).  That call evicts at close time; this one
+        catches any records that were missed or created between close and
+        compaction.
         """
-        pass
+        now = now or int(time.time() * 1000)
+
+        for subgoal_id in sorted(compacted_subgoal_ids):
+            try:
+                self.on_subgoal_completed(subgoal_id=subgoal_id, now=now)
+            except Exception:
+                continue  # best-effort: one failure shouldn't block others
 
     # ------------------------------------------------------------------
     # Internal — decision application

@@ -315,7 +315,7 @@ class TestOnEpisodeCompacted:
 
     def test_no_op(self, orchestrator):
         """Currently does nothing; no stores are touched."""
-        orchestrator.on_episode_compacted()
+        orchestrator.on_episode_compacted(compacted_subgoal_ids=set())
 
         orchestrator._segment_memory.remove.assert_not_called()
         orchestrator._subgoal_memory.remove.assert_not_called()

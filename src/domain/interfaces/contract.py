@@ -54,6 +54,8 @@ class PromptResponse:
     output: Dict[str, Any]          # structured LLM output
     tool_calls: List[Dict[str, Any]] = field(default_factory=list)  # optional tool call requests
     errors: List[Dict[str, Any]] = field(default_factory=list)      # schema/format errors
+    input_tokens: int = 0           # token count of input (messages + tools)
+    context_pressure: float = 0.0   # input_tokens / safe_context_limit (0.0-1.0+)
 
     def to_dict(self) -> Dict[str, Any]:
         return {

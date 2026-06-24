@@ -55,12 +55,14 @@ class MemoryGovernance:
         plan_memory: PlanMemory,
         drift_memory: DriftMemory,
         eviction_orchestrator: Optional[EvictionOrchestrator] = None,
+        compaction_orchestrator: Optional[object] = None,
     ) -> None:
         self._subgoal_memory = subgoal_memory
         self._segment_memory = segment_memory
         self._plan_memory = plan_memory
         self._drift_memory = drift_memory
         self._eviction_orchestrator = eviction_orchestrator
+        self._compaction_orchestrator = compaction_orchestrator
 
     # ------------------------------------------------------------------
     # Governed writes
@@ -98,6 +100,17 @@ class MemoryGovernance:
             new_state = incoming.state.lower()
             if prev_state != "closed" and new_state == "closed":
                 self._eviction_orchestrator.on_subgoal_completed(subgoal.subgoal_id)
+
+        # Notify compaction when a subgoal closes
+        if self._compaction_orchestrator is not None and existing is not None:
+            prev_state = existing.state.lower()
+            new_state = incoming.state.lower()
+            if prev_state != "closed" and new_state == "closed":
+                self._compaction_orchestrator.on_subgoal_closed(
+                    subgoal_id=subgoal.subgoal_id,
+                    goal=subgoal.goal,
+                    context=str(subgoal.context),
+                )
 
     def put_segment(
         self,

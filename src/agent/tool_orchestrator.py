@@ -39,6 +39,33 @@ def _extract_args(tc: dict) -> dict:
     return args if isinstance(args, dict) else {}
 
 
+# ── Phase 2 helpers: tool result deduplication & large-output summarisation ─
+
+_TOOL_OUTPUT_THRESHOLD: int = 10000
+"""Character threshold above which a tool result is summarised.  Matches
+the default in CompactionConfig.tool_output_threshold."""
+
+
+def _summarize_large_output(result_str: str, tool_name: str) -> str:
+    """Summarise a tool result that exceeds the output threshold.
+
+    Extracts the first and last *threshold/10* characters plus a summary
+    note, so the LLM retains the *what* and the *result* without the
+    full verbatim content.
+    """
+    chunk_size = _TOOL_OUTPUT_THRESHOLD // 10
+    first_chunk = result_str[:chunk_size]
+    last_chunk = result_str[-chunk_size:] if len(result_str) > chunk_size else ""
+    summary = (
+        f"[SUMMARISED OUTPUT: {tool_name} — "
+        f"{len(result_str)} chars, showing first/last {chunk_size} chars]\n"
+        f"---first {chunk_size} chars---\n{first_chunk}\n"
+    )
+    if last_chunk:
+        summary += f"---last {chunk_size} chars---\n{last_chunk}\n"
+    return summary
+
+
 # ---------------------------------------------------------------------------
 # ToolOrchestrator
 # ---------------------------------------------------------------------------
@@ -411,12 +438,37 @@ class ToolOrchestrator:
         # iterations and will re-request the same tools endlessly.
         conversation_history.append(assistant_msg)
 
-        # Tool result messages
+        # Tool result messages (Phase 2: dedup + large-output summarisation)
+        prev_tool_name: Optional[str] = None
+        merged_content: List[str] = []
         for pe in executed_primitives:
+            tool_name = pe.get("name", "")
+            if tool_name and tool_name == prev_tool_name and merged_content:
+                # Same tool called consecutively → merge into one result
+                merged_content.append(pe["result_str"])
+                continue
+
+            # Flush any accumulated merged content before swapping to a new tool
+            if merged_content:
+                content = "\n\n---\n\n".join(merged_content) if len(merged_content) > 1 else merged_content[0]
+                conversation_history.append({
+                    "role": "tool",
+                    "tool_call_id": merged_pe["tool_call_id"],  # first entry's call_id for the group
+                    "content": _summarize_large_output(content, prev_tool_name) if len(content) > _TOOL_OUTPUT_THRESHOLD else content,
+                })
+
+            # Start new group
+            prev_tool_name = tool_name
+            merged_content = [pe["result_str"]]
+            merged_pe = pe  # remember the last pe for call_id
+
+        # Flush final group
+        if merged_content:
+            content = "\n\n---\n\n".join(merged_content) if len(merged_content) > 1 else merged_content[0]
             conversation_history.append({
                 "role": "tool",
-                "tool_call_id": pe["tool_call_id"],
-                "content": pe["result_str"],
+                "tool_call_id": merged_pe["tool_call_id"],  # first entry's call_id for the group
+                "content": _summarize_large_output(content, prev_tool_name) if len(content) > _TOOL_OUTPUT_THRESHOLD else content,
             })
 
         # Follow-up LLM call — include the user's original request so the
