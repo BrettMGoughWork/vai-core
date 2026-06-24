@@ -373,6 +373,31 @@ def call_s1_backend(
                 pattern_lines.append(f"--- End Pattern: {pname} ---")
             system_prompt += "\n".join(pattern_lines)
 
+        # Inject agent capabilities — available councils for deliberation
+        agent_councils = agent_metadata.get("councils", [])
+        if agent_councils:
+            council_lines = [
+                "\n\nYou have the following councils available for deliberation."
+            ]
+            for c in agent_councils:
+                cid = c.get("council_id", "unknown")
+                cname = c.get("name", cid)
+                cdesc = c.get("description", "")
+                members = c.get("members", [])
+                arbitrator = c.get("arbitrator", "")
+                council_lines.append(f"\n- {cname} ({cid}): {cdesc}")
+                if members:
+                    council_lines.append(
+                        f"  Members: {', '.join(str(m) for m in members)}"
+                    )
+                if arbitrator:
+                    council_lines.append(f"  Arbitrator: {arbitrator}")
+            council_lines.append(
+                "\n\nTo convene a council, call the `convene_council` tool "
+                "with the council_id and your problem description."
+            )
+            system_prompt += "\n".join(council_lines)
+
         # ── Build tool definitions and prepare for native function calling ──
         all_tool_context = request.tool_context or []
 

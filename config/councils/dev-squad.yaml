@@ -1,0 +1,17 @@
+# config/councils/dev-squad.yaml
+council_id: dev-squad
+name: "Dev Squad Council"
+description: >
+  Software design & architecture decisions.  Five perspectives mirror a
+  cross-functional product team: Architect, Product Manager, Engineer,
+  Quality Analyst, Delivery Lead.  Adjudicated by the Tech Lead.
+arbitrator_agent_id: tech-lead-adjudicator
+member_agent_ids:
+  - architect
+  - product-manager
+  - software-engineer
+  - quality-analyst
+  - delivery-lead
+max_analysis_tokens: 2000
+max_counter_tokens: 1500
+require_consensus: false

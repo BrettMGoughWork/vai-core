@@ -33,9 +33,11 @@ DEST_WORKFLOW = "workflow"    # → workflow engine (multi-step / orchestration)
 DEST_S4B = "s4b"              # → platform job (direct tool execution)
 DEST_PLANNER = "planner"      # → S2 planner (plan generation)  *(reserved)*
 DEST_CAPABILITY = "capability"  # → S3 via S4 (skill / tool)  *(reserved)*
+DEST_COUNCIL = "council"      # → council deliberation
 
-# Trigger prefix for explicit workflow dispatch
+# Trigger prefixes for explicit dispatch
 _WORKFLOW_TRIGGER = "/workflow"
+_COUNCIL_TRIGGER = "/council"
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +68,7 @@ class Route:
     confidence: float = 1.0
 
     def __post_init__(self) -> None:
-        valid = {DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B, DEST_PLANNER, DEST_CAPABILITY}
+        valid = {DEST_RUNTIME, DEST_WORKFLOW, DEST_S4B, DEST_PLANNER, DEST_CAPABILITY, DEST_COUNCIL}
         if self.destination not in valid:
             raise ValueError(
                 f"destination must be one of {sorted(valid)}, "
@@ -113,7 +115,27 @@ def route_message(
     msg = message.strip()
     msg_lower = msg.lower()
 
-    # ── 1. "/workflow" explicit prefix → DEST_WORKFLOW ────────────────
+    # ── 1. "/council" explicit prefix → DEST_COUNCIL ─────────────────
+    # Format: /council <council_id> on <problem description>
+    if msg_lower.startswith(_COUNCIL_TRIGGER):
+        rest = msg[len(_COUNCIL_TRIGGER):].strip()
+        # Split on " on " to separate council_id from problem
+        parts = rest.split(" on ", maxsplit=1)
+        council_id = parts[0].strip()
+        problem = parts[1].strip() if len(parts) > 1 else rest
+        return Route(
+            destination=DEST_COUNCIL,
+            payload={
+                "message": msg,
+                "trigger": "council_request",
+                "council_id": council_id,
+                "problem": problem,
+            },
+            agent_id=agent.identity.agent_id,
+            confidence=0.95,
+        )
+
+    # ── 2. "/workflow" explicit prefix → DEST_WORKFLOW ────────────────
     if msg_lower.startswith(_WORKFLOW_TRIGGER):
         # Extract optional workflow_id after the trigger
         rest = msg[len(_WORKFLOW_TRIGGER):].strip()
@@ -129,7 +151,7 @@ def route_message(
             confidence=0.9,
         )
 
-    # ── 2. Default → Runtime (conversational) ────────────────────────
+    # ── 3. Default → Runtime (conversational) ────────────────────────
     return Route(
         destination=DEST_RUNTIME,
         payload={"message": message},

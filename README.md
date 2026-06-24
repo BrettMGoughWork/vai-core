@@ -100,6 +100,14 @@ This enables **specialisation** (a general support agent hands off billing queri
 
 See [Agent Deferral](docs/architecture/agent-deferral.md) for the full design.
 
+##### Agent Councils
+
+A **council** is a multi-agent deliberation pattern: a panel of specialist agents (e.g. architect, product-manager, engineer) independently analyse a problem, critique each other, and an impartial arbitrator synthesises a final decision. Councils are invoked via the `/council <council_id> on <problem>` command or triggered from a workflow.
+
+Available councils include **dev-squad** (five roles + tech lead adjudicator) for technical decisions and **general-nominal** (strategist, critic, risk-assessor + adjudicator) for broader analysis.
+
+See [Agent Councils](docs/architecture/agent-councils.md) for the full design.
+
 #### Sub-Goal Planner (Two-Level Planning)
 
 The **sub-goal planner** is a two-level planning architecture that decomposes complex requests into *sub-goals* (coarse milestones) and then iteratively breaks each sub-goal into *tasks* (concrete actions). It is a **first-class capability** — automatically invoked by the S5 Supervisor when the LLM creates goals, not a tool the LLM calls directly.

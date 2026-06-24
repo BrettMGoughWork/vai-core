@@ -99,6 +99,7 @@ OutcomeType = Literal[
     "completed",
     "failed",
     "timeout",
+    "council_deliberate",
 ]
 
 
@@ -149,9 +150,11 @@ class WorkflowEngine:
         registry: WorkflowRegistry,
         *,
         pattern_registry: Any = None,
+        council_registry: Any = None,
     ) -> None:
         self._registry = registry
         self._pattern_registry = pattern_registry
+        self._council_registry = council_registry
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -645,6 +648,55 @@ def _handle_condition(
     )
 
 
+def _handle_council_deliberate(
+    engine: WorkflowEngine,
+    state: WorkflowExecutionState,
+    step: Any,
+    defn: Any,
+) -> Tuple[WorkflowExecutionState, StepOutcome]:
+    """Handle a ``council_deliberate`` step.
+
+    Validates that the council exists in the registry, then returns a
+    ``council_deliberate`` outcome for the invoker to dispatch to the
+    ``CouncilOrchestrator``.
+    """
+    council_id = step.config.get("council_id")
+    if not council_id:
+        return engine._fail(
+            state,
+            f"council_deliberate step {step.step_id!r} missing config.council_id",
+        )
+
+    if engine._council_registry is None:
+        return engine._fail(
+            state,
+            f"council_deliberate step {step.step_id!r}: no council_registry configured",
+        )
+
+    council = engine._council_registry.get(council_id)
+    if council is None:
+        return engine._fail(
+            state,
+            f"council_deliberate step {step.step_id!r}: "
+            f"council {council_id!r} not found in registry",
+        )
+
+    problem = step.config.get("problem") or state.context.get("problem", "")
+
+    return engine._advance(
+        state,
+        step,
+        StepOutcome(
+            type="council_deliberate",
+            step_id=step.step_id,
+            config={
+                "council_id": council_id,
+                "problem": problem,
+            },
+        ),
+    )
+
+
 # ── Handler registry ──────────────────────────────────────────────────
 
 _STEP_HANDLERS = {
@@ -654,6 +706,7 @@ _STEP_HANDLERS = {
     "user_input": _handle_user_input,
     "condition": _handle_condition,
     "apply_pattern": _handle_apply_pattern,
+    "council_deliberate": _handle_council_deliberate,
 }
 
 

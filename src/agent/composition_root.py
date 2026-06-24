@@ -62,12 +62,16 @@ from src.agent.workflow.loader import load_workflows_from_yaml
 from src.agent.workflow.primitive_tool_adapter import PrimitiveToolAdapter
 from src.agent.workflow.workflow_tool_adapter import WorkflowToolAdapter
 from src.agent.planner.todo_orchestrator import TodoOrchestrator
+from src.agent.council.loader import load_councils_from_directory
+from src.agent.council.orchestrator import CouncilOrchestrator
+from src.agent.council.registry import CouncilRegistry
 from src.platform.runtime.control_plane import ControlPlane
 from src.platform.runtime.job_store.job_store import InMemoryJobStore
 
 # ── Agent registry (loaded from declarative YAML) ─────────────────────
 _registry = AgentRegistry()
 load_agents_from_directory(_registry, "config/agents")
+load_agents_from_directory(_registry, "config/agents/council")
 
 # Validate deferral graph for acyclicity before any runtime operations
 # (catches cycles, self-references, and references to unknown agents)
@@ -82,6 +86,11 @@ wf_registry = WorkflowRegistry()
 for defn in load_workflows_from_yaml("config/workflows"):
     wf_registry.register(defn)
 
+# ── Council definitions + registry (loaded from YAML files) ──────────
+_council_defs = load_councils_from_directory("config/councils")
+_council_registry = CouncilRegistry()
+for _cd in _council_defs:
+    _council_registry.register(_cd)
 
 # ── Primitive registry (loaded from stdlib + custom) ────────────────
 _primitive_registry = PrimitiveRegistry()
@@ -320,7 +329,11 @@ _strategy_router = StrategyRouter(
 )
 
 # ── Wired Supervisor ────────────────────────────────────────────────
-_workflow_engine = WorkflowEngine(wf_registry, pattern_registry=_pattern_registry)
+_workflow_engine = WorkflowEngine(
+    wf_registry,
+    pattern_registry=_pattern_registry,
+    council_registry=_council_registry,
+)
 _interaction_manager = UserInteractionManager(_workflow_engine)
 _workflow_tool_adapter = WorkflowToolAdapter(wf_registry)
 _primitive_tool_adapter = PrimitiveToolAdapter(_primitive_registry)
@@ -350,12 +363,21 @@ _supervisor = Supervisor(
     primitive_tool_adapter=_primitive_tool_adapter,
     pattern_registry=_pattern_registry,
     todo_orchestrator=_todo_orchestrator,
+    council_registry=_council_registry,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────
 _event_bus = EventBus()
 _trigger_router = TriggerRouter(wf_registry, _workflow_engine)
 _trigger_router.subscribe_all(_event_bus)
+
+# ── Council Orchestrator (Sprint C1 — multi-agent arbitration) ─────────
+_council_orchestrator = CouncilOrchestrator(supervisor=_supervisor)
+
+# Late-bind council_orchestrator into Supervisor (circular dependency:
+# Supervisor needs CouncilOrchestrator, CouncilOrchestrator needs Supervisor)
+_supervisor._council_orchestrator = _council_orchestrator
+_supervisor._workflow_invoker._council_orchestrator = _council_orchestrator
 
 s5_adapter: GatewayAgentAdapter = SessionedAdapter(
     AgentGatewayAdapter(_supervisor),
@@ -366,3 +388,6 @@ s5_event_bus: EventBus = _event_bus
 agent_registry: AgentRegistry = _registry
 workflow_registry: WorkflowRegistry = wf_registry
 pattern_registry: PatternRegistry = _pattern_registry
+council_defs: list = _council_defs
+council_registry: CouncilRegistry = _council_registry
+council_orchestrator: CouncilOrchestrator = _council_orchestrator

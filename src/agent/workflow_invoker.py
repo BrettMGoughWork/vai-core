@@ -119,6 +119,7 @@ class WorkflowInvoker:
         registry: Any = None,
         workflow_tool_adapter: Any = None,
         primitive_tool_adapter: Any = None,
+        council_orchestrator: Any = None,
     ) -> None:
         self._workflow_engine = workflow_engine
         self._workflow_store = workflow_store
@@ -130,6 +131,7 @@ class WorkflowInvoker:
         self._registry = registry
         self._workflow_tool_adapter = workflow_tool_adapter
         self._primitive_tool_adapter = primitive_tool_adapter
+        self._council_orchestrator = council_orchestrator
 
     # ------------------------------------------------------------------
     # run_workflow_loop
@@ -335,6 +337,53 @@ class WorkflowInvoker:
                     wf_state, outcome.step_id,
                     "tool_execute dispatched zero jobs",
                 )
+                wf_store.save(wf_state)
+                continue
+
+            # ── Council deliberate → CouncilOrchestrator → resume ──
+            if outcome.type == "council_deliberate":
+                if self._council_orchestrator is None:
+                    wf_state, _ = engine.fail_step(
+                        wf_state, outcome.step_id,
+                        "council_deliberate step but no council_orchestrator configured",
+                    )
+                    wf_store.save(wf_state)
+                    continue
+
+                council_id = outcome.config.get("council_id", "")
+                problem = outcome.config.get("problem", "")
+                council_def = (
+                    engine._council_registry.get(council_id)
+                    if engine._council_registry else None
+                )
+                if council_def is None:
+                    wf_state, _ = engine.fail_step(
+                        wf_state, outcome.step_id,
+                        f"council {council_id!r} not found in registry",
+                    )
+                    wf_store.save(wf_state)
+                    continue
+
+                try:
+                    council_outcome = self._council_orchestrator.deliberate(
+                        council_def=council_def,
+                        problem=problem,
+                        calling_agent_state=state,
+                    )
+                    wf_state, _ = engine.resume_with_result(
+                        wf_state, outcome.step_id, {
+                            "decision": council_outcome.decision,
+                            "confidence": council_outcome.confidence,
+                            "dissent_notes": council_outcome.dissent_notes,
+                            "member_analyses": council_outcome.member_analyses,
+                            "member_counters": council_outcome.member_counters,
+                        },
+                    )
+                except Exception as exc:
+                    wf_state, _ = engine.fail_step(
+                        wf_state, outcome.step_id,
+                        f"Council deliberation failed: {exc}",
+                    )
                 wf_store.save(wf_state)
                 continue
 

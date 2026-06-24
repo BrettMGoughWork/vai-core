@@ -113,11 +113,7 @@ class AgentGatewayAdapter:
             if not reason and state.errors:
                 reason = state.errors[-1].get("message", "")
             return {
-                "error": (
-                    "Agent completed without producing a response"
-                    if state.lifecycle_state == LifecycleState.COMPLETED
-                    else reason or "Agent failed"
-                ),
+                "error": reason or "Agent completed without producing a response",
             }
 
         # Agent is WAITING (jobs dispatched to S4B) or RUNNING
@@ -209,12 +205,11 @@ class AgentGatewayAdapter:
                         "metadata": resp.metadata,
                         "agent_id": agent_id,
                     }
+                _reason = state._reason or ""
+                if not _reason and state.errors:
+                    _reason = state.errors[-1].get("message", "")
                 return {
-                    "error": (
-                        "Agent completed without producing a response"
-                        if state.lifecycle_state == LifecycleState.COMPLETED
-                        else state._reason or "Agent failed"
-                    ),
+                    "error": _reason or "Agent completed without producing a response",
                 }
 
             # Still waiting (multi-step resume) or running
