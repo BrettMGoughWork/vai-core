@@ -13,6 +13,51 @@ from src.agent.council.orchestrator import (
 from src.domain.council import CouncilDefinition, CouncilOutcome
 
 
+def _parallelize_result(
+    responses: dict[str, str],
+) -> tuple[MagicMock, dict[str, dict[str, str]]]:
+    """Build ``(merge_mock, agent_results)`` as returned by ``parallelize()``."""
+    agent_results: dict[str, dict[str, str]] = {}
+    for agent_id, text in responses.items():
+        agent_results[agent_id] = {
+            "output": text,
+            "status": "success",
+            "done": True,
+        }
+    return MagicMock(), agent_results
+
+
+def _make_mock_supervisor_with_parallelize(
+    canned: dict[str, str] | None = None,
+) -> MagicMock:
+    """Build a mock Supervisor where ``parallelize()`` returns canned responses.
+
+    Phase 4 (arbitrator) still uses ``defer_to_agent()`` — that is mocked
+    separately below in each test that needs it.
+    """
+    sup = MagicMock()
+    responses: dict[str, str] = canned or {
+        "m1": "Analysis from member X",
+        "m2": "Analysis from member X",
+    }
+
+    def _parallelize(
+        items, *, parent_task="", merge_strategy="concat"
+    ):
+        agent_results: dict[str, dict[str, str]] = {}
+        for agent_id, _prompt in items:
+            text = responses.get(agent_id, "Default response")
+            agent_results[agent_id] = {
+                "output": text,
+                "status": "success",
+                "done": True,
+            }
+        return MagicMock(), agent_results
+
+    sup.parallelize.side_effect = _parallelize
+    return sup
+
+
 @pytest.fixture
 def council_def() -> CouncilDefinition:
     return CouncilDefinition(
@@ -25,15 +70,7 @@ def council_def() -> CouncilDefinition:
 
 @pytest.fixture
 def mock_supervisor() -> MagicMock:
-    sup = MagicMock()
-    # Simulate successful deferral by default
-    sup.defer_to_agent.return_value.supervisor_metadata = {
-        "deferral_result": {
-            "success": True,
-            "response": "Analysis from member X",
-        }
-    }
-    return sup
+    return _make_mock_supervisor_with_parallelize()
 
 
 @pytest.fixture
@@ -51,6 +88,13 @@ class TestCouncilOrchestrator:
         mock_calling_state: MagicMock,
     ) -> None:
         """End-to-end council with mocked Supervisor returns CouncilOutcome."""
+        # Wire arbitrator deferral
+        mock_supervisor.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Decision: Deploy\nConfidence: HIGH\n",
+            }
+        }
         orch = CouncilOrchestrator(mock_supervisor)
         outcome = orch.deliberate(council_def, "Should we deploy?", mock_calling_state)
 
@@ -61,18 +105,26 @@ class TestCouncilOrchestrator:
         assert "m1" in outcome.member_counters
         assert "m2" in outcome.member_counters
 
-    def test_calls_defer_to_agent_for_each_phase(
+    def test_calls_parallelize_and_defer_to_agent(
         self,
         council_def: CouncilDefinition,
         mock_supervisor: MagicMock,
         mock_calling_state: MagicMock,
     ) -> None:
-        """defer_to_agent is called once per member per phase + arbitrator."""
+        """parallelize is called for Phase 2 and 3; defer_to_agent once for Phase 4."""
+        mock_supervisor.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Decision: x\nConfidence: LOW\n",
+            }
+        }
         orch = CouncilOrchestrator(mock_supervisor)
         orch.deliberate(council_def, "problem", mock_calling_state)
 
-        # 2 members × (analysis + counter) + 1 arbitrator = 5 calls
-        assert mock_supervisor.defer_to_agent.call_count == 5
+        # parallelize: once for analysis, once for counter-analysis
+        assert mock_supervisor.parallelize.call_count == 2
+        # defer_to_agent: once for arbitrator
+        assert mock_supervisor.defer_to_agent.call_count == 1
 
     def test_member_failure_graceful(
         self,
@@ -80,20 +132,28 @@ class TestCouncilOrchestrator:
         mock_calling_state: MagicMock,
     ) -> None:
         """If a member fails, council continues and arbitrator is informed."""
+        def _parallelize(items, *, parent_task="", merge_strategy="concat"):
+            agent_results: dict[str, dict[str, str]] = {}
+            for agent_id, _prompt in items:
+                if agent_id == "m1":
+                    agent_results[agent_id] = {
+                        "output": "m1 analysis", "status": "success", "done": True,
+                    }
+                else:
+                    # m2 fails — empty output
+                    agent_results[agent_id] = {
+                        "output": "", "status": "error", "done": True,
+                    }
+            return MagicMock(), agent_results
+
         mock_sup = MagicMock()
-        def _side_effect(state, target_agent_id, prompt, **kwargs):
-            result = MagicMock()
-            if target_agent_id == "m1":
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": True, "response": "m1 analysis"}
-                }
-            else:
-                # m2 fails
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": False, "response": ""}
-                }
-            return result
-        mock_sup.defer_to_agent.side_effect = _side_effect
+        mock_sup.parallelize.side_effect = _parallelize
+        mock_sup.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Decision: x\nConfidence: LOW\n",
+            }
+        }
 
         orch = CouncilOrchestrator(mock_sup)
         outcome = orch.deliberate(council_def, "problem", mock_calling_state)
@@ -109,28 +169,19 @@ class TestCouncilOrchestrator:
         mock_calling_state: MagicMock,
     ) -> None:
         """Arbitrator's structured output is parsed into CouncilOutcome."""
-        mock_sup = MagicMock()
         arb_response = (
             "Decision: Deploy after fixing security issue\n"
             "Rationale: The risk is manageable with mitigations\n"
             "Confidence: HIGH\n"
             "Dissent Notes: m2 raised valid concerns about latency\n"
         )
-
-        call_count = [0]
-        def _side_effect(state, target_agent_id, prompt, **kwargs):
-            result = MagicMock()
-            if target_agent_id == "arbitrator":
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": True, "response": arb_response}
-                }
-            else:
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": True, "response": "analysis"}
-                }
-            call_count[0] += 1
-            return result
-        mock_sup.defer_to_agent.side_effect = _side_effect
+        mock_sup = _make_mock_supervisor_with_parallelize({
+            "m1": "analysis", "m2": "analysis",
+        })
+        mock_sup.defer_to_agent.side_effect = None
+        mock_sup.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {"success": True, "response": arb_response}
+        }
 
         orch = CouncilOrchestrator(mock_sup)
         outcome = orch.deliberate(council_def, "problem", mock_calling_state)
@@ -146,22 +197,13 @@ class TestCouncilOrchestrator:
         mock_calling_state: MagicMock,
     ) -> None:
         """Confidence strings are mapped to numeric values."""
-        # Override only the arbitration response
-        def _side_effect(state, target_agent_id, prompt, **kwargs):
-            result = MagicMock()
-            if target_agent_id == "arbitrator":
-                result.supervisor_metadata = {
-                    "deferral_result": {
-                        "success": True,
-                        "response": "Decision: x\nConfidence: MEDIUM\n",
-                    }
-                }
-            else:
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": True, "response": "analysis"}
-                }
-            return result
-        mock_supervisor.defer_to_agent.side_effect = _side_effect
+        mock_supervisor.defer_to_agent.side_effect = None
+        mock_supervisor.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Decision: x\nConfidence: MEDIUM\n",
+            }
+        }
 
         cdef = CouncilDefinition(
             council_id="c",
@@ -179,21 +221,13 @@ class TestCouncilOrchestrator:
         mock_calling_state: MagicMock,
     ) -> None:
         """If arbitrator gives unstructured response, fallback uses full text."""
-        def _side_effect(state, target_agent_id, prompt, **kwargs):
-            result = MagicMock()
-            if target_agent_id == "arbitrator":
-                result.supervisor_metadata = {
-                    "deferral_result": {
-                        "success": True,
-                        "response": "Just do it. I think it's fine.",
-                    }
-                }
-            else:
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": True, "response": "analysis"}
-                }
-            return result
-        mock_supervisor.defer_to_agent.side_effect = _side_effect
+        mock_supervisor.defer_to_agent.side_effect = None
+        mock_supervisor.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Just do it. I think it's fine.",
+            }
+        }
 
         cdef = CouncilDefinition(
             council_id="c",

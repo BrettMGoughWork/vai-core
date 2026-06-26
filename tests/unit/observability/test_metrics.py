@@ -68,12 +68,12 @@ class TestMetricEvent:
 
 
 class TestStdoutSink:
-    def test_accept_writes_to_stdout(self, capsys):
+    def test_accept_writes_to_stderr(self, capsys):
         sink = mod.StdoutSink()
         event = mod.MetricEvent(name="s4.test", value=1.0)
         sink.accept(event)
         captured = capsys.readouterr()
-        assert "s4.test" in captured.out
+        assert "s4.test" in captured.err
 
     def test_accept_never_raises(self, capsys):
         sink = mod.StdoutSink()

@@ -29,6 +29,16 @@ class Job(BaseModel):
         result:             Optional output dict, populated after execution.
         trace:              Append-only state-transition trace.
         execution_context:  Opaque cross-cycle cognitive envelope.
+
+    Decomposition fields (used for agent task fan-out/fan-in):
+        job_type:           "default" | "subtask" | "continuation"
+        parent_job_id:      Links child job back to its parent.
+        priority:           Higher values = earlier dispatch.
+        max_retries:        Per-job retry limit.
+        timeout_seconds:    Per-job timeout.
+        plan_id:            Links to the ``DecompositionPlan``.
+        subtask_id:         Matches ``SubtaskSpec.id``.
+        depends_on:         Subtask IDs this job waits for.
     """
 
     job_id: str = Field(default_factory=lambda: str(uuid4()))
@@ -43,6 +53,16 @@ class Job(BaseModel):
     consecutive_failures: int = 0
     panic_count: int = 0
     crash_count: int = 0
+
+    # ── Decomposition fields ──────────────────────────────────────────
+    job_type: str = "default"
+    parent_job_id: str | None = None
+    priority: int = 0
+    max_retries: int = 0
+    timeout_seconds: int = 300
+    plan_id: str | None = None
+    subtask_id: str | None = None
+    depends_on: list[str] = Field(default_factory=list)
 
     # ------------------------------------------------------------------
     # Checkpoint helpers

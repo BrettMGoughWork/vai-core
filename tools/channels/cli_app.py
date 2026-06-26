@@ -33,6 +33,9 @@ from src.agent.composition_root import (
 from src.gateway.channels.cli import register_cli_channel
 from src.gateway.channels.registry import ChannelRegistry
 from src.gateway.entrypoint import submit_channel_input
+from src.platform.observability import logging as _obs_logging
+from src.platform.observability import metrics as _obs_metrics
+from src.platform.observability import tracing as _obs_tracing
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -276,11 +279,25 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Start interactive REPL mode (reads commands from stdin)",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose observability output (traces, metrics, logs)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
+
+    if args.verbose:
+        _obs_metrics.set_verbose(True)
+        _obs_logging.set_verbose(True)
+        _obs_tracing.set_verbose(True)
+    else:
+        _obs_metrics.set_verbose(False)
+        _obs_logging.set_verbose(False)
+        _obs_tracing.set_verbose(False)
 
     # Param guard: require text arg, --interactive flag, or pipe input
     if not args.text and not args.interactive:

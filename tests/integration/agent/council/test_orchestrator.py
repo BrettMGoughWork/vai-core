@@ -2,6 +2,9 @@
 
 Uses a mock Supervisor that returns canned responses to verify the
 orchestrator's 5-phase cycle works end-to-end without touching real LLMs.
+
+Phases 2 and 3 use ``parallelize()`` (fan-out/fan-in); Phase 4 still
+uses ``defer_to_agent()`` for the single arbitrator.
 """
 
 from __future__ import annotations
@@ -41,6 +44,10 @@ def calling_agent_state() -> AgentState:
 def _make_mock_supervisor(canned_responses: dict[str, str]) -> MagicMock:
     """Build a mock Supervisor that returns canned member responses.
 
+    Phases 2 & 3 use ``parallelize()`` — the mock returns the canned
+    responses keyed by agent_id.  The arbitrator response is also in the
+    dict and returned via ``defer_to_agent()``.
+
     Parameters
     ----------
     canned_responses:
@@ -48,6 +55,21 @@ def _make_mock_supervisor(canned_responses: dict[str, str]) -> MagicMock:
     """
     sup = MagicMock()
 
+    # Phase 2 & 3: parallelize returns (merge_mock, agent_results)
+    def _parallelize(items, *, parent_task="", merge_strategy="concat"):
+        agent_results: dict[str, dict[str, str]] = {}
+        for agent_id, _prompt in items:
+            text = canned_responses.get(agent_id, "Default response")
+            agent_results[agent_id] = {
+                "output": text,
+                "status": "success",
+                "done": True,
+            }
+        return MagicMock(), agent_results
+
+    sup.parallelize.side_effect = _parallelize
+
+    # Phase 4: arbitrator uses defer_to_agent
     def _defer_to_agent(state, target_agent_id, prompt, **kwargs):
         result = MagicMock()
         response = canned_responses.get(target_agent_id, "Default response")
@@ -114,26 +136,28 @@ class TestCouncilIntegration:
         """When a member fails, council continues with placeholder."""
         sup = MagicMock()
 
-        call_info: dict = {"count": 0}
-
-        def _defer_to_agent(state, target_agent_id, prompt, **kwargs):
-            call_info["count"] += 1
-            call_info["last_target"] = target_agent_id
-            result = MagicMock()
-            if target_agent_id == "m2":
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": False, "response": ""}
-                }
-            else:
-                result.supervisor_metadata = {
-                    "deferral_result": {
-                        "success": True,
-                        "response": f"Response from {target_agent_id}",
+        def _parallelize(items, *, parent_task="", merge_strategy="concat"):
+            agent_results: dict[str, dict[str, str]] = {}
+            for agent_id, _prompt in items:
+                if agent_id == "m2":
+                    agent_results[agent_id] = {
+                        "output": "", "status": "error", "done": True,
                     }
-                }
-            return result
+                else:
+                    agent_results[agent_id] = {
+                        "output": f"Response from {agent_id}",
+                        "status": "success",
+                        "done": True,
+                    }
+            return MagicMock(), agent_results
 
-        sup.defer_to_agent.side_effect = _defer_to_agent
+        sup.parallelize.side_effect = _parallelize
+        sup.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Decision: Default\nConfidence: LOW\n",
+            }
+        }
         orch = CouncilOrchestrator(sup)
         outcome = orch.deliberate(
             council_def, "Deploy now?", calling_agent_state
@@ -151,22 +175,21 @@ class TestCouncilIntegration:
         """Even if all members fail, the council still produces an outcome."""
         sup = MagicMock()
 
-        def _defer_to_agent(state, target_agent_id, prompt, **kwargs):
-            result = MagicMock()
-            if target_agent_id == "arbitrator":
-                result.supervisor_metadata = {
-                    "deferral_result": {
-                        "success": True,
-                        "response": "Decision: Default to safe option\nConfidence: LOW\n",
-                    }
+        def _parallelize(items, *, parent_task="", merge_strategy="concat"):
+            agent_results: dict[str, dict[str, str]] = {}
+            for agent_id, _prompt in items:
+                agent_results[agent_id] = {
+                    "output": "", "status": "error", "done": True,
                 }
-            else:
-                result.supervisor_metadata = {
-                    "deferral_result": {"success": False, "response": ""}
-                }
-            return result
+            return MagicMock(), agent_results
 
-        sup.defer_to_agent.side_effect = _defer_to_agent
+        sup.parallelize.side_effect = _parallelize
+        sup.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Decision: Default to safe option\nConfidence: LOW\n",
+            }
+        }
         orch = CouncilOrchestrator(sup)
         outcome = orch.deliberate(
             council_def, "Deploy now?", calling_agent_state
@@ -184,6 +207,16 @@ class TestCouncilIntegration:
     ) -> None:
         """If arbitrator raises, _defer_to_member catches it."""
         sup = MagicMock()
+
+        def _parallelize(items, *, parent_task="", merge_strategy="concat"):
+            agent_results: dict[str, dict[str, str]] = {}
+            for agent_id, _prompt in items:
+                agent_results[agent_id] = {
+                    "output": "Member analysis", "status": "success", "done": True,
+                }
+            return MagicMock(), agent_results
+
+        sup.parallelize.side_effect = _parallelize
 
         call_count: int = 0
 
@@ -220,26 +253,24 @@ class TestCouncilIntegration:
 
         prompts_seen: list[str] = []
 
-        def _defer_to_agent(state, target_agent_id, prompt, **kwargs):
-            prompts_seen.append(prompt)
-            result = MagicMock()
-            if target_agent_id == "arbitrator":
-                result.supervisor_metadata = {
-                    "deferral_result": {
-                        "success": True,
-                        "response": "Decision: Accept\nConfidence: LOW\n",
-                    }
+        def _parallelize(items, *, parent_task="", merge_strategy="concat"):
+            for _agent_id, prompt in items:
+                prompts_seen.append(prompt)
+            agent_results: dict[str, dict[str, str]] = {}
+            for agent_id, _prompt in items:
+                agent_results[agent_id] = {
+                    "output": "Member analysis", "status": "success", "done": True,
                 }
-            else:
-                result.supervisor_metadata = {
-                    "deferral_result": {
-                        "success": True,
-                        "response": "Member analysis",
-                    }
-                }
-            return result
+            return MagicMock(), agent_results
 
-        sup.defer_to_agent.side_effect = _defer_to_agent
+        sup.parallelize.side_effect = _parallelize
+        sup.defer_to_agent.return_value.supervisor_metadata = {
+            "deferral_result": {
+                "success": True,
+                "response": "Decision: Accept\nConfidence: LOW\n",
+            }
+        }
+
         cdef = CouncilDefinition(
             council_id="c",
             name="c",
@@ -251,5 +282,6 @@ class TestCouncilIntegration:
         orch = CouncilOrchestrator(sup)
         orch.deliberate(cdef, "problem", calling_agent_state)
 
-        # Analysis prompt should mention the token limit guidance
-        assert "500 tokens" in prompts_seen[0]
+        # The first prompt (analysis) should mention the token limit guidance
+        analysis_prompt = prompts_seen[0]
+        assert "500 tokens" in analysis_prompt

@@ -7,6 +7,8 @@ list, and delete.
 
 from __future__ import annotations
 
+import threading
+
 from src.platform.runtime.execution_context import ExecutionContext
 from src.platform.runtime.job import Job
 
@@ -58,10 +60,12 @@ class InMemoryJobStore(JobStore):
 
     def __init__(self) -> None:
         self._store: dict[str, Job] = {}
+        self._lock = threading.Lock()
 
     def save(self, job: Job) -> None:
         """Store or overwrite a job by its ``job_id``."""
-        self._store[job.job_id] = job
+        with self._lock:
+            self._store[job.job_id] = job
 
     def get(self, job_id: str) -> Job | None:
         """Retrieve a job by its ``job_id``, or ``None`` if not found.
@@ -71,10 +75,11 @@ class InMemoryJobStore(JobStore):
         via a serialisation round-trip inside the copy, simulating
         checkpoint load from a persistent store.
         """
-        stored = self._store.get(job_id)
-        if stored is None:
-            return None
-        copy = stored.model_copy(deep=True)
+        with self._lock:
+            stored = self._store.get(job_id)
+            if stored is None:
+                return None
+            copy = stored.model_copy(deep=True)
         if copy.execution_context is not None:
             copy.execution_context = ExecutionContext.from_dict(
                 copy.execution_context.to_dict()
@@ -83,17 +88,20 @@ class InMemoryJobStore(JobStore):
 
     def list(self) -> list[dict]:
         """Return metadata for all known jobs."""
-        return [
-            {"job_id": job.job_id, "created_at": job.created_at.isoformat()}
-            for job in self._store.values()
-        ]
+        with self._lock:
+            return [
+                {"job_id": job.job_id, "created_at": job.created_at.isoformat()}
+                for job in self._store.values()
+            ]
 
     def delete(self, job_id: str) -> None:
         """Remove a job by ``job_id`` (no-op if missing)."""
-        self._store.pop(job_id, None)
+        with self._lock:
+            self._store.pop(job_id, None)
 
     def __len__(self) -> int:
-        return len(self._store)
+        with self._lock:
+            return len(self._store)
 
 
 # module-level singleton so gateway, worker, etc. share one store

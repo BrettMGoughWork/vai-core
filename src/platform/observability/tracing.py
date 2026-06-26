@@ -107,11 +107,11 @@ class StdoutTraceSink:
     """
 
     def accept(self, event: TraceEvent) -> None:
-        """Write ``event`` as a JSON line to stdout."""
+        """Write ``event`` as a JSON line to stderr."""
         try:
             line = event.to_json()
-            sys.stdout.write(line + "\n")
-            sys.stdout.flush()
+            sys.stderr.write(line + "\n")
+            sys.stderr.flush()
         except Exception:
             pass  # never raise
 
@@ -158,6 +158,19 @@ _global_trace_sinks: list[TraceSink] = []
 
 _lock = threading.Lock()
 """Protects ``_global_trace_sinks`` against concurrent modification."""
+
+_verbose = False
+"""If ``False``, ``emit_trace()`` is a no-op.  Set via ``set_verbose()``."""
+
+
+def set_verbose(enable: bool = True) -> None:
+    """Enable or disable trace emission globally.
+
+    Args:
+        enable: ``True`` to emit traces (default), ``False`` to silence.
+    """
+    global _verbose
+    _verbose = enable
 
 
 def register_trace_sink(sink: TraceSink) -> None:
@@ -269,6 +282,9 @@ def emit_trace(
         - ``correlation_id`` is auto-injected from thread-local state.
         - A unique ``trace_id`` is generated for every call.
     """
+    if not _verbose:
+        return ""
+
     try:
         safe_fields: dict[str, str] = {}
         if fields:

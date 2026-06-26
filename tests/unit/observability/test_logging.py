@@ -78,12 +78,12 @@ class TestLogEvent:
 
 
 class TestStdoutLogSink:
-    def test_accept_writes_to_stdout(self, capsys):
+    def test_accept_writes_to_stderr(self, capsys):
         sink = mod.StdoutLogSink()
         event = mod.LogEvent(level="info", message="test")
         sink.accept(event)
         captured = capsys.readouterr()
-        assert "test" in captured.out
+        assert "test" in captured.err
 
     def test_accept_never_raises(self, capsys):
         sink = mod.StdoutLogSink()

@@ -84,12 +84,12 @@ class TestTraceEvent:
 
 
 class TestStdoutTraceSink:
-    def test_accept_writes_to_stdout(self, capsys):
+    def test_accept_writes_to_stderr(self, capsys):
         sink = mod.StdoutTraceSink()
         event = mod.TraceEvent(trace_type="job", trace_id="t-1")
         sink.accept(event)
         captured = capsys.readouterr()
-        assert "t-1" in captured.out
+        assert "t-1" in captured.err
 
     def test_accept_never_raises(self, capsys):
         sink = mod.StdoutTraceSink()

@@ -93,11 +93,11 @@ class StdoutSink:
     """
 
     def accept(self, event: MetricEvent) -> None:
-        """Write ``event`` as a JSON line to stdout."""
+        """Write ``event`` as a JSON line to stderr."""
         try:
             line = event.to_json()
-            sys.stdout.write(line + "\n")
-            sys.stdout.flush()
+            sys.stderr.write(line + "\n")
+            sys.stderr.flush()
         except Exception:
             pass  # never raise
 
@@ -144,6 +144,19 @@ _global_sinks: list[MetricSink] = []
 
 _lock = threading.Lock()
 """Protects ``_global_sinks`` against concurrent modification."""
+
+_verbose = False
+"""If ``False``, ``emit_metric()`` is a no-op.  Set via ``set_verbose()``."""
+
+
+def set_verbose(enable: bool = True) -> None:
+    """Enable or disable metric emission globally.
+
+    Args:
+        enable: ``True`` to emit metrics (default), ``False`` to silence.
+    """
+    global _verbose
+    _verbose = enable
 
 
 def register_sink(sink: MetricSink) -> None:
@@ -193,6 +206,9 @@ def emit_metric(
         - Never raises.
         - Safe to call from any S4 component.
     """
+    if not _verbose:
+        return
+
     try:
         safe_labels: dict[str, str] = {}
         if labels:

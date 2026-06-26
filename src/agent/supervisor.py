@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -65,7 +66,6 @@ from src.agent.interfaces.agent_state import (
 from src.agent.interfaces.agent_state_store import AgentStateStore
 from src.agent.job_interface import JobDispatchResult, dispatch_route
 from src.agent.registry import AgentRegistry, AgentNotFoundError
-from src.agent.registry import AgentRegistry, AgentNotFoundError  # noqa: F811
 from src.agent.router import DEST_COUNCIL, DEST_RUNTIME, DEST_S4B, DEST_WORKFLOW, Route, route_message
 from src.agent.selection import AgentSelectionStrategy
 from src.agent.workflow import WorkflowEngine, WorkflowInstanceStore, WorkflowRegistry
@@ -73,6 +73,12 @@ from src.agent.workflow.engine import WorkflowExecutionState, WorkflowStatus
 from src.agent.workflow.user_interaction import UserInteractionManager
 from src.capabilities.patterns.pattern_registry import PatternRegistry
 from src.agent.strategy_router import RouterOutcome, StrategyRouter
+from src.agent.decomposition.orchestrator import DecompositionOrchestrator
+from src.agent.interfaces.s2_planner import S2PlanDecomposer
+from src.agent.types.decomposition import DecompositionPlan, DecompositionRequest, FanOutResult, MergeResult, SubtaskSpec
+from src.capabilities.planner.todo_store import TodoStore
+from src.platform.runtime.join_handle import JoinHandleState
+from src.platform.runtime.job_store.job_store import JobStore
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -129,10 +135,16 @@ class Supervisor:
         todo_orchestrator: Optional[TodoOrchestrator] = None,
         council_registry: Optional[Any] = None,
         council_orchestrator: Optional[Any] = None,
+        decomposer: Optional[S2PlanDecomposer] = None,
+        decomposition_orchestrator: Optional[DecompositionOrchestrator] = None,
+        job_store: Optional[JobStore] = None,
     ) -> None:
         self._registry = registry
         self._store = store
         self._submit_job = submit_job_callable
+        self._decomposer = decomposer
+        self._decomposition_orchestrator = decomposition_orchestrator
+        self._job_store = job_store
         self._workflow_registry = workflow_registry
         self._workflow_engine = workflow_engine
         self._workflow_store = workflow_instance_store or WorkflowInstanceStore()
@@ -516,6 +528,15 @@ class Supervisor:
                     self._build_defer_to_tool(agent_meta.defer_to)
                 )
 
+            # D1.9: inject execute_todo_plan synthetic tool when the agent
+            # uses the plan-with-todo pattern — fan-out/fan-in replaces manual
+            # sequential execution of plan items.
+            if ("plan_with_todo" in agent_meta.patterns
+                    and self._decomposition_orchestrator is not None):
+                tool_context.append(
+                    self._build_execute_todo_plan_tool()
+                )
+
             # C1: inject convene_council synthetic tool when the agent
             # has councils available for deliberation.
             if agent_meta.councils and self._council_registry:
@@ -668,6 +689,51 @@ class Supervisor:
                             )
                         ]
 
+                # D1.9: intercept execute_todo_plan tool calls — execute
+                # fan-out/fan-in in the Supervisor BEFORE ToolOrchestrator
+                # processes other tools.
+                if tool_calls:
+                    _exec_calls = [
+                        tc for tc in tool_calls
+                        if isinstance(tc, dict) and tc.get("name", "") == "execute_todo_plan"
+                        or hasattr(tc, "name") and getattr(tc, "name", "") == "execute_todo_plan"
+                    ]
+                    if _exec_calls:
+                        for _tc in _exec_calls:
+                            _args = _tc.get("arguments", _tc.get("args", {}))
+                            if isinstance(_args, str):
+                                _args = json.loads(_args)
+                            _db_path = _args.get("db_path", "todo_plan.db")
+                            _caller = state.agent_id
+                            try:
+                                _result = self.execute_todo_plan(
+                                    _db_path,
+                                    calling_agent_id=_caller,
+                                )
+                                _summary = _result.get("summary", "")[:2000]
+                                _status = _result.get("status", "")
+                                reply += (
+                                    f"\n\n[Plan executed via fan-out/fan-in: "
+                                    f"{_status} — {_summary}]"
+                                )
+                            except Exception as _exc:
+                                reply += (
+                                    f"\n\n[Todo plan execution failed: {_exc}]"
+                                )
+                        # Remove execute_todo_plan calls so ToolOrchestrator
+                        # doesn't see them
+                        tool_calls = [
+                            tc for tc in tool_calls
+                            if (
+                                isinstance(tc, dict)
+                                and tc.get("name", "") != "execute_todo_plan"
+                            )
+                            or (
+                                hasattr(tc, "name")
+                                and getattr(tc, "name", "") != "execute_todo_plan"
+                            )
+                        ]
+
                 # C1: intercept convene_council tool calls — run council
                 # deliberation and inject the outcome back into the
                 # conversation so the calling agent can continue its work.
@@ -731,31 +797,9 @@ class Supervisor:
                     pattern_instructions=self._get_pattern_instructions(agent_meta),
                 )
 
-                # Sprint 12b: if primitive.stdlib.todo.create_* was called,
-                # auto-invoke TodoOrchestrator as a first-class capability
-                # to process created goals through the two-level inner loop.
-                if self._todo_orchestrator is not None:
-                    _todo_create_calls = [
-                        tc for tc in tool_calls
-                        if isinstance(tc, dict) and (
-                            tc.get("name", "").startswith("primitive.stdlib.todo.create_")
-                            or tc.get("function", {}).get("name", "").startswith("primitive.stdlib.todo.create_")
-                        )
-                    ]
-                    if _todo_create_calls:
-                        _first = _todo_create_calls[0]
-                        _args = _first.get("arguments") or _first.get("function", {}).get("arguments", {})
-                        if isinstance(_args, str):
-                            try:
-                                _args = json.loads(_args)
-                            except json.JSONDecodeError:
-                                _args = {}
-                        db_path = _args.get("db_path", "todo_plan.db")
-                        try:
-                            orch_result = self._todo_orchestrator.run(db_path)
-                            reply += f"\n\n[Plan executed: {orch_result.get('output', 'Done.')}]"
-                        except Exception as exc:
-                            reply += f"\n\n[Plan execution failed: {exc}]"
+                # Sprint 12b: todo items were created — execution is now
+                # handled by the LLM calling execute_todo_plan after user
+                # approval (Phase 3 of the plan-with-todo pattern).
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"
                 metadata["runtime_error"] = result["error"]
@@ -1158,6 +1202,45 @@ class Supervisor:
             },
         }
 
+    # ── 5b. execute_todo_plan tool ────────────────────────────────────────
+
+    @staticmethod
+    def _build_execute_todo_plan_tool() -> dict:
+        """Build a synthetic ``execute_todo_plan`` tool definition.
+
+        Injected when the agent has ``plan_with_todo`` in its pattern list
+        *and* a DecompositionOrchestrator is configured on the Supervisor.
+
+        The LLM calls this after the user approves a plan.  The Supervisor
+        intercepts the call, fans out all pending todos respecting
+        dependencies, fans in results, and marks todos done/failed.
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": "execute_todo_plan",
+                "description": (
+                    "Execute all pending todo items using fan-out/fan-in. "
+                    "Call this AFTER the user approves the plan. "
+                    "Items without dependencies run in parallel; sequential "
+                    "chains are preserved. Results are merged automatically."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "db_path": {
+                            "type": "string",
+                            "description": (
+                                "Path to the SQLite todo database "
+                                "(the same db_path used when creating items)."
+                            ),
+                            "default": "todo_plan.db",
+                        },
+                    },
+                },
+            },
+        }
+
     # ── 5c. convene_council tool ─────────────────────────────────────────
 
     @staticmethod
@@ -1396,6 +1479,471 @@ class Supervisor:
         state = self._persist(state.with_(supervisor_metadata=meta))
 
         return state
+
+    # ── 5b. decompose_task ─────────────────────────────────────────────
+
+    def decompose_task(
+        self,
+        state: AgentState,
+        task: str,
+        *,
+        max_depth: int = 2,
+        available_agents: list[str] | None = None,
+        poll_interval_seconds: float = 0.5,
+        poll_timeout_seconds: float = 1800.0,
+    ) -> AgentState:
+        """Fan-out a non-atomic task to N child agents, wait, then merge.
+
+        Full lifecycle: **suspend** the parent → get decomposition plan →
+        fan-out N child jobs → wait for JoinHandle → fan-in merge →
+        **resume** the parent with merged results.
+
+        The parent must be in RUNNING or WAITING state (i.e. active).
+
+        After this call the parent resumes in RUNNING state with merged
+        results in ``supervisor_metadata["decomposition_result"]``.
+
+        Parameters
+        ----------
+        state:
+            Current state of the parent agent (must be active).
+        task:
+            Natural-language description of the task to decompose.
+        max_depth:
+            Maximum decomposition depth (default 2).
+        available_agents:
+            Optional list of agent IDs that can serve as subtask targets.
+            Defaults to all registered agents if not provided.
+        poll_interval_seconds:
+            Seconds between JoinHandle polls (default 0.5).
+        poll_timeout_seconds:
+            Maximum wall-clock seconds to wait for children (default 1800).
+
+        Returns
+        -------
+        AgentState:
+            Updated parent state in RUNNING with decomposition results
+            in ``supervisor_metadata["decomposition_result"]``.
+        """
+        self._require_not_terminal(state)
+
+        if not state.is_active():
+            raise AgentNotActiveError(
+                f"cannot decompose from agent {state.agent_id!r} in "
+                f"state {state.lifecycle_state.value}; "
+                f"expected RUNNING or WAITING"
+            )
+
+        # ── 1. Decompose via the planner protocol ──────────────────────
+        decomposer = self._decomposer
+        if decomposer is None:
+            raise SupervisorError(
+                "decompose_task requires a decomposer (S2PlanDecomposer); "
+                "none was provided to the Supervisor constructor"
+            )
+
+        if available_agents is None:
+            available_agents = [m.identity.agent_id for m in self._registry.list_agents()]
+
+        request = DecompositionRequest(
+            parent_task=task,
+            parent_context=dict(state.supervisor_metadata),
+            available_agents=available_agents,
+            constraints={
+                "max_depth": max_depth,
+                "max_children": 8,
+            },
+        )
+        plan = decomposer.decompose(request)
+
+        if plan is None:
+            # Task cannot be decomposed — treat as atomic, no-op.
+            return state
+
+        # ── 2. Fan-out via the orchestrator ────────────────────────────
+        orchestrator = self._decomposition_orchestrator
+        if orchestrator is None:
+            raise SupervisorError(
+                "decompose_task requires a DecompositionOrchestrator; "
+                "none was provided to the Supervisor constructor"
+            )
+
+        fan_out_result: FanOutResult = orchestrator.fan_out(
+            plan, parent_job_id=state.agent_id,
+        )
+
+        # ── 3. Suspend parent to AWAITING_CHILDREN ─────────────────────
+        state = state.with_(
+            lifecycle_state=LifecycleState.AWAITING_CHILDREN,
+            _reason=f"Decomposing task (plan={plan.plan_id}, "
+                    f"subtasks={len(plan.subtasks)})",
+            _details={
+                "plan_id": plan.plan_id,
+                "subtask_count": len(plan.subtasks),
+                "child_job_ids": fan_out_result.child_job_ids,
+                "task_preview": task[:200],
+            },
+        )
+        meta = dict(state.supervisor_metadata)
+        meta["decomposition_fan_out"] = {
+            "plan_id": plan.plan_id,
+            "join_handle_id": fan_out_result.join_handle_id,
+            "child_job_ids": fan_out_result.child_job_ids,
+            "continuation_job_id": fan_out_result.continuation_job_id,
+            "merge_strategy": plan.merge_strategy,
+            "merge_agent_id": plan.merge_agent_id,
+            "merge_prompt_template": plan.merge_prompt_template,
+        }
+        state = self._persist(
+            state.with_(supervisor_metadata=meta)
+        )
+
+        # ── 4. Fan-in — poll until all children complete or timeout ────
+        import time as _time
+        deadline = _time.monotonic() + poll_timeout_seconds
+        join_store = (
+            orchestrator._join_store  # noqa: SLF001
+        )
+        # Ensure the worker pool is started so pool threads drain the
+        # queue independently while we poll.
+        pool = getattr(self, "_decomposition_worker_pool", None)
+        if pool is not None and not pool.is_running:
+            pool.start()
+
+        while _time.monotonic() < deadline:
+            handle = join_store.get(fan_out_result.join_handle_id)
+            if handle is None:
+                raise SupervisorError(
+                    f"JoinHandle {fan_out_result.join_handle_id} "
+                    f"disappeared during fan-in"
+                )
+            if handle.state == JoinHandleState.COMPLETED:
+                break
+            if handle.state == JoinHandleState.FAILED:
+                state = self._persist(
+                    state.with_(
+                        lifecycle_state=LifecycleState.FAILED,
+                        errors=[
+                            *state.errors,
+                            {
+                                "type": "decomposition_failed",
+                                "message": (
+                                    f"JoinHandle {handle.join_handle_id} "
+                                    f"entered FAILED state"
+                                ),
+                                "details": {
+                                    "plan_id": plan.plan_id,
+                                    "child_job_ids": (
+                                        fan_out_result.child_job_ids
+                                    ),
+                                },
+                            },
+                        ],
+                    )
+                )
+                return state
+            _time.sleep(poll_interval_seconds)
+        else:
+            # Timeout reached
+            orchestrator.cancel(plan.plan_id)
+            state = self._persist(
+                state.with_(
+                    lifecycle_state=LifecycleState.FAILED,
+                    errors=[
+                        *state.errors,
+                        {
+                            "type": "decomposition_timeout",
+                            "message": (
+                                f"Fan-in timed out after "
+                                f"{poll_timeout_seconds}s"
+                            ),
+                            "details": {
+                                "plan_id": plan.plan_id,
+                                "join_handle_id": (
+                                    fan_out_result.join_handle_id
+                                ),
+                            },
+                        },
+                    ],
+                )
+            )
+            return state
+
+        # ── 5. Collect child results from JobStore ─────────────────────
+        job_store = self._job_store
+        child_results: dict[str, dict[str, Any]] = {}
+        if job_store is not None:
+            for subtask_id, job_id in zip(
+                (s.id for s in plan.subtasks),
+                fan_out_result.child_job_ids,
+            ):
+                child_job = job_store.get(job_id)
+                if child_job is not None and child_job.result is not None:
+                    child_results[subtask_id] = child_job.result
+
+        # ── 6. Execute merge ───────────────────────────────────────────
+        merged = orchestrator.fan_in(
+            join_handle_id=fan_out_result.join_handle_id,
+            child_results=child_results,
+            parent_context={
+                "task": task,
+                "metadata": dict(state.supervisor_metadata),
+            },
+        )
+
+        # ── 7. Resume parent with result injected ──────────────────────
+        meta = dict(state.supervisor_metadata)
+        meta["decomposition_result"] = {
+            "output": merged.output,
+            "strategy": merged.strategy,
+            "selected": merged.selected,
+            "satisfaction_gap": merged.satisfaction_gap,
+            "child_summaries": merged.child_summaries,
+            "child_job_ids": fan_out_result.child_job_ids,
+        }
+        state = self._persist(
+            state.with_(
+                lifecycle_state=LifecycleState.RUNNING,
+                supervisor_metadata=meta,
+            )
+        )
+
+        return state
+
+    # ── parallelize ────────────────────────────────────────────────────
+
+    def parallelize(
+        self,
+        items: list[tuple[str, str]],
+        *,
+        parent_task: str = "",
+        merge_strategy: str = "concat",
+    ) -> tuple[MergeResult, dict[str, dict[str, Any]]]:
+        """Synchronously execute N items in parallel via decomposition.
+
+        Unlike ``decompose_task()`` which uses the LLM decomposer to
+        produce a plan, this method takes an explicit list of
+        ``(agent_id, description)`` tuples and fans them all out at once.
+        The calling agent/session is **not** suspended — this blocks
+        until all items complete and returns the merged result plus raw
+        per-agent outputs.
+
+        Parameters
+        ----------
+        items:
+            List of ``(agent_id, prompt)`` tuples to execute in parallel.
+        parent_task:
+            Optional label for the merge context (e.g. the council problem).
+        merge_strategy:
+            Merge strategy (default ``"concat"``).
+
+        Returns
+        -------
+        tuple[MergeResult, dict[str, dict[str, Any]]]:
+            ``(merged_result, agent_results)`` where ``agent_results``
+            maps each agent_id → its job result dict (``{"output": …,
+            "status": …, "done": True}``).
+        """
+        orchestrator = self._decomposition_orchestrator
+        if orchestrator is None:
+            raise RuntimeError(
+                "parallelize requires a DecompositionOrchestrator; "
+                "ensure decomposition is configured"
+            )
+        pool = getattr(self, "_decomposition_worker_pool", None)
+        if pool is None:
+            raise RuntimeError(
+                "parallelize requires a decomposition worker pool; "
+                "ensure _decomposition_worker_pool is late-bound"
+            )
+        if not pool.is_running:
+            pool.start()
+
+        parent_job_id = str(uuid.uuid4())
+        return orchestrator.parallelize(
+            parent_job_id=parent_job_id,
+            items=items,
+            job_store_get=self._job_store.get,
+            parent_task=parent_task,
+            merge_strategy=merge_strategy,
+        )
+
+    # ── 5c. execute_todo_plan (fan-out/fan-in from todo store) ─────────
+
+    def execute_todo_plan(
+        self,
+        db_path: str,
+        *,
+        calling_agent_id: str = "default-agent",
+        merge_strategy: str = "concat",
+        poll_interval: float = 0.5,
+        poll_timeout: float = 600.0,
+    ) -> dict[str, Any]:
+        """Execute all pending todos from *db_path* via fan-out/fan-in.
+
+        This is the synthetic ``execute_todo_plan`` tool handler.  It opens
+        the SQLite todo database, builds a ``DecompositionPlan`` from all
+        ``pending`` / ``in_progress`` items, fans out subtasks (respecting
+        dependency order), polls for completion, fans in results, and marks
+        todos as done or failed.
+
+        Parameters
+        ----------
+        db_path:
+            Path to the SQLite todo store database.
+        calling_agent_id:
+            Fallback agent ID used when a ``TodoItem`` has no ``agent_id``.
+        merge_strategy:
+            Passed through to the orchestrator fan-in.
+        poll_interval:
+            Seconds between completion checks (default 0.5).
+        poll_timeout:
+            Maximum seconds to wait for completion (default 600).
+
+        Returns
+        -------
+        dict:
+            ``{"status": "succeeded"|"failed", "summary": str,
+            "results": list[dict]}``.
+        """
+        orchestrator = self._decomposition_orchestrator
+        if orchestrator is None:
+            return {
+                "status": "failed",
+                "summary": "No DecompositionOrchestrator configured.",
+                "results": [],
+            }
+        pool = getattr(self, "_decomposition_worker_pool", None)
+        if pool is None:
+            return {
+                "status": "failed",
+                "summary": "No decomposition worker pool configured.",
+                "results": [],
+            }
+        if not pool.is_running:
+            pool.start()
+        from src.capabilities.planner.todo_store import TodoStore
+
+        import time as _time
+
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            store = TodoStore(conn)
+
+            items = store.get_all()
+            pending = [t for t in items if t.status in ("pending", "in_progress")]
+            if not pending:
+                return {
+                    "status": "succeeded",
+                    "summary": "No pending todos to execute.",
+                    "results": [],
+                }
+
+            # ── build SubtaskSpec list ──────────────────────────────────
+            subtasks: list[SubtaskSpec] = []
+            for todo in pending:
+                deps: list[str] = []
+                # resolve dependency IDs — stored as short IDs in todo.depends_on
+                if todo.depends_on:
+                    for dep in todo.depends_on:
+                        if dep in {t.id for t in pending}:
+                            deps.append(dep)
+                subtasks.append(
+                    SubtaskSpec(
+                        subtask_id=todo.id,
+                        description=todo.description
+                        or todo.title
+                        or todo.id,
+                        agent_id=todo.agent_id or calling_agent_id,
+                        depends_on=deps,
+                    )
+                )
+
+            plan = DecompositionPlan(
+                parent_task_id=f"todo-{uuid.uuid4().hex[:8]}",
+                subtasks=subtasks,
+            )
+
+            # ── fan-out ─────────────────────────────────────────────────
+            fan_out_result = orchestrator.fan_out(
+                parent_job_id=plan.parent_task_id,
+                plan=plan,
+            )
+            if fan_out_result.status == "failed":
+                return {
+                    "status": "failed",
+                    "summary": f"Fan-out failed: {fan_out_result.error or 'unknown'}",
+                    "results": [],
+                }
+
+            # ── poll for completion ─────────────────────────────────────
+            started = _time.time()
+            join_handle = fan_out_result.join_handle
+            if join_handle is None:
+                return {
+                    "status": "failed",
+                    "summary": "Fan-out returned no join handle.",
+                    "results": [],
+                }
+
+            while join_handle.state not in (
+                JoinHandleState.SUCCEEDED,
+                JoinHandleState.FAILED,
+            ):
+                if _time.time() - started > poll_timeout:
+                    return {
+                        "status": "failed",
+                        "summary": f"Timed out after {poll_timeout}s.",
+                        "results": [],
+                    }
+                _time.sleep(poll_interval)
+                join_handle = orchestrator.get_join_handle(
+                    plan.parent_task_id
+                ) or join_handle
+
+            # ── fan-in ──────────────────────────────────────────────────
+            merge_result = orchestrator.fan_in(
+                parent_job_id=plan.parent_task_id,
+                merge_strategy=merge_strategy,
+            )
+            all_results: list[dict] = []
+            for subtask in subtasks:
+                child = plan.get_child(subtask.subtask_id)
+                if child is not None:
+                    all_results.append({
+                        "subtask_id": subtask.subtask_id,
+                        "status": child.status,
+                        "output": child.output,
+                        "error": child.error,
+                    })
+
+            # ── mark todos done/failed ──────────────────────────────────
+            for r in all_results:
+                if r["status"] == "succeeded":
+                    store.mark_done(r["subtask_id"])
+                elif r["status"] == "failed":
+                    store.mark_failed(
+                        r["subtask_id"],
+                        error=str(r.get("error", "")),
+                    )
+
+            overall = "succeeded" if merge_result.status == "succeeded" else "failed"
+            return {
+                "status": overall,
+                "summary": merge_result.merged_output or f"Plan {overall}.",
+                "results": all_results,
+            }
+        except Exception as exc:
+            return {
+                "status": "failed",
+                "summary": f"execute_todo_plan error: {exc}",
+                "results": [],
+            }
+        finally:
+            if conn is not None:
+                conn.close()
 
     # ── 6. cancel_agent ────────────────────────────────────────────────
 

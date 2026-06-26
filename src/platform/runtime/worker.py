@@ -73,6 +73,11 @@ class Worker:
         crash_recovery:    Optional custom ``CrashRecovery`` evaluator.
         channel_registry:  Optional ``ChannelRegistry`` for routing job
                            responses back to the originating channel.
+        on_job_complete:   Optional callback fired after pipeline execution
+                           completes.  Receives the updated ``Job`` and can
+                           perform side-effects (e.g. unblocking dependent
+                           jobs, updating ``JoinHandle`` state).  Called for
+                           every completed job, including failures.
     """
 
     def __init__(
@@ -83,12 +88,14 @@ class Worker:
         timeout_seconds: int = 5,
         crash_recovery: CrashRecovery | None = None,
         channel_registry: ChannelRegistry | None = None,
+        on_job_complete: Callable[[Job], None] | None = None,
     ) -> None:
         self._executor = executor
         self._queue = queue
         self._cp = control_plane
         self.timeout_seconds = timeout_seconds
         self._channel_registry = channel_registry
+        self._on_job_complete = on_job_complete
         self._retry_wrapper = ToolRetryWrapper(
             self._executor,
             poison_detector=default_poison_detector(),
@@ -174,6 +181,29 @@ class Worker:
             if stored.resume_token is not None:
                 job.resume_token = stored.resume_token
             job.failure_count = stored.failure_count
+
+            # Early exit: if the stored job is already in a terminal state
+            # that indicates it should not be processed (e.g. cancelled by
+            # sibling failure via PENDING->FAILED, or hit the retry limit
+            # via POISON), skip pipeline execution entirely.
+            if stored.state in (JobState.FAILED, JobState.POISON):
+                emit_metric("s4.job.skipped", 1, {
+                    "worker_id": str(id(self)),
+                    "job_id": job.job_id,
+                    "reason": f"already_{stored.state.value}",
+                })
+                _emit_cycle_trace(
+                    job.job_id, str(id(self)), attempt, "skipped",
+                    component="worker", parent_trace_id=cycle_trace_id,
+                    extra_fields={"reason": f"already_{stored.state.value}"},
+                )
+                _log_supervisor_action(
+                    "skipped",
+                    f"Job {job.job_id} already {stored.state.value} — skipping pipeline",
+                    worker_id=str(id(self)),
+                    job_id=job.job_id,
+                )
+                return stored
 
         self._cp.append_lifecycle_event(
             job, "hydrate_execution_context",
@@ -267,5 +297,18 @@ class Worker:
 
         # Route the response back to the originating channel
         self._route_response(updated_job)
+
+        # Post-execution hook — used by decomposition to unblock siblings
+        # and update JoinHandle state.
+        if self._on_job_complete is not None:
+            from src.platform.runtime.diagnostics import diag
+            diag(f"Worker calling _on_job_complete for {updated_job.job_id} (state={updated_job.state})")
+            try:
+                self._on_job_complete(updated_job)
+            except Exception:
+                import traceback
+                diag(f"  _on_job_complete raised: {traceback.format_exc()}")
+                raise
+            diag(f"Worker _on_job_complete returned OK for {updated_job.job_id}")
 
         return updated_job
