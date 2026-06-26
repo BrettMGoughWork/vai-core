@@ -8,8 +8,7 @@ llm:
   temperature: 0.0
   max_tokens: 4096
 
-# ── Phase 2.14.7 — Kill‑switch for real LLM backend ──────────────────────
-# Set to true only after passing the readiness checklist (Phase 2.14.6).
+# Kill‑switch for real LLM backend
 enable_real_llm: true
 
 agent:
@@ -33,7 +32,6 @@ logging:
 telemetry:
   enabled: true
 
-# ── Phase 1 — Conversation Compaction ───────────────────────────────────
 # Controls when older conversation turns are summarised into a compact
 # summary to reduce context-window pressure.
 compaction:
@@ -45,15 +43,10 @@ compaction:
   min_tokens_for_compaction: 2000
   tool_output_threshold: 10000
 
-# ── PHASE 3.13.1 — Search Provider Configuration ──────────────────────────
 # Keeping this config in the runtime ensures the LLM NEVER sees the
 # provider name, API key, or endpoint.  The LLM only receives normalised
 # search results: {title, url, snippet}.
-#
-# default_provider: canonical name of the provider to use.
-# providers.<name>.api_key_env: env var holding the API key (omitted for keyless providers).
-# providers.<name>.max_results: default maximum results per query.
-search:
+ssearch:
   enabled: true                    # DuckDuckGo + Tavily providers are configured
   default_provider: tavily
   providers:
@@ -65,7 +58,7 @@ search:
       max_results: 5
       timeout: 10.0
 
-# ── PHASE 3.19.1 — Embedding Provider Configuration ──────────────────────
+# Embedding Provider Configuration
 # Controls the semantic embedding backend used for skill discovery fallback.
 # Embeddings are ONLY consulted when the LLM fails to name a capability.
 #
@@ -80,3 +73,10 @@ embedding:
   provider: local
   model: all-MiniLM-L6-v2
   dimensions: 384
+
+# Fan-out / fan-in parallel execution pool for decomposition (Phase 6).
+# pool_size controls how many worker threads process subtasks concurrently.
+# Increase for I/O-bound (LLM) subtasks; decrease for CPU-bound work.
+decomposition:
+  worker_pool:
+    pool_size: 5

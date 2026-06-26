@@ -86,6 +86,26 @@ SCHEMA: Dict[str, Any] = {
             "maxrequestsper_minute": {"type": int, "default": 60},
         },
     },
+    "decomposition": {
+        "type": dict,
+        "fields": {
+            "max_depth": {"type": int, "default": 2},
+            "max_children": {"type": int, "default": 8},
+            "default_timeout_seconds": {"type": int, "default": 300},
+            "default_max_retries": {"type": int, "default": 2},
+            "max_concurrent_subtasks": {"type": int, "default": 16},
+            "merge_strategy": {
+                "type": str,
+                "valid_values": ["concat", "summarize_llm", "select_best", "custom"],
+                "default": "concat",
+            },
+            "dag_validation_enabled": {"type": bool, "default": True},
+            "fan_out_batch_size": {"type": int, "default": 4},
+            "fan_in_poll_interval_ms": {"type": int, "default": 500},
+            "continuation_timeout_seconds": {"type": int, "default": 600},
+            "pool_size": {"type": int, "default": 2},
+        },
+    },
 }
 
 ENV_PREFIX = "S4"

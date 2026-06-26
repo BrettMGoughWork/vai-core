@@ -2,8 +2,12 @@
 CouncilOrchestrator — multi-agent deliberation and arbitration.
 
 Runs a full 5-phase council cycle (Convene → Analysis → Counter-Analysis
-→ Arbitration → Hand-back) using the existing ``Supervisor.defer_to_agent()``
-primitive.  No new lifecycle states are needed — council members go through
+→ Arbitration → Hand-back).  Phases 2 and 3 execute in parallel across
+all members via ``Supervisor.parallelize()`` (decomposition fan-out/fan-in),
+reducing wall-clock time from O(N×rounds) to O(rounds).  Phase 4
+(arbitration) remains sequential because there is a single arbitrator.
+
+No new lifecycle states are needed — council members go through
 the standard CREATED → ACTIVATED → RUNNING → COMPLETED flow.
 """
 
@@ -66,21 +70,34 @@ class CouncilOrchestrator:
         """
         session = CouncilSession.create(council_def, problem)
 
-        # ── Phase 2: Individual Analysis ──────────────────────────────
+        # ── Phase 2: Individual Analysis (parallel fan-out) ───────────
         session.transition_to("analysis")
-        for member_id in council_def.member_agent_ids:
-            prompt = build_analysis_prompt(
-                problem,
+        analysis_items: list[tuple[str, str]] = [
+            (
                 member_id,
-                max_tokens=council_def.max_analysis_tokens,
+                build_analysis_prompt(
+                    problem,
+                    member_id,
+                    max_tokens=council_def.max_analysis_tokens,
+                ),
             )
-            analysis = self._defer_to_member(
-                calling_agent_state, member_id, prompt
+            for member_id in council_def.member_agent_ids
+        ]
+        if analysis_items:
+            _, _analysis_results = self._supervisor.parallelize(
+                analysis_items, parent_task=problem, merge_strategy="concat",
             )
-            session.analyses[member_id] = analysis
+            for member_id in council_def.member_agent_ids:
+                result = _analysis_results.get(member_id, {})
+                output = result.get("output", "")
+                session.analyses[member_id] = (
+                    output if output
+                    else _ERROR_PLACEHOLDER.format(member_id=member_id)
+                )
 
-        # ── Phase 3: Counter-Analysis ─────────────────────────────────
+        # ── Phase 3: Counter-Analysis (parallel fan-out) ──────────────
         session.transition_to("counter")
+        counter_items: list[tuple[str, str]] = []
         for member_id in council_def.member_agent_ids:
             others = {
                 mid: text
@@ -93,10 +110,18 @@ class CouncilOrchestrator:
                 others,
                 max_tokens=council_def.max_counter_tokens,
             )
-            counter = self._defer_to_member(
-                calling_agent_state, member_id, prompt
+            counter_items.append((member_id, prompt))
+        if counter_items:
+            _, _counter_results = self._supervisor.parallelize(
+                counter_items, parent_task=problem, merge_strategy="concat",
             )
-            session.counters[member_id] = counter
+            for member_id in council_def.member_agent_ids:
+                result = _counter_results.get(member_id, {})
+                output = result.get("output", "")
+                session.counters[member_id] = (
+                    output if output
+                    else _ERROR_PLACEHOLDER.format(member_id=member_id)
+                )
 
         # ── Phase 4: Arbitration ──────────────────────────────────────
         session.transition_to("arbitration")

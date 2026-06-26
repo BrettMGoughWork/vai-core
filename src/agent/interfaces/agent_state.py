@@ -48,6 +48,7 @@ class LifecycleState(str, Enum):
     SUSPENDED = "suspended"
     COMPLETED = "completed"
     FAILED = "failed"
+    AWAITING_CHILDREN = "awaiting_children"
 
     def is_terminal(self) -> bool:
         """True if this state is terminal (no further transitions)."""
@@ -58,6 +59,8 @@ class LifecycleState(str, Enum):
         return self in (
             LifecycleState.RUNNING,
             LifecycleState.WAITING,
+        ) and self not in (
+            LifecycleState.AWAITING_CHILDREN,
         )
 
 
@@ -164,6 +167,9 @@ class AgentState:
     version: int = 1
     supervisor_metadata: Dict[str, Any] = field(default_factory=dict)
 
+    # Decomposition (agent task fan-out / fan-in)
+    decomposition_result: Optional[Dict[str, Any]] = None
+
     # Conversation
     conversation_history: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -203,6 +209,8 @@ class AgentState:
         """
         d = {**changes}
         now = _now()
+        reason = d.pop("_reason", "state transition")
+        details = d.pop("_details", {})
 
         # Append a lifecycle event if lifecycle_state changed
         new_state = d.get("lifecycle_state", self.lifecycle_state)
@@ -212,8 +220,8 @@ class AgentState:
                 timestamp=now,
                 from_state=self.lifecycle_state,
                 to_state=new_state,
-                reason=d.pop("_reason", "state transition"),
-                details=d.pop("_details", {}),
+                reason=reason,
+                details=details,
             ))
             d["lifecycle_history"] = history
 
@@ -248,6 +256,10 @@ class AgentState:
     def is_active(self) -> bool:
         """True if the agent is actively progressing."""
         return self.lifecycle_state.is_active()
+
+    def is_awaiting_children(self) -> bool:
+        """True if the agent is paused waiting for subtask results."""
+        return self.lifecycle_state == LifecycleState.AWAITING_CHILDREN
 
 
 def _now() -> str:

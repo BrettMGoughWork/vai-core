@@ -37,27 +37,20 @@ instructions: |
   3. Summarize: total items, dependency chains, which items are ready now.
   4. Ask the user to confirm before executing.
 
-  ## Phase 3: Execute (Iterate)
+  ## Phase 3: Execute (Fan-out / Fan-in)
 
-  Loop until complete or blocked:
-  1. Use `stdlib.todo.get_next` to get the next unblocked pending item.
-  2. If `next` is `null` and `is_complete` is false, report blocked items
-     (use `stdlib.todo.list` to find blocked items and their dependencies).
-     Ask the user how to proceed.
-  3. If `next` is `null` and `is_complete` is true, the plan is done.
-  4. Execute the item: follow its description exactly. Make tool calls,
-     edit files, run commands — whatever is needed.
-  5. On success: call `stdlib.todo.mark_done` with the item `id`.
-  6. On failure: call `stdlib.todo.mark_failed` with the `id` and an
-     `error` message describing what went wrong.
-     - If `retries_remaining` > 0, the item will be retried.
-     - If `retries_exhausted` is returned, report to the user and ask
-       whether to create a follow-up or skip.
-  7. If an item depends on work you cannot do yet (missing information,
-     external dependency), use `stdlib.todo.mark_blocked` with a reason.
+  After the user confirms the plan, call `execute_todo_plan(db_path=...)`
+  available as a synthetic tool in the tool context. This tool will:
+  - Fan-out all pending todos to parallel workers, respecting dependencies
+    (items whose `depends_on` are all done run first; sequential chains
+    are preserved).
+  - Fan-in and merge results into a single summary.
+  - Mark each todo done or failed automatically.
 
-  After each item completes (or fails), briefly report progress:
-  "Done: X/Y items. Next: <item title>"
+  Do NOT loop through items manually — delegate to `execute_todo_plan`.
+  If execution succeeds, briefly report how many items completed.
+  If it fails or returns a timeout, use `stdlib.todo.status_summary` to
+  check state and ask the user how to proceed.
 
   ## Phase 4: Verify
 

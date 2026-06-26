@@ -438,37 +438,23 @@ class ToolOrchestrator:
         # iterations and will re-request the same tools endlessly.
         conversation_history.append(assistant_msg)
 
-        # Tool result messages (Phase 2: dedup + large-output summarisation)
-        prev_tool_name: Optional[str] = None
-        merged_content: List[str] = []
+        # Tool result messages — one per executed primitive.
+        # IMPORTANT: Do NOT merge same-name consecutive tool results, even
+        # though it saves tokens.  DeepSeek (and other providers) enforce a
+        # strict 1:1 correspondence: every tool_call_id in the assistant
+        # message must have a matching tool role response.  Merging violates
+        # this contract and causes HTTP 400 errors.
         for pe in executed_primitives:
-            tool_name = pe.get("name", "")
-            if tool_name and tool_name == prev_tool_name and merged_content:
-                # Same tool called consecutively → merge into one result
-                merged_content.append(pe["result_str"])
-                continue
-
-            # Flush any accumulated merged content before swapping to a new tool
-            if merged_content:
-                content = "\n\n---\n\n".join(merged_content) if len(merged_content) > 1 else merged_content[0]
-                conversation_history.append({
-                    "role": "tool",
-                    "tool_call_id": merged_pe["tool_call_id"],  # first entry's call_id for the group
-                    "content": _summarize_large_output(content, prev_tool_name) if len(content) > _TOOL_OUTPUT_THRESHOLD else content,
-                })
-
-            # Start new group
-            prev_tool_name = tool_name
-            merged_content = [pe["result_str"]]
-            merged_pe = pe  # remember the last pe for call_id
-
-        # Flush final group
-        if merged_content:
-            content = "\n\n---\n\n".join(merged_content) if len(merged_content) > 1 else merged_content[0]
+            content = pe.get("result_str", "")
+            content = (
+                _summarize_large_output(content, pe.get("name", ""))
+                if len(content) > _TOOL_OUTPUT_THRESHOLD
+                else content
+            )
             conversation_history.append({
                 "role": "tool",
-                "tool_call_id": merged_pe["tool_call_id"],  # first entry's call_id for the group
-                "content": _summarize_large_output(content, prev_tool_name) if len(content) > _TOOL_OUTPUT_THRESHOLD else content,
+                "tool_call_id": pe.get("tool_call_id", ""),
+                "content": content,
             })
 
         # Follow-up LLM call — include the user's original request so the
@@ -523,6 +509,15 @@ class ToolOrchestrator:
         if follow_up_result.get("error") is None:
             fu_reply = follow_up_result["output"].get("message") or reply
             fu_tool_calls: list[dict] = follow_up_result.get("tool_calls", [])
+            runtime_fallback = follow_up_result.get("runtime_fallback")
+            if runtime_fallback:
+                import os
+                if os.environ.get("S1_DEBUG"):
+                    runtime_error = follow_up_result.get("runtime_error", "unknown")
+                    print(f"[S1_DEBUG] Follow-up LLM fell back to mock: {runtime_error}")
             return fu_reply, fu_tool_calls
         # Keep the raw primitive reply as fallback
+        import os
+        if os.environ.get("S1_DEBUG"):
+            print(f"[S1_DEBUG] Follow-up LLM returned error: {follow_up_result.get('error')}")
         return reply, []

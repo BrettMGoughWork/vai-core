@@ -23,34 +23,11 @@ python -m tools.channels.cli_app --interactive
 Commands:
 - Type a request — dispatched through the agent strategy router
 - `/agents` — full list of agents
-- `/agent <name>` — switch agents
+- `/agent <agent-name>` — switch agents
 - `/workflows` — full list of workflows
-- `/workflow <id>` — explicitly invoke a workflow
+- `/workflow <workflow-name>` — explicitly invoke a workflow
+- `/council <council-name> on "<deliberation>" - explicitly call a council to deliberate on point
 - Ctrl+C to exit
-
----
-
-## Channels
-
-Some basic channels have been created (MVP for now):
-
-### cli (mentioned above)
-
-### simple web:
-
--- very basic web interface (PWA) used to test
--- sits on the same api surface as the gateway
--- listens on 0.0.0.0:8000 (edit this in the web_app code)
-
-```bash
-python -m tools.channels.web_app
-``` 
-
-### future:
--- whatsapp, telegram webhooks (requires some cert setup, https, etc)
--- web SPA
--- native flutter app (my preference) with basic chat
--- tui
 
 ---
 
@@ -203,6 +180,16 @@ The platform layer (S4) provides durable execution:
 
 The gateway ships with a **Progressive Web App (PWA)** frontend served at `/`. It provides a mobile-friendly chat interface that talks directly to the gateway's own API endpoints — zero CORS, zero external dependencies.
 
+```bash
+python -m tools.channels.web_app
+``` 
+
+### future channels:
+-- whatsapp, telegram webhooks (requires some cert setup, https, etc)
+-- web SPA
+-- native flutter app (my preference) with basic chat
+-- tui (to replace the REPL cli, which is a test interface)
+
 ### Access
 
 Start the gateway and open `http://localhost:8000/` in a browser:
@@ -267,11 +254,15 @@ See [Memory Governance](docs/architecture/MEMORY_GOVERNANCE.md) for the full des
 
 ## Documentation
 
-- [Architecture](docs/architecture/ARCHITECTURE.md) — strata, boundaries, data flow
-- [Roadmap](docs/architecture/ROADMAP.md) — sprint-based planning, Y-horizon experimental features
+Note: if marked with an asterisk, this documentation is old and requires work
+
+- * [Architecture](docs/architecture/ARCHITECTURE.md) — strata, boundaries, data flow
+- * [Roadmap](docs/architecture/ROADMAP.md) — sprint-based planning, Y-horizon experimental features
 - [Memory Governance](docs/architecture/MEMORY_GOVERNANCE.md) — compaction, eviction, store validation
-- [Contracts](docs/contracts/) — interface boundaries between strata
-- [Lifecycle](docs/architecture/LIFECYCLE.md) — boot sequence, shutdown, state management
-- [Observability](docs/architecture/OBSERVABILITY.md) — metrics, tracing, dashboards
-- [Worker Pool](docs/architecture/WORKER_POOL.md) — worker lifecycle, isolation, pipeline
-- [Channels](docs/architecture/CHANNELS.md) — transport abstraction, provider adapters
+- * [Contracts](docs/contracts/) — interface boundaries between strata
+- * [Lifecycle](docs/architecture/LIFECYCLE.md) — boot sequence, shutdown, state management
+- * [Observability](docs/architecture/OBSERVABILITY.md) — metrics, tracing, dashboards
+- * [Worker Pool](docs/architecture/WORKER_POOL.md) — worker lifecycle, isolation, pipeline
+- * [Channels](docs/architecture/CHANNELS.md) — transport abstraction, provider adapters
+- [Agent Deferral](docs/architecture/agent-deferral.md)
+- [Agent Councils](docs/architecture/agent-councils.md)

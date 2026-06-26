@@ -18,10 +18,11 @@ from enum import Enum
 class JobState(str, Enum):
     """Lifecycle states for a ``Job`` inside Stratum-4.
 
-    Six states total: ``PENDING``, ``RUNNING``, ``SUCCEEDED``, ``FAILED``,
-    and ``POISON``.  ``POISON`` is a terminal state for jobs that have
-    exceeded the maximum consecutive failure threshold and must not be
-    retried.
+    Seven states total: ``PENDING``, ``RUNNING``, ``SUCCEEDED``, ``FAILED``,
+    ``POISON``, and ``BLOCKED``.  ``POISON`` is a terminal state for jobs
+    that have exceeded the maximum consecutive failure threshold and must
+    not be retried.  ``BLOCKED`` is used by agent decomposition — a subtask
+    job whose dependencies are not yet satisfied.
 
     Values are lowercase strings for stable JSON serialisation.
     """
@@ -31,6 +32,7 @@ class JobState(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     POISON = "poison"
+    BLOCKED = "blocked"
 
 
 # Allowed transitions expressed as a set of (current, target) pairs.
@@ -39,6 +41,12 @@ _TRANSITIONS: set[tuple[JobState, JobState]] = {
     (JobState.RUNNING, JobState.SUCCEEDED),
     (JobState.RUNNING, JobState.FAILED),
     (JobState.RUNNING, JobState.POISON),
+    # BLOCKED — job waiting on decomposition dependencies
+    (JobState.PENDING, JobState.BLOCKED),
+    (JobState.BLOCKED, JobState.PENDING),    # Unblocked when deps satisfied
+    (JobState.BLOCKED, JobState.FAILED),     # Dependency failure propagation
+    # Cancel — sibling propagation on decomposition failure
+    (JobState.PENDING, JobState.FAILED),     # Cancelled by sibling failure
     # Terminal — no outgoing transitions from SUCCEEDED, FAILED, or POISON.
 }
 

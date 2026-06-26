@@ -8,9 +8,8 @@ backing with Redis/SQS/etc.
 from __future__ import annotations
 
 from collections import deque
+import threading
 
-from src.platform.observability.logging import log_queue_event
-from src.platform.observability.metrics import emit_metric
 from src.platform.runtime.job import Job
 
 
@@ -63,12 +62,12 @@ class InMemoryQueue(Queue):
     def __init__(self) -> None:
         self._items: deque[Job] = deque()
         self._in_flight: dict[str, Job] = {}
+        self._lock = threading.Lock()
 
     def push(self, job: Job) -> str:
         """Append *job* and return its ``job_id``."""
-        self._items.append(job)
-        emit_metric("s4.queue.depth", float(len(self._items)), {"queue": "default"})
-        log_queue_event("default", "enqueue", len(self._items))
+        with self._lock:
+            self._items.append(job)
         return job.job_id
 
     def pop(self) -> Job | None:
@@ -77,29 +76,32 @@ class InMemoryQueue(Queue):
         The returned job is tracked as in-flight until acknowledged,
         requeued, or nacked.
         """
-        try:
-            job = self._items.popleft()
-            self._in_flight[job.job_id] = job
-            emit_metric("s4.queue.depth", float(len(self._items)), {"queue": "default"})
-            log_queue_event("default", "dequeue", len(self._items))
-            return job
-        except IndexError:
-            return None
+        with self._lock:
+            try:
+                job = self._items.popleft()
+                self._in_flight[job.job_id] = job
+                return job
+            except IndexError:
+                return None
 
     def acknowledge(self, job_id: str) -> None:
         """Release the lease on *job_id* (remove from in-flight)."""
-        self._in_flight.pop(job_id, None)
+        with self._lock:
+            self._in_flight.pop(job_id, None)
 
     def requeue(self, job_id: str) -> None:
         """Return *job_id* to the front of the queue."""
-        job = self._in_flight.pop(job_id, None)
-        if job is not None:
-            self._items.appendleft(job)
+        with self._lock:
+            job = self._in_flight.pop(job_id, None)
+            if job is not None:
+                self._items.appendleft(job)
 
     def nack(self, job_id: str) -> None:
         """Remove *job_id* from in-flight (discard)."""
-        self._in_flight.pop(job_id, None)
+        with self._lock:
+            self._in_flight.pop(job_id, None)
 
     def __len__(self) -> int:
         """Return the number of jobs in the queue."""
-        return len(self._items)
+        with self._lock:
+            return len(self._items)
