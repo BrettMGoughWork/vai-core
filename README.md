@@ -10,6 +10,35 @@ This is the baseline. Once it hits a stable level, this project will lean into m
 
 *Note: this project is in early development.*
 
+## Getting Started (Post-Fork)
+
+```bash
+# Install the package and dependencies
+pip install -e .
+
+# Copy the example environment file and fill in your values
+cp .env.example .env
+
+# Configure your LLM provider and other settings in config.yaml
+#   /config/config.yaml
+#
+#   llm:
+#     provider: openai          # or anthropic, azure, etc.
+#     model: gpt-4o
+#
+#   # Worker pool size (controls S4 parallelism)
+#   runtime:
+#     workers: 4
+
+# Run the REPL test harness to verify everything works
+python -m tools.channels.cli_app --interactive
+
+# Or start the web UI
+python -m tools.channels.web_app
+```
+
+The config file at `/config/config.yaml` is the primary place to adjust runtime behaviour. Sensitive values (API keys, tokens) go in `.env` and are loaded at startup — never commit `.env` to version control.
+
 ---
 
 ## REPL Test Harness
@@ -249,6 +278,59 @@ Long-running sessions present a challenge: conversation history accumulates, mem
 - **Eviction pipeline** — removes stale or completed entries from memory stores when buffers overflow or episodes wrap up.
 
 See [Memory Governance](docs/architecture/MEMORY_GOVERNANCE.md) for the full design and configuration options.
+
+---
+
+## Fan-Out / Fan-In (Parallel Job Execution)
+
+The platform runtime (S4) supports **fan-out / fan-in** — distributing independent work across parallel workers and aggregating results. This is used internally by councils (each agent analyses in parallel), planners (nested todo items run concurrently where dependencies allow), and any multi-job dispatch.
+
+```
+     ┌──────────────────┐
+     │  Parent Job      │
+     │  (orchestrator)  │
+     └────────┬─────────┘
+              │  parallelize()
+              ▼
+     ┌──────────────────┐
+     │  Job Dispatcher  │
+     │  (creates N jobs)│
+     └──┬───┬───┬───┬───┘
+        │   │   │   │
+        ▼   ▼   ▼   ▼
+     ┌──┐ ┌──┐ ┌──┐ ┌──┐
+     │W1│ │W2│ │W3│ │W4│   ← Worker pool (configurable size)
+     └──┘ └──┘ └──┘ └──┘
+        │   │   │   │
+        └───┴───┴───┘
+              │  join_all()
+              ▼
+     ┌──────────────────┐
+     │  Result Aggregator│
+     └──────────────────┘
+```
+
+**How it works:**
+
+1. **Fan-out** — The orchestrator calls `parallelize(child_specs)`, which enqueues N independent child jobs into the shared FIFO queue. Each child gets its own `correlation_id` linking it back to the parent.
+
+2. **Parallel execution** — The worker pool picks up child jobs as capacity allows. Workers are long-lived goroutine-style processes; the pool size controls how many jobs run concurrently. Configure via `config.yaml`:
+   ```yaml
+   runtime:
+     workers: 4   # default; increase for more parallelism
+   ```
+
+3. **Error isolation** — A child job failure does **not** cancel siblings. Failed children are recorded in the aggregate result with their error details. The aggregate succeeds if at least one child succeeded (or fails entirely if all children failed).
+
+4. **Fan-in** — `join_all()` blocks until every child reaches a terminal state (success, failure, or timeout). Results are collected into a list keyed by `correlation_id`, with per-child status, reply, error metadata, and timing.
+
+5. **Timeouts** — A configurable wall-clock timeout applies to the full batch. If the timeout fires before all children complete, remaining children are skipped and aggregated as timed-out results.
+
+**Key characteristics:**
+- At-most-once delivery per child (idempotency is the child's responsibility)
+- Shared queue with lease-based consumption — no dedicated per-child channels
+- Deterministic ordering of child IDs for reproducible traceability
+- On orchestrator restart, incomplete fan-out batches are detected and re-dispatched (crash recovery)
 
 ---
 
