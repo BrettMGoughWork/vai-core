@@ -197,7 +197,7 @@ class TestCompactionOrchestratorTurnCount:
         assert result.turns_after == 3  # 1 summary + 1 turn (2 entries)
 
     def test_compacted_history_structure(self) -> None:
-        """After compaction, history starts with a system summary entry
+        """After compaction, history starts with an assistant summary entry
         followed by the recent un-compacted turns."""
         cfg = CompactionConfig(
             turn_count_threshold=4,
@@ -207,8 +207,8 @@ class TestCompactionOrchestratorTurnCount:
         orch = CompactionOrchestrator(llm_complete=_dummy_llm, config=cfg)
         hist = _make_history(8)
         _ = orch.compact_if_needed(hist)
-        # First entry should be a system summary
-        assert hist[0]["role"] == "system"
+        # First entry should be an assistant summary
+        assert hist[0]["role"] == "assistant"
         assert "[Compacted summary" in hist[0]["content"]
         # Remaining entries should be the last 2 turns
         assert len(hist) == 5  # 1 summary + 2 turns × 2 entries

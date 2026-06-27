@@ -800,6 +800,15 @@ class Supervisor:
                 # Sprint 12b: todo items were created — execution is now
                 # handled by the LLM calling execute_todo_plan after user
                 # approval (Phase 3 of the plan-with-todo pattern).
+
+                # Preserve original LLM tool_calls in metadata so the
+                # session adapter can store them in conversation history.
+                # This prevents the "tool forgetting" bug where the LLM
+                # stops calling tools after several turns of clean text
+                # in session history.
+                original_tool_calls = result.get("tool_calls", [])
+                if original_tool_calls:
+                    metadata["llm_tool_calls"] = original_tool_calls
             else:
                 reply = f"[Runtime unavailable: {result['error']}]"
                 metadata["runtime_error"] = result["error"]
