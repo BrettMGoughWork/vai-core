@@ -16,9 +16,13 @@ composition root and every channel gets multi-turn memory for free.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from src.gateway.adapters.agent_adapter import AgentRequest, GatewayAgentAdapter
+
+# Maximum number of turns (user+assistant pairs) retained per session.
+# Beyond this, oldest turns are evicted to prevent unbounded context growth.
+_MAX_HISTORY_TURNS = 25
 
 
 class SessionedAdapter:
@@ -30,12 +34,16 @@ class SessionedAdapter:
     2. Inject ``conversation_history`` into the request metadata.
     3. Delegate to the inner adapter.
     4. On success, append the user + assistant turns to the session.
+
+    Tool calls from LLM responses are preserved in assistant entries so that
+    the LLM sees evidence of past tool usage on subsequent turns, preventing
+    the "tool forgetting" bug.
     """
 
     def __init__(self, inner: GatewayAgentAdapter) -> None:
         self._inner = inner
         # {session_key: [{"role": "user"/"assistant", "content": str}, ...]}
-        self._sessions: dict[str, list[dict[str, str]]] = {}
+        self._sessions: dict[str, List[dict[str, Any]]] = {}
         # Track the last ingest session key so resume() uses a consistent key.
         self._last_session_key: str | None = None
 
@@ -65,10 +73,12 @@ class SessionedAdapter:
         # request, breaking tests that inspect ``last_request`` after
         # the call returns.
         if isinstance(result, dict) and "reply" in result:
-            self._sessions[key] = history + [
-                {"role": "user", "content": request.message_text},
-                {"role": "assistant", "content": self._strip_annotations(result["reply"])},
-            ]
+            self._sessions[key] = self._build_history(
+                history,
+                request.message_text,
+                result["reply"],
+                result.get("metadata", {}),
+            )
 
         return result
 
@@ -92,10 +102,12 @@ class SessionedAdapter:
         if isinstance(result, dict) and "reply" in result:
             key = self._last_session_key or f"cli:{agent_id}"
             history = list(self._sessions.get(key, []))
-            self._sessions[key] = history + [
-                {"role": "user", "content": message_text},
-                {"role": "assistant", "content": self._strip_annotations(result["reply"])},
-            ]
+            self._sessions[key] = self._build_history(
+                history,
+                message_text,
+                result["reply"],
+                result.get("metadata", {}),
+            )
 
         return result
 
@@ -141,6 +153,42 @@ class SessionedAdapter:
                 result.append(text[i])
                 i += 1
         return "".join(result)
+
+    def _build_history(
+        self,
+        prior: List[dict],
+        user_msg: str,
+        assistant_reply: str,
+        metadata: dict,
+    ) -> List[dict]:
+        """Append a user+assistant turn and enforce the turn limit.
+
+        Assistant entries include tool-call metadata when available so the
+        LLM sees evidence of past tool usage on subsequent turns.
+        """
+        assistant_entry: dict[str, Any] = {
+            "role": "assistant",
+            "content": self._strip_annotations(assistant_reply),
+        }
+
+        # Preserve tool-call evidence in session history.
+        # The supervisor injects ``llm_tool_calls`` into the result metadata
+        # when the LLM's response included tool calls.
+        llm_tool_calls = metadata.get("llm_tool_calls")
+        if llm_tool_calls:
+            assistant_entry["tool_calls"] = llm_tool_calls
+
+        turns = prior + [
+            {"role": "user", "content": user_msg},
+            assistant_entry,
+        ]
+
+        # Enforce maximum turn limit — evict oldest pairs.
+        if len(turns) > _MAX_HISTORY_TURNS * 2:
+            excess = len(turns) - _MAX_HISTORY_TURNS * 2
+            turns = turns[excess:]
+
+        return turns
 
     @staticmethod
     def _session_key(request: AgentRequest) -> str:

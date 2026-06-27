@@ -247,11 +247,11 @@ class CompactionOrchestrator:
         if structured_state:
             # Phase 3: inject [CURRENT STATE] + prose summary sidecar
             state_entry: Dict = {
-                "role": "system",
+                "role": "assistant",
                 "content": structured_state.format_for_injection(),
             }
             summary_entry: Dict = {
-                "role": "system",
+                "role": "assistant",
                 "content": f"[Compacted summary — {trigger.value}]\n{raw_response.strip()}",
             }
             conversation_history.clear()
@@ -261,7 +261,7 @@ class CompactionOrchestrator:
         else:
             # Phase 1: plain prose summary
             summary_entry: Dict = {
-                "role": "system",
+                "role": "assistant",
                 "content": f"[Compacted summary — {trigger.value}]\n{raw_response.strip()}",
             }
             conversation_history.clear()

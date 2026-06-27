@@ -81,7 +81,7 @@ class TestProseCompactionPipeline:
         summary_entries = [
             e
             for e in history
-            if e.get("role") == "system"
+            if e.get("role") == "assistant"
             and "Compacted summary" in e.get("content", "")
         ]
         assert len(summary_entries) == 1
@@ -180,11 +180,13 @@ class TestStructuredCompactionPipeline:
         )
 
         assert result.triggered is True
-        # Fallback to prose — only one system entry
-        system_entries = [
-            e for e in history if e.get("role") == "system"
+        # Fallback to prose — only one assistant summary entry
+        assistant_entries = [
+            e for e in history if e.get("role") == "assistant"
+            and ("Compacted summary" in e.get("content", "")
+                 or "CURRENT STATE" in e.get("content", ""))
         ]
-        assert len(system_entries) >= 1
+        assert len(assistant_entries) >= 1
         assert result.tokens_after < result.tokens_before
 
 
@@ -228,15 +230,17 @@ class TestStructuredCompactionJson:
         assert result.structured_state.goal == "Test goal"
         assert "Setup" in result.structured_state.completed
 
-        # Should have 2 system entries: state + summary
-        system_entries = [
-            e for e in history if e.get("role") == "system"
+        # Should have 2 assistant entries: state + summary
+        assistant_entries = [
+            e for e in history if e.get("role") == "assistant"
+            and ("Compacted summary" in e.get("content", "")
+                 or "CURRENT STATE" in e.get("content", ""))
         ]
-        assert len(system_entries) == 2, (
-            f"Expected 2 system entries (state + summary), got {len(system_entries)}"
+        assert len(assistant_entries) == 2, (
+            f"Expected 2 assistant entries (state + summary), got {len(assistant_entries)}"
         )
-        assert any("CURRENT STATE" in e.get("content", "") for e in system_entries)
-        assert any("Compacted summary" in e.get("content", "") for e in system_entries)
+        assert any("CURRENT STATE" in e.get("content", "") for e in assistant_entries)
+        assert any("Compacted summary" in e.get("content", "") for e in assistant_entries)
 
 
 # ── Subgoal-closed trigger ───────────────────────────────────────────────

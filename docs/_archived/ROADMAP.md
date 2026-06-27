@@ -3369,7 +3369,6 @@ grep -r "s1_contract\|s1_client\|s1_real_client\|call_s1_backend\|call_runtime_b
 **R.6.3 — Run Test Suites**
 
 ```bash
-cd C:\Users\mikut\Code\vai-core
 python -m pytest tests/ -x --tb=short 2>&1
 ```
 
