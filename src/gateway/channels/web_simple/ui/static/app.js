@@ -369,6 +369,17 @@
       var data = await res.json();
       if (data.output) {
         addMessage('assistant', data.output, data.metadata);
+      } else if (data.decision) {
+        var text = '**Council Deliberation: ' + esc(data.council_id) + '**\n\n' +
+          '**Decision:** ' + esc(data.decision) + '\n\n' +
+          '**Confidence:** ' + Math.round((data.confidence || 0) * 100) + '%\n';
+        if (data.member_analyses && data.member_analyses.length > 0) {
+          text += '\n**Member Analyses:**\n\n';
+          data.member_analyses.forEach(function (m) {
+            text += '- **' + esc(m.member_id || m.member || '?') + '**: ' + esc(m.analysis || m.response || '') + '\n';
+          });
+        }
+        addMessage('assistant', text, data.metadata);
       } else {
         addMessage('assistant', JSON.stringify(data, null, 2));
       }
