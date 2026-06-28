@@ -268,8 +268,8 @@
     try {
       var res = await fetch('/agents');
       var data = await res.json();
-      var text = '**Available Agents:**\n\n' + (data.agents || data || []).map(function (a) {
-        return '- **' + esc(a.id || a.name || a) + '**' + (a.description ? ': ' + esc(a.description) : '');
+      var text = '**Available Agents:**\n\n' + (Array.isArray(data) ? data : data.agents || []).map(function (a) {
+        return '- **' + esc(a.agent_id || a.name || a) + '**' + (a.description ? ': ' + esc(a.description) : '');
       }).join('\n');
       addMessage('assistant', text);
     } catch (err) {
@@ -295,9 +295,9 @@
     try {
       var res = await fetch('/workflows');
       var data = await res.json();
-      var items = data.workflows || data || [];
+      var items = Array.isArray(data) ? data : data.workflows || [];
       var text = '**Available Workflows:**\n\n' + (items.length === 0 ? '*None found*' : items.map(function (w) {
-        return '- **' + esc(w.id || w.name || w) + '**' + (w.description ? ': ' + esc(w.description) : '');
+        return '- **' + esc(w.workflow_id || w.name || w) + '**' + (w.description ? ': ' + esc(w.description) : '');
       }).join('\n'));
       addMessage('assistant', text);
     } catch (err) {
@@ -336,9 +336,9 @@
     try {
       var res = await fetch('/councils');
       var data = await res.json();
-      var items = data.councils || data || [];
+      var items = Array.isArray(data) ? data : data.councils || [];
       var text = '**Available Councils:**\n\n' + (items.length === 0 ? '*None found*' : items.map(function (c) {
-        return '- **' + esc(c.id || c.name || c) + '**' + (c.description ? ': ' + esc(c.description) : '') + (c.members ? ' *(members: ' + esc(c.members.join(', ')) + ')*' : '');
+        return '- **' + esc(c.council_id || c.name || c) + '**' + (c.description ? ': ' + esc(c.description) : '') + (c.members ? ' *(members: ' + esc(c.members.join(', ')) + ')*' : '');
       }).join('\n'));
       addMessage('assistant', text);
     } catch (err) {
