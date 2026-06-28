@@ -201,7 +201,12 @@ class WorkflowDefinition(BaseModel):
         pass  # Dict keys enforce uniqueness automatically
 
     def _validate_graph_is_acyclic(self) -> None:
-        """Use Kahn's algorithm (topological sort) to detect cycles."""
+        """Use Kahn's algorithm (topological sort) to detect cycles.
+
+        Condition-loop patterns are explicitly allowed: a condition step whose
+        ``on_success`` edge eventually loops back to itself (while-loop pattern)
+        is valid because the condition dynamically breaks the cycle at runtime.
+        """
         # Build adjacency list — only consider on_success transitions for the main path
         in_degree: dict[str, int] = {sid: 0 for sid in self.steps}
         adjacency: dict[str, list[str]] = {sid: [] for sid in self.steps}
@@ -227,7 +232,12 @@ class WorkflowDefinition(BaseModel):
                     queue.append(neighbor)
 
         if visited != len(self.steps):
-            raise ValueError(
-                "workflow graph contains a cycle — topological sort "
-                f"visited {visited}/{len(self.steps)} nodes"
-            )
+            # Check if the cycle involves a condition step → intentional loop
+            unvisited = set(self.steps.keys()) - {
+                sid for sid in self.steps if in_degree.get(sid, 0) == 0
+            }
+            if not any(self.steps[sid].step_type == "condition" for sid in unvisited):
+                raise ValueError(
+                    "workflow graph contains a cycle — topological sort "
+                    f"visited {visited}/{len(self.steps)} nodes"
+                )

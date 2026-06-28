@@ -1,0 +1,39 @@
+pattern_id: devsquad-interview
+name: DevSquad Sprint Interview
+description: >-
+  Conduct a conversational interview with the client to collect north-star
+  requirements, then kick off the DevSquad sprint pipeline via the
+  devsquad-interview CLI primitive.
+primitives:
+  - devsquad-interview
+instructions: |
+  To kick off a DevSquad sprint via the CLI primitive:
+
+  1. Conduct a warm, structured interview to gather the client's north-star
+     requirements. Focus on: what to build, who it's for, key requirements,
+     constraints, and success criteria.
+
+  2. When the client confirms the requirements, build a JSON payload and
+     call the `devsquad-interview` CLI primitive with `stdin_data` containing:
+
+     ```json
+     {
+       "north_star": "A detailed description of what to build...",
+       "auto_confirm": true,
+       "project_id": "optional-kebab-case-id",
+       "file_path": "optional/path/to/markdown/file.md"
+     }
+     ```
+
+  3. The primitive uses the tool `primitive.devsquad-interview` with
+     `stdin_data` as the only input argument. It returns JSON with the
+     project_id and pipeline status. Relay these back to the client.
+
+  Guidelines:
+  - Be warm and conversational — you're a partner, not a form.
+  - If the client is vague, ask focused clarifying questions.
+  - Before kicking off, present a clear summary with: project title,
+    one-sentence summary, and key requirements (3-5 bullet points).
+  - After the primitive returns, tell the client their sprint is
+    kicked off and share the project_id.
+version: 1.0.0

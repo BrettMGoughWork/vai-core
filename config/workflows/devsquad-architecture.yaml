@@ -1,0 +1,62 @@
+# DevSquad Architecture Workflow
+workflow_id: workflow-architecture
+name: "DevSquad Architecture Phase"
+description: "Architect reads the PRD and designs the solution architecture"
+version: "1.0.0"
+trigger_on:
+  - prd.completed
+
+steps:
+  load_prd:
+    step_id: load_prd
+    step_type: tool_execute
+    label: "Load PRD from artifact path"
+    config:
+      tool: file.read
+      args:
+        path: "{{ input.artifact_path }}"
+    transitions:
+      on_success: design_solution
+
+  design_solution:
+    step_id: design_solution
+    step_type: llm_call
+    label: "Architect designs solution"
+    config:
+      job_family: job-family-architect
+      agent_id: agent-architect
+      prompt_template: architect-solution-design
+      output_artifact: "/projects/{{ input.project_id }}/solution.md"
+      context:
+        prd: "{{ steps.load_prd.outputs.content }}"
+    transitions:
+      on_success: update_metadata_solution
+
+  update_metadata_solution:
+    step_id: update_metadata_solution
+    step_type: tool_execute
+    label: "Update metadata after solution"
+    config:
+      tool: update_metadata
+      args:
+        project_id: "{{ input.project_id }}"
+        stage: solution
+        status: completed
+    transitions:
+      on_success: publish_solution_completed
+
+  publish_solution_completed:
+    step_id: publish_solution_completed
+    step_type: tool_execute
+    label: "Emit solution.completed event"
+    config:
+      tool: publish_event
+      args:
+        event_type: solution.completed
+        payload:
+          project_id: "{{ input.project_id }}"
+          artifact_path: "/projects/{{ input.project_id }}/solution.md"
+    transitions:
+      on_success: __end__
+
+start_step: load_prd

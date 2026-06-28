@@ -46,7 +46,7 @@ compaction:
 # Keeping this config in the runtime ensures the LLM NEVER sees the
 # provider name, API key, or endpoint.  The LLM only receives normalised
 # search results: {title, url, snippet}.
-ssearch:
+search:
   enabled: true                    # DuckDuckGo + Tavily providers are configured
   default_provider: tavily
   providers:

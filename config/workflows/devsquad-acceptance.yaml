@@ -1,0 +1,106 @@
+# DevSquad HITL Acceptance Workflow
+workflow_id: workflow-acceptance
+name: "DevSquad HITL Acceptance"
+description: "Presents deliverables to Client for human-in-the-loop acceptance decision"
+version: "1.0.0"
+trigger_on:
+  - review.completed
+
+steps:
+  present_for_acceptance:
+    step_id: present_for_acceptance
+    step_type: user_input
+    label: "Present deliverables to Client for acceptance"
+    config:
+      prompt_template: client-acceptance-request
+      context:
+        prd: "/projects/{{ input.project_id }}/prd.md"
+        review: "/projects/{{ input.project_id }}/review.md"
+        implementation: "/projects/{{ input.project_id }}/src/"
+      input_schema:
+        type: object
+        required: [decision]
+        properties:
+          decision:
+            type: string
+            enum: [approved, rejected, changes_requested]
+          feedback:
+            type: string
+    transitions:
+      on_success: check_approved
+
+  check_approved:
+    step_id: check_approved
+    step_type: condition
+    label: "Check if HITL approved"
+    config:
+      expression: "{{ steps.present_for_acceptance.result.decision == 'approved' }}"
+    transitions:
+      on_success: publish_sprint_completed
+      on_failure: check_changes_requested
+
+  check_changes_requested:
+    step_id: check_changes_requested
+    step_type: condition
+    label: "Check if changes requested"
+    config:
+      expression: "{{ steps.present_for_acceptance.result.decision == 'changes_requested' }}"
+    transitions:
+      on_success: publish_sprint_restart
+      on_failure: publish_sprint_rejected
+
+  publish_sprint_completed:
+    step_id: publish_sprint_completed
+    step_type: tool_execute
+    label: "Emit sprint.completed event"
+    config:
+      tool: publish_event
+      args:
+        event_type: sprint.completed
+        payload:
+          project_id: "{{ input.project_id }}"
+    transitions:
+      on_success: update_metadata_accepted
+
+  update_metadata_accepted:
+    step_id: update_metadata_accepted
+    step_type: tool_execute
+    label: "Mark sprint completed in metadata"
+    config:
+      tool: update_metadata
+      args:
+        project_id: "{{ input.project_id }}"
+        stage: acceptance
+        status: completed
+    transitions:
+      on_success: __end__
+
+  publish_sprint_restart:
+    step_id: publish_sprint_restart
+    step_type: tool_execute
+    label: "Emit sprint.restart event with feedback"
+    config:
+      tool: publish_event
+      args:
+        event_type: sprint.restart
+        payload:
+          project_id: "{{ input.project_id }}"
+          feedback: "{{ steps.present_for_acceptance.result.feedback }}"
+    transitions:
+      on_success: __end__
+
+  publish_sprint_rejected:
+    step_id: publish_sprint_rejected
+    step_type: tool_execute
+    label: "Emit sprint.rejected event"
+    config:
+      tool: publish_event
+      args:
+        event_type: sprint.rejected
+        payload:
+          project_id: "{{ input.project_id }}"
+          feedback: "{{ steps.present_for_acceptance.result.feedback }}"
+    transitions:
+      on_success: __end__
+
+start_step: present_for_acceptance

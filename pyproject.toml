@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "vai-core"
+version = "0.1.0"
+description = "Agentic DevSquad — multi-agent sprint factory"
+requires-python = ">=3.11"
+
+[project.scripts]
+devsquad = "src.devsquad.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src.devsquad*"]

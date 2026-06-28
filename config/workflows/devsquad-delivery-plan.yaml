@@ -1,0 +1,63 @@
+# DevSquad Delivery Planning Workflow
+workflow_id: workflow-delivery-plan
+name: "DevSquad Delivery Planning"
+description: "Architect creates the delivery plan from the solution design"
+version: "1.0.0"
+trigger_on:
+  - solution.completed
+
+steps:
+  load_solution:
+    step_id: load_solution
+    step_type: tool_execute
+    label: "Load solution from artifact path"
+    config:
+      tool: file.read
+      args:
+        path: "{{ input.artifact_path }}"
+    transitions:
+      on_success: create_delivery_plan
+
+  create_delivery_plan:
+    step_id: create_delivery_plan
+    step_type: llm_call
+    label: "Architect creates delivery plan"
+    config:
+      job_family: job-family-architect
+      agent_id: agent-architect
+      prompt_template: architect-delivery-plan
+      output_artifact: "/projects/{{ input.project_id }}/delivery_plan.json"
+      context:
+        solution: "{{ steps.load_solution.outputs.content }}"
+        prd_path: "/projects/{{ input.project_id }}/prd.md"
+    transitions:
+      on_success: update_metadata_delivery
+
+  update_metadata_delivery:
+    step_id: update_metadata_delivery
+    step_type: tool_execute
+    label: "Update metadata after delivery plan"
+    config:
+      tool: update_metadata
+      args:
+        project_id: "{{ input.project_id }}"
+        stage: delivery_plan
+        status: completed
+    transitions:
+      on_success: publish_delivery_plan_completed
+
+  publish_delivery_plan_completed:
+    step_id: publish_delivery_plan_completed
+    step_type: tool_execute
+    label: "Emit delivery_plan.completed event"
+    config:
+      tool: publish_event
+      args:
+        event_type: delivery_plan.completed
+        payload:
+          project_id: "{{ input.project_id }}"
+          artifact_path: "/projects/{{ input.project_id }}/delivery_plan.json"
+    transitions:
+      on_success: __end__
+
+start_step: load_solution

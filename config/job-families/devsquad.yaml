@@ -1,0 +1,44 @@
+# DevSquad Job Family Registrations
+job_families:
+  - job_family_id: job-family-pm
+    agent_id: agent-pm
+    description: "Product Manager — generates PRDs"
+    trigger_events: [sprint.init, sprint.restart]
+    completion_events: [prd.completed]
+    max_retries: 1
+    timeout_seconds: 1800
+
+  - job_family_id: job-family-architect
+    agent_id: agent-architect
+    description: "Architect — designs solutions and delivery plans"
+    trigger_events: [prd.completed, solution.completed]
+    completion_events: [solution.completed, delivery_plan.completed]
+    max_retries: 2
+    timeout_seconds: 3600
+
+  - job_family_id: job-family-engineer
+    agent_id: agent-engineer
+    description: "Engineer — implements task blocks"
+    trigger_events: [delivery_plan.completed, task_block.completed]
+    completion_events: [task_block.completed, implementation.completed]
+    max_retries: 3
+    timeout_seconds: 7200
+
+  - job_family_id: job-family-reviewer
+    agent_ids: [agent-pm, agent-architect]
+    description: "Reviewer council — reviews implementation"
+    trigger_events: [implementation.completed]
+    completion_events: [review.completed]
+    use_council: true
+    council_id: council-devsquad-review
+    max_retries: 1
+    timeout_seconds: 1800
+
+  - job_family_id: job-family-client
+    agent_id: __human__
+    description: "HITL (Human-in-the-Loop) — accepts or rejects deliverables"
+    trigger_events: [review.completed]
+    completion_events: [sprint.completed, sprint.rejected, sprint.changes_requested]
+    requires_human_input: true
+    max_retries: 0
+    timeout_seconds: 86400

@@ -1,0 +1,68 @@
+# DevSquad Review Workflow
+workflow_id: workflow-review
+name: "DevSquad Review Phase"
+description: "PM and Architect review implementation together via council deliberation"
+version: "1.0.0"
+trigger_on:
+  - implementation.completed
+
+steps:
+  parallel_review:
+    step_id: parallel_review
+    step_type: council_deliberate
+    label: "PM + Architect review implementation together"
+    config:
+      council_id: council-devsquad-review
+      member_agent_ids: [agent-pm, agent-architect]
+      arbitrator_agent_id: agent-pm
+      max_analysis_tokens: 2000
+      max_counter_tokens: 1000
+      require_consensus: false
+      context:
+        prd: "/projects/{{ input.project_id }}/prd.md"
+        solution: "/projects/{{ input.project_id }}/solution.md"
+        delivery_plan: "/projects/{{ input.project_id }}/delivery_plan.json"
+        implementation: "/projects/{{ input.project_id }}/src/"
+    transitions:
+      on_success: write_review_artifact
+
+  write_review_artifact:
+    step_id: write_review_artifact
+    step_type: tool_execute
+    label: "Write review artifact to file"
+    config:
+      tool: file.write
+      args:
+        path: "/projects/{{ input.project_id }}/review.md"
+        content: "{{ steps.parallel_review.result }}"
+    transitions:
+      on_success: update_metadata_review
+
+  update_metadata_review:
+    step_id: update_metadata_review
+    step_type: tool_execute
+    label: "Update metadata after review"
+    config:
+      tool: update_metadata
+      args:
+        project_id: "{{ input.project_id }}"
+        stage: review
+        status: completed
+    transitions:
+      on_success: publish_review_completed
+
+  publish_review_completed:
+    step_id: publish_review_completed
+    step_type: tool_execute
+    label: "Emit review.completed event"
+    config:
+      tool: publish_event
+      args:
+        event_type: review.completed
+        payload:
+          project_id: "{{ input.project_id }}"
+          artifact_path: "/projects/{{ input.project_id }}/review.md"
+    transitions:
+      on_success: __end__
+
+start_step: parallel_review

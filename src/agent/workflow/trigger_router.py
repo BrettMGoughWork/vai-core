@@ -220,7 +220,24 @@ class TriggerRouter:
 
 
 # Event types that trigger *new* workflow instances (as opposed to resume).
+# Includes both generic workflow events and DevSquad pipeline events.
+# Each DevSquad event maps to a workflow definition via its ``trigger_on`` field
+# in the workflow YAML config.  The registry's ``find_by_trigger()`` auto-discovers
+# the mapping at runtime.
+_DEVSQUAD_EVENT_TYPES: frozenset[str] = frozenset({
+    "sprint.init",
+    "prd.completed",
+    "solution.completed",
+    "delivery_plan.completed",
+    "implementation.completed",
+    "task_block.completed",
+    "review.completed",
+    "sprint.completed",
+    "sprint.rejected",
+    "workflow.external_input",
+})
+
 _START_EVENT_TYPES: frozenset[str] = frozenset({
     "workflow.start",
     "workflow.scheduled_trigger",
-})
+}) | _DEVSQUAD_EVENT_TYPES
