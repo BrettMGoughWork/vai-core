@@ -360,10 +360,16 @@ Drop a north-star description into the pipeline and DevSquad orchestrates a full
 # Interactive mode
 python -m src.devsquad interview
 
-# Non-interactive (JSON payload)
+# Non-interactive (JSON payload) with optional reference document
 python -m src.devsquad interview --json input.json --confirm
 ```
 
 > ⚠️ **Experimental — still being tuned.** Expect iteration limits to be hit for larger projects.
+
+### Recent enhancements
+
+- **Code verification step** — The engineer now verifies that generated code loads without import errors before running tests, reducing downstream breakage.
+- **Reference document support** — Drop a detailed markdown spec alongside your north star (via `reference_doc` in JSON mode or interactive prompt). The interviewer reads it and asks follow-ups about anything unclear.
+- **Iterative sprints** — Re-run the pipeline on an existing project directory. The PM, Architect, and Engineer each receive context about prior work and build on top of it instead of starting from scratch.
 
 See [DEV_SQUAD.md](docs/architecture/DEV_SQUAD.md) for full architecture, configuration reference, and known limitations.

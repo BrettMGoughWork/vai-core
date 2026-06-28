@@ -34,5 +34,7 @@ user_prompt: |
   Solution: {solution}
   PRD path: {prd_path}
 
+  {sprint_context}
+
   Create the delivery plan as a JSON document.
   Save it to: /projects/{project_id}/delivery_plan.json

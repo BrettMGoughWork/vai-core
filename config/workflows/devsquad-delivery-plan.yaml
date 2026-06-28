@@ -30,6 +30,8 @@ steps:
       context:
         solution: "{{ steps.load_solution.outputs.content }}"
         prd_path: "/projects/{{ input.project_id }}/prd.md"
+        sprint_context: "{{ input.sprint_context | default('') }}"
+        iteration_number: "{{ input.iteration_number | default('1') }}"
     transitions:
       on_success: update_metadata_delivery
 
@@ -57,6 +59,8 @@ steps:
         payload:
           project_id: "{{ input.project_id }}"
           artifact_path: "/projects/{{ input.project_id }}/delivery_plan.json"
+          sprint_context: "{{ input.sprint_context | default('') }}"
+          iteration_number: "{{ input.iteration_number | default('1') }}"
     transitions:
       on_success: __end__
 

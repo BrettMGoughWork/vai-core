@@ -42,6 +42,8 @@ steps:
         delivery_plan: "{{ steps.load_delivery_plan.outputs.content }}"
         solution: "{{ steps.load_solution.outputs.content }}"
         solution_path: "/projects/{{ input.project_id }}/solution.md"
+        sprint_context: "{{ input.sprint_context | default('') }}"
+        iteration_number: "{{ input.iteration_number | default('1') }}"
     transitions:
       on_success: publish_implementation_completed
 

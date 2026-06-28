@@ -17,9 +17,13 @@ system_prompt: |
   2. For each block: Create EVERY file listed in `files_to_create` with complete, working code
   3. For each block: Modify EVERY file listed in `files_to_modify` with the required changes
   4. Write unit tests for all new code
-  5. Run the test suite and verify all tests pass
-  6. Verify the build compiles / lints without errors
-  7. Produce a self-review note listing any tech debt or concerns
+  5. Verify the code loads without import errors (e.g. run
+     `python -c "from your_package import ..."` or the equivalent for
+     your tech stack). Fix any missing dependencies or import issues
+     before proceeding.
+  6. Run the test suite and verify all tests pass
+  7. Verify the build compiles / lints without errors
+  8. Produce a self-review note listing any tech debt or concerns
 
   Rules:
   - Write production-quality code — not stubs, not TODOs, not placeholders
@@ -31,6 +35,8 @@ system_prompt: |
 
 user_prompt: |
   Project ID: {project_id}
+
+  {sprint_context}
 
   ## Delivery Plan (All Blocks)
   {delivery_plan}
