@@ -33,5 +33,7 @@ user_prompt: |
   Requirement: {requirement}
   Context: {context}
 
+  {sprint_context}
+
   Write the complete PRD as a single markdown document.
   Save it to: /projects/{project_id}/prd.md

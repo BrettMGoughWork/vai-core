@@ -19,6 +19,9 @@ system_prompt: |
   Rules:
   - project_id must be lowercase kebab-case, max 40 chars, no special chars
   - If the user provides a file path, treat the file contents as their requirement
+  - If a reference document is provided alongside the north star, read it carefully as
+    detailed technical/domain context. Ask clarifying follow-up questions about anything
+    unclear via an "ask" field: {"ask": "What specific question?"}
   - If the user is vague, ask clarifying questions embedded in your JSON response
     via an "ask" field: {"ask": "What specific question?"}
   - Output ONLY valid JSON, nothing else -- no markdown fences, no commentary
@@ -29,5 +32,7 @@ user_prompt: |
   {user_input}
 
   {file_context}
+
+  {reference_context}
 
   Extract the structured sprint parameters as JSON.

@@ -32,6 +32,8 @@ steps:
         project_id: "{{ input.project_id }}"
         requirement: "{{ input.requirement }}"
         context: "{{ input.context | default('') }}"
+        sprint_context: "{{ input.sprint_context | default('') }}"
+        iteration_number: "{{ input.iteration_number | default('1') }}"
     transitions:
       on_success: update_metadata_prd
 
@@ -59,6 +61,8 @@ steps:
         payload:
           project_id: "{{ input.project_id }}"
           artifact_path: "/projects/{{ input.project_id }}/prd.md"
+          sprint_context: "{{ input.sprint_context | default('') }}"
+          iteration_number: "{{ input.iteration_number | default('1') }}"
     transitions:
       on_success: __end__
 

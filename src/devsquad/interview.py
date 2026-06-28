@@ -149,6 +149,10 @@ _EXTRACTION_SYSTEM_PROMPT = (
     "Rules:\n"
     "- project_id must be lowercase kebab-case, max 40 chars, no special chars\n"
     "- If the user provides a file path, treat the file contents as their requirement\n"
+    "- If a reference document is provided alongside the north star, read it carefully as\n"
+    "  detailed technical/domain context. Ask clarifying follow-up questions about anything\n"
+    "  unclear by returning JSON with only an 'ask' key:\n"
+    '  {"ask": "What specific question?"}\n'
     "- If the user is vague, ask clarifying questions by returning JSON with only an 'ask' key:\n"
     '  {"ask": "What specific question?"}\n'
     "- Output ONLY valid JSON, nothing else - no markdown fences, no commentary"
@@ -158,6 +162,7 @@ _EXTRACTION_SYSTEM_PROMPT = (
 def extract_sprint_params(
     user_input: str,
     file_context: str = "",
+    reference_context: str = "",
     llm_callable: Callable[[str], str] | None = None,
 ) -> dict[str, Any] | None:
     """Extract structured sprint parameters from a user's north-star description.
@@ -173,6 +178,9 @@ def extract_sprint_params(
         The user's north-star description of what they want to build.
     file_context:
         Optional file contents to include as additional context.
+    reference_context:
+        Optional reference document content with detailed specs. The LLM is
+        instructed to read this and ask follow-up questions if anything is unclear.
     llm_callable:
         Override the LLM callable.  Defaults to the system's ``_llm_complete``.
     """
@@ -184,8 +192,16 @@ def extract_sprint_params(
     if file_context:
         file_block = f"\nThe user also provided a file with this content:\n\n{file_context}\n"
 
+    ref_block = ""
+    if reference_context:
+        ref_block = (
+            f"\nThe user also provided a reference document with detailed "
+            f"specifications:\n\n{reference_context}\n"
+            f"Read it carefully and ask follow-ups about anything unclear.\n"
+        )
+
     user_prompt = (
-        f"The user said:\n\n{user_input}\n{file_block}\n"
+        f"The user said:\n\n{user_input}\n{file_block}\n{ref_block}\n"
         f"Extract the structured sprint parameters as JSON."
     )
 
@@ -245,16 +261,51 @@ def kickoff_sprint(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     -------
     List of result dicts, one per workflow that ran.
     """
+    project_id = parsed.get("project_id", "unnamed")
+    requirement = parsed.get("requirement", "")
+
+    # ── Detect existing artifacts for iterative sprints ──────────────
+    project_dir = _PROJECTS_ROOT / project_id
+    iteration_number = 1
+    sprint_context = ""
+
+    if project_dir.exists():
+        iteration_number = 2
+        existing_parts: list[str] = [
+            f"This is an incremental sprint (iteration {iteration_number}).",
+            f"Previous work exists at: {project_dir}",
+            "",
+            "Build on top of the existing code — read existing files before creating",
+            "or modifying. Do NOT rewrite from scratch unless absolutely necessary.",
+            "",
+        ]
+        # Read existing artifacts
+        for artifact_name, filename in [
+            ("PRD", "prd.md"),
+            ("Solution", "solution.md"),
+            ("Delivery Plan", "delivery_plan.json"),
+        ]:
+            artifact_path = project_dir / filename
+            if artifact_path.exists():
+                content = artifact_path.read_text(encoding="utf-8")
+                existing_parts.append(f"--- Existing {artifact_name} ---")
+                existing_parts.append(content)
+                existing_parts.append("")
+
+        sprint_context = "\n".join(existing_parts)
+
     # Publish the event first so the EventBus / TriggerRouter
     # maps the event for any external listeners.
     bus = get_event_bus()
     bus.publish(
         "sprint.init",
         payload={
-            "project_id": parsed.get("project_id", "unnamed"),
+            "project_id": project_id,
             "title": parsed.get("title", ""),
-            "requirement": parsed.get("requirement", ""),
+            "requirement": requirement,
             "context": parsed.get("context", ""),
+            "sprint_context": sprint_context,
+            "iteration_number": iteration_number,
         },
     )
 
@@ -274,10 +325,12 @@ def kickoff_sprint(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     )
     results = driver.run_pipeline(
         initial_payload={
-            "project_id": parsed.get("project_id", "unnamed"),
+            "project_id": project_id,
             "title": parsed.get("title", ""),
-            "requirement": parsed.get("requirement", ""),
+            "requirement": requirement,
             "context": parsed.get("context", ""),
+            "sprint_context": sprint_context,
+            "iteration_number": iteration_number,
         },
     )
     return results
@@ -370,8 +423,27 @@ def run_interview(
     # Collect user input
     user_input = _collect_user_input()
 
+    # Ask if the user has a reference document with detailed specs
+    reference_context = ""
+    try:
+        print()
+        print("  Do you have a reference document with more detailed specs?")
+        print("  (Path to a .md file, or press Enter to skip)")
+        ref_path = input("> ").strip()
+        if ref_path:
+            candidate = Path(ref_path)
+            if not candidate.is_absolute():
+                candidate = _INBOX_DIR / ref_path
+            if candidate.exists():
+                reference_context = candidate.read_text(encoding="utf-8")
+                _print_section("Reference document loaded", f"{candidate.name} ({len(reference_context)} chars)")
+            else:
+                print(f"  [WARN] File not found: {ref_path}. Skipping reference doc.")
+    except EOFError:
+        pass
+
     # Call LLM to extract structured fields
-    parsed = extract_sprint_params(user_input)
+    parsed = extract_sprint_params(user_input, reference_context=reference_context)
 
     # Handle LLM unavailability -- fallback to manual input
     if parsed is None:
@@ -396,6 +468,27 @@ def run_interview(
         if parsed is None:
             print("  Aborting.")
             return None
+
+    # ── Iteration prompt — detect existing project and ask the user ──
+    project_id = parsed.get("project_id", "unnamed")
+    project_dir = _PROJECTS_ROOT / project_id
+    if project_dir.exists() and not auto_confirm:
+        print()
+        print(f"  [⏺] Existing project found: {project_dir}")
+        try:
+            iterate = input(
+                "  Iterate on this project (build on top of existing work)? (Y/n): "
+            ).strip().lower()
+        except EOFError:
+            iterate = "y"
+        if iterate in ("n", "no"):
+            # Generate a fresh project_id by appending a version suffix
+            suffix = 2
+            while (_PROJECTS_ROOT / f"{project_id}-v{suffix}").exists():
+                suffix += 1
+            new_id = f"{project_id}-v{suffix}"
+            print(f"  Starting fresh — new project ID: {new_id}")
+            parsed["project_id"] = new_id
 
     # Confirm with user
     confirmed = True
@@ -454,8 +547,18 @@ def _run_json_mode(json_input: str) -> dict[str, Any]:
             file_content = fp.read_text(encoding="utf-8")
             north_star = f"{north_star}\n\n(File contents from {file_path}:\n{file_content})"
 
+    # Handle optional reference_doc — detailed spec that LLM reads and asks follow-ups about
+    reference_doc_path = payload.get("reference_doc")
+    reference_content = ""
+    if reference_doc_path:
+        rp = Path(reference_doc_path)
+        if rp.exists():
+            reference_content = rp.read_text(encoding="utf-8")
+
     # Extract params via LLM
-    parsed = extract_sprint_params(north_star, file_context=file_content)
+    parsed = extract_sprint_params(
+        north_star, file_context=file_content, reference_context=reference_content,
+    )
 
     if parsed is None:
         err = "LLM could not extract sprint parameters. Use interactive mode."

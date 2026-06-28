@@ -356,14 +356,37 @@ Note: if marked with an asterisk, this documentation is old and requires work
 
 Drop a north-star description into the pipeline and DevSquad orchestrates a full team of agents (interviewer → PM → architect → engineer → council) to produce a working implementation — all in a single subprocess.
 
+### Usage
+
+Switch to the DevSquad interviewer agent, then tell it to start a sprint:
+
+```
+/agent devsquad-interviewer
+```
+
+Then in the conversation with the agent:
+```
+> start a new sprint
+```
+
+The agent will guide you through a structured interview — describing your project, optionally dropping a reference document, and confirming the plan before the pipeline kicks off.
+
+Alternatively, you can use the CLI directly for automation or non-interactive workflows:
+
 ```bash
-# Interactive mode
+# Interactive mode (if you prefer the terminal prompt)
 python -m src.devsquad interview
 
-# Non-interactive (JSON payload)
+# Non-interactive (JSON payload) with optional reference document
 python -m src.devsquad interview --json input.json --confirm
 ```
 
 > ⚠️ **Experimental — still being tuned.** Expect iteration limits to be hit for larger projects.
+
+### Recent enhancements
+
+- **Code verification step** — The engineer now verifies that generated code loads without import errors before running tests, reducing downstream breakage.
+- **Reference document support** — Drop a detailed markdown spec alongside your north star (via `reference_doc` in JSON mode or interactive prompt). The interviewer reads it and asks follow-ups about anything unclear.
+- **Iterative sprints** — Re-run the pipeline on an existing project directory. The PM, Architect, and Engineer each receive context about prior work and build on top of it instead of starting from scratch. When running in interactive mode, you'll be prompted to confirm whether to iterate or start fresh.
 
 See [DEV_SQUAD.md](docs/architecture/DEV_SQUAD.md) for full architecture, configuration reference, and known limitations.

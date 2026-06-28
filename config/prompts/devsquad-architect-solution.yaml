@@ -30,5 +30,7 @@ user_prompt: |
   Project ID: {project_id}
   PRD: {prd}
 
+  {sprint_context}
+
   Design the complete solution architecture.
   Save it to: /projects/{project_id}/solution.md
