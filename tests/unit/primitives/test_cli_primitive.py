@@ -44,6 +44,7 @@ def slow_primitive() -> CLIPrimitive:
         name="test.slow",
         description="sleeps forever",
         command="python",
+        timeout_ms=2000,  # 2-second sliding-wall window
     )
 
 
