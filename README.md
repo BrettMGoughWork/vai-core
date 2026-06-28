@@ -33,8 +33,8 @@ cp .env.example .env
 # Run the REPL test harness to verify everything works
 python -m tools.channels.cli_app --interactive
 
-# Or start the web UI
-python -m tools.channels.web_app
+# Or start the web UI (PWA)
+python -m src.platform.transport.app
 ```
 
 The config file at `/config/config.yaml` is the primary place to adjust runtime behaviour. Sensitive values (API keys, tokens) go in `.env` and are loaded at startup — never commit `.env` to version control.
@@ -210,7 +210,7 @@ The platform layer (S4) provides durable execution:
 The gateway ships with a **Progressive Web App (PWA)** frontend served at `/`. It provides a mobile-friendly chat interface that talks directly to the gateway's own API endpoints — zero CORS, zero external dependencies.
 
 ```bash
-python -m tools.channels.web_app
+python -m src.platform.transport.app
 ``` 
 
 ### future channels:
