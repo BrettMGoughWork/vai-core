@@ -469,6 +469,27 @@ def run_interview(
             print("  Aborting.")
             return None
 
+    # ── Iteration prompt — detect existing project and ask the user ──
+    project_id = parsed.get("project_id", "unnamed")
+    project_dir = _PROJECTS_ROOT / project_id
+    if project_dir.exists() and not auto_confirm:
+        print()
+        print(f"  [⏺] Existing project found: {project_dir}")
+        try:
+            iterate = input(
+                "  Iterate on this project (build on top of existing work)? (Y/n): "
+            ).strip().lower()
+        except EOFError:
+            iterate = "y"
+        if iterate in ("n", "no"):
+            # Generate a fresh project_id by appending a version suffix
+            suffix = 2
+            while (_PROJECTS_ROOT / f"{project_id}-v{suffix}").exists():
+                suffix += 1
+            new_id = f"{project_id}-v{suffix}"
+            print(f"  Starting fresh — new project ID: {new_id}")
+            parsed["project_id"] = new_id
+
     # Confirm with user
     confirmed = True
     if not auto_confirm:

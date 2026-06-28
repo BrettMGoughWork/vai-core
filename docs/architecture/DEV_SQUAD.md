@@ -233,6 +233,20 @@ Iteration 2+ (existing project):
   Engineer implements new features on top of existing codebase
 ```
 
+### Interactive UX
+
+When running in **interactive mode** and the extracted `project_id` matches an existing project directory, the system prompts:
+
+```
+  [⏺] Existing project found: ./projects/forgotten-realms-telnet-mud
+  Iterate on this project (build on top of existing work)? (Y/n):
+```
+
+- **Yes** (default) — the sprint runs as iteration 2+. All agents receive context about prior work.
+- **No** — a fresh `project_id` is generated with an incrementing version suffix (e.g. `forgotten-realms-telnet-mud-v2`) and the sprint starts from scratch.
+
+In **JSON (non-interactive) mode**, the existing behaviour applies — if the `project_id` matches an existing directory, it always iterates. To start fresh in JSON mode, provide a different `project_id`.
+
 ### Context injection
 
 The `sprint_context` is passed through the entire workflow chain via event payloads, ensuring every agent has visibility into prior iterations. The prompt templates use the `{sprint_context}` placeholder which is resolved at runtime by the pipeline driver.
