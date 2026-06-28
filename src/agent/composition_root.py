@@ -814,6 +814,7 @@ agent_registry: AgentRegistry = _registry
 workflow_registry: WorkflowRegistry = wf_registry
 pattern_registry: PatternRegistry = _pattern_registry
 council_defs: list = _council_defs
+supervisor: Supervisor = _supervisor
 council_registry: CouncilRegistry = _council_registry
 council_orchestrator: CouncilOrchestrator = _council_orchestrator
 prompt_registry: PromptRegistry = _prompt_registry
