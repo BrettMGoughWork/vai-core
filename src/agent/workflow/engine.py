@@ -41,6 +41,7 @@ Step outcome types and caller responsibilities:
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -253,8 +254,9 @@ class WorkflowEngine:
         self,
         state: WorkflowExecutionState,
         user_input: str,
+        step_id: str | None = None,
     ) -> Tuple[WorkflowExecutionState, StepOutcome]:
-        """Inject user input into context.
+        """Inject user input into context and step_results.
 
         The engine assumes ``current_step_id`` already points beyond
         the ``user_input`` step (set by the previous ``step()`` call).
@@ -265,14 +267,32 @@ class WorkflowEngine:
         Args:
             state: Execution state (should be WAITING_FOR_INPUT or RUNNING).
             user_input: The user's response text.
+            step_id: The step_id of the ``user_input`` step that produced
+                     this input. If omitted, ``state.current_step_id`` is
+                     used (which may already point beyond the input step).
 
         Returns:
             ``(new_state, continue_outcome)`` — caller should loop
             back to ``step()``.
         """
+        import json
         context = dict(state.context)
         context["_user_input"] = user_input
-        resumed = _copy_state(state, status=WorkflowStatus.RUNNING, context=context)
+        step_results = dict(state.step_results)
+        source_step = step_id or state.current_step_id or ""
+        # Store parsed user input as step result for template resolution
+        # e.g. {{ steps.present_for_acceptance.result.decision }}
+        try:
+            parsed = json.loads(user_input)
+            step_results[source_step] = {"result": parsed}
+        except (json.JSONDecodeError, TypeError):
+            step_results[source_step] = {"result": user_input}
+        resumed = _copy_state(
+            state,
+            status=WorkflowStatus.RUNNING,
+            context=context,
+            step_results=step_results,
+        )
         return resumed, StepOutcome(type="continue", step_id=state.current_step_id or "")
 
     def resume_with_result(
@@ -627,8 +647,11 @@ def _handle_condition(
     defn: Any,
 ) -> Tuple[WorkflowExecutionState, StepOutcome]:
     expression = step.config.get("expression", "True")
+    # Merge step_results into context so {{ steps.x.result.y }} resolves
+    eval_context = dict(state.context)
+    eval_context["steps"] = dict(state.step_results)
     try:
-        result = _evaluate_expression(expression, state.context)
+        result = _evaluate_expression(expression, eval_context)
     except Exception as exc:
         return engine._fail(
             state,
@@ -733,12 +756,42 @@ def _copy_state(
     )
 
 
+class _AttrDict(dict):
+    """A dict that also supports dotted attribute access via ``obj.key``.
+
+    Recursively wraps nested dicts so ``obj.a.b.c`` works like
+    ``obj["a"]["b"]["c"]``.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            val = self[name]
+        except KeyError:
+            raise AttributeError(name)
+        if isinstance(val, dict) and not isinstance(val, _AttrDict):
+            val = _AttrDict(val)
+            self[name] = val
+        return val
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        self[name] = value
+
+
 def _evaluate_expression(expression: str, context: dict) -> bool:
     """Safely evaluate a Python expression against a context dict.
 
     Only safe built-ins are exposed — no IO, no imports, no attribute
     access on arbitrary objects.
     """
+    # Strip optional {{ }} wrappers used in workflow YAML templates
+    expression = expression.strip()
+    if expression.startswith("{{") and expression.endswith("}}"):
+        expression = expression[2:-2].strip()
+    # Convert Jinja2 pipe filters to Python equivalents
+    # e.g. "context.tasks | length > 0" → "len(context.tasks) > 0"
+    expression = re.sub(r"(\w[\w.]*)\s*\|\s*length\b", r"len(\1)", expression)
+    # e.g. "context.x | default('y')" → "context.x or 'y'"
+    expression = re.sub(r"(\w[\w.]*)\s*\|\s*default\(([^)]+)\)", r"(\1 or \2)", expression)
     allowed_builtins: Dict[str, Any] = {
         "len": len,
         "str": str,
@@ -749,9 +802,15 @@ def _evaluate_expression(expression: str, context: dict) -> bool:
         "dict": dict,
         "isinstance": isinstance,
     }
+    eval_locals: Dict[str, Any] = {"context": _AttrDict(context)}
+    for k, v in context.items():
+        if isinstance(v, dict) and not isinstance(v, _AttrDict):
+            eval_locals[k] = _AttrDict(v)
+        else:
+            eval_locals[k] = v
     result = eval(
         expression,
         {"__builtins__": allowed_builtins},
-        {"context": context},
+        eval_locals,
     )
     return bool(result)

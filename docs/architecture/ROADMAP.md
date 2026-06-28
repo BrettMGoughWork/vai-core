@@ -312,7 +312,7 @@ S1 Runtime  S2 Planner  S3 Capab.  S4 Platform     │
 
 **Goal:** Agents can declare a list of peer agents they are allowed to defer/hand-off work to. A delegating agent suspends, the delegate runs with its own persona and tools, and the delegating agent resumes with the delegate's response. The deferral graph must be acyclic — enforced at registration time.
 
-**Concept doc:** [docs/architecture/agent-deferral.md](./agent-deferral.md)
+**Concept doc:** [docs/architecture/AGENT_DEFERRAL.md](./AGENT_DEFERRAL.md)
 
 **Files to create/modify:**
 - `src/agent/deferral/` — resolver, context bridge, depth guard

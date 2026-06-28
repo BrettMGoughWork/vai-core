@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -99,8 +100,6 @@ class AgentInTerminalStateError(SupervisorError):
 
 class AgentNotSuspendedError(SupervisorError):
     """Raised when attempting to resume a non-suspended agent."""
-
-
 # ---------------------------------------------------------------------------
 # Supervisor
 # ---------------------------------------------------------------------------
@@ -138,6 +137,7 @@ class Supervisor:
         decomposer: Optional[S2PlanDecomposer] = None,
         decomposition_orchestrator: Optional[DecompositionOrchestrator] = None,
         job_store: Optional[JobStore] = None,
+        prompt_registry: Any = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -161,6 +161,7 @@ class Supervisor:
         self._todo_orchestrator = todo_orchestrator
         self._council_registry = council_registry
         self._council_orchestrator = council_orchestrator
+        self._prompt_registry = prompt_registry
         self._hitl = HitlManager(
             inline_tool_executor=inline_tool_executor,
             strategy_router=strategy_router,
@@ -183,6 +184,7 @@ class Supervisor:
             workflow_tool_adapter=workflow_tool_adapter,
             primitive_tool_adapter=primitive_tool_adapter,
             council_orchestrator=council_orchestrator,
+            prompt_registry=prompt_registry,
         )
     
     @staticmethod
@@ -244,7 +246,8 @@ class Supervisor:
             pattern = self._pattern_registry.get(pid)
             if pattern:
                 all_tools.update(pattern.primitives)
-        return sorted(all_tools)
+        result = sorted(all_tools)
+        return result
 
     def _get_pattern_instructions(self, agent_meta) -> list[dict]:
         """Return pattern instructions for patterns listed by the agent.
@@ -491,9 +494,12 @@ class Supervisor:
                 if self._primitive_tool_adapter is not None:
                     primitive_tools = self._primitive_tool_adapter.list_tools()
                     tool_context.extend(primitive_tools)
+                _resolved = self._resolve_pattern_primitives(agent_meta)
+                _pre = [t.get("name", "") or t.get("function", {}).get("name", "") for t in tool_context]
                 tool_context = self._filter_tool_context(
-                    tool_context, self._resolve_pattern_primitives(agent_meta),
+                    tool_context, _resolved,
                 )
+                _post = [t.get("name", "") or t.get("function", {}).get("name", "") for t in tool_context]
                 return self._hitl.run_confirmed_skills(
                     state, pending, input_text, route, meta, self._persist,
                     agent_meta=agent_meta,
@@ -518,9 +524,11 @@ class Supervisor:
             # When agent_meta.tools is populated, only tools whose function name
             # matches an entry (substring or fnmatch glob) are included.
             resolved_skills = self._resolve_pattern_primitives(agent_meta)
+            _pre_filter_names = [t.get("name", "") or t.get("function", {}).get("name", "") for t in tool_context]
             tool_context = self._filter_tool_context(
                 tool_context, resolved_skills,
             )
+            _post_filter_names = [t.get("name", "") or t.get("function", {}).get("name", "") for t in tool_context]
 
             # D1.8: inject defer_to synthetic tool when the agent can hand off
             if agent_meta.defer_to:

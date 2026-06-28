@@ -1,0 +1,65 @@
+# DevSquad Sprint Bootstrap Workflow
+workflow_id: workflow-sprint-bootstrap
+name: "DevSquad Sprint Bootstrap"
+description: "Initialises the project structure and dispatches to PM for PRD generation"
+version: "1.0.0"
+trigger_on:
+  - sprint.init
+
+steps:
+  create_project:
+    step_id: create_project
+    step_type: tool_execute
+    label: "Create project directory structure"
+    config:
+      tool: create_project_structure
+      args:
+        project_id: "{{ input.project_id }}"
+        title: "{{ input.title | default('') }}"
+    transitions:
+      on_success: dispatch_pm
+
+  dispatch_pm:
+    step_id: dispatch_pm
+    step_type: llm_call
+    label: "PM generates PRD from requirement"
+    config:
+      job_family: job-family-pm
+      agent_id: agent-pm
+      prompt_template: pm-prd-generation
+      output_artifact: "/projects/{{ input.project_id }}/prd.md"
+      context:
+        project_id: "{{ input.project_id }}"
+        requirement: "{{ input.requirement }}"
+        context: "{{ input.context | default('') }}"
+    transitions:
+      on_success: update_metadata_prd
+
+  update_metadata_prd:
+    step_id: update_metadata_prd
+    step_type: tool_execute
+    label: "Update metadata after PRD"
+    config:
+      tool: update_metadata
+      args:
+        project_id: "{{ input.project_id }}"
+        stage: prd
+        status: completed
+    transitions:
+      on_success: publish_prd_completed
+
+  publish_prd_completed:
+    step_id: publish_prd_completed
+    step_type: tool_execute
+    label: "Emit prd.completed event"
+    config:
+      tool: publish_event
+      args:
+        event_type: prd.completed
+        payload:
+          project_id: "{{ input.project_id }}"
+          artifact_path: "/projects/{{ input.project_id }}/prd.md"
+    transitions:
+      on_success: __end__
+
+start_step: create_project

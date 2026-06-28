@@ -104,7 +104,7 @@ An agent can optionally declare a list of peer agents it can **defer** to — ha
 
 This enables **specialisation** (a general support agent hands off billing queries to a billing specialist), **capability mismatch** (a chat assistant defers execution to a task-specific agent), and **task decomposition** (one agent breaks a complex request into sub-tasks for peers). The deferral graph is validated for acyclicity at registration time — no agent can defer, directly or indirectly, back to itself.
 
-See [Agent Deferral](docs/architecture/agent-deferral.md) for the full design.
+See [Agent Deferral](docs/architecture/AGENT_DEFERRAL.md) for the full design.
 
 ##### Agent Councils
 
@@ -112,7 +112,7 @@ A **council** is a multi-agent deliberation pattern: a panel of specialist agent
 
 Available councils include **dev-squad** (five roles + tech lead adjudicator) for technical decisions and **general-nominal** (strategist, critic, risk-assessor + adjudicator) for broader analysis.
 
-See [Agent Councils](docs/architecture/agent-councils.md) for the full design.
+See [Agent Councils](docs/architecture/AGENT_COUNCILS.md) for the full design.
 
 #### Sub-Goal Planner (Two-Level Planning)
 
@@ -346,5 +346,24 @@ Note: if marked with an asterisk, this documentation is old and requires work
 - * [Observability](docs/architecture/OBSERVABILITY.md) — metrics, tracing, dashboards
 - * [Worker Pool](docs/architecture/WORKER_POOL.md) — worker lifecycle, isolation, pipeline
 - * [Channels](docs/architecture/CHANNELS.md) — transport abstraction, provider adapters
-- [Agent Deferral](docs/architecture/agent-deferral.md)
-- [Agent Councils](docs/architecture/agent-councils.md)
+- [Agent Deferral](docs/architecture/AGENT_DEFERRAL.md)
+- [Agent Councils](docs/architecture/AGENT_COUNCILS.md)
+- [DevSquad — Multi-Agent Sprint Factory](docs/architecture/DEV_SQUAD.md)
+
+---
+
+## DevSquad — Multi-Agent Sprint Factory
+
+Drop a north-star description into the pipeline and DevSquad orchestrates a full team of agents (interviewer → PM → architect → engineer → council) to produce a working implementation — all in a single subprocess.
+
+```bash
+# Interactive mode
+python -m src.devsquad interview
+
+# Non-interactive (JSON payload)
+python -m src.devsquad interview --json input.json --confirm
+```
+
+> ⚠️ **Experimental — still being tuned.** Expect iteration limits to be hit for larger projects.
+
+See [DEV_SQUAD.md](docs/architecture/DEV_SQUAD.md) for full architecture, configuration reference, and known limitations.

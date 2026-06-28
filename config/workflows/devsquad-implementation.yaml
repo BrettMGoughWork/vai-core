@@ -1,0 +1,75 @@
+# DevSquad Implementation Workflow
+workflow_id: workflow-implementation
+name: "DevSquad Implementation Phase"
+description: "Engineer implements all task blocks from the delivery plan in a single pass"
+version: "1.1.0"
+trigger_on:
+  - delivery_plan.completed
+
+steps:
+  load_delivery_plan:
+    step_id: load_delivery_plan
+    step_type: tool_execute
+    label: "Load delivery plan from artifact path"
+    config:
+      tool: file.read
+      args:
+        path: "{{ input.artifact_path }}"
+    transitions:
+      on_success: load_solution
+
+  load_solution:
+    step_id: load_solution
+    step_type: tool_execute
+    label: "Load solution architecture from artifact path"
+    config:
+      tool: file.read
+      args:
+        path: "/projects/{{ input.project_id }}/solution.md"
+    transitions:
+      on_success: implement_from_plan
+
+  implement_from_plan:
+    step_id: implement_from_plan
+    step_type: llm_call
+    label: "Engineer implements all blocks from the delivery plan"
+    config:
+      job_family: job-family-engineer
+      agent_id: agent-engineer
+      prompt_template: engineer-implement-block
+      output_artifact: "/projects/{{ input.project_id }}/implementation.md"
+      context:
+        delivery_plan: "{{ steps.load_delivery_plan.outputs.content }}"
+        solution: "{{ steps.load_solution.outputs.content }}"
+        solution_path: "/projects/{{ input.project_id }}/solution.md"
+    transitions:
+      on_success: publish_implementation_completed
+
+  publish_implementation_completed:
+    step_id: publish_implementation_completed
+    step_type: tool_execute
+    label: "Emit implementation.completed event"
+    config:
+      tool: publish_event
+      args:
+        event_type: implementation.completed
+        payload:
+          project_id: "{{ input.project_id }}"
+          artifact_path: "/projects/{{ input.project_id }}/implementation.md"
+    transitions:
+      on_success: update_metadata_impl_done
+
+  update_metadata_impl_done:
+    step_id: update_metadata_impl_done
+    step_type: tool_execute
+    label: "Mark implementation stage completed"
+    config:
+      tool: update_metadata
+      args:
+        project_id: "{{ input.project_id }}"
+        stage: implementation
+        status: completed
+    transitions:
+      on_success: __end__
+
+start_step: load_delivery_plan

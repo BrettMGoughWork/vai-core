@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import logging
 from typing import List, Dict, Any
 
 from .types import CoreLLMResponse
@@ -48,9 +49,27 @@ class LLMTransport:
         if msg.get("tool_calls"):
             raw_tool_calls = msg["tool_calls"]
             tc = raw_tool_calls[0]
-            args = tc["function"].get("arguments")
-            if isinstance(args, str):
-                args = json.loads(args)
+            raw_args = tc["function"].get("arguments", "{}")
+            if isinstance(raw_args, str):
+                try:
+                    args = json.loads(raw_args)
+                except json.JSONDecodeError:
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "Malformed tool-call arguments for %s: %.200s",
+                        tc["function"].get("name", "?"), raw_args,
+                    )
+                    # Return the raw content as text so the caller can
+                    # decide how to proceed (e.g. re-prompt the LLM).
+                    return CoreLLMResponse(
+                        text=(
+                            f"[LLM issued tool call with malformed arguments. "
+                            f"Tool: {tc['function'].get('name', '?')}. "
+                            f"Raw arguments: {raw_args[:500]}]"
+                        ),
+                    )
+            else:
+                args = raw_args
             return CoreLLMResponse(
                 tool_name=tc["function"]["name"],
                 tool_args=args,

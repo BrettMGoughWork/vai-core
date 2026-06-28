@@ -8,7 +8,7 @@
 
 An **agent council** is a multi-agent deliberation pattern where a panel of specialist agents independently analyse a problem, critique each other's positions, and an impartial arbitrator synthesises a final decision. Each member contributes from its own persona — architect, product manager, engineer, etc. — while the arbitrator weighs all perspectives and produces a structured outcome.
 
-This builds on the [Agent Deferral](agent-deferral.md) primitive: the council orchestrator uses `supervisor.defer_to_agent()` to run each member in turn, collecting their responses before moving to the next phase.
+This builds on the [Agent Deferral](AGENT_DEFERRAL.md) primitive: the council orchestrator uses `supervisor.defer_to_agent()` to run each member in turn, collecting their responses before moving to the next phase.
 
 ## Deliberation Lifecycle
 

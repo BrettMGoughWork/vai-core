@@ -162,6 +162,12 @@ def _tool_matches_workflows(tool: dict, agent_workflows: list[str]) -> bool:
     return wf_id in agent_workflows or name in agent_workflows
 
 
+def _is_primitive_tool(tool: dict) -> bool:
+    """Check if a tool definition is a primitive tool (starts with ``primitive.``)."""
+    name = tool.get("function", {}).get("name", "") or tool.get("name", "")
+    return name.startswith("primitive.")
+
+
 _NON_SAFE_NAME_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
 
 
@@ -401,14 +407,21 @@ def call_s1_backend(
         # ── Build tool definitions and prepare for native function calling ──
         all_tool_context = request.tool_context or []
 
-        # Filter to workflows the agent has access to
-        wf_tool_context = [
+        # Keep tools the agent can use:
+        #   - Workflow tools matching the agent's workflow list
+        #   - Primitive tools (primitive.*) — always included regardless of
+        #     workflow filter, since primitives aren't workflows
+        kept_tool_context = [
             t for t in all_tool_context
-            if not agent_workflows or _tool_matches_workflows(t, agent_workflows)
+            if (
+                not agent_workflows
+                or _tool_matches_workflows(t, agent_workflows)
+                or _is_primitive_tool(t)
+            )
         ]
 
         # Convert to OpenAI-compatible tool definitions
-        tools, tool_name_map = _to_openai_tools(wf_tool_context) if wf_tool_context else ([], {})
+        tools, tool_name_map = _to_openai_tools(kept_tool_context) if kept_tool_context else ([], {})
 
         # ── Token counting & model resolution (needed by compaction below) ─
         conversation_history = request.memory.get("conversation_history", [])

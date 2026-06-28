@@ -23,7 +23,7 @@ class DeepSeekClient(ChatProvider):
         self,
         api_key: Optional[str] = None,
         base_url: str = "https://api.deepseek.com/v1",
-        timeout: float = 30.0,
+        timeout: float = 120.0,
     ) -> None:
         # Load local .env values for dev/runtime environments where env vars
         # are not pre-exported by the shell/session.

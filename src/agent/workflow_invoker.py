@@ -120,6 +120,7 @@ class WorkflowInvoker:
         workflow_tool_adapter: Any = None,
         primitive_tool_adapter: Any = None,
         council_orchestrator: Any = None,
+        prompt_registry: Any = None,
     ) -> None:
         self._workflow_engine = workflow_engine
         self._workflow_store = workflow_store
@@ -132,6 +133,7 @@ class WorkflowInvoker:
         self._workflow_tool_adapter = workflow_tool_adapter
         self._primitive_tool_adapter = primitive_tool_adapter
         self._council_orchestrator = council_orchestrator
+        self._prompt_registry = prompt_registry
 
     # ------------------------------------------------------------------
     # run_workflow_loop
@@ -221,6 +223,36 @@ class WorkflowInvoker:
                     wf_state.context,
                     wf_state.step_results,
                 )
+
+                # ── Prompt template resolution ────────────────────────────
+                # If the step config has a ``prompt_template`` ID, look it up
+                # in the PromptRegistry and merge its content into the config.
+                prompt_id = rendered_config.pop("prompt_template", None)
+                if prompt_id is not None and self._prompt_registry is not None:
+                    template = self._prompt_registry.get(prompt_id)
+                    if template is not None:
+                        # Interpolate context/result placeholders into prompts
+                        prompt_context = {
+                            **{k: str(v) for k, v in wf_state.context.items()},
+                            **{k: str(v) for k, v in wf_state.step_results.items()},
+                            "project_id": wf_state.context.get("project_id", ""),
+                        }
+                        system = template.system_prompt
+                        user = template.user_prompt
+                        for key, val in prompt_context.items():
+                            ph = f"{{{key}}}"
+                            if ph in system:
+                                system = system.replace(ph, str(val))
+                            if ph in user:
+                                user = user.replace(ph, str(val))
+                        rendered_config["system_prompt"] = system
+                        rendered_config["user_prompt"] = user
+                    else:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "prompt_template '%s' not found in PromptRegistry",
+                            prompt_id,
+                        )
 
                 # Agent selection: resolve agent_profile / agent_id from step config
                 selected_agent_id: Optional[str] = None
@@ -565,6 +597,34 @@ class WorkflowInvoker:
                         wf_state.context,
                         wf_state.step_results,
                     )
+
+                    # ── Prompt template resolution ────────────────────────
+                    prompt_id = rendered_config.pop("prompt_template", None)
+                    if prompt_id is not None and self._prompt_registry is not None:
+                        template = self._prompt_registry.get(prompt_id)
+                        if template is not None:
+                            prompt_context = {
+                                **{k: str(v) for k, v in wf_state.context.items()},
+                                **{k: str(v) for k, v in wf_state.step_results.items()},
+                                "project_id": wf_state.context.get("project_id", ""),
+                            }
+                            system = template.system_prompt
+                            user = template.user_prompt
+                            for key, val in prompt_context.items():
+                                ph = f"{{{key}}}"
+                                if ph in system:
+                                    system = system.replace(ph, str(val))
+                                if ph in user:
+                                    user = user.replace(ph, str(val))
+                            rendered_config["system_prompt"] = system
+                            rendered_config["user_prompt"] = user
+                        else:
+                            import logging
+                            logging.getLogger(__name__).warning(
+                                "prompt_template '%s' not found in PromptRegistry",
+                                prompt_id,
+                            )
+
                     ro = RouterOutcome(
                         type=outcome.type,
                         payload=dict(rendered_config) if isinstance(rendered_config, dict) else {},

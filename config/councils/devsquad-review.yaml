@@ -1,0 +1,11 @@
+# DevSquad Review Council
+council_id: council-devsquad-review
+name: "DevSquad Review Council"
+description: "PM and Architect review implementation together"
+arbitrator_agent_id: agent-pm
+member_agent_ids:
+  - agent-pm
+  - agent-architect
+max_analysis_tokens: 2000
+max_counter_tokens: 1000
+require_consensus: false

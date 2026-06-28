@@ -11,8 +11,9 @@ and capability (``src.capabilities.*``).
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 # Load .env into the process environment BEFORE any module-level init that
 # depends on env vars (e.g. MCP client config resolution expands ${VAR}
@@ -32,6 +33,7 @@ load_dotenv(dotenv_path=_env_path, override=True)
 
 from src.capabilities.patterns.pattern_loader import load_patterns_from_directory
 from src.capabilities.patterns.pattern_registry import PatternRegistry
+from src.capabilities.primitives.cli import CLIPrimitive
 from src.capabilities.primitives.mcp import MCPPrimitive
 from src.capabilities.primitives.mcp_client import MCPClientManager
 from src.capabilities.primitives.fetch import load_all_primitives as load_fetch_primitives
@@ -65,6 +67,14 @@ from src.agent.planner.todo_orchestrator import TodoOrchestrator
 from src.agent.council.loader import load_councils_from_directory
 from src.agent.council.orchestrator import CouncilOrchestrator
 from src.agent.council.registry import CouncilRegistry
+from src.agent.loaders.prompt_loader import (
+    PromptRegistry,
+    load_prompts_from_directory as load_prompts,
+)
+from src.agent.loaders.job_family_loader import (
+    JobFamilyRegistry,
+    load_job_families_from_yaml as load_job_families,
+)
 from src.platform.runtime.control_plane import ControlPlane
 from src.platform.runtime.job_store.job_store import InMemoryJobStore
 from src.agent.decomposition.llm_decomposer import LLMDecomposer
@@ -105,11 +115,39 @@ _council_registry = CouncilRegistry()
 for _cd in _council_defs:
     _council_registry.register(_cd)
 
+# ── Prompt template registry (loaded from declarative YAML files) ───
+_prompt_registry = PromptRegistry()
+_prompts_loaded = load_prompts(_prompt_registry, "config/prompts")
+
+# ── Job family registry (loaded from declarative YAML files) ────────
+_job_family_registry = JobFamilyRegistry()
+_job_families_loaded = load_job_families(_job_family_registry, "config/job-families")
+
 # ── Primitive registry (loaded from stdlib + custom) ────────────────
 _primitive_registry = PrimitiveRegistry()
+
 _primitives_loaded = load_stdlib_primitives(_primitive_registry)
 _custom_primitives_loaded = load_custom_primitives(_primitive_registry)
 _fetch_primitives_loaded = load_fetch_primitives(_primitive_registry)
+
+# ── CLI primitives (registered inline for patterns to reference) ────
+_devsquad_interview_primitive = CLIPrimitive(
+    name="devsquad-interview",
+    description="Kick off a DevSquad sprint pipeline with north-star requirements.",
+    command="python -m src.devsquad interview --json",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "stdin_data": {
+                "type": "string",
+                "description": "JSON payload with north_star, auto_confirm, project_id, file_path",
+            },
+        },
+        "required": ["stdin_data"],
+    },
+    timeout_ms=600_000,  # 10 minutes — the full pipeline runs 6+ workflows sequentially
+)
+_primitive_registry.register("devsquad-interview", _devsquad_interview_primitive)
 
 # ── Pattern registry (loaded from declarative YAML files) ──────────
 _pattern_registry = PatternRegistry()
@@ -175,19 +213,131 @@ _PRIMITIVE_CONTEXT: dict[str, object] = {
 }
 
 
-def _execute_tool_inline(payload: dict[str, Any]) -> dict[str, Any] | None:
+# ── Template rendering (resolves {{ }} placeholders) ────────────────────
+_TEMPLATE_RE = re.compile(r"\{\{\s*(.+?)\s*\}\}")
+
+def _resolve_template_var(raw: str, state_context: dict, step_results: dict) -> Any:
+    """Resolve a single dotted template expression against context/step_results.
+
+    Handles:
+      ``input.key``         → ``state_context["key"]``
+      ``context.key``       → ``state_context["key"]``
+      ``steps.sid.result``  → ``step_results["sid"]``  (full result dict)
+    """
+    raw = raw.strip()
+    # Strip pipe filters (e.g. | default(''), | length) — not supported in this engine
+    raw = raw.split("|")[0].strip()
+
+    parts = raw.split(".")
+    if len(parts) >= 2 and parts[0] in ("input", "context"):
+        key = parts[1]
+        if key in state_context:
+            return state_context[key]
+        return ""
+    if len(parts) >= 2 and parts[0] == "steps":
+        sid = parts[1]
+        result = step_results.get(sid, {})
+        if isinstance(result, dict):
+            # Walk remaining dotted path (e.g., steps.x.outputs.content)
+            for attr in parts[2:]:
+                if isinstance(result, dict):
+                    result = result.get(attr, "")
+                else:
+                    # Reached a scalar value — can't drill deeper.
+                    # Return the value as-is (e.g. outputs is a string from
+                    # file.read, and the template says outputs.content).
+                    break
+        return result
+    return raw  # fallback — return raw
+
+
+def _render_template(value: Any, state_context: dict, step_results: dict) -> Any:
+    """Recursively walk a config value and resolve all {{ }} placeholders."""
+    if isinstance(value, str):
+        if not _TEMPLATE_RE.search(value):
+            return value
+        # If the entire string is a single template expression, resolve as typed value
+        m = _TEMPLATE_RE.fullmatch(value.strip())
+        if m:
+            resolved = _resolve_template_var(m.group(1), state_context, step_results)
+            # JSON-serialize non-string results for tool arguments (e.g. file.write content)
+            if isinstance(resolved, (dict, list)):
+                import json
+                return json.dumps(resolved)
+            return resolved
+        # Otherwise replace each {{ }} in-place as string
+        def _replace(m: re.Match) -> str:
+            resolved = _resolve_template_var(m.group(1), state_context, step_results)
+            if isinstance(resolved, str):
+                return resolved
+            return str(resolved)
+        return _TEMPLATE_RE.sub(_replace, value)
+    elif isinstance(value, dict):
+        return {k: _render_template(v, state_context, step_results) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_render_template(v, state_context, step_results) for v in value]
+    return value
+
+
+def _execute_tool_inline(payload: dict[str, Any],
+                         state_context: dict[str, Any] | None = None,
+                         step_results: dict[str, Any] | None = None,
+                         ) -> dict[str, Any] | None:
     """Execute a known tool synchronously, bypassing S4B.
+
+    Supports two payload styles:
+
+    * **LLM tool-call style** — ``payload = {"skill_name": "stdlib.file.read",
+      "arguments": {...}}``  (produced by the LLM via ``PrimitiveToolAdapter``)
+    * **Workflow tool-execute style** — ``payload = {"tool": "publish_event",
+      "args": {...}}``  (produced by workflow ``tool_execute`` steps)
 
     Looks up the skill name in the real ``PrimitiveRegistry``.  Returns
     the result dict if the primitive is recognised, or *None* to fall
     through to S4B dispatch.
     """
+    # ── Resolve skill name ──────────────────────────────────────────
     skill_name = payload.get("skill_name", "")
-    arguments = payload.get("arguments", {})
+    arguments: dict[str, Any] = payload.get("arguments", {})
 
-    primitive = _primitive_registry.get(skill_name)
-    if primitive is None:
-        return None  # unknown → dispatch to S4B
+    if not skill_name:
+        # Workflow-style payload — the key is "tool" not "skill_name"
+        tool_name = payload.get("tool", "")
+        if tool_name:
+            # Try exact match first, then stdlib.{tool}
+            skill_name = tool_name
+            candidate = _primitive_registry.get(skill_name)
+            if candidate is None:
+                skill_name = f"stdlib.{tool_name}"
+                candidate = _primitive_registry.get(skill_name)
+            if candidate is not None:
+                primitive = candidate
+            else:
+                return None  # unknown → dispatch to S4B
+        else:
+            return None  # no tool identifier → dispatch to S4B
+
+        # Workflow-style args live under "args"
+        arguments = payload.get("args", {})
+    else:
+        primitive = _primitive_registry.get(skill_name)
+        if primitive is None:
+            return None  # unknown → dispatch to S4B
+
+    # Render templates against workflow context/step_results before execution
+    _ctx = state_context or {}
+    _sr = step_results or {}
+    arguments = _render_template(arguments, _ctx, _sr)
+
+    # Resolve /projects/ virtual paths to real filesystem paths
+    # DevSquad workflows use /projects/{{ project_id }}/... as a virtual path
+    # convention.  On Windows the file.read primitive would try to open
+    # C:\projects\... which doesn't exist — translate it to DEVSQUAD_PROJECTS_ROOT.
+    _projects_root = os.environ.get("DEVSQUAD_PROJECTS_ROOT", "./projects")
+    for _key, _val in list(arguments.items()):
+        if isinstance(_val, str) and _val.startswith("/projects/"):
+            _relative = _val[len("/projects/"):].lstrip("/\\")
+            arguments[_key] = str(Path(_projects_root) / _relative)
 
     try:
         result = primitive.execute(arguments, context=_PRIMITIVE_CONTEXT)
@@ -452,12 +602,23 @@ _supervisor = Supervisor(
     job_store=_control_plane.job_store,
     decomposition_orchestrator=_decomposition_orchestrator,
     decomposer=_decomposer,
+    prompt_registry=_prompt_registry,
 )
 
 # ── Event Bus & Trigger Router (Sprint 6 — transport layer) ────────
 _event_bus = EventBus()
 _trigger_router = TriggerRouter(wf_registry, _workflow_engine)
 _trigger_router.subscribe_all(_event_bus)
+
+
+def get_event_bus() -> EventBus:
+    """Return the module-level EventBus singleton.
+
+    Used by the ``publish_event`` primitive (and other late-bound
+    consumers) that cannot import ``_event_bus`` at import time.
+    """
+    return _event_bus
+
 
 # ── Council Orchestrator (Sprint C1 — multi-agent arbitration) ─────────
 _council_orchestrator = CouncilOrchestrator(supervisor=_supervisor)
@@ -655,3 +816,5 @@ pattern_registry: PatternRegistry = _pattern_registry
 council_defs: list = _council_defs
 council_registry: CouncilRegistry = _council_registry
 council_orchestrator: CouncilOrchestrator = _council_orchestrator
+prompt_registry: PromptRegistry = _prompt_registry
+job_family_registry: JobFamilyRegistry = _job_family_registry

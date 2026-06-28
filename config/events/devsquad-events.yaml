@@ -1,0 +1,91 @@
+# DevSquad Event Definitions
+events:
+  - event_type: sprint.init
+    description: "External trigger to start a new DevSquad sprint"
+    schema:
+      type: object
+      required: [project_id, requirement]
+      properties:
+        project_id: { type: string }
+        requirement: { type: string }
+        context: { type: string }
+
+  - event_type: prd.completed
+    description: "PM has completed the PRD artifact"
+    schema:
+      type: object
+      required: [project_id, artifact_path]
+      properties:
+        project_id: { type: string }
+        artifact_path: { type: string }
+
+  - event_type: solution.completed
+    description: "Architect has completed the solution design"
+    schema:
+      type: object
+      required: [project_id, artifact_path]
+      properties:
+        project_id: { type: string }
+        artifact_path: { type: string }
+
+  - event_type: delivery_plan.completed
+    description: "Architect has completed the delivery plan"
+    schema:
+      type: object
+      required: [project_id, artifact_path]
+      properties:
+        project_id: { type: string }
+        artifact_path: { type: string }
+
+  - event_type: task_block.completed
+    description: "Engineer completed one task block"
+    schema:
+      type: object
+      required: [project_id, block_id]
+      properties:
+        project_id: { type: string }
+        block_id: { type: string }
+
+  - event_type: implementation.completed
+    description: "All task blocks are implemented"
+    schema:
+      type: object
+      required: [project_id, artifact_path]
+      properties:
+        project_id: { type: string }
+        artifact_path: { type: string }
+
+  - event_type: review.completed
+    description: "PM and Architect have reviewed the implementation"
+    schema:
+      type: object
+      required: [project_id, artifact_path]
+      properties:
+        project_id: { type: string }
+        artifact_path: { type: string }
+
+  - event_type: acceptance.completed
+    description: "Client has accepted or rejected"
+    schema:
+      type: object
+      required: [project_id, decision]
+      properties:
+        project_id: { type: string }
+        decision: { type: string, enum: [approved, rejected, changes_requested] }
+        feedback: { type: string }
+
+  - event_type: sprint.completed
+    description: "Terminal event — sprint successfully delivered"
+    schema:
+      type: object
+      properties:
+        project_id: { type: string }
+
+  - event_type: sprint.rejected
+    description: "Sprint rejected by client — loops back for re-planning"
+    schema:
+      type: object
+      required: [project_id, feedback]
+      properties:
+        project_id: { type: string }
+        feedback: { type: string }
