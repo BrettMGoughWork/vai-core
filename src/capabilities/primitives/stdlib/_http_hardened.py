@@ -13,12 +13,12 @@ from typing import Any
 
 from src.capabilities.primitives.base import PrimitiveBase
 from src.capabilities.primitives.types import PrimitiveResult, PrimitiveType
+from src.domain._markers import deadcode_ignore
 
 _curl_cffi_available: bool
 try:
     from curl_cffi.requests import Session
     from curl_cffi.requests.exceptions import (
-from src.domain._markers import deadcode_ignore
         ConnectTimeout,
         ConnectionError as CurlConnectionError,
         DNSError,

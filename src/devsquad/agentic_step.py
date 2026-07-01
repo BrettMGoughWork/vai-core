@@ -386,7 +386,7 @@ def execute_agentic_step(
                 # tool-calling protocol.
                 messages.append({
                     "role": "assistant",
-                    "content": None,
+                    "content": "",
                     "tool_calls": [raw_tc],
                 })
                 messages.append({

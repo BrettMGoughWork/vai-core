@@ -13,6 +13,7 @@ the Supervisor, decoupling S5 from the S1 runtime interface.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
 
@@ -23,6 +24,8 @@ from src.runtime.interfaces import (
 )
 from src.runtime.llm.client import call_runtime_backend
 from src.agent.memory.governance.memory_governance import MemoryGovernance
+
+logger = logging.getLogger("strategy_router")
 
 
 @dataclass(frozen=True)
@@ -170,8 +173,22 @@ class StrategyRouter:
                 "error": None,
             }
 
-        # First attempt failed — try mock fallback
+        # First attempt failed — log and try mock fallback
         error_msg: str = getattr(response, "message", str(response))
+        error_type: str = getattr(response, "type", "unknown")
+        error_details: dict = getattr(response, "details", {})
+
+        logger.warning(
+            "Conversational LLM call failed (type=%s, exception=%s) — "
+            "falling back to mock. Error: %s",
+            error_type,
+            error_details.get("exception_type", "unknown"),
+            error_msg,
+        )
+
+        # If the error indicates a persistent transport issue (not a
+        # transient network blip), include a hint in the response so the
+        # user knows /reset or restart may be required.
         fallback = self._call_runtime(runtime_request, backend="mock")
         if isinstance(fallback, PromptResponse):
             return {
