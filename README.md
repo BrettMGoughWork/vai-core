@@ -66,13 +66,13 @@ vai-core is built around four compositional abstractions:
 
 ### Primitives
 
-The smallest unit of work — an atomic tool call with a defined input/output contract. Examples: `gmail_send`, `gmail_search`, `github_create_issue`. Primitives are registered in the capability system (S3), discoverable at runtime, and are the only things that touch the outside world.
+The smallest unit of work — an atomic tool call with a defined input/output contract. Examples: `shell_exec`, `file_read`, `web_fetch`. Primitives are registered in the capability system (S3), discoverable at runtime, and are the only things that touch the outside world.
 
 ### Patterns
 
 A pattern is an **LLM-readable instruction template** that teaches an agent *how* to accomplish a goal by composing primitives. Think of it as a recipe — natural-language guidance, not deterministic code. A pattern lives as a YAML file declaring its name, description, required primitives, and step-by-step instructions.
 
-Patterns act as **capability gateways**: if an agent includes a pattern (e.g., `reply_to_email`), it automatically gains access to that pattern's required primitives (`gmail_read`, `gmail_send`) — even if those primitives aren't explicitly listed in the agent's tool set.
+Patterns act as **capability gateways**: if an agent includes a pattern, it automatically gains access to that pattern's required primitives — even if those primitives aren't explicitly listed in the agent's tool set.
 
 Patterns can also be called as workflow steps via the `apply_pattern` step type, bridging LLM interpretation and deterministic orchestration.
 

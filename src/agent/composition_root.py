@@ -38,7 +38,10 @@ from src.capabilities.primitives.mcp import MCPPrimitive
 from src.capabilities.primitives.mcp_client import MCPClientManager
 from src.capabilities.primitives.fetch import load_all_primitives as load_fetch_primitives
 from src.capabilities.primitives.stdlib import load_all_primitives as load_stdlib_primitives
-from src.capabilities.primitives.custom import load_all_primitives as load_custom_primitives
+try:
+    from src.capabilities.primitives.custom import load_all_primitives as load_custom_primitives
+except ImportError:
+    load_custom_primitives = None  # type: ignore[assignment]
 from src.capabilities.registry.primitive_registry import PrimitiveRegistry
 
 # ── Infrastructure imports (adapter→infrastructure: allowed) ─────────
@@ -127,7 +130,7 @@ _job_families_loaded = load_job_families(_job_family_registry, "config/job-famil
 _primitive_registry = PrimitiveRegistry()
 
 _primitives_loaded = load_stdlib_primitives(_primitive_registry)
-_custom_primitives_loaded = load_custom_primitives(_primitive_registry)
+_custom_primitives_loaded = load_custom_primitives(_primitive_registry) if load_custom_primitives is not None else 0
 _fetch_primitives_loaded = load_fetch_primitives(_primitive_registry)
 
 # ── CLI primitives (registered inline for patterns to reference) ────

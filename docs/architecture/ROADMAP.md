@@ -275,7 +275,7 @@ S1 Runtime  S2 Planner  S3 Capab.  S4 Platform     │
 | P1.2 | Create YAML loader — scan `config/patterns/*.yaml`, validate via Pydantic |
 | P1.3 | Build `PatternRegistry` — in-memory, registered in `composition_root`, discoverable via S3 capability discovery |
 | P1.4 | Wire pattern registry into S3's `capability_discoverer` — patterns appear alongside primitives in discovery results |
-| P1.5 | Create example patterns: `reply_to_email` (gmail_read → compose → gmail_send), `summarise_inbox` (gmail_search → read → summarise), `triage_inbox` (gmail_search → categorize → flag) |
+| P1.5 | Create example patterns: `web_research` (web_search → web_fetch → summarise), `parse_document` (file_read → parse → validate), `data_pipeline` (fetch → transform → store) |
 
 ### Sprint P2 — Patterns: Agent Integration
 
