@@ -7,19 +7,19 @@ Reads declarative pattern definitions from YAML files under
 
 YAML format (single pattern per file)::
 
-    pattern_id: reply_to_email
-    name: Reply to Email
-    description: Read an email by ID and compose a contextual reply, then send it.
+    pattern_id: web_research
+    name: Web Research
+    description: Search the web and fetch full page content for analysis.
     primitives:
-      - gmail_read
-      - gmail_send
+      - web_search
+      - web_fetch
     instructions: |
-      To reply to an email:
-      1. Use gmail_read to get the full email content by its message_id
-      2. Analyze the email to understand context and intent
-      3. Draft a reply that addresses the email's content naturally
-      4. Use gmail_send with the thread_id from the original email
-      5. Confirm to the user what was sent
+      To research a topic:
+      1. Use web_search to find relevant pages matching the query
+      2. Analyze the search results to identify the most promising URLs
+      3. Use web_fetch to retrieve full content from selected URLs
+      4. Synthesize findings into a coherent summary
+      5. Present results to the user with source citations
 """
 
 from __future__ import annotations

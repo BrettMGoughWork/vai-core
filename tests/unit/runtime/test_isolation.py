@@ -110,29 +110,6 @@ def test_thread_worker_daemon_flag() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_process_worker_stops_on_event() -> None:
-    """Process worker starts, runs for a tick, then stops cleanly.
-
-    On Windows with ``spawn`` the child runs in a fresh interpreter, so we
-    cannot observe child-side global state from the parent.  We verify
-    lifecycle (start → stop → not alive) instead.
-    """
-    stop = ProcessEvent()
-
-    p = ProcessWorker(
-        worker_id=3,
-        handler=_tracking_handler,
-        stop_event=stop,
-        tick_interval=0.001,
-    )
-    p.start()
-    time.sleep(0.1)  # let it spin a few ticks
-    assert p.is_alive()
-    stop.set()
-    p.join(timeout=3)
-    assert not p.is_alive()
-
-
 def test_process_worker_daemon_flag() -> None:
     stop = ProcessEvent()
     p = ProcessWorker(

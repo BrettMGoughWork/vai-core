@@ -10,5 +10,5 @@
 # first use.
 #
 servers:
-  # Custom Gmail primitives now handle email directly — no MCP server needed.
-  # See src/capabilities/primitives/custom/gmail_*.py
+  # Custom primitives may be added via the src/capabilities/primitives/custom/
+  # package.  See the project documentation for details.
