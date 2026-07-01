@@ -174,9 +174,33 @@ class SessionedAdapter:
         # Preserve tool-call evidence in session history.
         # The supervisor injects ``llm_tool_calls`` into the result metadata
         # when the LLM's response included tool calls.
+        #
+        # IMPORTANT: ToolOrchestrator._run_follow_up_llm() appends an
+        # assistant entry + tool result messages directly into the same
+        # ``prior`` list (the ``history`` variable in ``ingest()`` is a
+        # shallow copy that gets mutated in-place).  If we blindly re-add
+        # the same tool_call_ids here, the session history will contain
+        # duplicate assistant entries with the same tool_call_ids but no
+        # matching tool messages for the final entry.  Many LLM providers
+        # enforce a strict 1:1 correspondence and reject the request with
+        # an HTTP 400, which triggers the strategy_router's mock fallback
+        # (the "haiku loop" bug).
         llm_tool_calls = metadata.get("llm_tool_calls")
         if llm_tool_calls:
-            assistant_entry["tool_calls"] = llm_tool_calls
+            # Collect tool_call_ids already present in prior (placed there
+            # by ToolOrchestrator).  Only emit tool_calls whose ids are
+            # NOT already in prior, so we don't double-book them.
+            prior_tc_ids: set[str] = set()
+            for entry in prior:
+                for tc in entry.get("tool_calls", []):
+                    if isinstance(tc, dict) and tc.get("id"):
+                        prior_tc_ids.add(tc["id"])
+            filtered = [
+                tc for tc in llm_tool_calls
+                if isinstance(tc, dict) and tc.get("id", "") not in prior_tc_ids
+            ]
+            if filtered:
+                assistant_entry["tool_calls"] = filtered
 
         turns = prior + [
             {"role": "user", "content": user_msg},
@@ -189,6 +213,18 @@ class SessionedAdapter:
             turns = turns[excess:]
 
         return turns
+
+    def clear_session(self, channel: str, user_id: str | None = None) -> None:
+        """Clear the session for *channel*:*user_id* (or *channel*:anon).
+
+        Used by the /reset endpoint to fully clear corrupted session state
+        so that a process restart is not required.
+        """
+        user_part = user_id or "anon"
+        key = f"{channel}:{user_part}"
+        self._sessions.pop(key, None)
+        if self._last_session_key == key:
+            self._last_session_key = None
 
     @staticmethod
     def _session_key(request: AgentRequest) -> str:

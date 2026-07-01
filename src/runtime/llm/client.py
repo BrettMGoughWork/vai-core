@@ -23,6 +23,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from typing import Optional, Union
 
 from src.domain.interfaces.contract import PromptRequest, PromptResponse, S1Error
@@ -459,15 +460,59 @@ def call_s1_backend(
                 pass  # compaction failure should never crash the LLM call
 
         # Build structured message list: system, conversation history, user
+        #
+        # SECURITY: Session history (SessionedAdapter._build_history) stores
+        # ``tool_calls`` in assistant entries but does NOT store the
+        # corresponding ``tool`` role messages with ``tool_call_id`` (tool
+        # results).  Sending an assistant message with ``tool_calls`` but
+        # without a matching ``tool`` message creates an invalid message
+        # sequence that many LLM providers reject — this causes an
+        # S1Error → strategy_router falls back to mock → haiku loop.
+        #
+        # To prevent this, we strip ``tool_calls`` from any conversation
+        # history entry if there is no following ``tool`` message with a
+        # matching ``tool_call_id`` in the same history slice.
+        #
+        # First pass: collect all tool_call_ids present in the history.
+        # We use a Counter so that we can implement order-aware matching:
+        # each ``tool`` message pairs with exactly *one* preceding
+        # ``assistant`` entry.  If the same tool_call_id appears in
+        # multiple assistant entries (because ``_build_history``
+        # duplicated the ``llm_tool_calls``), only the first encounter
+        # is included; subsequent encounters are stripped — they have
+        # no matching tool message.
+        available_tool_call_ids: Counter = Counter()
+        for entry in conversation_history:
+            if entry.get("role") == "tool":
+                tcid = entry.get("tool_call_id")
+                if isinstance(tcid, str) and tcid:
+                    available_tool_call_ids[tcid] += 1
+
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
         for entry in conversation_history:
             role = entry.get("role", "user")
-            content = entry.get("content", "")
+            content = entry.get("content") or ""  # or "" guards against None stored in session
             if role in ("user", "assistant", "tool"):
                 msg: dict[str, object] = {"role": role, "content": content}
-                if role == "assistant" and "tool_calls" in entry:
-                    msg["tool_calls"] = entry["tool_calls"]
+                if role == "assistant" and "tool_calls" in entry and available_tool_call_ids:
+                    # Order-aware matching: each tool_call_id must have
+                    # a *following* tool message.  We consume one
+                    # occurrence per assistant entry that references it,
+                    # so that later duplicates are correctly stripped.
+                    paired: list[dict] = []
+                    for tc in entry["tool_calls"]:
+                        if not isinstance(tc, dict):
+                            continue
+                        tcid = tc.get("id", "")
+                        if not tcid or tc.get("function", {}).get("name") == "":
+                            paired.append(tc)
+                            continue
+                        if available_tool_call_ids.get(tcid, 0) > 0:
+                            available_tool_call_ids[tcid] -= 1
+                            paired.append(tc)
+                    if paired:
+                        msg["tool_calls"] = paired
                 if role == "tool" and "tool_call_id" in entry:
                     msg["tool_call_id"] = entry["tool_call_id"]
                 messages.append(msg)
@@ -539,6 +584,13 @@ def call_s1_backend(
                     context_pressure=context_pressure,
                 )
         except Exception as exc:
+            import logging
+            _logger = logging.getLogger(__name__)
+            _logger.error(
+                "S1 conversational LLM call failed — triggering mock fallback. "
+                "exception_type=%s, exception_message=%s, full_exc=%r",
+                type(exc).__name__, str(exc), exc,
+            )
             return S1Error(
                 type="conversational_llm_failure",
                 message=f"Conversational LLM call failed: {str(exc)}",

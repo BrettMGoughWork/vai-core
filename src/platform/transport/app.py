@@ -214,7 +214,13 @@ def execute_workflow(workflow_id: str, payload: dict[str, Any]) -> dict[str, Any
     )
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    return {
+        "output": result.get("reply", ""),
+        "metadata": result.get("metadata", {}),
+        "agent_id": result.get("agent_id", ""),
+        "reply": result.get("reply", ""),
+        "workflow_id": workflow_id,
+    }
 
 
 @app.get("/workflows")
@@ -264,7 +270,12 @@ def chat_with_agent(agent_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     )
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    return {
+        "output": result.get("reply", ""),
+        "metadata": result.get("metadata", {}),
+        "agent_id": result.get("agent_id", agent_id),
+        "reply": result.get("reply", ""),
+    }
 
 
 # ── Council commands ─────────────────────────────────────────────────────
@@ -318,15 +329,18 @@ def deliberate_council(council_id: str, payload: dict[str, Any]) -> dict[str, An
 
 @app.post("/reset")
 def reset_session() -> dict[str, str]:
-    """Signal the frontend to clear conversation context.
+    """Clear the current session and reset agent selection.
 
-    The actual reset (clearing local conversation history, removing cached
-    messages) happens client-side.  New sessions are created automatically
-    by the adapter on the next ``POST /run`` call.
+    Clears the in-memory conversation history for the default anonymous
+    web session so that corrupted state (e.g. orphaned tool_calls that
+    causes the haiku fallback) is fully purged without requiring a
+    process restart.  The frontend should also clear its local history.
     """
     global _current_agent_id
     _current_agent_id = "default-agent"
-    return {"status": "ok", "message": "Session reset — frontend will clear history"}
+    # Clear the server-side session so corrupted history is fully purged.
+    s5_adapter.clear_session("web")
+    return {"status": "ok", "message": "Session reset — server and frontend history cleared"}
 
 
 @app.get("/health")

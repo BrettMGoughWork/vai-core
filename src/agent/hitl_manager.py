@@ -283,7 +283,7 @@ class HitlManager:
         # Build assistant message with the tool_calls that were executed
         assistant_msg: dict[str, object] = {
             "role": "assistant",
-            "content": None,
+            "content": "",
             "tool_calls": [
                 {
                     "id": tc.get("id", ""),

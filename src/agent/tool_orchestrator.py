@@ -412,7 +412,7 @@ class ToolOrchestrator:
         initial_text = result.get("output", {}).get("message", "")
         assistant_msg: dict[str, object] = {
             "role": "assistant",
-            "content": initial_text if initial_text else None,
+            "content": initial_text or "",
             "tool_calls": [
                 {
                     "id": tc.get("id", ""),
