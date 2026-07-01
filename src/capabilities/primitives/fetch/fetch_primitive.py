@@ -38,6 +38,8 @@ class FetchPrimitive(PrimitiveBase):
     description = (
         "Fetch a URL with automatic fallback through multiple strategies "
         "(simple HTTP, hardened, headless browser, stealth). "
+        "Supports optional CSS selector to extract specific elements "
+        "server-side — use this instead of fetching then parsing separately. "
         "Use this for ALL web fetching — it will pick the best approach."
     )
     primitive_type = PrimitiveType.PYTHON
@@ -53,6 +55,25 @@ class FetchPrimitive(PrimitiveBase):
             "headers": {
                 "type": "object",
                 "description": "Optional HTTP headers as key-value pairs.",
+            },
+            "selector": {
+                "type": "string",
+                "description": (
+                    "Optional CSS selector to extract specific elements from the "
+                    "response body (e.g. 'h2', '.headline', 'article a'). "
+                    "When provided, only matching elements are returned — ideal "
+                    "for fetching news headlines, articles, or specific page "
+                    "sections without pulling the entire page into context."
+                ),
+            },
+            "max_body_length": {
+                "type": "integer",
+                "minimum": 1,
+                "description": (
+                    "Truncate the response body to at most this many characters "
+                    "(before any selector is applied). Useful as a safety cap "
+                    "on unexpectedly large pages."
+                ),
             },
         },
         "required": ["url"],
@@ -160,6 +181,60 @@ class FetchPrimitive(PrimitiveBase):
                 )
             if timeout <= 0:
                 raise ValueError(f"'timeout' must be positive, got {timeout}")
+        if "selector" in args:
+            selector = args["selector"]
+            if not isinstance(selector, str):
+                raise ValueError(
+                    f"'selector' must be a string, got {type(selector).__name__}"
+                )
+            if not selector.strip():
+                raise ValueError("'selector' must not be empty")
+        if "max_body_length" in args:
+            max_len = args["max_body_length"]
+            if not isinstance(max_len, int) or isinstance(max_len, bool):
+                raise ValueError(
+                    f"'max_body_length' must be an integer, got {type(max_len).__name__}"
+                )
+            if max_len < 1:
+                raise ValueError(f"'max_body_length' must be at least 1, got {max_len}")
+
+    # ------------------------------------------------------------------
+    # Post-fetch HTML extraction (CSS selector)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _apply_selector(body: str, selector: str) -> dict:
+        """Apply a CSS selector to *body* and return extracted content.
+
+        Returns a dict with:
+        * ``matches`` — list of matched element HTML strings
+        * ``text`` — concatenated inner text of all matches
+        * ``count`` — number of matched elements
+        * ``truncated`` — whether the total match text was capped
+        """
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(body, "lxml")
+        elements = soup.select(selector)
+        matches = [str(el) for el in elements]
+        text = "\n".join(el.get_text(" ", strip=True) for el in elements)
+
+        # Protect against enormous text from broad selectors
+        _MAX_TEXT = 16000
+        truncated = len(text) > _MAX_TEXT
+        if truncated:
+            text = text[:_MAX_TEXT]
+
+        return {
+            "matches": matches,
+            "text": text,
+            "count": len(elements),
+            "truncated": truncated,
+        }
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def execute(self, args: dict, context: dict) -> PrimitiveResult:
         self.validate_args(args)
@@ -167,6 +242,8 @@ class FetchPrimitive(PrimitiveBase):
         url: str = args["url"]
         timeout: float | None = args.get("timeout")
         headers: dict[str, str] | None = args.get("headers")
+        selector: str | None = args.get("selector")
+        max_body_length: int | None = args.get("max_body_length")
 
         executor = self._build_executor()
 
@@ -178,17 +255,51 @@ class FetchPrimitive(PrimitiveBase):
         )
 
         if result.ok:
+            body = result.body or ""
+
+            # Apply max_body_length truncation BEFORE selector
+            if max_body_length is not None and len(body) > max_body_length:
+                body = body[:max_body_length]
+
+            # Build the response data
+            data: dict = {
+                "ok": True,
+                "status_code": result.status_code,
+                "final_url": result.final_url,
+                "headers": result.headers,
+                "cookies": result.cookies,
+                "body": body,
+                "elapsed_ms": result.elapsed_ms,
+            }
+
+            # Apply CSS selector if requested
+            if selector and body:
+                try:
+                    extracted = self._apply_selector(body, selector)
+                except Exception as exc:
+                    return PrimitiveResult(
+                        status="error",
+                        data={
+                            "ok": False,
+                            "error_type": "SelectorError",
+                            "error_message": f"CSS selector failed: {exc}",
+                            "elapsed_ms": result.elapsed_ms,
+                        },
+                    )
+                data["selector"] = {
+                    "selector": selector,
+                    "count": extracted["count"],
+                    "text": extracted["text"],
+                    "matches": extracted["matches"],
+                    "truncated": extracted["truncated"],
+                }
+                # Replace body with just the extracted text so the LLM sees
+                # the relevant content directly
+                data["body"] = extracted["text"]
+
             return PrimitiveResult(
                 status="success",
-                data={
-                    "ok": True,
-                    "status_code": result.status_code,
-                    "final_url": result.final_url,
-                    "headers": result.headers,
-                    "cookies": result.cookies,
-                    "body": result.body,
-                    "elapsed_ms": result.elapsed_ms,
-                },
+                data=data,
             )
         else:
             return PrimitiveResult(
